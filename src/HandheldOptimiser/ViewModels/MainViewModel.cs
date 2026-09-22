@@ -44,7 +44,8 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         RestorePointService restorePoints,
         AppxService appxService,
         StartupService startupService,
-        TweakJournalService journal)
+        TweakJournalService journal,
+        RuntimeService runtimeService)
     {
         Log = log;
 
@@ -101,6 +102,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         Pages.Add(new BloatwareViewModel(appxService, restorePoints, journal, log, this));
         Pages.Add(new StartupViewModel(startupService, this));
         Pages.Add(new PowerActionsViewModel(engine, this));
+        Pages.Add(new GameRuntimesViewModel(runtimeService, this));
         Pages.Add(new AsusHealthViewModel(systemState, this));
 
         SelectedPage = Pages[0];

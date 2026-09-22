@@ -41,12 +41,13 @@ public partial class App : Application
         var startupService = new StartupService(log, registry);
         var systemState = new SystemStateService(log, runner, registry);
         var engine = new TweakEngine(log, registry, runner, restorePoints, journal);
+        var runtimes = new RuntimeService(log, runner, restorePoints);
 
         log.Info("Handheld Optimiser started (elevated).");
         log.Info($"Session log: {log.LogFilePath}");
 
         var viewModel = new MainViewModel(
-            log, engine, systemState, restorePoints, appxService, startupService, journal);
+            log, engine, systemState, restorePoints, appxService, startupService, journal, runtimes);
 
         var window = new MainWindow { DataContext = viewModel };
         MainWindow = window;

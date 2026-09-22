@@ -38,6 +38,9 @@
         <DataTemplate DataType="{x:Type vm:PowerActionsViewModel}">
             <pages:PowerActionsPage />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:GameRuntimesViewModel}">
+            <pages:GameRuntimesPage />
+        </DataTemplate>
     </ui:FluentWindow.Resources>
 
     <Grid>

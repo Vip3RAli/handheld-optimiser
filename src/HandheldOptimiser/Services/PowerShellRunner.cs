@@ -79,7 +79,8 @@ public sealed class PowerShellRunner(LogService log)
         IReadOnlyList<string> arguments,
         string description,
         CancellationToken ct = default,
-        bool echoCommand = true)
+        bool echoCommand = true,
+        bool logOutput = true)
     {
         if (echoCommand)
         {
@@ -117,9 +118,11 @@ public sealed class PowerShellRunner(LogService log)
             }
 
             stdout.AppendLine(e.Data);
-            if (!string.IsNullOrWhiteSpace(e.Data))
+
+            var shown = LastRedraw(e.Data);
+            if (logOutput && !string.IsNullOrWhiteSpace(shown))
             {
-                _log.Trace($"    {e.Data.TrimEnd()}");
+                _log.Trace($"    {shown}");
             }
         };
 
@@ -131,9 +134,11 @@ public sealed class PowerShellRunner(LogService log)
             }
 
             stderr.AppendLine(e.Data);
-            if (!string.IsNullOrWhiteSpace(e.Data))
+
+            var shown = LastRedraw(e.Data);
+            if (logOutput && !string.IsNullOrWhiteSpace(shown))
             {
-                _log.Warning($"    {e.Data.TrimEnd()}");
+                _log.Warning($"    {shown}");
             }
         };
 
@@ -172,5 +177,15 @@ public sealed class PowerShellRunner(LogService log)
         }
 
         return new ProcessOutcome(process.ExitCode, stdout.ToString(), stderr.ToString());
+    }
+
+    /// <summary>
+    /// winget and DISM draw progress bars by rewriting one line with carriage returns. Only the final
+    /// state of that line is worth showing; otherwise the console fills with every intermediate frame.
+    /// </summary>
+    private static string LastRedraw(string line)
+    {
+        var frames = line.Split('\r', StringSplitOptions.RemoveEmptyEntries);
+        return frames.Length == 0 ? string.Empty : frames[^1].TrimEnd();
     }
 }
