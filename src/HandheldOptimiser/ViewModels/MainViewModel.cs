@@ -88,6 +88,19 @@ public sealed partial class MainViewModel : ObservableObject, IShell
     {
         try
         {
+            // Page loads wait for any running operation instead of being dropped by RunExclusiveAsync,
+            // otherwise a page opened during the startup scan never reads its state and shows "Unknown".
+            // Everything here runs on the UI thread, so nothing can take the gate between the release
+            // and the page's own RunExclusiveAsync call.
+            await _gate.WaitAsync();
+            _gate.Release();
+
+            // The user may have moved on while we waited; only scan the page they are looking at.
+            if (!ReferenceEquals(SelectedPage, page))
+            {
+                return;
+            }
+
             await page.OnNavigatedToAsync();
         }
         catch (OperationCanceledException)

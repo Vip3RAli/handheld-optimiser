@@ -8,6 +8,8 @@ namespace HandheldOptimiser;
 
 public partial class App : Application
 {
+    private LogService? _log;
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -30,6 +32,7 @@ public partial class App : Application
         }
 
         var log = new LogService();
+        _log = log;
         var runner = new PowerShellRunner(log);
         var registry = new RegistryHelper(log);
         var journal = new TweakJournalService(log);
@@ -60,13 +63,21 @@ public partial class App : Application
     {
         // A crash midway through a registry pass is exactly when the user most needs to know where the
         // log is, so surface the path rather than just the exception.
+        _log?.Error($"Unhandled exception: {e.Exception}");
+
         MessageBox.Show(
-            $"Something went wrong:\n\n{e.Exception.Message}\n\n" +
+            $"Something went wrong:\n\n{Innermost(e.Exception).Message}\n\n" +
             "The session log has the detail of what had been executed up to this point.",
             "Unexpected error",
             MessageBoxButton.OK,
             MessageBoxImage.Error);
 
         e.Handled = true;
+    }
+
+    private static Exception Innermost(Exception ex)
+    {
+        while (ex.InnerException is not null) ex = ex.InnerException;
+        return ex;
     }
 }
