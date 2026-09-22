@@ -80,7 +80,9 @@ public sealed class LogService
         }
         else
         {
-            dispatcher.Invoke(AddToUi);
+            // Queue rather than block: winget and DISM emit lines fast enough that waiting on the UI
+            // thread for each one stalls the worker. Posts from one thread keep their order.
+            dispatcher.BeginInvoke(AddToUi);
         }
 
         lock (_fileLock)

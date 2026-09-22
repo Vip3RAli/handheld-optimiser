@@ -65,12 +65,18 @@
 
                                 <!-- Sized for a thumb on a 7" touchscreen. -->
                                 <ui:Button Grid.Column="2"
-                                           Content="Run"
                                            Appearance="Primary"
                                            Command="{Binding RunCommand}"
-                                           MinWidth="96"
+                                           MinWidth="120"
                                            MinHeight="44"
-                                           VerticalAlignment="Center" />
+                                           VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:ProgressRing IsIndeterminate="True" Width="16" Height="16"
+                                                         Margin="0,0,8,0" VerticalAlignment="Center"
+                                                         Visibility="{Binding IsWorking, Converter={StaticResource BoolToVis}}" />
+                                        <TextBlock Text="{Binding ButtonText}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </ui:Button>
                             </Grid>
                         </ui:Card>
                     </DataTemplate>

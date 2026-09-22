@@ -26,5 +26,11 @@ public sealed class PowerAction
     /// <summary>Rough duration shown on the button, so a multi-minute job does not look hung.</summary>
     public string? DurationHint { get; init; }
 
+    /// <summary>
+    /// Optional check run before anything else, including the confirmation prompt and restore point.
+    /// Returns a reason to refuse, or null to allow the action.
+    /// </summary>
+    public Func<string?>? Precheck { get; init; }
+
     public required Func<TweakContext, IProgress<string>?, CancellationToken, Task<TweakResult>> Execute { get; init; }
 }

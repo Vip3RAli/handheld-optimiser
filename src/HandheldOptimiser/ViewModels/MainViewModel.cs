@@ -99,6 +99,30 @@ public sealed partial class MainViewModel : ObservableObject, IShell
             engine,
             this));
 
+        Pages.Add(new TweakListViewModel(
+            "Storage",
+            "",
+            "Cuts needless NTFS writes to save SSD wear. Only affects files from now on.",
+            [TweakCategory.Storage],
+            engine,
+            this));
+
+        Pages.Add(new TweakListViewModel(
+            "Graphics & Scheduling",
+            "",
+            "How Windows prioritises the game and schedules the GPU.",
+            [TweakCategory.Graphics],
+            engine,
+            this));
+
+        Pages.Add(new TweakListViewModel(
+            "Handheld Usability",
+            "",
+            "Stops pop-ups and background throttling from interrupting a game.",
+            [TweakCategory.Usability],
+            engine,
+            this));
+
         Pages.Add(new BloatwareViewModel(appxService, restorePoints, journal, log, this));
         Pages.Add(new StartupViewModel(startupService, this));
         Pages.Add(new PowerActionsViewModel(engine, this));
@@ -185,7 +209,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         }
     }
 
-    public async Task<bool> ConfirmAsync(string title, string message, string confirmText, bool destructive = false)
+    public async Task<bool> ConfirmAsync(string title, string message, string confirmText)
     {
         var box = new Wpf.Ui.Controls.MessageBox
         {
@@ -197,9 +221,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
                 MaxWidth = 460
             },
             PrimaryButtonText = confirmText,
-            PrimaryButtonAppearance = destructive
-                ? Wpf.Ui.Controls.ControlAppearance.Caution
-                : Wpf.Ui.Controls.ControlAppearance.Primary,
+            PrimaryButtonAppearance = Wpf.Ui.Controls.ControlAppearance.Primary,
             CloseButtonText = confirmText == "OK" ? "Close" : "Cancel",
             MaxWidth = 560
         };
@@ -236,8 +258,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         if (!await ConfirmAsync(
                 "Restart now?",
                 "Windows will restart immediately. Save anything you have open first.",
-                "Restart now",
-                destructive: true))
+                "Restart now"))
         {
             return;
         }

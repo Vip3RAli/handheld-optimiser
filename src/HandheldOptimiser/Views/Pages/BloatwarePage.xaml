@@ -92,7 +92,7 @@
 
         <Border Grid.Row="2" Padding="4,12,4,0">
             <ui:Button Content="Remove selected apps"
-                       Appearance="Caution"
+                       Appearance="Primary"
                        Height="52"
                        FontSize="15"
                        HorizontalAlignment="Stretch"

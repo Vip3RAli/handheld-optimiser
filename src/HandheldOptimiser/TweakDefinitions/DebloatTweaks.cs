@@ -117,9 +117,10 @@ public static class DebloatTweaks
         },
         ScriptRevert = async (ctx, journal, ct) =>
         {
+            // A task captured as Running or Queued was enabled too; only Disabled ones stay off.
             var toEnable = journal.CapturedState
                 .Where(kv => kv.Key.StartsWith("task.", StringComparison.Ordinal) &&
-                             kv.Value.Equals("Ready", StringComparison.OrdinalIgnoreCase))
+                             !kv.Value.Equals("Disabled", StringComparison.OrdinalIgnoreCase))
                 .Select(kv => kv.Key["task.".Length..])
                 .ToArray();
 

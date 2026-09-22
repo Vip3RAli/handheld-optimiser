@@ -33,8 +33,8 @@ public sealed class Tweak
     /// <summary>Shown prominently in the UI for anything that lowers security or breaks a feature.</summary>
     public string? Warning { get; init; }
 
-    /// <summary>Whether the one-click "Drag Car" run includes this tweak.</summary>
-    public bool IncludeInDragCar { get; init; } = true;
+    /// <summary>Whether the One-Click Optimise run includes this tweak.</summary>
+    public bool IncludeInOneClick { get; init; } = true;
 
     public IReadOnlyList<RegistryValueSpec> RegistryValues { get; init; } = [];
 

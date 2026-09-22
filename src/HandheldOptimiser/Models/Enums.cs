@@ -9,7 +9,10 @@ public enum TweakCategory
     CpuKernel,
     Network,
     Services,
-    Interface
+    Interface,
+    Storage,
+    Graphics,
+    Usability
 }
 
 /// <summary>

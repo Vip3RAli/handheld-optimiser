@@ -13,7 +13,7 @@ public interface IShell
 
     Task RunExclusiveAsync(string statusText, Func<IProgress<string>, CancellationToken, Task> work);
 
-    Task<bool> ConfirmAsync(string title, string message, string confirmText, bool destructive = false);
+    Task<bool> ConfirmAsync(string title, string message, string confirmText);
 
     void NotifyRebootRequired();
 }

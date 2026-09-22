@@ -11,7 +11,26 @@ public partial class MainWindow : FluentWindow
     public MainWindow()
     {
         InitializeComponent();
+        FitToWorkArea();
         DataContextChanged += OnDataContextChanged;
+    }
+
+    /// <summary>
+    /// A 1080p 7" handheld at 150% scaling has about 720 units of height, less than the default window,
+    /// which would push the status bar and console off screen. Shrink to fit and start maximised there.
+    /// </summary>
+    private void FitToWorkArea()
+    {
+        var area = SystemParameters.WorkArea;
+
+        if (Width <= area.Width && Height <= area.Height)
+        {
+            return;
+        }
+
+        Width = Math.Max(MinWidth, Math.Min(Width, area.Width));
+        Height = Math.Max(MinHeight, Math.Min(Height, area.Height));
+        WindowState = WindowState.Maximized;
     }
 
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)

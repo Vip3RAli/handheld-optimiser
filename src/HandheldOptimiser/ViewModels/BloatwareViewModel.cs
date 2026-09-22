@@ -153,8 +153,7 @@ public sealed partial class BloatwareViewModel(
             $"{list}\n\nThese will be removed for all users and from the provisioned image, so Windows will " +
             "not reinstall them.\n\nThis cannot be undone by the Revert button. Getting one back means " +
             "reinstalling it from the Microsoft Store. A System Restore point will be created first.",
-            $"Remove {selected.Count} app(s)",
-            destructive: true);
+            $"Remove {selected.Count} app(s)");
 
         if (!confirmed)
         {
