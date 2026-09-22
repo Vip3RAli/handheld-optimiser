@@ -123,6 +123,15 @@ public sealed partial class MainViewModel : ObservableObject, IShell
             engine,
             this));
 
+        Pages.Add(new TweakListViewModel(
+            "Full Screen Mode",
+            "",
+            "Choose what the Windows full screen experience opens, and whether to sign straight into it.",
+            [TweakCategory.FullScreen],
+            engine,
+            this,
+            new HomeAppPickerViewModel(log)));
+
         Pages.Add(new BloatwareViewModel(appxService, restorePoints, journal, log, this));
         Pages.Add(new StartupViewModel(startupService, this));
         Pages.Add(new PowerActionsViewModel(engine, this));

@@ -53,7 +53,8 @@ public sealed class TweakEngine
             .. InterfaceTweaks.All,
             .. StorageTweaks.All,
             .. GraphicsTweaks.All,
-            .. UsabilityTweaks.All
+            .. UsabilityTweaks.All,
+            .. FullScreenTweaks.All
         ];
 
         PowerActions = TweakDefinitions.PowerActions.All;

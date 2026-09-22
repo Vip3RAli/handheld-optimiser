@@ -12,7 +12,8 @@ public enum TweakCategory
     Interface,
     Storage,
     Graphics,
-    Usability
+    Usability,
+    FullScreen
 }
 
 /// <summary>

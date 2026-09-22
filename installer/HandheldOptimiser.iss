@@ -50,7 +50,16 @@ Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
+; Post-install entries run as the original, non-elevated user. The app requires administrator, which a
+; plain CreateProcess cannot satisfy (error 740), so launch through the shell: it shows the UAC prompt
+; exactly as the Start menu does, and the app then runs as the right user with that user's HKCU.
+Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent shellexec
+
+[UninstallRun]
+; Remove the full screen home app registration before its files go, and if it was the selected home
+; app, clear the setting so Windows falls back to the Xbox app instead of an entry that no longer exists.
+; Braces are doubled because Inno reads single braces as constants.
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""Get-AppxPackage -Name 'HandheldOptimiser.HomeApp' | Remove-AppxPackage; $k = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\GamingConfiguration'; if ((Get-ItemProperty $k -ErrorAction SilentlyContinue).GamingHomeApp -eq 'HandheldOptimiser.HomeApp_n7ggsqt1rt3jm!HomeApp') {{ Remove-ItemProperty $k -Name GamingHomeApp }"""; Flags: runhidden; RunOnceId: "RemoveHomeApp"
 
 [Code]
 // Uninstalling removes the program only. Tweaks stay applied, and the undo journal in
