@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Started by Windows as the full screen experience home app. Kept separate from the main app because
+    that one requires administrator, which would show a UAC prompt every time full screen mode starts.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\HandheldOptimiser\Assets\app.ico</ApplicationIcon>
+    <AssemblyName>HandheldOptimiser.HomeLauncher</AssemblyName>
+    <RootNamespace>HandheldOptimiser.HomeLauncher</RootNamespace>
+    <Product>Handheld Optimiser</Product>
+    <Version>0.2.0</Version>
+  </PropertyGroup>
+
+</Project>

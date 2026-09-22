@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Registration-only ("sparse") package. It holds no program files: it gives HandheldOptimiser.HomeLauncher.exe
+  in the install folder a package identity, which is what puts "Handheld Optimiser" on the list under
+  Settings > Gaming > Full screen experience > Choose home app.
+
+  Unsigned on purpose. The OID in Publisher marks it as an unsigned package, installed with
+  Add-AppxPackage -AllowUnsigned, so no certificate has to be trusted on the machine.
+  Identity Name, Publisher and Application Id must match the <msix> element in the launcher's app.manifest.
+  Bump Version (and HomeAppRegistration.PackageVersion) whenever anything in this folder changes: Windows
+  caches logos per version, and the app re-registers only when the registered version is older.
+-->
+<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+         xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+         xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+         xmlns:uap4="http://schemas.microsoft.com/appx/manifest/uap/windows10/4"
+         xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+         xmlns:uap18="http://schemas.microsoft.com/appx/manifest/uap/windows10/18"
+         xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+         IgnorableNamespaces="uap uap3 uap4 uap10 uap18 rescap">
+
+  <Identity Name="HandheldOptimiser.HomeApp"
+            Publisher="CN=Handheld Optimiser, OID.2.25.311729368913984317654407730594956997722=1"
+            Version="0.1.2.0"
+            ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>Handheld Optimiser</DisplayName>
+    <PublisherDisplayName>Handheld Optimiser</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <uap10:AllowExternalContent>true</uap10:AllowExternalContent>
+  </Properties>
+
+  <Dependencies>
+    <!-- The full screen experience only exists on Windows 11 24H2 and later. -->
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.26100.0" MaxVersionTested="10.0.26200.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-US" />
+  </Resources>
+
+  <Applications>
+    <Application Id="HomeApp"
+                 Executable="HandheldOptimiser.HomeLauncher.exe"
+                 uap10:TrustLevel="mediumIL"
+                 uap10:RuntimeBehavior="win32App">
+      <uap:VisualElements DisplayName="Handheld Optimiser"
+                          Description="Opens your chosen app as the full screen experience home"
+                          BackgroundColor="transparent"
+                          Square150x150Logo="Assets\Square150x150Logo.png"
+                          Square44x44Logo="Assets\Square44x44Logo.png" />
+      <Extensions>
+        <!-- What the "Choose home app" list is built from. -->
+        <uap3:Extension Category="windows.appExtension">
+          <uap3:AppExtension Name="windows.gamingApp"
+                             Id="HomeApp"
+                             DisplayName="Handheld Optimiser"
+                             Description="Opens your chosen app as the full screen experience home"
+                             PublicFolder="Public" />
+        </uap3:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+    <rescap:Capability Name="unvirtualizedResources" />
+    <uap4:CustomCapability Name="Microsoft.appCategory.gamingHome_8wekyb3d8bbwe" />
+  </Capabilities>
+</Package>

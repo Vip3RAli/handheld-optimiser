@@ -5,6 +5,12 @@ using HandheldOptimiser.Services;
 
 namespace HandheldOptimiser.ViewModels;
 
+/// <summary>A block of page-specific settings shown above a tweak list.</summary>
+public interface IPageSection
+{
+    void Reload();
+}
+
 /// <summary>
 /// A page showing every tweak in one or more categories. Backs both the Gaming Tweaks and System Debloat
 /// pages, which differ only in which categories they include and their heading text.
@@ -20,13 +26,20 @@ public sealed partial class TweakListViewModel : PageViewModelBase
 
     public ObservableCollection<TweakItemViewModel> Tweaks { get; } = [];
 
+    /// <summary>
+    /// Optional settings shown above the toggles, rendered through its own DataTemplate. Reloaded along
+    /// with the tweak states on Re-check.
+    /// </summary>
+    public IPageSection? Header { get; }
+
     public TweakListViewModel(
         string title,
         string glyph,
         string subtitle,
         TweakCategory[] categories,
         TweakEngine engine,
-        IShell shell)
+        IShell shell,
+        IPageSection? header = null)
         : base(shell)
     {
         Title = title;
@@ -34,6 +47,7 @@ public sealed partial class TweakListViewModel : PageViewModelBase
         Subtitle = subtitle;
         _categories = categories;
         _engine = engine;
+        Header = header;
 
         foreach (var tweak in engine.AllTweaks.Where(t => categories.Contains(t.Category)))
         {
@@ -48,6 +62,8 @@ public sealed partial class TweakListViewModel : PageViewModelBase
     {
         await Shell.RunExclusiveAsync($"Checking {Title.ToLowerInvariant()}…", async (progress, ct) =>
         {
+            Header?.Reload();
+
             foreach (var item in Tweaks)
             {
                 progress.Report($"Checking {item.Name}");

@@ -1,0 +1,62 @@
+<UserControl x:Class="HandheldOptimiser.Views.Pages.HomeAppPicker"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:views="clr-namespace:HandheldOptimiser.Views">
+
+    <UserControl.Resources>
+        <views:BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </UserControl.Resources>
+
+    <ui:Card Margin="0,0,0,10">
+        <StackPanel>
+            <TextBlock Text="Home app" FontSize="16" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding AvailabilityText}" Opacity="0.7" FontSize="12.5" Margin="0,4,0,0" TextWrapping="Wrap" />
+
+            <!-- Sized for a thumb: each choice is a full-width row with its own note. -->
+            <StackPanel Margin="0,12,0,0" IsEnabled="{Binding IsAvailable}">
+                <RadioButton GroupName="HomeApp" IsChecked="{Binding IsSteam, Mode=TwoWay}" MinHeight="40">
+                    <StackPanel>
+                        <TextBlock Text="Steam Big Picture" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding SteamNote}" FontSize="11.5" Opacity="0.6" />
+                    </StackPanel>
+                </RadioButton>
+
+                <RadioButton GroupName="HomeApp" IsChecked="{Binding IsArmouryCrate, Mode=TwoWay}" MinHeight="40" Margin="0,6,0,0">
+                    <StackPanel>
+                        <TextBlock Text="Armoury Crate SE" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding ArmouryCrateNote}" FontSize="11.5" Opacity="0.6" />
+                    </StackPanel>
+                </RadioButton>
+
+                <RadioButton GroupName="HomeApp" IsChecked="{Binding IsCustom, Mode=TwoWay}" MinHeight="40" Margin="0,6,0,0">
+                    <StackPanel>
+                        <TextBlock Text="Another app" FontWeight="SemiBold" />
+                        <TextBlock Text="Any program or shortcut, such as Playnite or a different launcher." FontSize="11.5" Opacity="0.6" />
+                    </StackPanel>
+                </RadioButton>
+
+                <Grid Margin="28,8,0,0" Visibility="{Binding IsCustom, Converter={StaticResource BoolToVis}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <ui:TextBox Grid.Row="0" Grid.Column="0" PlaceholderText="Path to program or shortcut"
+                                Text="{Binding CustomPath, UpdateSourceTrigger=LostFocus}" />
+                    <ui:Button Grid.Row="0" Grid.Column="1" Content="Browse" Margin="8,0,0,0" MinHeight="36"
+                               Command="{Binding BrowseCommand}" />
+                    <ui:TextBox Grid.Row="1" Grid.Column="0" Margin="0,8,0,0" PlaceholderText="Arguments (optional)"
+                                Text="{Binding CustomArgs, UpdateSourceTrigger=LostFocus}" />
+                </Grid>
+            </StackPanel>
+
+            <TextBlock Margin="0,12,0,0" FontSize="11.5" Opacity="0.55" TextWrapping="Wrap"
+                       Text="Your choice takes effect the next time full screen mode opens its home app. If the app cannot be opened, the Xbox app opens instead." />
+        </StackPanel>
+    </ui:Card>
+</UserControl>
