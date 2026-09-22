@@ -105,6 +105,23 @@ public sealed class LogSeverityToBrushConverter : IValueConverter
         throw new NotSupportedException();
 }
 
+public sealed class RuntimeStatusToBrushConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is RuntimeStatus status
+            ? new SolidColorBrush(status switch
+            {
+                RuntimeStatus.UpToDate => Color.FromRgb(0x6C, 0xC0, 0x7A),
+                RuntimeStatus.UpdateAvailable => Color.FromRgb(0xE8, 0xC4, 0x5F),
+                RuntimeStatus.Error => Color.FromRgb(0xE0, 0x6C, 0x6C),
+                _ => Color.FromRgb(0x90, 0x90, 0x90)
+            })
+            : Brushes.Gray;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
 public sealed class TweakStateToBrushConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>

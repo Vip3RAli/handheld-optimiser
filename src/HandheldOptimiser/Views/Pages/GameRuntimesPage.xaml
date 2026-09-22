@@ -1,0 +1,87 @@
+<UserControl x:Class="HandheldOptimiser.Views.Pages.GameRuntimesPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:views="clr-namespace:HandheldOptimiser.Views">
+
+    <UserControl.Resources>
+        <views:BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <views:StringNotEmptyToVisibilityConverter x:Key="StringToVis" />
+        <views:RuntimeStatusToBrushConverter x:Key="StatusBrush" />
+
+        <DataTemplate x:Key="RuntimeRow">
+            <Border Background="#10FFFFFF" CornerRadius="6" Padding="12,10" Margin="0,0,0,6">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
+                                       VerticalAlignment="Center" />
+                            <Border CornerRadius="9" Padding="8,2" Margin="10,0,0,0" Background="#22FFFFFF"
+                                    VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal">
+                                    <Ellipse Width="7" Height="7" Margin="0,0,6,0" VerticalAlignment="Center"
+                                             Fill="{Binding Status, Converter={StaticResource StatusBrush}}" />
+                                    <TextBlock Text="{Binding StatusText}" FontSize="10.5" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
+                            <TextBlock Text="{Binding VersionText}" FontFamily="Consolas" FontSize="11.5"
+                                       Opacity="0.65" Margin="10,0,0,0" VerticalAlignment="Center"
+                                       Visibility="{Binding VersionText, Converter={StaticResource StringToVis}}" />
+                        </StackPanel>
+
+                        <TextBlock Text="{Binding Description}" FontSize="12" Opacity="0.7"
+                                   TextWrapping="Wrap" Margin="0,4,0,0" />
+                    </StackPanel>
+
+                    <!-- Sized for a thumb on a 7" touchscreen. -->
+                    <ui:Button Grid.Column="1"
+                               Content="{Binding ActionText}"
+                               Command="{Binding ActCommand}"
+                               Visibility="{Binding CanAct, Converter={StaticResource BoolToVis}}"
+                               MinWidth="96"
+                               MinHeight="40"
+                               VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="4,0,4,12">
+            <TextBlock Text="{Binding Title}" FontSize="26" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding Subtitle}" Opacity="0.7" FontSize="13" Margin="0,2,0,0" TextWrapping="Wrap" />
+
+            <WrapPanel Orientation="Horizontal" Margin="0,12,0,0">
+                <ui:Button Content="Update all" Appearance="Primary"
+                           Command="{Binding UpdateAllCommand}" Margin="0,0,10,6" />
+                <ui:Button Content="Install missing essentials"
+                           Command="{Binding InstallMissingCommand}" Margin="0,0,10,6" />
+                <ui:Button Content="Re-scan" Command="{Binding ScanCommand}" Margin="0,0,10,6" />
+            </WrapPanel>
+
+            <TextBlock Text="{Binding SummaryText}" Opacity="0.7" FontSize="12" Margin="0,4,0,0" />
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="4,0,4,8">
+                <TextBlock Text="Essentials" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8" />
+                <ItemsControl ItemsSource="{Binding EssentialRows}" ItemTemplate="{StaticResource RuntimeRow}" />
+
+                <TextBlock Text="Optional legacy runtimes" FontSize="16" FontWeight="SemiBold" Margin="0,14,0,2" />
+                <TextBlock Text="Only a handful of older games need these. Install one if a game asks for it."
+                           FontSize="12" Opacity="0.6" Margin="0,0,0,8" TextWrapping="Wrap" />
+                <ItemsControl ItemsSource="{Binding LegacyRows}" ItemTemplate="{StaticResource RuntimeRow}" />
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>
