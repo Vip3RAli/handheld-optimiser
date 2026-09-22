@@ -1,0 +1,207 @@
+using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using HandheldOptimiser.Models;
+using HandheldOptimiser.Services;
+
+namespace HandheldOptimiser.ViewModels;
+
+/// <summary>
+/// The shell. Owns navigation, the single "one operation at a time" gate, and the log console.
+/// </summary>
+public sealed partial class MainViewModel : ObservableObject, IShell
+{
+    private readonly SemaphoreSlim _gate = new(1, 1);
+
+    public LogService Log { get; }
+
+    public ObservableCollection<PageViewModelBase> Pages { get; } = [];
+
+    [ObservableProperty]
+    private PageViewModelBase? _selectedPage;
+
+    [ObservableProperty]
+    private bool _isBusy;
+
+    [ObservableProperty]
+    private string _statusText = "Ready";
+
+    [ObservableProperty]
+    private string _progressDetail = string.Empty;
+
+    [ObservableProperty]
+    private bool _rebootRequired;
+
+    [ObservableProperty]
+    private bool _isLogExpanded = true;
+
+    public string LogFilePath => Log.LogFilePath;
+
+    public MainViewModel(
+        LogService log,
+        TweakEngine engine,
+        SystemStateService systemState,
+        RestorePointService restorePoints,
+        AppxService appxService,
+        StartupService startupService,
+        TweakJournalService journal)
+    {
+        Log = log;
+
+        Pages.Add(new DashboardViewModel(engine, systemState, restorePoints, log, this));
+
+        Pages.Add(new TweakListViewModel(
+            "Gaming Tweaks",
+            "",
+            "Handheld performance changes. These are where the frame rate comes from.",
+            [TweakCategory.Gaming],
+            engine,
+            this));
+
+        Pages.Add(new TweakListViewModel(
+            "System Debloat",
+            "",
+            "Telemetry, search, assistants and background activity.",
+            [TweakCategory.Debloat, TweakCategory.Privacy],
+            engine,
+            this));
+
+        Pages.Add(new BloatwareViewModel(appxService, restorePoints, journal, log, this));
+        Pages.Add(new StartupViewModel(startupService, this));
+        Pages.Add(new AsusHealthViewModel(systemState, this));
+
+        SelectedPage = Pages[0];
+    }
+
+    partial void OnSelectedPageChanged(PageViewModelBase? value)
+    {
+        if (value is null)
+        {
+            return;
+        }
+
+        // Fire and forget: page loads are self-contained and report their own failures into the log.
+        _ = NavigateToAsync(value);
+    }
+
+    private async Task NavigateToAsync(PageViewModelBase page)
+    {
+        try
+        {
+            await page.OnNavigatedToAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            // Navigating away mid-scan is not an error.
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"Failed to load {page.Title}: {ex.Message}");
+        }
+    }
+
+    public async Task RunExclusiveAsync(string statusText, Func<IProgress<string>, CancellationToken, Task> work)
+    {
+        // Non-blocking: if something is already running, say so rather than queueing up a second
+        // registry pass behind it.
+        if (!await _gate.WaitAsync(0))
+        {
+            Log.Warning($"\"{statusText}\" ignored — another operation is already running.");
+            return;
+        }
+
+        IsBusy = true;
+        StatusText = statusText;
+        ProgressDetail = string.Empty;
+
+        var progress = new Progress<string>(detail => ProgressDetail = detail);
+
+        try
+        {
+            await work(progress, CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+            Log.Warning($"{statusText} was cancelled.");
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"{statusText} failed: {ex.Message}");
+        }
+        finally
+        {
+            IsBusy = false;
+            StatusText = "Ready";
+            ProgressDetail = string.Empty;
+            _gate.Release();
+        }
+    }
+
+    public async Task<bool> ConfirmAsync(string title, string message, string confirmText, bool destructive = false)
+    {
+        var box = new Wpf.Ui.Controls.MessageBox
+        {
+            Title = title,
+            Content = new System.Windows.Controls.TextBlock
+            {
+                Text = message,
+                TextWrapping = System.Windows.TextWrapping.Wrap,
+                MaxWidth = 460
+            },
+            PrimaryButtonText = confirmText,
+            PrimaryButtonAppearance = destructive
+                ? Wpf.Ui.Controls.ControlAppearance.Caution
+                : Wpf.Ui.Controls.ControlAppearance.Primary,
+            CloseButtonText = confirmText == "OK" ? "Close" : "Cancel",
+            MaxWidth = 560
+        };
+
+        var result = await box.ShowDialogAsync();
+        return result == Wpf.Ui.Controls.MessageBoxResult.Primary;
+    }
+
+    public void NotifyRebootRequired() => RebootRequired = true;
+
+    [RelayCommand]
+    private void ClearLog() => Log.Clear();
+
+    [RelayCommand]
+    private void OpenLogFile()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = Log.LogFilePath,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"Could not open the log file: {ex.Message}");
+        }
+    }
+
+    [RelayCommand]
+    private async Task RestartNowAsync()
+    {
+        if (!await ConfirmAsync(
+                "Restart now?",
+                "Windows will restart immediately. Save anything you have open first.",
+                "Restart now",
+                destructive: true))
+        {
+            return;
+        }
+
+        Log.Warning("Restarting Windows at the user's request.");
+
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "shutdown.exe",
+            Arguments = "/r /t 5 /c \"Handheld Optimiser: applying changes\"",
+            CreateNoWindow = true,
+            UseShellExecute = false
+        });
+    }
+}
