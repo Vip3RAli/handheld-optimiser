@@ -1,0 +1,19 @@
+<Application x:Class="HandheldOptimiser.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ui:ThemesDictionary Theme="Dark" />
+                <ui:ControlsDictionary />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- FontIcon does not resolve an icon font on its own, so the glyphs render as boxes
+                 without this. Segoe Fluent Icons ships with Windows 11; MDL2 is the Windows 10 fallback. -->
+            <Style TargetType="{x:Type ui:FontIcon}">
+                <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" />
+            </Style>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

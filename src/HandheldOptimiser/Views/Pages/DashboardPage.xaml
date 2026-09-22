@@ -1,0 +1,114 @@
+<UserControl x:Class="HandheldOptimiser.Views.Pages.DashboardPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:views="clr-namespace:HandheldOptimiser.Views">
+
+    <UserControl.Resources>
+        <views:BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <views:InverseBooleanConverter x:Key="InverseBool" />
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="4,0,4,8">
+
+            <TextBlock Text="Dashboard" FontSize="26" FontWeight="SemiBold" Margin="0,0,0,2" />
+            <TextBlock Text="{Binding HardwareModel}" Opacity="0.7" FontSize="13" Margin="0,0,0,14" />
+
+            <!-- Warned about early: this tool assumes ROG Ally behaviour. -->
+            <ui:InfoBar Severity="Warning"
+                        IsClosable="False"
+                        Margin="0,0,0,12"
+                        Title="Unrecognised hardware"
+                        Message="This device does not report as a ROG Ally. The tweaks are still valid Windows 11 changes, but they are tuned for Ally hardware."
+                        IsOpen="{Binding IsRogAlly, Converter={StaticResource InverseBool}}" />
+
+            <ui:InfoBar Severity="Error"
+                        IsClosable="False"
+                        Margin="0,0,0,12"
+                        Title="System Protection is off"
+                        Message="Restore points cannot be created, so tweaks will refuse to run. Turn on System Protection for the C: drive, or use the button below which enables it automatically."
+                        IsOpen="{Binding ProtectionEnabled, Converter={StaticResource InverseBool}}" />
+
+            <!-- The headline action. -->
+            <ui:Card Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="Drag Car Mode" FontSize="20" FontWeight="SemiBold" />
+                    <TextBlock TextWrapping="Wrap" Opacity="0.75" Margin="0,4,0,0"
+                               Text="Applies every performance and debloat tweak in one pass. Creates a System Restore point first, and refuses to change anything if that fails. Bloatware removal stays separate so you can review it." />
+
+                    <ui:Button Command="{Binding RunDragCarCommand}"
+                               Appearance="Primary"
+                               Height="68"
+                               FontSize="17"
+                               Margin="0,16,0,0"
+                               HorizontalAlignment="Stretch"
+                               HorizontalContentAlignment="Center"
+                               IsEnabled="{Binding DataContext.IsBusy, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource InverseBool}}">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:FontIcon Glyph="&#xE945;" FontSize="22" Margin="0,0,12,0" VerticalAlignment="Center" />
+                            <TextBlock Text="One-Click Optimise" VerticalAlignment="Center" FontSize="17" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </ui:Button>
+
+                    <TextBlock Margin="0,12,0,0" TextWrapping="Wrap" FontSize="12" Opacity="0.6"
+                               Text="Never touched: Windows Update, Microsoft Defender, the firewall, Armoury Crate SE, ASUS services, AMD drivers, Realtek audio, Game Pass." />
+                </StackPanel>
+            </ui:Card>
+
+            <!-- Current state -->
+            <ui:Card Margin="0,0,0,12">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Current state" FontSize="16" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding OptimisationStatus}" Opacity="0.75" Margin="0,4,0,0"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
+                            <TextBlock HorizontalAlignment="Right" FontSize="24" FontWeight="SemiBold">
+                                <Run Text="{Binding AppliedCount, Mode=OneWay}" />
+                                <Run Text="/" Foreground="Gray" />
+                                <Run Text="{Binding TotalCount, Mode=OneWay}" Foreground="Gray" />
+                            </TextBlock>
+                            <TextBlock Text="tweaks applied" FontSize="11" Opacity="0.6" HorizontalAlignment="Right" />
+                        </StackPanel>
+                    </Grid>
+
+                    <ui:Button Content="Re-check current state"
+                               Command="{Binding RefreshCommand}"
+                               Margin="0,14,0,0"
+                               HorizontalAlignment="Left" />
+                </StackPanel>
+            </ui:Card>
+
+            <!-- Safety actions -->
+            <ui:Card>
+                <StackPanel>
+                    <TextBlock Text="Safety" FontSize="16" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding RevertSummary}" Opacity="0.75" Margin="0,4,0,0" TextWrapping="Wrap" />
+
+                    <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                        <ui:Button Content="Create restore point now"
+                                   Command="{Binding CreateRestorePointOnlyCommand}"
+                                   Margin="0,0,10,0" />
+                        <ui:Button Content="Revert all tweaks"
+                                   Appearance="Caution"
+                                   Command="{Binding RevertAllCommand}"
+                                   IsEnabled="{Binding CanRevert}" />
+                    </StackPanel>
+
+                    <TextBlock Margin="0,12,0,0" TextWrapping="Wrap" FontSize="12" Opacity="0.6"
+                               Text="Reverting restores each registry value to exactly what it was before this app changed it, including deleting values that did not previously exist. Removed bloatware is not restored — reinstall those from the Microsoft Store." />
+                </StackPanel>
+            </ui:Card>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
