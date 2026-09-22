@@ -13,6 +13,10 @@
   <a href="https://github.com/Vip3RAli/handheld-optimiser/releases/latest"><b>Download the latest release</b></a>
 </p>
 
+<p align="center">
+  <img src="docs/dashboard.png" alt="Handheld Optimiser dashboard with the One-Click Optimise button, current state and safety options" width="900">
+</p>
+
 ---
 
 ## What it does
@@ -68,6 +72,10 @@ One-Click Optimise includes turning off **Memory Integrity**, which is usually t
 ### Full Screen Mode (Xbox mode home app)
 
 Windows 11's full screen experience normally opens the Xbox app. Handheld Optimiser can replace it with the app you actually use:
+
+<p align="center">
+  <img src="docs/full-screen-mode.png" alt="Full Screen Mode page with the home app choices and the two toggles" width="900">
+</p>
 
 1. Open **Full Screen Mode** and choose **Steam Big Picture**, **Armoury Crate SE**, or **Another app** (any program or shortcut, such as Playnite).
 2. Switch on **Use Handheld Optimiser as the full screen home app**.
