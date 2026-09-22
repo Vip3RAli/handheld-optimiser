@@ -137,6 +137,90 @@ public static class SafetyGuard
     public static bool IsRegistryPathProtected(RegistryValueSpec spec, out string? reason) =>
         IsRegistryPathProtected(spec.Root, spec.SubKey, spec.ValueName, out reason);
 
+    /// <summary>
+    /// Service start-type and stop operations go through the same fragments as the registry, since a
+    /// service's configuration is its Services\&lt;name&gt; key. One list means one place to protect a service.
+    /// </summary>
+    public static bool IsServiceProtected(string serviceName, out string? reason)
+    {
+        if (IsRegistryPathProtected(
+                RegistryRoot.LocalMachine, $@"SYSTEM\CurrentControlSet\Services\{serviceName}", "Start", out var inner))
+        {
+            reason = $"Service \"{serviceName}\" is protected. {inner}";
+            return true;
+        }
+
+        reason = null;
+        return false;
+    }
+
+    /// <summary>
+    /// The only places the maintenance actions may delete files from. An allowlist rather than a
+    /// denylist: a cache cleaner that can be pointed at the wrong folder is how people lose data, so
+    /// anything not listed here is refused outright.
+    /// </summary>
+    private static IReadOnlyList<string> DeletableRoots { get; } = BuildDeletableRoots();
+
+    private static List<string> BuildDeletableRoots()
+    {
+        var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+
+        string[] roots =
+        [
+            // DirectX and AMD shader caches. The drivers rebuild these on demand. The rest of the AMD
+            // folder (Radeon Software settings, ReLive recordings) is deliberately not listed.
+            System.IO.Path.Combine(local, "D3DSCache"),
+            System.IO.Path.Combine(local, "AMD", "DxCache"),
+            System.IO.Path.Combine(local, "AMD", "DxcCache"),
+            System.IO.Path.Combine(local, "AMD", "DX9Cache"),
+            System.IO.Path.Combine(local, "AMD", "VkCache"),
+            System.IO.Path.Combine(local, "AMD", "OglCache"),
+            System.IO.Path.Combine(local, "AMD", "GLCache"),
+            System.IO.Path.Combine(local, "AMD", "cl.cache"),
+
+            // Crash dumps and error reports.
+            System.IO.Path.Combine(windows, "Minidump"),
+            System.IO.Path.Combine(windows, "MEMORY.DMP"),
+            System.IO.Path.Combine(windows, "LiveKernelReports"),
+            System.IO.Path.Combine(local, "CrashDumps"),
+            System.IO.Path.Combine(programData, "Microsoft", "Windows", "WER", "ReportArchive"),
+            System.IO.Path.Combine(programData, "Microsoft", "Windows", "WER", "ReportQueue")
+        ];
+
+        return roots.Select(r => System.IO.Path.GetFullPath(r).TrimEnd('\\')).ToList();
+    }
+
+    public static IReadOnlyList<string> AllowedDeletionRoots => DeletableRoots;
+
+    public static bool IsDeletionAllowed(string path, out string? reason)
+    {
+        string full;
+        try
+        {
+            full = System.IO.Path.GetFullPath(path).TrimEnd('\\');
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or System.IO.PathTooLongException)
+        {
+            reason = $"Path could not be resolved ({ex.Message}). Refusing to delete.";
+            return false;
+        }
+
+        foreach (var root in DeletableRoots)
+        {
+            if (full.Equals(root, StringComparison.OrdinalIgnoreCase) ||
+                full.StartsWith(root + "\\", StringComparison.OrdinalIgnoreCase))
+            {
+                reason = null;
+                return true;
+            }
+        }
+
+        reason = $"\"{full}\" is outside the cache and crash-dump folders this app may clean. Refusing to delete.";
+        return false;
+    }
+
     public static bool IsAppxProtected(string packageIdentityName, out string? reason)
     {
         var lower = packageIdentityName.ToLowerInvariant();

@@ -43,8 +43,20 @@ public sealed class TweakEngine
         _journal = journal;
         _context = new TweakContext(log, registry, runner);
 
-        AllTweaks = [.. GamingTweaks.All, .. DebloatTweaks.All];
+        AllTweaks =
+        [
+            .. GamingTweaks.All,
+            .. DebloatTweaks.All,
+            .. CpuKernelTweaks.All,
+            .. NetworkTweaks.All,
+            .. ServiceTweaks.All,
+            .. InterfaceTweaks.All
+        ];
+
+        PowerActions = TweakDefinitions.PowerActions.All;
     }
+
+    public IReadOnlyList<PowerAction> PowerActions { get; }
 
     public TweakContext Context => _context;
 
@@ -207,4 +219,68 @@ public sealed class TweakEngine
     }
 
     public bool HasUndoData => _journal.All().Count > 0;
+
+    /// <summary>
+    /// Runs a one-shot maintenance action. Actions that change system configuration take a restore point
+    /// first under the same rule as tweaks: no checkpoint, no change. Nothing is journalled, because there
+    /// is no prior state to return to.
+    /// </summary>
+    public async Task<ApplyRunSummary> RunActionAsync(
+        PowerAction action,
+        IProgress<string>? progress = null,
+        CancellationToken ct = default)
+    {
+        var summary = new ApplyRunSummary();
+
+        _log.Info($"=== {action.Name} ===");
+
+        if (action.CreateRestorePoint)
+        {
+            progress?.Report("Creating System Restore point…");
+
+            var rp = await _restorePoints.CreateAsync($"Handheld Optimiser — {action.Name}", ct);
+            summary.RestorePointCreated = rp.Created;
+
+            if (!rp.Created)
+            {
+                summary.Aborted = true;
+                summary.AbortReason =
+                    $"No System Restore point could be created ({rp.Message}). Nothing was changed.";
+                _log.Error("ABORTED before making any change: no restore point.");
+                return summary;
+            }
+        }
+
+        TweakResult result;
+        try
+        {
+            result = await action.Execute(_context, progress, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            result = TweakResult.Fail(action.Id, $"\"{action.Name}\" threw: {ex.Message}");
+        }
+
+        summary.Results.Add(result);
+
+        if (result.IsFailure)
+        {
+            _log.Error(result.Message ?? $"{action.Name} failed.");
+        }
+        else
+        {
+            _log.Success(result.Message ?? $"{action.Name} finished.");
+        }
+
+        if (summary.RebootRequired)
+        {
+            _log.Warning("A restart is required before this takes full effect.");
+        }
+
+        return summary;
+    }
 }

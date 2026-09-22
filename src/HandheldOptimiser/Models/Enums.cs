@@ -5,7 +5,11 @@ public enum TweakCategory
     Gaming,
     Debloat,
     Privacy,
-    Startup
+    Startup,
+    CpuKernel,
+    Network,
+    Services,
+    Interface
 }
 
 /// <summary>
