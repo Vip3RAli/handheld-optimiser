@@ -33,7 +33,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
     private bool _rebootRequired;
 
     [ObservableProperty]
-    private bool _isLogExpanded = true;
+    private bool _isLogExpanded;
 
     public string LogFilePath => Log.LogFilePath;
 
