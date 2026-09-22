@@ -76,7 +76,21 @@ public static class SafetyGuard
         "\\services\\xblauthmanager",
         "\\services\\xblgamesave",
         "\\services\\xboxnetapisvc",
-        "\\services\\xboxgipsvc"
+        "\\services\\xboxgipsvc",
+
+        // --- Handheld essentials that server-oriented "safe to disable" lists get wrong ---
+        "\\services\\wlidsvc",        // Microsoft account sign-in (Game Pass, Xbox app)
+        "\\services\\tokenbroker",    // Web Account Manager, same
+        "\\services\\ngcsvc",         // Windows Hello PIN
+        "\\services\\ngcctnrsvc",
+        "\\services\\wbiosrvc",       // fingerprint reader in the Ally's power button
+        "\\services\\bthserv",        // Bluetooth controllers and headsets
+        "\\services\\sensorservice",  // ambient light and orientation sensors
+        "\\services\\sensrsvc",
+        "\\services\\rmsvc",          // airplane mode / radio toggles
+        "\\services\\ssdpsrv",        // UPnP discovery, used for NAT traversal in online games
+        "\\services\\storsvc",        // installing Game Pass titles to the microSD card
+        "\\services\\lfsvc"           // geolocation and automatic time zone (kept at the user's request)
     ];
 
     /// <summary>

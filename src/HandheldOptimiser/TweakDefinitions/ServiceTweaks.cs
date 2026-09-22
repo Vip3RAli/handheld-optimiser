@@ -19,8 +19,67 @@ public static class ServiceTweaks
     [
         SysMain,
         SearchIndexer,
-        PrintAndFax
+        PrintAndFax,
+        CompatibilityAssistant,
+        LinkTracking,
+        UnusedHandheldServices
     ];
+
+    public static Tweak CompatibilityAssistant => DisableServices(
+        id: "services.pcasvc",
+        name: "Disable Program Compatibility Assistant",
+        description:
+            "Stops the service that watches every program launch for known compatibility problems. It runs " +
+            "constantly and has no role in games, which ship their own compatibility handling.",
+        risk: RiskLevel.Safe,
+        warning: null,
+        includeInDragCar: true,
+        services: ["PcaSvc"]);
+
+    public static Tweak LinkTracking => DisableServices(
+        id: "services.trkwks",
+        name: "Disable Distributed Link Tracking",
+        description:
+            "Stops the service that repairs shortcuts when their target moves to another NTFS drive or " +
+            "network share. Nothing on a single-drive handheld relies on it.",
+        risk: RiskLevel.Safe,
+        warning: null,
+        includeInDragCar: true,
+        services: ["TrkWks"]);
+
+    /// <summary>
+    /// All of these are Manual and stopped on a stock Ally, so disabling them frees nothing at runtime.
+    /// The value is that nothing can start them later. Kept as one toggle and out of Drag Car Mode so it is
+    /// not mistaken for a performance change.
+    /// </summary>
+    public static Tweak UnusedHandheldServices => DisableServices(
+        id: "services.unused",
+        name: "Disable unused handheld services",
+        description:
+            "Retail Demo, Wallet, Payments & NFC, Phone Service, Downloaded Maps Manager, Internet Connection " +
+            "Sharing, Mobile Hotspot, Windows Insider, Parental Controls, Media Player Network Sharing and the " +
+            "ActiveX Installer. These normally sit stopped, so this is tidying rather than a performance gain: " +
+            "it just stops anything waking them up.",
+        risk: RiskLevel.Moderate,
+        warning:
+            "Mobile Hotspot and Internet Connection Sharing stop working, calls through Phone Link stop, " +
+            "offline maps no longer update, Microsoft Family parental controls are not enforced on this device, " +
+            "and Windows Insider builds cannot be received.",
+        includeInDragCar: false,
+        services:
+        [
+            "RetailDemo",
+            "WalletService",
+            "SEMgrSvc",
+            "PhoneSvc",
+            "MapsBroker",
+            "SharedAccess",
+            "icssvc",
+            "wisvc",
+            "WpcMonSvc",
+            "WMPNetworkSvc",
+            "AxInstSV"
+        ]);
 
     public static Tweak SysMain => DisableServices(
         id: "services.sysmain",
