@@ -77,9 +77,9 @@ public sealed partial class DashboardViewModel(
 
         AppliedCount = applied;
 
-        OptimisationStatus = applied == 0 ? "Stock Windows — nothing optimised yet"
+        OptimisationStatus = applied == 0 ? "Stock Windows: nothing optimised yet"
             : applied == TotalCount ? "Fully optimised"
-            : $"Partially optimised — {TotalCount - applied} tweak(s) still available";
+            : $"Partially optimised: {TotalCount - applied} tweak(s) still available";
 
         CanRevert = _engine.HasUndoData;
         RevertSummary = CanRevert
@@ -134,9 +134,9 @@ public sealed partial class DashboardViewModel(
                 "Drag Car Mode complete",
                 $"{summary.Applied} tweak(s) applied.\n" +
                 $"{summary.AlreadyDone} were already set.\n" +
-                (summary.Failures > 0 ? $"{summary.Failures} failed — check the log.\n" : string.Empty) +
+                (summary.Failures > 0 ? $"{summary.Failures} failed. Check the log.\n" : string.Empty) +
                 (summary.RebootRequired ? "\nRestart required for some changes to take effect." : string.Empty) +
-                "\n\nBloatware removal is deliberately separate — review it on the Bloatware page.",
+                "\n\nBloatware removal is deliberately separate. Review it on the Bloatware page.",
                 "OK");
         });
     }
@@ -147,7 +147,7 @@ public sealed partial class DashboardViewModel(
         if (!await Shell.ConfirmAsync(
                 "Revert everything",
                 "Every tweak this app applied will be restored to the value it had beforehand, using the " +
-                "recorded undo data.\n\nRemoved bloatware is not restored — that has to come back from the " +
+                "recorded undo data.\n\nRemoved bloatware is not restored. That has to come back from the " +
                 "Microsoft Store.",
                 "Revert all tweaks",
                 destructive: true))
@@ -169,7 +169,7 @@ public sealed partial class DashboardViewModel(
             await Shell.ConfirmAsync(
                 "Revert finished",
                 $"{summary.Applied} tweak(s) reverted." +
-                (summary.Failures > 0 ? $"\n{summary.Failures} failed — check the log." : string.Empty),
+                (summary.Failures > 0 ? $"\n{summary.Failures} failed. Check the log." : string.Empty),
                 "OK");
         });
     }
@@ -179,7 +179,7 @@ public sealed partial class DashboardViewModel(
     {
         await Shell.RunExclusiveAsync("Creating System Restore point…", async (progress, ct) =>
         {
-            var result = await _restorePoints.CreateAsync("Handheld Optimiser — manual checkpoint", ct);
+            var result = await _restorePoints.CreateAsync("Handheld Optimiser: manual checkpoint", ct);
 
             await Shell.ConfirmAsync(
                 result.Created ? "Restore point created" : "Could not create restore point",

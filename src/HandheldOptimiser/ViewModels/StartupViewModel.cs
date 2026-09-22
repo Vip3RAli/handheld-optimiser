@@ -45,7 +45,7 @@ public sealed partial class StartupRowViewModel(StartupEntry entry, StartupServi
 }
 
 /// <summary>
-/// Startup entry manager. ASUS, AMD, Realtek and security entries are listed but locked — visible so the
+/// Startup entry manager. ASUS, AMD, Realtek and security entries are listed but locked: visible so the
 /// user can confirm they are present and untouched, not editable.
 /// </summary>
 public sealed partial class StartupViewModel(StartupService service, IShell shell) : PageViewModelBase(shell)
@@ -82,7 +82,7 @@ public sealed partial class StartupViewModel(StartupService service, IShell shel
                 Entries.Add(new StartupRowViewModel(entry, _service, Shell));
             }
 
-            SummaryText = $"{found.Count} entries — {found.Count(e => e.IsProtected)} locked as protected, " +
+            SummaryText = $"{found.Count} entries: {found.Count(e => e.IsProtected)} locked as protected, " +
                           $"{found.Count(e => !e.IsProtected)} you can change.";
 
             return Task.CompletedTask;

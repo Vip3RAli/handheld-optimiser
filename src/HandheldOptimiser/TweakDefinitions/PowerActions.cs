@@ -91,7 +91,7 @@ public static class PowerActions
             "Removes superseded Windows Update components with DISM, then deletes crash dumps and Windows " +
             "Error Reporting files. Installed updates can still be uninstalled afterwards.",
         Glyph = "",
-        DurationHint = "5–15 minutes",
+        DurationHint = "5 to 15 minutes",
         Execute = async (ctx, progress, ct) =>
         {
             progress?.Report("Cleaning up superseded update components (this is the slow part)");

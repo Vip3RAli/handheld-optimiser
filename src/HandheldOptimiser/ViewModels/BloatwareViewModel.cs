@@ -36,7 +36,7 @@ public sealed class AppxGroupViewModel
 }
 
 /// <summary>
-/// The bloatware page. Nothing is ticked on load — the user reviews each package, with its real Appx
+/// The bloatware page. Nothing is ticked on load. The user reviews each package, with its real Appx
 /// identity name visible, before anything is removed.
 /// </summary>
 public sealed partial class BloatwareViewModel(
@@ -102,7 +102,7 @@ public sealed partial class BloatwareViewModel(
         var selected = AllRows.Count(r => r.IsSelected);
 
         SummaryText = total == 0
-            ? "No catalog bloatware found on this machine — it is already clean."
+            ? "No catalog bloatware found on this machine. It is already clean."
             : $"{total} removable app(s) found, {selected} selected.";
     }
 
@@ -151,7 +151,7 @@ public sealed partial class BloatwareViewModel(
         var confirmed = await Shell.ConfirmAsync(
             $"Remove {selected.Count} app(s)?",
             $"{list}\n\nThese will be removed for all users and from the provisioned image, so Windows will " +
-            "not reinstall them.\n\nThis cannot be undone by the Revert button — getting one back means " +
+            "not reinstall them.\n\nThis cannot be undone by the Revert button. Getting one back means " +
             "reinstalling it from the Microsoft Store. A System Restore point will be created first.",
             $"Remove {selected.Count} app(s)",
             destructive: true);
@@ -165,7 +165,7 @@ public sealed partial class BloatwareViewModel(
         {
             progress.Report("Creating System Restore point…");
 
-            var rp = await _restorePoints.CreateAsync("Handheld Optimiser — bloatware removal", ct);
+            var rp = await _restorePoints.CreateAsync("Handheld Optimiser: bloatware removal", ct);
 
             if (!rp.Created)
             {
@@ -191,7 +191,7 @@ public sealed partial class BloatwareViewModel(
 
             if (entry.CapturedState.Count > 0)
             {
-                // Recorded as a manifest of what was removed, not as undo data — Appx removal is
+                // Recorded as a manifest of what was removed, not as undo data. Appx removal is
                 // one-way. The list is what makes reinstalling possible later.
                 _journal.Record(entry);
             }
@@ -201,7 +201,7 @@ public sealed partial class BloatwareViewModel(
             await Shell.ConfirmAsync(
                 "Bloatware removal finished",
                 $"{removed} app(s) removed." +
-                (failed > 0 ? $"\n{failed} could not be fully removed — see the log for details." : string.Empty),
+                (failed > 0 ? $"\n{failed} could not be fully removed. See the log for details." : string.Empty),
                 "OK");
         });
     }

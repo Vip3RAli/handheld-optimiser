@@ -22,7 +22,7 @@ public sealed class AppxTarget
     public string? KeepIfNote { get; init; }
 
     /// <summary>
-    /// Included by the "Select recommended" helper. Nothing is ever ticked automatically on load —
+    /// Included by the "Select recommended" helper. Nothing is ever ticked automatically on load;
     /// this only drives that one button.
     /// </summary>
     public bool Recommended { get; init; }

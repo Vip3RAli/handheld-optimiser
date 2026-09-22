@@ -147,7 +147,7 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
                 Detail = $"{state.Status}, start type {state.StartType}",
                 Status = status,
                 Advice = disabled
-                    ? "This service is disabled. Handheld Optimiser never disables it — another tool likely did. " +
+                    ? "This service is disabled. Handheld Optimiser never disables it, so another tool likely did. " +
                       "Re-enable it from the repair action below."
                     : null
             });
@@ -176,7 +176,7 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
         checks.Add(new HealthCheck
         {
             Name = "[Performance] Memory Integrity (HVCI)",
-            Detail = hvciOn ? "Enabled — costing frame rate" : "Disabled — optimised for gaming",
+            Detail = hvciOn ? "Enabled (costing frame rate)" : "Disabled (optimised for gaming)",
             Status = hvciOn ? HealthStatus.Warning : HealthStatus.Good,
             Advice = hvciOn ? "Disable this on the Gaming Tweaks page for the largest single FPS gain." : null
         });
@@ -218,7 +218,7 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
 
     /// <summary>
     /// Re-enables a protected service that some other tool disabled. This app only ever moves these in the
-    /// safe direction — there is no code path here that disables them.
+    /// safe direction. There is no code path here that disables them.
     /// </summary>
     public async Task<bool> RepairProtectedServicesAsync(CancellationToken ct = default)
     {

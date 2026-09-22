@@ -23,7 +23,7 @@ public static class GamingTweaks
     /// <summary>
     /// HVCI runs driver code verification inside the hypervisor. Turning it off is usually the single
     /// biggest CPU-bound win on a handheld, and it is also a genuine reduction in kernel exploit
-    /// mitigation — hence the explicit warning rather than a silent toggle.
+    /// mitigation, hence the explicit warning rather than a silent toggle.
     /// </summary>
     public static Tweak MemoryIntegrity => new()
     {
@@ -225,7 +225,7 @@ public static class GamingTweaks
         Name = "Disable Game DVR & background recording",
         Description =
             "Stops the Game Bar from continuously recording gameplay in the background. The Xbox app, " +
-            "Game Pass, cloud saves and the overlay itself keep working — only the capture pipeline stops.",
+            "Game Pass, cloud saves and the overlay itself keep working. Only the capture pipeline stops.",
         Category = TweakCategory.Gaming,
         Risk = RiskLevel.Safe,
         RegistryValues =
@@ -259,7 +259,7 @@ public static class GamingTweaks
     {
         if (Services.SafetyGuard.IsOptionalFeatureProtected(feature, out var reason))
         {
-            ctx.Log.Error($"BLOCKED optional feature {feature} — {reason}");
+            ctx.Log.Error($"BLOCKED optional feature {feature}: {reason}");
             blocked = TweakResult.Blocked("gaming.vmp", reason!);
             return true;
         }

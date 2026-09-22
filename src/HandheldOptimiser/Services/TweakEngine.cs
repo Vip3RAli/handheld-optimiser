@@ -19,7 +19,7 @@ public sealed class ApplyRunSummary
 /// <summary>
 /// Orchestrates everything: restore point, then tweaks, then journalling.
 ///
-/// The ordering matters and is not negotiable — a restore point that is created after the first registry
+/// The ordering matters and is not negotiable. A restore point that is created after the first registry
 /// write is worse than useless, because it would snapshot the already-modified machine.
 /// </summary>
 public sealed class TweakEngine
@@ -95,7 +95,7 @@ public sealed class TweakEngine
         {
             progress?.Report("Creating System Restore point…");
 
-            var rp = await _restorePoints.CreateAsync($"Handheld Optimiser — {runDescription}", ct);
+            var rp = await _restorePoints.CreateAsync($"Handheld Optimiser: {runDescription}", ct);
             summary.RestorePointCreated = rp.Created;
 
             if (!rp.Created)
@@ -167,7 +167,7 @@ public sealed class TweakEngine
 
         if (entry is null)
         {
-            var message = $"No undo data recorded for \"{tweak.Name}\" — it was not applied by this app, " +
+            var message = $"No undo data recorded for \"{tweak.Name}\". It was not applied by this app, " +
                           "so there is no original value to restore.";
             _log.Warning(message);
             return TweakResult.Blocked(tweak.Id, message);
@@ -192,7 +192,7 @@ public sealed class TweakEngine
 
         if (entries.Count == 0)
         {
-            _log.Info("Nothing to revert — the undo journal is empty.");
+            _log.Info("Nothing to revert. The undo journal is empty.");
             return summary;
         }
 
@@ -238,7 +238,7 @@ public sealed class TweakEngine
         {
             progress?.Report("Creating System Restore point…");
 
-            var rp = await _restorePoints.CreateAsync($"Handheld Optimiser — {action.Name}", ct);
+            var rp = await _restorePoints.CreateAsync($"Handheld Optimiser: {action.Name}", ct);
             summary.RestorePointCreated = rp.Created;
 
             if (!rp.Created)

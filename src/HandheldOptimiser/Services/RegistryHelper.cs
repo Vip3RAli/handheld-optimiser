@@ -125,7 +125,7 @@ public sealed class RegistryHelper(LogService log)
     {
         if (SafetyGuard.IsRegistryPathProtected(spec, out var reason))
         {
-            _log.Error($"BLOCKED {spec.DisplayPath} — {reason}");
+            _log.Error($"BLOCKED {spec.DisplayPath}: {reason}");
             return null;
         }
 
@@ -158,7 +158,7 @@ public sealed class RegistryHelper(LogService log)
     {
         if (SafetyGuard.IsRegistryPathProtected(snapshot.Root, snapshot.SubKey, snapshot.ValueName, out var reason))
         {
-            _log.Error($"BLOCKED restore of {snapshot.Root}\\{snapshot.SubKey}\\{snapshot.ValueName} — {reason}");
+            _log.Error($"BLOCKED restore of {snapshot.Root}\\{snapshot.SubKey}\\{snapshot.ValueName}: {reason}");
             return false;
         }
 
