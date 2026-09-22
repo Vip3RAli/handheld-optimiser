@@ -66,8 +66,41 @@ public sealed partial class MainViewModel : ObservableObject, IShell
             engine,
             this));
 
+        Pages.Add(new TweakListViewModel(
+            "CPU & Kernel",
+            "",
+            "Scheduler settings that put the game ahead of background work.",
+            [TweakCategory.CpuKernel],
+            engine,
+            this));
+
+        Pages.Add(new TweakListViewModel(
+            "Network",
+            "",
+            "Latency and memory fixes for the network stack.",
+            [TweakCategory.Network],
+            engine,
+            this));
+
+        Pages.Add(new TweakListViewModel(
+            "Deep Services",
+            "",
+            "Background services a gaming handheld does not need. Security, update and vendor services are protected.",
+            [TweakCategory.Services],
+            engine,
+            this));
+
+        Pages.Add(new TweakListViewModel(
+            "Interface",
+            "",
+            "Desktop responsiveness and touch behaviour. Games are unaffected.",
+            [TweakCategory.Interface],
+            engine,
+            this));
+
         Pages.Add(new BloatwareViewModel(appxService, restorePoints, journal, log, this));
         Pages.Add(new StartupViewModel(startupService, this));
+        Pages.Add(new PowerActionsViewModel(engine, this));
         Pages.Add(new AsusHealthViewModel(systemState, this));
 
         SelectedPage = Pages[0];
