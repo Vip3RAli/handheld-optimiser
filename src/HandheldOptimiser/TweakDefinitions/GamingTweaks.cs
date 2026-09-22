@@ -60,6 +60,8 @@ public static class GamingTweaks
         Category = TweakCategory.Gaming,
         Risk = RiskLevel.Breaking,
         RequiresReboot = true,
+        // Opt-in only: Vanguard and FACEIT games stop launching, which is too easy to miss in a one-click run.
+        IncludeInDragCar = false,
         Warning =
             "WSL / WSL2, Windows Sandbox, the Windows Subsystem for Android, Hyper-V VMs and Credential " +
             "Guard will all stop working until this is reverted. Some anti-cheat systems (notably Vanguard " +

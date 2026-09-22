@@ -11,6 +11,12 @@
 
             <!-- FontIcon does not resolve an icon font on its own, so the glyphs render as boxes
                  without this. Segoe Fluent Icons ships with Windows 11; MDL2 is the Windows 10 fallback. -->
+            <!-- WPF-UI 4.3.0's Dark.xaml defines this brush with a StaticResource to SystemAccentColorPrimary,
+                 which lives in a sibling dictionary and cannot be resolved, so any ui:Badge throws on first
+                 render. Redefining it here (app-level keys win over merged dictionaries) with a
+                 DynamicResource matches how every other accent brush in the theme is declared. -->
+            <SolidColorBrush x:Key="BadgeBackground" Color="{DynamicResource SystemAccentColorPrimary}" />
+
             <Style TargetType="{x:Type ui:FontIcon}">
                 <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" />
             </Style>
