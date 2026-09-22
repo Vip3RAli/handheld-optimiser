@@ -21,7 +21,7 @@
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
                                        VerticalAlignment="Center" />
-                            <Border CornerRadius="9" Padding="8,2" Margin="10,0,0,0" Background="#22FFFFFF"
+                            <Border CornerRadius="4" Padding="8,2" Margin="10,0,0,0" Background="#22FFFFFF"
                                     VerticalAlignment="Center">
                                 <StackPanel Orientation="Horizontal">
                                     <Ellipse Width="7" Height="7" Margin="0,0,6,0" VerticalAlignment="Center"

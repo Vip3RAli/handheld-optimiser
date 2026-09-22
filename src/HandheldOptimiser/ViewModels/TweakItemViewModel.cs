@@ -94,8 +94,7 @@ public sealed partial class TweakItemViewModel : ObservableObject
             var confirmed = await _shell.ConfirmAsync(
                 Tweak.Name,
                 $"{Tweak.Description}\n\n{Tweak.Warning}",
-                "Apply anyway",
-                destructive: true);
+                "Apply anyway");
 
             if (!confirmed)
             {

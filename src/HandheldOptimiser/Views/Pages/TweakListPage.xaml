@@ -49,7 +49,7 @@
 
                                     <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
                                         <ui:Badge Content="{Binding RiskBadge}" FontSize="10" Margin="0,0,6,0" />
-                                        <Border CornerRadius="9" Padding="8,2" Margin="0,0,6,0"
+                                        <Border CornerRadius="4" Padding="8,2" Margin="0,0,6,0"
                                                 Background="#22FFFFFF">
                                             <StackPanel Orientation="Horizontal">
                                                 <Ellipse Width="7" Height="7" Margin="0,0,6,0"

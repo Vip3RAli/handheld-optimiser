@@ -1,6 +1,8 @@
 using System.Security.Principal;
 using System.Windows;
+using System.Windows.Media;
 using System.Windows.Threading;
+using Wpf.Ui.Appearance;
 using HandheldOptimiser.Services;
 using HandheldOptimiser.ViewModels;
 
@@ -15,6 +17,8 @@ public partial class App : Application
         base.OnStartup(e);
 
         DispatcherUnhandledException += OnUnhandledException;
+
+        ApplyBrandAccent();
 
         if (!IsRunningElevated())
         {
@@ -52,6 +56,20 @@ public partial class App : Application
         var window = new MainWindow { DataContext = viewModel };
         MainWindow = window;
         window.Show();
+    }
+
+    /// <summary>
+    /// Pins the accent to the app's purple instead of the Windows accent, so primary buttons, toggles,
+    /// checkboxes, badges and the sidebar highlight look the same on every device. Dark theme fills
+    /// use the lighter steps, matching how Fluent derives them from a system accent.
+    /// </summary>
+    private static void ApplyBrandAccent()
+    {
+        ApplicationAccentColorManager.Apply(
+            systemAccent: Color.FromRgb(0x6D, 0x28, 0xD9),
+            primaryAccent: Color.FromRgb(0x7C, 0x3A, 0xED),
+            secondaryAccent: Color.FromRgb(0x8B, 0x5C, 0xF6),
+            tertiaryAccent: Color.FromRgb(0xA7, 0x8B, 0xFA));
     }
 
     private static bool IsRunningElevated()

@@ -14,8 +14,104 @@ public static class PowerActions
     [
         FlushNetwork,
         ClearShaderCaches,
-        DeepCleanup
+        DeepCleanup,
+        CompactOs,
+        UncompactOs
     ];
+
+    /// <summary>
+    /// Compresses the Windows install in place with the same mechanism OEMs use on small-storage devices.
+    /// Files are decompressed on read, which a Zen 4 CPU does faster than the SSD can supply them, so load
+    /// times do not suffer. Reversible at any time with <c>compact /CompactOS:never</c>.
+    /// </summary>
+    public static PowerAction CompactOs => new()
+    {
+        Id = "action.compact_os",
+        Name = "Compact OS (save several GB)",
+        Description =
+            "Compresses the Windows system files to free space for games, typically 2 to 5 GB. Everything " +
+            "keeps working as before; files are decompressed on the fly when read.",
+        Glyph = "",
+        CreateRestorePoint = true,
+        DurationHint = "2 to 5 minutes",
+        Warning =
+            "Keep the Ally plugged in and do not close the app while this runs. It can be reversed later with " +
+            "Undo Compact OS below.",
+        Execute = async (ctx, progress, ct) =>
+        {
+            progress?.Report("Compressing Windows system files (this takes a few minutes)");
+
+            var outcome = await ctx.Runner.RunProcessAsync(
+                "compact.exe",
+                ["/CompactOS:always"],
+                "Compress the Windows installation",
+                ct);
+
+            return outcome.Succeeded
+                ? TweakResult.Ok("action.compact_os", "Windows system files are compressed.")
+                : TweakResult.Fail("action.compact_os", $"compact.exe failed (exit {outcome.ExitCode}). See log.");
+        }
+    };
+
+    /// <summary>
+    /// Compact OS usually saves 2 to 5 GB, which decompressing gives back to Windows. The margin on top
+    /// keeps the drive from being left completely full, which breaks updates and the page file.
+    /// </summary>
+    private const int UncompactMinFreeGb = 8;
+
+    private static string? CheckSpaceForUncompact()
+    {
+        var root = Path.GetPathRoot(Environment.SystemDirectory) ?? "C:\\";
+
+        try
+        {
+            var freeGb = new DriveInfo(root).AvailableFreeSpace / (1024.0 * 1024 * 1024);
+
+            return freeGb >= UncompactMinFreeGb
+                ? null
+                : $"Only {freeGb:0.0} GB is free on {root.TrimEnd('\\')}. Undo Compact OS needs at least " +
+                  $"{UncompactMinFreeGb} GB, because the system files take up their full size again. Free up " +
+                  "some space (uninstalling a game is the quickest way) and try again.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return $"Could not read the free space on {root.TrimEnd('\\')} ({ex.Message}).";
+        }
+    }
+
+    /// <summary>
+    /// The counterpart to <see cref="CompactOs"/>. Kept as its own button because compression state is
+    /// not something System Restore or the undo journal can put back.
+    /// </summary>
+    public static PowerAction UncompactOs => new()
+    {
+        Id = "action.uncompact_os",
+        Name = "Undo Compact OS",
+        Description =
+            "Decompresses the Windows system files again, returning them to how they were before Compact OS. " +
+            "Does nothing if Windows is not compressed.",
+        Glyph = "",
+        CreateRestorePoint = true,
+        DurationHint = "2 to 10 minutes",
+        Warning =
+            $"Needs at least {UncompactMinFreeGb} GB free on the system drive, since the files take up their " +
+            "full size again. Keep the Ally plugged in and do not close the app while this runs.",
+        Precheck = CheckSpaceForUncompact,
+        Execute = async (ctx, progress, ct) =>
+        {
+            progress?.Report("Decompressing Windows system files (this takes a few minutes)");
+
+            var outcome = await ctx.Runner.RunProcessAsync(
+                "compact.exe",
+                ["/CompactOS:never"],
+                "Decompress the Windows installation",
+                ct);
+
+            return outcome.Succeeded
+                ? TweakResult.Ok("action.uncompact_os", "Windows system files are no longer compressed.")
+                : TweakResult.Fail("action.uncompact_os", $"compact.exe failed (exit {outcome.ExitCode}). See log.");
+        }
+    };
 
     public static PowerAction FlushNetwork => new()
     {

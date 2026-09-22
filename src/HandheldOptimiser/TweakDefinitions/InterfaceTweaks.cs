@@ -46,7 +46,7 @@ public static class InterfaceTweaks
         Category = TweakCategory.Interface,
         Risk = RiskLevel.Moderate,
         RequiresReboot = true,
-        IncludeInDragCar = false,
+        IncludeInOneClick = false,
         Warning =
             "Notifications and Widgets have to be opened from the taskbar or Armoury Crate instead of by " +
             "swiping. This is a machine-wide policy, so it applies to every user account.",
@@ -71,7 +71,7 @@ public static class InterfaceTweaks
         Category = TweakCategory.Interface,
         Risk = RiskLevel.Safe,
         RequiresReboot = true,
-        IncludeInDragCar = false,
+        IncludeInOneClick = false,
         RegistryValues =
         [
             new(RegistryRoot.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",

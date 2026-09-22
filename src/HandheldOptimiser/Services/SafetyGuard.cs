@@ -133,7 +133,12 @@ public static class SafetyGuard
 
     public static bool IsRegistryPathProtected(RegistryRoot root, string subKey, string valueName, out string? reason)
     {
-        var haystack = $"{root}\\{subKey}\\{valueName}".ToLowerInvariant();
+        // StartupApproved values are named after the startup entry they switch on or off, so matching
+        // the value name would lock any entry called "SecurityHealth" or "ASUS...". They are only
+        // enable/disable flags that Task Manager also writes, so the key path alone is vetted there.
+        var isStartupFlag = subKey.Contains(@"\Explorer\StartupApproved\", StringComparison.OrdinalIgnoreCase);
+
+        var haystack = (isStartupFlag ? $"{root}\\{subKey}" : $"{root}\\{subKey}\\{valueName}").ToLowerInvariant();
 
         foreach (var fragment in ProtectedRegistryFragments)
         {
@@ -261,35 +266,6 @@ public static class SafetyGuard
             if (lower.Contains(fragment, StringComparison.Ordinal))
             {
                 reason = $"Optional feature is protected (matched \"{fragment}\"). Refusing to disable.";
-                return true;
-            }
-        }
-
-        reason = null;
-        return false;
-    }
-
-    /// <summary>
-    /// Startup entries whose names indicate they belong to hardware that must keep working.
-    /// Used to lock rows in the startup manager so they cannot be unchecked.
-    /// </summary>
-    public static bool IsStartupEntryProtected(string name, string command, out string? reason)
-    {
-        var haystack = $"{name} {command}".ToLowerInvariant();
-
-        string[] fragments =
-        [
-            "asus", "armoury", "armourycrate", "rog", "myasus", "acse",
-            "amd", "realtek", "rtk", "nvidia",
-            "securityhealth", "windows defender", "msmpeng",
-            "onedrive setup" // leave OneDrive's own uninstall/setup stub alone
-        ];
-
-        foreach (var fragment in fragments)
-        {
-            if (haystack.Contains(fragment, StringComparison.Ordinal))
-            {
-                reason = $"Belongs to protected hardware/security software (matched \"{fragment}\").";
                 return true;
             }
         }

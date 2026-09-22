@@ -6,7 +6,7 @@ using HandheldOptimiser.Services;
 namespace HandheldOptimiser.ViewModels;
 
 /// <summary>
-/// The one-click page. "Drag Car Mode" applies every tweak marked for it, after a restore point and after
+/// The one-click page. "One-Click Optimise" applies every tweak marked for it, after a restore point and after
 /// an explicit confirmation listing exactly what carries a warning.
 /// </summary>
 public sealed partial class DashboardViewModel(
@@ -62,7 +62,7 @@ public sealed partial class DashboardViewModel(
 
         ProtectionEnabled = await _restorePoints.IsProtectionEnabledAsync(ct);
 
-        var tweaks = _engine.DragCarTweaks.ToList();
+        var tweaks = _engine.OneClickTweaks.ToList();
         TotalCount = tweaks.Count;
 
         var applied = 0;
@@ -88,9 +88,9 @@ public sealed partial class DashboardViewModel(
     }
 
     [RelayCommand]
-    private async Task RunDragCarAsync()
+    private async Task RunOneClickAsync()
     {
-        var pending = _engine.DragCarTweaks.ToList();
+        var pending = _engine.OneClickTweaks.ToList();
 
         var risky = pending.Where(t => t.Risk is RiskLevel.SecurityTradeoff or RiskLevel.Breaking).ToList();
 
@@ -108,14 +108,14 @@ public sealed partial class DashboardViewModel(
 
         message += "Each tweak can be individually reverted afterwards from its category page.";
 
-        if (!await Shell.ConfirmAsync("Drag Car Mode", message, "Create restore point & optimise", destructive: true))
+        if (!await Shell.ConfirmAsync("One-Click Optimise", message, "Create restore point & optimise"))
         {
             return;
         }
 
-        await Shell.RunExclusiveAsync("Drag Car Mode", async (progress, ct) =>
+        await Shell.RunExclusiveAsync("One-Click Optimise", async (progress, ct) =>
         {
-            var summary = await _engine.ApplyAsync(pending, "Drag Car Mode", createRestorePoint: true, progress, ct);
+            var summary = await _engine.ApplyAsync(pending, "One-Click Optimise", createRestorePoint: true, progress, ct);
 
             if (summary.Aborted)
             {
@@ -131,7 +131,7 @@ public sealed partial class DashboardViewModel(
             await LoadStateAsync(progress, ct);
 
             await Shell.ConfirmAsync(
-                "Drag Car Mode complete",
+                "Optimisation complete",
                 $"{summary.Applied} tweak(s) applied.\n" +
                 $"{summary.AlreadyDone} were already set.\n" +
                 (summary.Failures > 0 ? $"{summary.Failures} failed. Check the log.\n" : string.Empty) +
@@ -149,8 +149,7 @@ public sealed partial class DashboardViewModel(
                 "Every tweak this app applied will be restored to the value it had beforehand, using the " +
                 "recorded undo data.\n\nRemoved bloatware is not restored. That has to come back from the " +
                 "Microsoft Store.",
-                "Revert all tweaks",
-                destructive: true))
+                "Revert all tweaks"))
         {
             return;
         }

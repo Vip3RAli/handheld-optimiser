@@ -33,11 +33,11 @@
             <!-- The headline action. -->
             <ui:Card Margin="0,0,0,12">
                 <StackPanel>
-                    <TextBlock Text="Drag Car Mode" FontSize="20" FontWeight="SemiBold" />
+                    <TextBlock Text="Recommended Tweaks" FontSize="20" FontWeight="SemiBold" />
                     <TextBlock TextWrapping="Wrap" Opacity="0.75" Margin="0,4,0,0"
                                Text="Applies the performance and debloat tweaks in one pass. Creates a System Restore point first, and refuses to change anything if that fails. Bloatware removal stays separate so you can review it, and Virtual Machine Platform is left on because some anti-cheat games need it. Turn that off from Gaming Tweaks if you don't." />
 
-                    <ui:Button Command="{Binding RunDragCarCommand}"
+                    <ui:Button Command="{Binding RunOneClickCommand}"
                                Appearance="Primary"
                                Height="68"
                                FontSize="17"
@@ -99,7 +99,7 @@
                                    Command="{Binding CreateRestorePointOnlyCommand}"
                                    Margin="0,0,10,0" />
                         <ui:Button Content="Revert all tweaks"
-                                   Appearance="Caution"
+                                   Appearance="Primary"
                                    Command="{Binding RevertAllCommand}"
                                    IsEnabled="{Binding CanRevert}" />
                     </StackPanel>

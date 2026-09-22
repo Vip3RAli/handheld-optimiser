@@ -33,7 +33,7 @@ public static class ServiceTweaks
             "constantly and has no role in games, which ship their own compatibility handling.",
         risk: RiskLevel.Safe,
         warning: null,
-        includeInDragCar: true,
+        includeInOneClick: true,
         services: ["PcaSvc"]);
 
     public static Tweak LinkTracking => DisableServices(
@@ -44,12 +44,12 @@ public static class ServiceTweaks
             "network share. Nothing on a single-drive handheld relies on it.",
         risk: RiskLevel.Safe,
         warning: null,
-        includeInDragCar: true,
+        includeInOneClick: true,
         services: ["TrkWks"]);
 
     /// <summary>
     /// All of these are Manual and stopped on a stock Ally, so disabling them frees nothing at runtime.
-    /// The value is that nothing can start them later. Kept as one toggle and out of Drag Car Mode so it is
+    /// The value is that nothing can start them later. Kept as one toggle and out of One-Click Optimise so it is
     /// not mistaken for a performance change.
     /// </summary>
     public static Tweak UnusedHandheldServices => DisableServices(
@@ -65,7 +65,7 @@ public static class ServiceTweaks
             "Mobile Hotspot and Internet Connection Sharing stop working, calls through Phone Link stop, " +
             "offline maps no longer update, Microsoft Family parental controls are not enforced on this device, " +
             "and Windows Insider builds cannot be received.",
-        includeInDragCar: false,
+        includeInOneClick: false,
         services:
         [
             "RetailDemo",
@@ -89,7 +89,7 @@ public static class ServiceTweaks
             "and on a 16 GB handheld that memory is better left free for the game and the iGPU.",
         risk: RiskLevel.Safe,
         warning: null,
-        includeInDragCar: true,
+        includeInOneClick: true,
         services: ["SysMain"]);
 
     public static Tweak SearchIndexer => DisableServices(
@@ -103,7 +103,7 @@ public static class ServiceTweaks
             "Searching for files and file contents in Start and File Explorer becomes slower, and apps that " +
             "rely on the index (Outlook search, for example) will return fewer results. Launching apps from " +
             "Start by name still works.",
-        includeInDragCar: false,
+        includeInOneClick: false,
         services: ["WSearch"]);
 
     public static Tweak PrintAndFax => DisableServices(
@@ -116,7 +116,7 @@ public static class ServiceTweaks
         warning:
             "Nothing can print while this is on, including \"Microsoft Print to PDF\". Revert it before " +
             "printing or adding a printer.",
-        includeInDragCar: false,
+        includeInOneClick: false,
         services: ["Spooler", "Fax"]);
 
     private static Tweak DisableServices(
@@ -125,7 +125,7 @@ public static class ServiceTweaks
         string description,
         RiskLevel risk,
         string? warning,
-        bool includeInDragCar,
+        bool includeInOneClick,
         string[] services) => new()
     {
         Id = id,
@@ -134,7 +134,7 @@ public static class ServiceTweaks
         Category = TweakCategory.Services,
         Risk = risk,
         Warning = warning,
-        IncludeInDragCar = includeInDragCar,
+        IncludeInOneClick = includeInOneClick,
 
         // Detection reads the registry directly: it is kept in step because changes go through sc.exe,
         // and it avoids starting a PowerShell process for every card on the page.

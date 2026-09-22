@@ -21,9 +21,24 @@ public sealed partial class PowerActionItemViewModel(PowerAction action, TweakEn
     [ObservableProperty]
     private string _lastResult = string.Empty;
 
+    /// <summary>Drives the spinner on this row's button, so a multi-minute job visibly belongs to it.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ButtonText))]
+    private bool _isWorking;
+
+    public string ButtonText => IsWorking ? "Working…" : "Run";
+
     [RelayCommand]
     private async Task RunAsync()
     {
+        // Refuse up front rather than after the user has confirmed; the engine checks again before running.
+        if (Action.Precheck?.Invoke() is { } refusal)
+        {
+            LastResult = $"Not run: {refusal}";
+            await shell.ConfirmAsync($"Cannot run {Action.Name}", refusal, "OK");
+            return;
+        }
+
         var message = Action.Description;
 
         if (HasWarning)
@@ -48,11 +63,21 @@ public sealed partial class PowerActionItemViewModel(PowerAction action, TweakEn
 
         await shell.RunExclusiveAsync(Action.Name, async (progress, ct) =>
         {
-            var summary = await engine.RunActionAsync(Action, progress, ct);
+            ApplyRunSummary summary;
+
+            IsWorking = true;
+            try
+            {
+                summary = await engine.RunActionAsync(Action, progress, ct);
+            }
+            finally
+            {
+                IsWorking = false;
+            }
 
             if (summary.Aborted)
             {
-                LastResult = "Not run: no restore point could be created.";
+                LastResult = $"Not run: {summary.AbortReason ?? "aborted."}";
                 await shell.ConfirmAsync("Nothing was changed", summary.AbortReason ?? "Aborted.", "OK");
                 return;
             }

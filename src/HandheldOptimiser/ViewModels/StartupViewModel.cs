@@ -21,14 +21,11 @@ public sealed partial class StartupRowViewModel(StartupEntry entry, StartupServi
     public string Name => Entry.Name;
     public string Command => Entry.Command;
     public string ScopeLabel => Entry.ScopeLabel;
-    public bool IsProtected => Entry.IsProtected;
-    public string? ProtectedReason => Entry.ProtectedReason;
-    public bool CanToggle => !Entry.IsProtected;
 
     [RelayCommand]
     private void Toggle()
     {
-        if (_suppress || IsProtected || _shell.IsBusy)
+        if (_suppress || _shell.IsBusy)
         {
             return;
         }
@@ -45,8 +42,8 @@ public sealed partial class StartupRowViewModel(StartupEntry entry, StartupServi
 }
 
 /// <summary>
-/// Startup entry manager. ASUS, AMD, Realtek and security entries are listed but locked: visible so the
-/// user can confirm they are present and untouched, not editable.
+/// Startup entry manager. Every Run-key entry can be switched on or off, including vendor and security
+/// ones; the change is a Task Manager flag, so it is always reversible from here or Task Manager.
 /// </summary>
 public sealed partial class StartupViewModel(StartupService service, IShell shell) : PageViewModelBase(shell)
 {
@@ -54,7 +51,7 @@ public sealed partial class StartupViewModel(StartupService service, IShell shel
 
     public override string Title => "Startup Apps";
     public override string Glyph => "";
-    public override string Subtitle => "Disable startup programs. Hardware and security entries are locked.";
+    public override string Subtitle => "Turn startup programs on or off.";
 
     public ObservableCollection<StartupRowViewModel> Entries { get; } = [];
 
@@ -82,8 +79,7 @@ public sealed partial class StartupViewModel(StartupService service, IShell shel
                 Entries.Add(new StartupRowViewModel(entry, _service, Shell));
             }
 
-            SummaryText = $"{found.Count} entries: {found.Count(e => e.IsProtected)} locked as protected, " +
-                          $"{found.Count(e => !e.IsProtected)} you can change.";
+            SummaryText = $"{found.Count} entries, {found.Count(e => e.IsEnabled)} enabled.";
 
             return Task.CompletedTask;
         });

@@ -77,7 +77,7 @@ public sealed partial class TweakListViewModel : PageViewModelBase
                        string.Join("\n", risky.Select(t => $"  • {t.Name}"));
         }
 
-        if (!await Shell.ConfirmAsync($"Apply all {Title}", message, "Create restore point & apply", destructive: risky.Count > 0))
+        if (!await Shell.ConfirmAsync($"Apply all {Title}", message, "Create restore point & apply"))
         {
             return;
         }

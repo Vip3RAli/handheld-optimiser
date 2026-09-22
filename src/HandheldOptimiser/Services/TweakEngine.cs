@@ -50,7 +50,10 @@ public sealed class TweakEngine
             .. CpuKernelTweaks.All,
             .. NetworkTweaks.All,
             .. ServiceTweaks.All,
-            .. InterfaceTweaks.All
+            .. InterfaceTweaks.All,
+            .. StorageTweaks.All,
+            .. GraphicsTweaks.All,
+            .. UsabilityTweaks.All
         ];
 
         PowerActions = TweakDefinitions.PowerActions.All;
@@ -62,7 +65,7 @@ public sealed class TweakEngine
 
     public Tweak? FindById(string id) => AllTweaks.FirstOrDefault(t => t.Id == id);
 
-    public IEnumerable<Tweak> DragCarTweaks => AllTweaks.Where(t => t.IncludeInDragCar);
+    public IEnumerable<Tweak> OneClickTweaks => AllTweaks.Where(t => t.IncludeInOneClick);
 
     public async Task<TweakState> DetectAsync(Tweak tweak, CancellationToken ct = default) =>
         await tweak.DetectAsync(_context, ct);
@@ -233,6 +236,15 @@ public sealed class TweakEngine
         var summary = new ApplyRunSummary();
 
         _log.Info($"=== {action.Name} ===");
+
+        // Checked before the restore point, so a run that cannot go ahead does not leave one behind.
+        if (action.Precheck?.Invoke() is { } refusal)
+        {
+            summary.Aborted = true;
+            summary.AbortReason = $"{refusal} Nothing was changed.";
+            _log.Warning($"Not run: {refusal}");
+            return summary;
+        }
 
         if (action.CreateRestorePoint)
         {

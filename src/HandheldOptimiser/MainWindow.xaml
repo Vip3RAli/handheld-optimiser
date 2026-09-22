@@ -6,6 +6,7 @@
                  xmlns:views="clr-namespace:HandheldOptimiser.Views"
                  xmlns:pages="clr-namespace:HandheldOptimiser.Views.Pages"
                  Title="Handheld Optimiser"
+                 Icon="pack://application:,,,/Assets/app.ico"
                  Width="1180" Height="740"
                  MinWidth="900" MinHeight="560"
                  WindowStartupLocation="CenterScreen"
@@ -54,7 +55,7 @@
 
         <ui:TitleBar Grid.Row="0" Title="Handheld Optimiser" ShowMaximize="True">
             <ui:TitleBar.Icon>
-                <ui:FontIcon Glyph="&#xE7FC;" />
+                <ui:ImageIcon Source="pack://application:,,,/Assets/app-64.png" Width="18" Height="18" />
             </ui:TitleBar.Icon>
         </ui:TitleBar>
 
@@ -70,7 +71,7 @@
                 <ui:Button Content="Restart now"
                            Margin="0,8,0,0"
                            HorizontalAlignment="Left"
-                           Appearance="Caution"
+                           Appearance="Primary"
                            Command="{Binding RestartNowCommand}" />
             </ui:InfoBar.Content>
         </ui:InfoBar>
