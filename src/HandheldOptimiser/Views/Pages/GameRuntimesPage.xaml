@@ -77,10 +77,19 @@
                 <TextBlock Text="Essentials" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8" />
                 <ItemsControl ItemsSource="{Binding EssentialRows}" ItemTemplate="{StaticResource RuntimeRow}" />
 
-                <TextBlock Text="Optional legacy runtimes" FontSize="16" FontWeight="SemiBold" Margin="0,14,0,2" />
-                <TextBlock Text="Only a handful of older games need these. Install one if a game asks for it."
-                           FontSize="12" Opacity="0.6" Margin="0,0,0,8" TextWrapping="Wrap" />
-                <ItemsControl ItemsSource="{Binding LegacyRows}" ItemTemplate="{StaticResource RuntimeRow}" />
+                <!-- Collapsed by default: few games need these, and they would otherwise push the
+                     essentials' buttons further down a 7" screen. -->
+                <Expander Margin="0,14,0,0" IsExpanded="False">
+                    <Expander.Header>
+                        <StackPanel>
+                            <TextBlock Text="Optional legacy runtimes" FontSize="16" FontWeight="SemiBold" />
+                            <TextBlock Text="Only a handful of older games need these. Install one if a game asks for it."
+                                       FontSize="12" Opacity="0.6" Margin="0,2,0,0" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Expander.Header>
+                    <ItemsControl ItemsSource="{Binding LegacyRows}" ItemTemplate="{StaticResource RuntimeRow}"
+                                  Margin="0,8,0,0" />
+                </Expander>
             </StackPanel>
         </ScrollViewer>
     </Grid>
