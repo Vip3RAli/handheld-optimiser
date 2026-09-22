@@ -165,7 +165,7 @@ public static class ServiceTweaks
             {
                 if (SafetyGuard.IsServiceProtected(service, out var reason))
                 {
-                    ctx.Log.Error($"BLOCKED service {service} — {reason}");
+                    ctx.Log.Error($"BLOCKED service {service}: {reason}");
                     return TweakResult.Blocked(id, reason!);
                 }
             }
@@ -265,7 +265,7 @@ public static class ServiceTweaks
 
                 if (SafetyGuard.IsServiceProtected(service, out var reason))
                 {
-                    ctx.Log.Error($"BLOCKED service {service} — {reason}");
+                    ctx.Log.Error($"BLOCKED service {service}: {reason}");
                     return TweakResult.Blocked(id, reason!);
                 }
 

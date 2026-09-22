@@ -5,7 +5,7 @@ namespace HandheldOptimiser.TweakDefinitions;
 
 /// <summary>
 /// Telemetry, search, assistant and background-app tweaks. Nothing here touches Defender, the firewall,
-/// Windows Update or any vendor software — see <see cref="Services.SafetyGuard"/>, which enforces that at
+/// Windows Update or any vendor software. See <see cref="Services.SafetyGuard"/>, which enforces that at
 /// write time rather than trusting this file to stay well-behaved.
 /// </summary>
 public static class DebloatTweaks
@@ -46,7 +46,7 @@ public static class DebloatTweaks
         Description =
             "Sets telemetry to the minimum the OS allows, disables the Compatibility Appraiser and CEIP " +
             "scheduled tasks, turns off the advertising ID, and stops the DiagTrack service. Windows Update " +
-            "and Defender are unaffected — neither depends on any of this.",
+            "and Defender are unaffected, as neither depends on any of this.",
         Category = TweakCategory.Privacy,
         Risk = RiskLevel.Safe,
         RequiresReboot = true,

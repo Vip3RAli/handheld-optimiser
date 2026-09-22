@@ -103,7 +103,7 @@ public sealed class StartupService(LogService log, RegistryHelper registry)
     {
         if (entry.IsProtected)
         {
-            _log.Error($"BLOCKED startup change for \"{entry.Name}\" — {entry.ProtectedReason}");
+            _log.Error($"BLOCKED startup change for \"{entry.Name}\": {entry.ProtectedReason}");
             return null;
         }
 

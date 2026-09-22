@@ -58,7 +58,7 @@ public sealed partial class PowerActionItemViewModel(PowerAction action, TweakEn
             }
 
             var result = summary.Results.FirstOrDefault();
-            LastResult = $"{DateTime.Now:HH:mm} — {result?.Message ?? "Finished."}";
+            LastResult = $"{DateTime.Now:HH:mm}: {result?.Message ?? "Finished."}";
 
             if (summary.RebootRequired)
             {

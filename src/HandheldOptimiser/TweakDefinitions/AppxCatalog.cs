@@ -4,7 +4,7 @@ namespace HandheldOptimiser.TweakDefinitions;
 
 /// <summary>
 /// The curated bloatware list. Deliberately a fixed catalog rather than "remove everything not on an
-/// allowlist" — the user sees each package ID before it goes, and a new Windows build cannot silently
+/// allowlist": the user sees each package ID before it goes, and a new Windows build cannot silently
 /// widen the blast radius.
 ///
 /// Anything ASUS, AMD, Realtek, Xbox/Game Pass, Store or codec-related is absent here by design and

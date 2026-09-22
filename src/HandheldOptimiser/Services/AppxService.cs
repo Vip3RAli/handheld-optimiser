@@ -6,7 +6,7 @@ namespace HandheldOptimiser.Services;
 /// <summary>
 /// Scans for and removes packaged apps from the curated catalog.
 ///
-/// Removal is the one operation in this app that the undo journal cannot reverse — getting an app back
+/// Removal is the one operation in this app that the undo journal cannot reverse. Getting an app back
 /// means reinstalling it from the Store. The journal still records what went, so there is a definitive
 /// list to reinstall from, and the UI says so plainly rather than implying a revert button will fix it.
 /// </summary>
@@ -108,7 +108,7 @@ public sealed class AppxService(LogService log, PowerShellRunner runner)
         {
             if (SafetyGuard.IsAppxProtected(target.IdentityName, out var reason))
             {
-                _log.Error($"BLOCKED removal of {target.IdentityName} — {reason}");
+                _log.Error($"BLOCKED removal of {target.IdentityName}: {reason}");
                 continue;
             }
 

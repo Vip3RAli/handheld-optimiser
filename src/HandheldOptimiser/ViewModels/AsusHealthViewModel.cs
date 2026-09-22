@@ -66,7 +66,7 @@ public sealed partial class AsusHealthViewModel(SystemStateService systemState, 
         HasProblems = bad > 0;
 
         SummaryText = bad > 0
-            ? $"{bad} problem(s) found — something has disabled a component that should be running."
+            ? $"{bad} problem(s) found. Something has disabled a component that should be running."
             : warn > 0
                 ? $"All protected components healthy. {warn} performance opportunit{(warn == 1 ? "y" : "ies")} available."
                 : "All protected components healthy and fully optimised.";
@@ -78,7 +78,7 @@ public sealed partial class AsusHealthViewModel(SystemStateService systemState, 
         var confirmed = await Shell.ConfirmAsync(
             "Repair protected services",
             "Any ASUS, AMD, Realtek, Defender, Windows Update or Game Pass service currently set to " +
-            "Disabled will be set back to Automatic and started.\n\nThis only ever re-enables services — " +
+            "Disabled will be set back to Automatic and started.\n\nThis only ever re-enables services; " +
             "it cannot disable anything.",
             "Repair now");
 

@@ -112,12 +112,12 @@ public static class SafetyGuard
         "gamingapp", "gamingservices", "xboxidentityprovider",
         "xbox.tcui", "xboxgameoverlay", "xboxgamingoverlay", "xboxspeechtotextoverlay",
 
-        // Framework dependencies — removing these breaks unrelated apps in confusing ways
+        // Framework dependencies: removing these breaks unrelated apps in confusing ways
         "vclibs", "net.native", "ui.xaml", "windowsappruntime",
         "microsoftwindows.client", "windows.shellexperiencehost",
         "windows.startmenuexperiencehost", "windows.search", "windows.cortana.persistentstorage",
 
-        // Media codecs — several games and the Xbox app depend on these
+        // Media codecs: several games and the Xbox app depend on these
         "heifimageextension", "hevcvideoextension", "vp9videoextensions",
         "webmediaextensions", "webpimageextension", "av1videoextension",
         "rawimageextension"

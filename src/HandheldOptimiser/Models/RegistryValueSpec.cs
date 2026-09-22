@@ -33,7 +33,7 @@ public sealed record RegistryValueSpec(
 }
 
 /// <summary>
-/// What a registry value looked like before we touched it, so the change can be undone exactly —
+/// What a registry value looked like before we touched it, so the change can be undone exactly,
 /// including undoing it back to "this value did not exist", which is not the same as "it was zero".
 /// </summary>
 public sealed class RegistryValueSnapshot

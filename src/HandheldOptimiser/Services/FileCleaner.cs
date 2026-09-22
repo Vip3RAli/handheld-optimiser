@@ -36,7 +36,7 @@ public static class FileCleaner
 
         if (!SafetyGuard.IsDeletionAllowed(root, out var reason))
         {
-            log.Error($"BLOCKED cleanup of {root} — {reason}");
+            log.Error($"BLOCKED cleanup of {root}: {reason}");
             tally.Blocked = true;
             return tally;
         }
@@ -58,7 +58,7 @@ public static class FileCleaner
 
         if (!SafetyGuard.IsDeletionAllowed(path, out var reason))
         {
-            log.Error($"BLOCKED deletion of {path} — {reason}");
+            log.Error($"BLOCKED deletion of {path}: {reason}");
             tally.Blocked = true;
             return tally;
         }

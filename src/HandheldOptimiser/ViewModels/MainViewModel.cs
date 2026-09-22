@@ -152,7 +152,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         // registry pass behind it.
         if (!await _gate.WaitAsync(0))
         {
-            Log.Warning($"\"{statusText}\" ignored — another operation is already running.");
+            Log.Warning($"\"{statusText}\" ignored because another operation is already running.");
             return;
         }
 

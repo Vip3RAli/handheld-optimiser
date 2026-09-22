@@ -17,7 +17,7 @@ public sealed class TweakContext(LogService log, RegistryHelper registry, PowerS
 /// One user-facing toggle.
 ///
 /// A tweak is any combination of registry values and script work. Most are pure registry, a few
-/// (optional features, boot configuration, scheduled tasks) need a script, and some need both — so
+/// (optional features, boot configuration, scheduled tasks) need a script, and some need both, so
 /// rather than a class per flavour this holds both and skips whichever half is empty.
 /// </summary>
 public sealed class Tweak

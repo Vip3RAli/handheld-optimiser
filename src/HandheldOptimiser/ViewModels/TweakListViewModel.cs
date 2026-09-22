@@ -7,7 +7,7 @@ namespace HandheldOptimiser.ViewModels;
 
 /// <summary>
 /// A page showing every tweak in one or more categories. Backs both the Gaming Tweaks and System Debloat
-/// pages — they differ only in which categories they include and their heading text.
+/// pages, which differ only in which categories they include and their heading text.
 /// </summary>
 public sealed partial class TweakListViewModel : PageViewModelBase
 {
