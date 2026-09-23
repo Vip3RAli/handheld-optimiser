@@ -21,8 +21,25 @@ public sealed class PowerShellRunner(LogService log)
     private readonly LogService _log = log;
 
     /// <summary>
-    /// Executes a PowerShell script block. The script is passed via a temp file rather than
-    /// -EncodedCommand so that the log shows readable source and quoting stops being a hazard.
+    /// Reads the script from stdin as UTF-8 and runs it in the session's own scope, so it behaves as if
+    /// it were a .ps1 run with -File: <c>exit N</c> sets the exit code, and finishing without one gives 0.
+    /// Output is switched to UTF-8 so non-ASCII paths and user names come back intact; that can fail
+    /// without a console, in which case output stays in the OEM code page as before.
+    /// </summary>
+    private const string StdinBootstrap =
+        "try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch { }; " +
+        "$r = New-Object System.IO.StreamReader([Console]::OpenStandardInput(), (New-Object System.Text.UTF8Encoding $false)); " +
+        "$s = $r.ReadToEnd(); " +
+        ". ([scriptblock]::Create($s)); " +
+        "exit 0";
+
+    /// <summary>
+    /// Executes a PowerShell script block, piped in over stdin.
+    ///
+    /// Not a temp file: this process is elevated, and anything unelevated running as the same user can
+    /// write to %TEMP%, so a script file there could be swapped between being written and being run
+    /// with administrator rights. Not -EncodedCommand either, which caps the script length and hides it
+    /// from anyone reading a process list. The log still shows the readable source.
     /// </summary>
     public async Task<ProcessOutcome> RunScriptAsync(
         string script,
@@ -44,34 +61,13 @@ public sealed class PowerShellRunner(LogService log)
             }
         }
 
-        var tempScript = Path.Combine(Path.GetTempPath(), $"ho-{Guid.NewGuid():N}.ps1");
-
-        try
-        {
-            // UTF-8 with BOM so PowerShell 5.1 reads non-ASCII correctly.
-            await File.WriteAllTextAsync(tempScript, script, new UTF8Encoding(true), ct);
-
-            return await RunProcessAsync(
-                "powershell.exe",
-                ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", tempScript],
-                description,
-                ct,
-                echoCommand: false);
-        }
-        finally
-        {
-            try
-            {
-                if (File.Exists(tempScript))
-                {
-                    File.Delete(tempScript);
-                }
-            }
-            catch (IOException)
-            {
-                // Temp file cleanup is best effort.
-            }
-        }
+        return await RunProcessAsync(
+            "powershell.exe",
+            ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", StdinBootstrap],
+            description,
+            ct,
+            echoCommand: false,
+            standardInput: script);
     }
 
     public async Task<ProcessOutcome> RunProcessAsync(
@@ -80,7 +76,8 @@ public sealed class PowerShellRunner(LogService log)
         string description,
         CancellationToken ct = default,
         bool echoCommand = true,
-        bool logOutput = true)
+        bool logOutput = true,
+        string? standardInput = null)
     {
         if (echoCommand)
         {
@@ -88,17 +85,31 @@ public sealed class PowerShellRunner(LogService log)
             _log.Trace($"    {fileName} {string.Join(' ', arguments)}");
         }
 
+        var executable = TrustedExecutables.Resolve(fileName, out var untrusted);
+        if (executable is null)
+        {
+            _log.Error($"Not running {fileName}: {untrusted}");
+            return new ProcessOutcome(-1, string.Empty, untrusted ?? string.Empty);
+        }
+
         var psi = new ProcessStartInfo
         {
-            FileName = fileName,
+            FileName = executable,
+            // The current directory is wherever the app was launched from, possibly a folder the user
+            // can write to; nothing started from here should look for files there.
+            WorkingDirectory = Environment.SystemDirectory,
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
+            RedirectStandardInput = standardInput is not null,
+            StandardInputEncoding = standardInput is not null ? new UTF8Encoding(false) : null,
             StandardOutputEncoding = Encoding.UTF8,
             StandardErrorEncoding = Encoding.UTF8,
             WindowStyle = ProcessWindowStyle.Hidden
         };
+
+        psi.Environment["PSModulePath"] = TrustedExecutables.SystemModulePath;
 
         foreach (var arg in arguments)
         {
@@ -157,6 +168,20 @@ public sealed class PowerShellRunner(LogService log)
 
         try
         {
+            // Written after the output pipes are being drained, so a chatty process cannot deadlock the write.
+            if (standardInput is not null)
+            {
+                try
+                {
+                    await process.StandardInput.WriteAsync(standardInput.AsMemory(), ct);
+                    process.StandardInput.Close();
+                }
+                catch (IOException)
+                {
+                    // The process exited before reading all of it; its exit code says what happened.
+                }
+            }
+
             await process.WaitForExitAsync(ct);
         }
         catch (OperationCanceledException)

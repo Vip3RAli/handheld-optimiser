@@ -178,7 +178,7 @@ public sealed partial class BloatwareViewModel(
 
             var entry = new TweakJournalEntry
             {
-                TweakId = $"appx.removal.{DateTimeOffset.UtcNow:yyyyMMddHHmmss}",
+                TweakId = $"{TweakJournalService.RemovalRecordPrefix}{DateTimeOffset.UtcNow:yyyyMMddHHmmss}",
                 TweakName = "Bloatware removal",
                 AppliedAtUtc = DateTimeOffset.UtcNow
             };

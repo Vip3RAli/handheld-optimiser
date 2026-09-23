@@ -117,11 +117,12 @@ public static class DebloatTweaks
         },
         ScriptRevert = async (ctx, journal, ct) =>
         {
-            // A task captured as Running or Queued was enabled too; only Disabled ones stay off.
-            var toEnable = journal.CapturedState
-                .Where(kv => kv.Key.StartsWith("task.", StringComparison.Ordinal) &&
-                             !kv.Value.Equals("Disabled", StringComparison.OrdinalIgnoreCase))
-                .Select(kv => kv.Key["task.".Length..])
+            // A task captured as Running or Queued was enabled too; only Disabled ones stay off. Names come
+            // from the task list rather than the journal's keys, because the journal is a file on disk and
+            // these names are pasted into an elevated script.
+            var toEnable = TelemetryTasks
+                .Where(t => journal.CapturedState.TryGetValue($"task.{t}", out var state) &&
+                            !state.Equals("Disabled", StringComparison.OrdinalIgnoreCase))
                 .ToArray();
 
             if (toEnable.Length == 0)
@@ -253,6 +254,7 @@ public static class DebloatTweaks
 
         return $$"""
             $ErrorActionPreference = 'Continue'
+            $failed = $false
             $tasks = @(
                 {{list}}
             )
@@ -265,8 +267,10 @@ public static class DebloatTweaks
                     continue
                 }
                 Write-Output "{{word}} scheduled task: $full"
-                {{verb}} -TaskPath $parent -TaskName $leaf -ErrorAction Continue | Out-Null
+                try { {{verb}} -TaskPath $parent -TaskName $leaf -ErrorAction Stop | Out-Null }
+                catch { Write-Output "  failed: $($_.Exception.Message)"; $failed = $true }
             }
+            if ($failed) { exit 1 }
             """;
     }
 }

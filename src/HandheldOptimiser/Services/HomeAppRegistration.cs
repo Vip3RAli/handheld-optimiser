@@ -135,12 +135,24 @@ public static class HomeAppRegistration
         key.SetValue("CustomArgs", customArgs);
     }
 
+    private const string AppModelUnlockKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock";
+    private const string DeveloperModeValue = "AllowDevelopmentWithoutDevLicense";
+
+    // Developer mode's value from before a registration, kept until it has been put back. In HKLM so
+    // only an administrator can plant or change it, since the next start acts on it.
+    private const string PendingKey = @"SOFTWARE\HandheldOptimiser";
+    private const string PendingDeveloperModeValue = "DeveloperModeBeforeRegistration";
+    private const string DeveloperModeWasAbsent = "absent";
+
     /// <summary>
     /// Registers the package against the install folder.
     ///
     /// Windows only accepts the package's unsigned capability file (Catalog FFFF) while developer mode
     /// is on, and only checks it at install time. So developer mode is switched on for this one
-    /// Add-AppxPackage call and put back to its previous value in a finally block, whatever happens.
+    /// Add-AppxPackage call and put back afterwards. That is done here rather than in the script's own
+    /// finally block, which never runs if PowerShell is killed. The previous value is also written down
+    /// first, so if this app is closed or crashes midway, <see cref="RestoreDeveloperModeIfInterrupted"/>
+    /// puts it back on the next start.
     /// </summary>
     public static async Task<bool> RegisterAsync(TweakContext ctx, CancellationToken ct)
     {
@@ -150,38 +162,119 @@ public static class HomeAppRegistration
             return false;
         }
 
-        var package = PackagePath.Replace("'", "''");
-        var location = InstallDirectory.Replace("'", "''");
+        var before = ctx.Registry.ReadValue(RegistryRoot.LocalMachine, AppModelUnlockKey, DeveloperModeValue);
+        SetPendingDeveloperMode(before is int value ? value.ToString() : DeveloperModeWasAbsent);
 
-        var script = $$"""
-            $ErrorActionPreference = 'Stop'
-            $key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock'
-            $name = 'AllowDevelopmentWithoutDevLicense'
-            $before = (Get-ItemProperty $key -Name $name -ErrorAction SilentlyContinue).$name
+        var devModeSnapshot = ctx.Registry.WriteValue(new RegistryValueSpec(
+            RegistryRoot.LocalMachine, AppModelUnlockKey, DeveloperModeValue, 1, RegistryValueKind.DWord));
 
-            try {
-                # A previous registration may point at an older install folder.
-                Get-AppxPackage -Name '{{PackageName}}' | Remove-AppxPackage
+        if (devModeSnapshot is null)
+        {
+            ClearPendingDeveloperMode();
+            ctx.Log.Error("Could not switch developer mode on, which Windows needs to register the home app.");
+            return false;
+        }
 
-                if (-not (Test-Path $key)) { New-Item $key -Force | Out-Null }
-                Set-ItemProperty $key -Name $name -Value 1 -Type DWord
-                Write-Output 'Developer mode switched on for registration'
+        try
+        {
+            var package = PackagePath.Replace("'", "''");
+            var location = InstallDirectory.Replace("'", "''");
 
-                Add-AppxPackage -Path '{{package}}' -ExternalLocation '{{location}}' -AllowUnsigned
-                Write-Output 'RESULT=OK'
+            var script = $$"""
+                $ErrorActionPreference = 'Stop'
+                try {
+                    # A previous registration may point at an older install folder.
+                    Get-AppxPackage -Name '{{PackageName}}' | Remove-AppxPackage
+
+                    Add-AppxPackage -Path '{{package}}' -ExternalLocation '{{location}}' -AllowUnsigned
+                    Write-Output 'RESULT=OK'
+                }
+                catch {
+                    Write-Output "RESULT=FAIL $($_.Exception.Message)"
+                }
+                """;
+
+            var outcome = await ctx.Runner.RunScriptAsync(script, "Register Handheld Optimiser as a home app", ct, echoScript: false);
+            return outcome.StdOut.Contains("RESULT=OK", StringComparison.Ordinal);
+        }
+        finally
+        {
+            // Left pending if this fails, so the next start tries again.
+            if (ctx.Registry.RestoreSnapshot(devModeSnapshot))
+            {
+                ClearPendingDeveloperMode();
             }
-            catch {
-                Write-Output "RESULT=FAIL $($_.Exception.Message)"
-            }
-            finally {
-                if ($null -eq $before) { Remove-ItemProperty $key -Name $name -ErrorAction SilentlyContinue }
-                else { Set-ItemProperty $key -Name $name -Value $before -Type DWord }
-                Write-Output "Developer mode restored to previous value ($(if ($null -eq $before) { 'not set' } else { $before }))"
-            }
-            """;
+        }
+    }
 
-        var outcome = await ctx.Runner.RunScriptAsync(script, "Register Handheld Optimiser as a home app", ct, echoScript: false);
-        return outcome.StdOut.Contains("RESULT=OK", StringComparison.Ordinal);
+    /// <summary>
+    /// Called at startup. If a registration was cut short with developer mode still switched on, puts it
+    /// back to the value recorded before the registration began.
+    /// </summary>
+    public static void RestoreDeveloperModeIfInterrupted(RegistryHelper registry, LogService log)
+    {
+        string? pending;
+        using (var key = Registry.LocalMachine.OpenSubKey(PendingKey))
+        {
+            pending = key?.GetValue(PendingDeveloperModeValue) as string;
+        }
+
+        if (pending is null)
+        {
+            return;
+        }
+
+        var wasAbsent = pending == DeveloperModeWasAbsent;
+        if (!wasAbsent && !int.TryParse(pending, out _))
+        {
+            log.Warning($"Ignoring an unreadable developer mode record (\"{pending}\").");
+            ClearPendingDeveloperMode();
+            return;
+        }
+
+        log.Warning("A home app registration did not finish last time. Putting developer mode back as it was.");
+
+        var snapshot = new RegistryValueSnapshot
+        {
+            Root = RegistryRoot.LocalMachine,
+            SubKey = AppModelUnlockKey,
+            ValueName = DeveloperModeValue,
+            KeyExisted = true,
+            ValueExisted = !wasAbsent,
+            OriginalKind = RegistryValueKind.DWord,
+            OriginalValue = wasAbsent ? null : pending
+        };
+
+        if (registry.RestoreSnapshot(snapshot))
+        {
+            ClearPendingDeveloperMode();
+        }
+    }
+
+    private static void SetPendingDeveloperMode(string value)
+    {
+        using var key = Registry.LocalMachine.CreateSubKey(PendingKey);
+        key.SetValue(PendingDeveloperModeValue, value, RegistryValueKind.String);
+    }
+
+    private static void ClearPendingDeveloperMode()
+    {
+        using (var key = Registry.LocalMachine.OpenSubKey(PendingKey, writable: true))
+        {
+            key?.DeleteValue(PendingDeveloperModeValue, throwOnMissingValue: false);
+        }
+
+        // Only there to hold the record; removed once it is empty so nothing is left behind.
+        bool empty;
+        using (var check = Registry.LocalMachine.OpenSubKey(PendingKey))
+        {
+            empty = check is not null && check.ValueCount == 0 && check.SubKeyCount == 0;
+        }
+
+        if (empty)
+        {
+            Registry.LocalMachine.DeleteSubKey(PendingKey, throwOnMissingSubKey: false);
+        }
     }
 
     public static async Task<bool> UnregisterAsync(TweakContext ctx, CancellationToken ct)

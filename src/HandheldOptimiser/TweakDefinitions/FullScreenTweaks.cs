@@ -13,6 +13,13 @@ public static class FullScreenTweaks
     private const string HomeAppId = "fse.homeapp";
     private const string RegisteredByUs = "package.registered";
 
+    private static readonly RegistryValueSpec HomeAppSetting = new(
+        RegistryRoot.CurrentUser,
+        HomeAppRegistration.GamingConfigurationKey,
+        HomeAppRegistration.HomeAppValue,
+        HomeAppRegistration.AppUserModelId,
+        RegistryValueKind.String);
+
     public static IReadOnlyList<Tweak> All =>
     [
         UseAsHomeApp,
@@ -34,6 +41,7 @@ public static class FullScreenTweaks
         Category = TweakCategory.FullScreen,
         Risk = RiskLevel.Moderate,
         IncludeInOneClick = false,
+        ScriptRegistryValues = [HomeAppSetting],
         ScriptDetect = (ctx, ct) =>
         {
             if (!HomeAppRegistration.IsFullScreenExperienceAvailable())
@@ -66,16 +74,9 @@ public static class FullScreenTweaks
                 journal.CapturedState[RegisteredByUs] = "1";
             }
 
-            var spec = new RegistryValueSpec(
-                RegistryRoot.CurrentUser,
-                HomeAppRegistration.GamingConfigurationKey,
-                HomeAppRegistration.HomeAppValue,
-                HomeAppRegistration.AppUserModelId,
-                RegistryValueKind.String);
-
-            if (!ctx.Registry.ValueMatches(spec))
+            if (!ctx.Registry.ValueMatches(HomeAppSetting))
             {
-                var snapshot = ctx.Registry.WriteValue(spec);
+                var snapshot = ctx.Registry.WriteValue(HomeAppSetting);
                 if (snapshot is null)
                 {
                     return TweakResult.Fail(HomeAppId, "Registered, but could not set it as the home app. See log.");

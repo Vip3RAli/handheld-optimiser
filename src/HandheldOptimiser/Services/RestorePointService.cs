@@ -35,11 +35,10 @@ public sealed class RestorePointService(LogService log, PowerShellRunner runner,
 
         // Windows throttles checkpoints to one per 24h. Setting the interval to 0 for the duration of
         // this call is the documented way to guarantee we actually get one.
-        var frequencySnapshot = _registry.Snapshot(RegistryRoot.LocalMachine, SystemRestoreKey, FrequencyValueName);
-        var frequencyOverridden = _registry.WriteValue(new RegistryValueSpec(
-            RegistryRoot.LocalMachine, SystemRestoreKey, FrequencyValueName, 0, RegistryValueKind.DWord)) is not null;
+        var frequencySnapshot = _registry.WriteValue(new RegistryValueSpec(
+            RegistryRoot.LocalMachine, SystemRestoreKey, FrequencyValueName, 0, RegistryValueKind.DWord));
 
-        if (!frequencyOverridden)
+        if (frequencySnapshot is null)
         {
             _log.Warning("Could not clear the restore point throttle; a checkpoint may be skipped if one was made recently.");
         }
@@ -61,10 +60,25 @@ public sealed class RestorePointService(LogService log, PowerShellRunner runner,
                     Write-Output "PROTECTION_WARNING: $($_.Exception.Message)"
                 }
 
-                # Give VSS somewhere to put the shadow copy if no cap is configured yet.
+                # Give VSS room for the shadow copy, but only ever grow its cap. Shrinking it makes VSS
+                # delete the oldest shadow copies to fit, and those are the user's older restore points.
+                # If the current cap cannot be read, it is left alone.
                 try {
-                    $null = & vssadmin.exe Resize ShadowStorage /For={{driveLetter}} /On={{driveLetter}} /MaxSize=10GB
-                } catch { }
+                    $vol = Get-CimInstance -ClassName Win32_Volume -Filter "DriveLetter = '{{driveLetter}}'"
+                    $storage = Get-CimInstance -ClassName Win32_ShadowStorage |
+                        Where-Object { $_.Volume.DeviceID -eq $vol.DeviceID } |
+                        Select-Object -First 1
+                    if ($null -eq $storage) {
+                        Write-Output 'Shadow storage cap not found; leaving it as it is.'
+                    } elseif ($storage.MaxSpace -lt 10GB) {
+                        Write-Output "Raising shadow storage cap from $([math]::Round($storage.MaxSpace / 1GB, 1)) GB to 10 GB"
+                        $null = & vssadmin.exe Resize ShadowStorage /For={{driveLetter}} /On={{driveLetter}} /MaxSize=10GB
+                    } else {
+                        Write-Output "Shadow storage cap is $([math]::Round($storage.MaxSpace / 1GB, 1)) GB; leaving it as it is."
+                    }
+                } catch {
+                    Write-Output "Could not read the shadow storage cap ($($_.Exception.Message)); leaving it as it is."
+                }
 
                 try {
                     Checkpoint-Computer -Description '{{safeDescription}}' -RestorePointType 'MODIFY_SETTINGS'
@@ -101,7 +115,7 @@ public sealed class RestorePointService(LogService log, PowerShellRunner runner,
         }
         finally
         {
-            if (frequencyOverridden)
+            if (frequencySnapshot is not null)
             {
                 _registry.RestoreSnapshot(frequencySnapshot);
             }

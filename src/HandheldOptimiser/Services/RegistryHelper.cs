@@ -59,7 +59,11 @@ public sealed class RegistryHelper(LogService log)
         _ => value.ToString() ?? string.Empty
     };
 
-    public RegistryValueSnapshot Snapshot(RegistryRoot root, string subKey, string valueName)
+    /// <summary>
+    /// Captures a value's current state, or returns null if it could not be read. A failed read is not
+    /// the same as "absent": recording it as absent would make revert delete a value that was there.
+    /// </summary>
+    private RegistryValueSnapshot? Snapshot(RegistryRoot root, string subKey, string valueName)
     {
         var snapshot = new RegistryValueSnapshot
         {
@@ -96,6 +100,7 @@ public sealed class RegistryHelper(LogService log)
         catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
         {
             _log.Warning($"Could not snapshot {root}\\{subKey}\\{valueName}: {ex.Message}");
+            return null;
         }
 
         return snapshot;
@@ -130,6 +135,11 @@ public sealed class RegistryHelper(LogService log)
         }
 
         var snapshot = Snapshot(spec.Root, spec.SubKey, spec.ValueName);
+        if (snapshot is null)
+        {
+            _log.Error($"REFUSED {spec.DisplayPath}: its current value could not be read, so the change could not be undone.");
+            return null;
+        }
 
         try
         {

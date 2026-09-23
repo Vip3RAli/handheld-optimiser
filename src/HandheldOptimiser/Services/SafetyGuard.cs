@@ -240,6 +240,41 @@ public static class SafetyGuard
         return false;
     }
 
+    /// <summary>
+    /// Returns the first entry on the way from the drive root to <paramref name="path"/> (inclusive) that
+    /// is a junction or symbolic link, or null if there is none. Entries that do not exist are skipped;
+    /// one whose attributes cannot be read is returned too: when in doubt, refuse.
+    ///
+    /// For anything this elevated app writes or deletes under a folder the user can write to, such as
+    /// %LOCALAPPDATA%. Without it, an unelevated process could swap one of those folders for a link and
+    /// have the write or delete happen as administrator somewhere else entirely.
+    /// </summary>
+    public static string? FindLinkOnPath(string path)
+    {
+        for (var current = System.IO.Path.GetFullPath(path).TrimEnd('\\');
+             !string.IsNullOrEmpty(current);
+             current = System.IO.Path.GetDirectoryName(current))
+        {
+            try
+            {
+                if (System.IO.File.GetAttributes(current).HasFlag(System.IO.FileAttributes.ReparsePoint))
+                {
+                    return current;
+                }
+            }
+            catch (Exception ex) when (ex is System.IO.FileNotFoundException or System.IO.DirectoryNotFoundException)
+            {
+                // Not there, so nothing to redirect through.
+            }
+            catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+            {
+                return current;
+            }
+        }
+
+        return null;
+    }
+
     public static bool IsAppxProtected(string packageIdentityName, out string? reason)
     {
         var lower = packageIdentityName.ToLowerInvariant();

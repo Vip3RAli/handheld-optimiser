@@ -128,10 +128,12 @@ public sealed class TweakEngine
             var (result, journalEntry) = await tweak.ApplyAsync(_context, ct);
             summary.Results.Add(result);
 
-            // Only journal a run that actually changed something, otherwise we would record a
-            // no-op entry whose snapshots are the already-optimised values.
-            if (result.Status == ResultStatus.Success &&
-                (journalEntry.RegistrySnapshots.Count > 0 || journalEntry.CapturedState.Count > 0))
+            // Journalled whenever the tweak captured undo data, whatever its result. A tweak that fails
+            // partway has usually already changed something (the first registry values, some of its
+            // services, the home app registration), and without this entry those changes could not be
+            // reverted. Values that were already optimised are never snapshotted, so a no-op run
+            // records nothing here.
+            if (journalEntry.RegistrySnapshots.Count > 0 || journalEntry.CapturedState.Count > 0)
             {
                 _journal.Record(journalEntry);
             }
@@ -192,7 +194,7 @@ public sealed class TweakEngine
         CancellationToken ct = default)
     {
         var summary = new ApplyRunSummary();
-        var entries = _journal.All().ToList();
+        var entries = _journal.Revertable().ToList();
 
         if (entries.Count == 0)
         {
@@ -222,7 +224,7 @@ public sealed class TweakEngine
         return summary;
     }
 
-    public bool HasUndoData => _journal.All().Count > 0;
+    public bool HasUndoData => _journal.Revertable().Any();
 
     /// <summary>
     /// Runs a one-shot maintenance action. Actions that change system configuration take a restore point

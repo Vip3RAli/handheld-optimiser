@@ -38,6 +38,22 @@ public sealed class Tweak
 
     public IReadOnlyList<RegistryValueSpec> RegistryValues { get; init; } = [];
 
+    /// <summary>
+    /// Registry values the script half writes itself (and journals), rather than through
+    /// <see cref="RegistryValues"/>. Listed so revert knows it may put them back.
+    /// </summary>
+    public IReadOnlyList<RegistryValueSpec> ScriptRegistryValues { get; init; } = [];
+
+    /// <summary>
+    /// Whether this tweak ever writes the given value. Revert restores only those, whatever the journal
+    /// says, so undo data can never be used to write anywhere else with administrator rights.
+    /// </summary>
+    public bool OwnsRegistryValue(RegistryValueSnapshot snapshot) =>
+        RegistryValues.Concat(ScriptRegistryValues).Any(spec =>
+            spec.Root == snapshot.Root &&
+            string.Equals(spec.SubKey, snapshot.SubKey, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(spec.ValueName, snapshot.ValueName, StringComparison.OrdinalIgnoreCase));
+
     public Func<TweakContext, CancellationToken, Task<TweakState>>? ScriptDetect { get; init; }
     public Func<TweakContext, TweakJournalEntry, CancellationToken, Task<TweakResult>>? ScriptApply { get; init; }
     public Func<TweakContext, TweakJournalEntry, CancellationToken, Task<TweakResult>>? ScriptRevert { get; init; }
@@ -193,6 +209,15 @@ public sealed class Tweak
         foreach (var snapshot in journal.RegistrySnapshots)
         {
             ct.ThrowIfCancellationRequested();
+
+            // Refused rather than counted as a failure: nothing this tweak changed is left behind, and a
+            // failure would keep the bad entry in the journal and fail every revert after it.
+            if (!OwnsRegistryValue(snapshot))
+            {
+                ctx.Log.Error($"BLOCKED restore of {snapshot.Root}\\{snapshot.SubKey}\\{snapshot.ValueName}: " +
+                              $"\"{Name}\" never writes that value, so its undo data should not contain it.");
+                continue;
+            }
 
             if (!ctx.Registry.RestoreSnapshot(snapshot))
             {
