@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Text;
 using System.Windows;
 using HandheldOptimiser.Models;
 
@@ -27,11 +28,21 @@ public sealed class LogEntry
 /// <summary>
 /// Single sink for everything the app does. The UI binds directly to <see cref="Entries"/>, and the
 /// same lines are appended to a session file so a user can send a log after something goes wrong.
+///
+/// The session file lives in %LOCALAPPDATA%, where the user can find it, but that is also a folder any
+/// unelevated process can rearrange, and this app writes there as administrator. <see cref="SessionFile"/>
+/// checks every open by handle, so nothing is written anywhere but the intended file.
 /// </summary>
 public sealed class LogService
 {
+    // Held while a viewer has the file open exclusively. A viewer that never lets go must not grow
+    // this without limit.
+    private const int MaxPendingChars = 1_000_000;
+
     private readonly object _fileLock = new();
     private readonly string _logFilePath;
+    private readonly StringBuilder _pending = new();
+    private SessionFile? _file;
 
     public ObservableCollection<LogEntry> Entries { get; } = [];
 
@@ -42,8 +53,15 @@ public sealed class LogService
         var dir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "HandheldOptimiser", "logs");
-        Directory.CreateDirectory(dir);
-        _logFilePath = Path.Combine(dir, $"session-{DateTime.Now:yyyyMMdd-HHmmss}.log");
+        var stamp = $"session-{DateTime.Now:yyyyMMdd-HHmmss}";
+
+        _file = SessionFile.Create(dir, stamp, out var problem);
+        _logFilePath = _file?.Path ?? Path.Combine(dir, $"{stamp}.log");
+
+        if (problem is not null)
+        {
+            Warning($"This session is not being saved to a log file: {problem}");
+        }
     }
 
     public void Info(string message) => Write(LogSeverity.Info, message);
@@ -85,18 +103,47 @@ public sealed class LogService
             dispatcher.BeginInvoke(AddToUi);
         }
 
+        string? lostReason = null;
+
+        // Losing a log line must never take down an operation that is midway through modifying the
+        // system, so nothing in here throws.
         lock (_fileLock)
         {
-            try
+            if (_file is null)
             {
-                File.AppendAllText(_logFilePath,
-                    $"[{entry.Timestamp:yyyy-MM-dd HH:mm:ss}] [{severity}] {message}{Environment.NewLine}");
+                return;
             }
-            catch (IOException)
+
+            _pending.Append($"[{entry.Timestamp:yyyy-MM-dd HH:mm:ss}] [{severity}] {message}{Environment.NewLine}");
+
+            switch (_file.TryAppend(_pending.ToString(), out var problem))
             {
-                // Losing a log line must never take down an operation that is midway through
-                // modifying the system.
+                case AppendResult.Written:
+                    _pending.Clear();
+                    break;
+
+                case AppendResult.Busy:
+                    // Usually Notepad, which opens the file exclusively. Kept and written with the next line.
+                    if (_pending.Length > MaxPendingChars)
+                    {
+                        _pending.Clear();
+                        _pending.Append($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{LogSeverity.Warning}] " +
+                                        $"Some lines were not saved here while another program had this file open.{Environment.NewLine}");
+                    }
+                    break;
+
+                default:
+                    _file = null;
+                    _pending.Clear();
+                    lostReason = problem;
+                    break;
             }
+        }
+
+        // Outside the lock, and with _file already cleared, so this goes to the screen only.
+        if (lostReason is not null)
+        {
+            Warning($"Stopped saving this session to {_logFilePath}: {lostReason}");
         }
     }
 

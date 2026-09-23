@@ -244,16 +244,23 @@ public sealed partial class MainViewModel : ObservableObject, IShell
     [RelayCommand]
     private void ClearLog() => Log.Clear();
 
+    /// <summary>
+    /// Opened in Notepad by full path, not through the shell. Shell-opening a .log from this elevated
+    /// process would start whatever the user's file association names, and that association is in HKCU,
+    /// where anything running as the user can change it to run its own program as administrator.
+    /// </summary>
     [RelayCommand]
     private void OpenLogFile()
     {
         try
         {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            var notepad = new System.Diagnostics.ProcessStartInfo
             {
-                FileName = Log.LogFilePath,
-                UseShellExecute = true
-            });
+                FileName = System.IO.Path.Combine(Environment.SystemDirectory, "notepad.exe"),
+                UseShellExecute = false
+            };
+            notepad.ArgumentList.Add(Log.LogFilePath);
+            System.Diagnostics.Process.Start(notepad);
         }
         catch (Exception ex)
         {
@@ -276,7 +283,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
 
         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
         {
-            FileName = "shutdown.exe",
+            FileName = System.IO.Path.Combine(Environment.SystemDirectory, "shutdown.exe"),
             Arguments = "/r /t 5 /c \"Handheld Optimiser: applying changes\"",
             CreateNoWindow = true,
             UseShellExecute = false

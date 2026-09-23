@@ -63,7 +63,7 @@ Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Com
 
 [Code]
 // Uninstalling removes the program only. Tweaks stay applied, and the undo journal in
-// %LOCALAPPDATA%\HandheldOptimiser is kept so a reinstall can still revert them.
+// HKLM\SOFTWARE\HandheldOptimiser\UndoJournal is kept so a reinstall can still revert them.
 // Lines must not start with '#', or the preprocessor reads them as directives; hence Gap.
 function InitializeUninstall(): Boolean;
 var

@@ -12,6 +12,11 @@ public static class GamingTweaks
     private const string DeviceGuardKey = @"SYSTEM\CurrentControlSet\Control\DeviceGuard";
     private const string HvciKey = @"SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity";
 
+    private static readonly string[] VirtualisationFeatures = ["VirtualMachinePlatform", "HypervisorPlatform"];
+
+    /// <summary>The values bcdedit accepts for hypervisorlaunchtype.</summary>
+    private static readonly string[] HypervisorLaunchTypes = ["Off", "Auto"];
+
     public static IReadOnlyList<Tweak> All =>
     [
         MemoryIntegrity,
@@ -157,17 +162,21 @@ public static class GamingTweaks
             var outcome = await ctx.Runner.RunScriptAsync(
                 """
                 $ErrorActionPreference = 'Continue'
+                $failed = $false
                 foreach ($f in 'VirtualMachinePlatform','HypervisorPlatform') {
                     $state = (Get-WindowsOptionalFeature -Online -FeatureName $f -ErrorAction SilentlyContinue).State
                     if ($state -eq 'Enabled') {
                         Write-Output "Disabling optional feature: $f"
-                        Disable-WindowsOptionalFeature -Online -FeatureName $f -NoRestart -ErrorAction Continue | Out-Null
+                        try { Disable-WindowsOptionalFeature -Online -FeatureName $f -NoRestart -ErrorAction Stop | Out-Null }
+                        catch { Write-Output "  failed: $($_.Exception.Message)"; $failed = $true }
                     } else {
                         Write-Output "Optional feature already disabled: $f"
                     }
                 }
                 Write-Output 'Setting boot hypervisor launch type to off'
                 & bcdedit /set '{current}' hypervisorlaunchtype off
+                if ($LASTEXITCODE -ne 0) { Write-Output "bcdedit failed (exit $LASTEXITCODE)"; $failed = $true }
+                if ($failed) { exit 1 }
                 """,
                 "Disable Virtual Machine Platform and boot hypervisor",
                 ct);
@@ -178,34 +187,36 @@ public static class GamingTweaks
         },
         ScriptRevert = async (ctx, journal, ct) =>
         {
-            var toEnable = journal.CapturedState
-                .Where(kv => kv.Key.StartsWith("feature.", StringComparison.Ordinal) &&
-                             kv.Value.Equals("Enabled", StringComparison.OrdinalIgnoreCase))
-                .Select(kv => kv.Key["feature.".Length..])
+            // The journal is a file on disk that ends up in an elevated script, so only names and values
+            // this tweak could have written are used from it.
+            var toEnable = VirtualisationFeatures
+                .Where(f => journal.CapturedState.TryGetValue($"feature.{f}", out var s) &&
+                            s.Equals("Enabled", StringComparison.OrdinalIgnoreCase))
                 .ToList();
 
-            var launchType = journal.CapturedState.TryGetValue("bcd.hypervisorlaunchtype", out var lt) && lt != "absent"
-                ? lt
+            var launchType = journal.CapturedState.TryGetValue("bcd.hypervisorlaunchtype", out var lt) &&
+                             HypervisorLaunchTypes.FirstOrDefault(t => t.Equals(lt, StringComparison.OrdinalIgnoreCase)) is { } known
+                ? known
                 : "auto";
 
-            var featureList = toEnable.Count > 0
-                ? string.Join(",", toEnable.Select(f => $"'{f}'"))
-                : null;
+            var featureList = string.Join(",", toEnable.Select(f => $"'{f}'"));
 
-            var script = featureList is null
-                ? $$"""
-                   $ErrorActionPreference = 'Continue'
-                   Write-Output 'No optional features were enabled before; only restoring boot configuration.'
-                   & bcdedit /set '{current}' hypervisorlaunchtype {{launchType}}
-                   """
-                : $$"""
-                   $ErrorActionPreference = 'Continue'
-                   foreach ($f in {{featureList}}) {
-                       Write-Output "Re-enabling optional feature: $f"
-                       Enable-WindowsOptionalFeature -Online -FeatureName $f -All -NoRestart -ErrorAction Continue | Out-Null
-                   }
-                   & bcdedit /set '{current}' hypervisorlaunchtype {{launchType}}
-                   """;
+            var script = $$"""
+                $ErrorActionPreference = 'Continue'
+                $failed = $false
+                $features = @({{featureList}})
+                if ($features.Count -eq 0) {
+                    Write-Output 'No optional features were enabled before; only restoring boot configuration.'
+                }
+                foreach ($f in $features) {
+                    Write-Output "Re-enabling optional feature: $f"
+                    try { Enable-WindowsOptionalFeature -Online -FeatureName $f -All -NoRestart -ErrorAction Stop | Out-Null }
+                    catch { Write-Output "  failed: $($_.Exception.Message)"; $failed = $true }
+                }
+                & bcdedit /set '{current}' hypervisorlaunchtype {{launchType}}
+                if ($LASTEXITCODE -ne 0) { Write-Output "bcdedit failed (exit $LASTEXITCODE)"; $failed = $true }
+                if ($failed) { exit 1 }
+                """;
 
             var outcome = await ctx.Runner.RunScriptAsync(script, "Restore virtualisation platform", ct);
 

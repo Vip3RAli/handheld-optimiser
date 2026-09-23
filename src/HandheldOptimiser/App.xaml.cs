@@ -50,6 +50,9 @@ public partial class App : Application
         log.Info("Handheld Optimiser started (elevated).");
         log.Info($"Session log: {log.LogFilePath}");
 
+        HomeAppRegistration.RestoreDeveloperModeIfInterrupted(registry, log);
+        journal.ImportLegacyFile(id => engine.FindById(id) is not null);
+
         var viewModel = new MainViewModel(
             log, engine, systemState, restorePoints, appxService, startupService, journal, runtimes);
 

@@ -64,9 +64,18 @@ public sealed partial class TweakItemViewModel : ObservableObject
     partial void OnStateChanged(TweakState value)
     {
         OnPropertyChanged(nameof(StateText));
+        SyncToggleToState();
+    }
 
+    /// <summary>
+    /// Puts the switch back in line with the detected state. OnStateChanged alone is not enough: when an
+    /// apply is aborted or a revert has no undo data, State does not change, so the switch would keep the
+    /// position the user tapped it to while the tweak stays as it was.
+    /// </summary>
+    private void SyncToggleToState()
+    {
         _suppressToggleHandling = true;
-        IsOn = value == TweakState.Applied;
+        IsOn = State == TweakState.Applied;
         _suppressToggleHandling = false;
     }
 
@@ -82,8 +91,14 @@ public sealed partial class TweakItemViewModel : ObservableObject
     [RelayCommand]
     private async Task ToggleAsync()
     {
-        if (_suppressToggleHandling || _shell.IsBusy)
+        if (_suppressToggleHandling)
         {
+            return;
+        }
+
+        if (_shell.IsBusy)
+        {
+            SyncToggleToState();
             return;
         }
 
@@ -98,9 +113,7 @@ public sealed partial class TweakItemViewModel : ObservableObject
 
             if (!confirmed)
             {
-                _suppressToggleHandling = true;
-                IsOn = false;
-                _suppressToggleHandling = false;
+                SyncToggleToState();
                 return;
             }
         }
@@ -149,5 +162,8 @@ public sealed partial class TweakItemViewModel : ObservableObject
                     IsWorking = false;
                 }
             });
+
+        // Also covers the run being turned away because another operation had just started.
+        SyncToggleToState();
     }
 }

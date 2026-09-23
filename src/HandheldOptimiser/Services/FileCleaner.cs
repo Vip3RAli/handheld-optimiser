@@ -25,7 +25,12 @@ public sealed class CleanTally
 /// <summary>
 /// Deletes cache and crash-dump files, and nothing else. Every path is checked against
 /// <see cref="SafetyGuard.IsDeletionAllowed"/>, and junctions/symlinks are never followed, so a link
-/// planted inside a cache folder cannot redirect the cleanup somewhere it should not go.
+/// planted in or above a cache folder cannot redirect the cleanup somewhere it should not go.
+///
+/// The folders above matter as much as the ones below. Several cleanup roots are under %LOCALAPPDATA%,
+/// which any unelevated process running as the user can write to, and this app runs elevated. Swapping
+/// %LOCALAPPDATA%\CrashDumps for a junction to a system folder would otherwise turn a cache clean
+/// into an administrator deleting that folder's contents.
 /// </summary>
 public static class FileCleaner
 {
@@ -44,6 +49,13 @@ public static class FileCleaner
         if (!Directory.Exists(root))
         {
             log.Trace($"    {root}: not present, skipping");
+            return tally;
+        }
+
+        if (SafetyGuard.FindLinkOnPath(root) is { } link)
+        {
+            log.Error($"BLOCKED cleanup of {root}: {link} is a junction or symbolic link, which is never followed.");
+            tally.Blocked = true;
             return tally;
         }
 
@@ -66,6 +78,13 @@ public static class FileCleaner
         if (!File.Exists(path))
         {
             log.Trace($"    {path}: not present, skipping");
+            return tally;
+        }
+
+        if (SafetyGuard.FindLinkOnPath(path) is { } link)
+        {
+            log.Error($"BLOCKED deletion of {path}: {link} is a junction or symbolic link, which is never followed.");
+            tally.Blocked = true;
             return tally;
         }
 
