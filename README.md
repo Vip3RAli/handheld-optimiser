@@ -108,6 +108,12 @@ Scans for the Visual C++, DirectX, .NET, XNA, OpenAL and PhysX runtimes games de
 ### ASUS & Health
 Checks that ASUS, AMD, Realtek, Defender, Windows Update and Game Pass services are running, and can re-enable any that were disabled by other tools.
 
+## Updating
+
+From 0.3.0, the app checks for a newer release each time it starts, and **Check for updates** in the status bar checks on demand. When one is available, a banner offers **Update now**: the app downloads the installer, checks its signature, installs it and reopens by itself. Your applied tweaks and undo history are kept.
+
+Every release is signed with the developer's own key, and the app refuses to install anything whose signature does not match, even a file that has been swapped on GitHub. Versions before 0.3.0 have no updater, so install 0.3.0 by hand once.
+
 ## Uninstalling
 
 Uninstall from **Settings > Apps > Installed apps**. Uninstalling removes the app but **does not undo tweaks**; use **Revert all tweaks** first if you want Windows put back as it was. Your undo history is kept, so reinstalling later can still revert everything. If Handheld Optimiser was your full screen home app, Windows goes back to the Xbox app.
@@ -134,11 +140,26 @@ winget install --id JRSoftware.InnoSetup -e --scope user
 
 This publishes a self-contained build, packs the full screen home app registration, and writes `artifacts\HandheldOptimiser-Setup-<version>.exe`. The version comes from `<Version>` in `src\HandheldOptimiser\HandheldOptimiser.csproj`.
 
+### Signing releases for the in-app updater
+
+If the update signing key is present, the build script also writes `HandheldOptimiser-Setup-<version>.exe.sig` and checks it against the public key built into the app. Upload **both files** to the release; without the `.sig`, the updater tells users to install that release by hand.
+
+The key is managed with `tools\UpdateSigner` and never goes in the repository:
+
+```powershell
+dotnet run --project tools\UpdateSigner -- keygen                  # once; prints the public key for Services\UpdateService.cs
+dotnet run --project tools\UpdateSigner -- export-backup key.pem   # password-protected backup; keep it off this PC
+dotnet run --project tools\UpdateSigner -- import-backup key.pem   # restore on a new PC
+```
+
+It is stored in `%APPDATA%\HandheldOptimiser-Signing`, encrypted to your Windows account. If it is lost, installed copies can no longer verify updates, and everyone has to install the next release by hand once.
+
 | Folder | Contents |
 |---|---|
 | `src/HandheldOptimiser` | The WPF app. Tweaks are declared in `TweakDefinitions/`; `Services/TweakEngine.cs` applies them with the restore point and undo journal, and `Services/SafetyGuard.cs` holds the protected list |
 | `src/HandheldOptimiser.HomeLauncher` | The small launcher Windows starts as the full screen home app |
 | `installer` | Inno Setup script, build script, and the home app registration package in `HomeApp/` |
+| `tools/UpdateSigner` | Creates the update signing key and signs installers; release tooling only, never shipped |
 
 ## Credits
 

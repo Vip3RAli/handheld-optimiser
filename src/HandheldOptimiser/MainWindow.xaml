@@ -62,22 +62,43 @@
             </ui:TitleBar.Icon>
         </ui:TitleBar>
 
-        <!-- Restart banner: only appears once a change needs a reboot to take effect. -->
-        <ui:InfoBar Grid.Row="1"
-                    Margin="16,0,16,8"
-                    Severity="Warning"
-                    IsClosable="False"
-                    Title="Restart required"
-                    Message="Some applied changes only take effect after a restart."
-                    IsOpen="{Binding RebootRequired}">
-            <ui:InfoBar.Content>
-                <ui:Button Content="Restart now"
-                           Margin="0,8,0,0"
-                           HorizontalAlignment="Left"
-                           Appearance="Primary"
-                           Command="{Binding RestartNowCommand}" />
-            </ui:InfoBar.Content>
-        </ui:InfoBar>
+        <StackPanel Grid.Row="1">
+            <!-- Restart banner: only appears once a change needs a reboot to take effect. -->
+            <ui:InfoBar Margin="16,0,16,8"
+                        Severity="Warning"
+                        IsClosable="False"
+                        Title="Restart required"
+                        Message="Some applied changes only take effect after a restart."
+                        IsOpen="{Binding RebootRequired}">
+                <ui:InfoBar.Content>
+                    <ui:Button Content="Restart now"
+                               Margin="0,8,0,0"
+                               HorizontalAlignment="Left"
+                               Appearance="Primary"
+                               Command="{Binding RestartNowCommand}" />
+                </ui:InfoBar.Content>
+            </ui:InfoBar>
+
+            <!-- Update banner: a newer release was found on GitHub. -->
+            <ui:InfoBar Margin="16,0,16,8"
+                        Severity="Informational"
+                        IsClosable="True"
+                        Title="{Binding UpdateTitle}"
+                        Message="{Binding UpdateMessage}"
+                        IsOpen="{Binding IsUpdateBannerOpen, Mode=TwoWay}">
+                <ui:InfoBar.Content>
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <ui:Button Content="Update now"
+                                   Margin="0,0,8,0"
+                                   Appearance="Primary"
+                                   Command="{Binding InstallUpdateCommand}"
+                                   Visibility="{Binding CanInstallUpdate, Converter={StaticResource BoolToVis}}" />
+                        <ui:Button Content="Open release page"
+                                   Command="{Binding OpenReleasePageCommand}" />
+                    </StackPanel>
+                </ui:InfoBar.Content>
+            </ui:InfoBar>
+        </StackPanel>
 
         <!-- Sidebar + page content -->
         <Grid Grid.Row="2" Margin="12,0,12,0">
@@ -205,8 +226,19 @@
                                Visibility="{Binding ProgressDetail, Converter={StaticResource StringToVis}}" />
                 </StackPanel>
 
-                <TextBlock Grid.Column="2" Opacity="0.5" FontSize="11" VerticalAlignment="Center"
-                           Text="Running as Administrator" />
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <TextBlock Opacity="0.5" FontSize="11" VerticalAlignment="Center"
+                               Text="{Binding VersionText}" />
+                    <ui:Button Content="Check for updates"
+                               FontSize="11"
+                               Padding="8,3"
+                               Margin="8,0,16,0"
+                               VerticalAlignment="Center"
+                               Command="{Binding CheckForUpdatesCommand}"
+                               IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}" />
+                    <TextBlock Opacity="0.5" FontSize="11" VerticalAlignment="Center"
+                               Text="Running as Administrator" />
+                </StackPanel>
             </Grid>
         </Border>
     </Grid>

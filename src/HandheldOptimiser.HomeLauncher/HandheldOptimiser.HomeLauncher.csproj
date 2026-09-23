@@ -18,7 +18,7 @@
     <AssemblyName>HandheldOptimiser.HomeLauncher</AssemblyName>
     <RootNamespace>HandheldOptimiser.HomeLauncher</RootNamespace>
     <Product>Handheld Optimiser</Product>
-    <Version>0.2.1</Version>
+    <Version>0.3.0</Version>
   </PropertyGroup>
 
 </Project>

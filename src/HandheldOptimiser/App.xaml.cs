@@ -46,19 +46,23 @@ public partial class App : Application
         var systemState = new SystemStateService(log, runner, registry);
         var engine = new TweakEngine(log, registry, runner, restorePoints, journal);
         var runtimes = new RuntimeService(log, runner, restorePoints);
+        var updates = new UpdateService(log);
 
-        log.Info("Handheld Optimiser started (elevated).");
+        log.Info($"Handheld Optimiser {UpdateService.Display(updates.CurrentVersion)} started (elevated).");
         log.Info($"Session log: {log.LogFilePath}");
 
         HomeAppRegistration.RestoreDeveloperModeIfInterrupted(registry, log);
         journal.ImportLegacyFile(id => engine.FindById(id) is not null);
+        UpdateService.CleanUpOldDownloads(log);
 
         var viewModel = new MainViewModel(
-            log, engine, systemState, restorePoints, appxService, startupService, journal, runtimes);
+            log, engine, systemState, restorePoints, appxService, startupService, journal, runtimes, updates);
 
         var window = new MainWindow { DataContext = viewModel };
         MainWindow = window;
         window.Show();
+
+        _ = viewModel.CheckForUpdatesOnStartupAsync();
     }
 
     /// <summary>

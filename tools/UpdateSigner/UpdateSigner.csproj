@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Release tooling only; never shipped. Signs installers for the in-app updater. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>HandheldOptimiser.UpdateSigner</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The app verifies exactly what this signs, so both compile the same definition. -->
+    <Compile Include="..\..\src\HandheldOptimiser\Services\UpdateManifest.cs" Link="UpdateManifest.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+  </ItemGroup>
+
+</Project>

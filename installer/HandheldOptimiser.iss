@@ -54,14 +54,25 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: deskto
 ; plain CreateProcess cannot satisfy (error 740), so launch through the shell: it shows the UAC prompt
 ; exactly as the Start menu does, and the app then runs as the right user with that user's HKCU.
 Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent shellexec
+; In-app updates run Setup silently with /UPDATE=1 from the already elevated app, so Setup is elevated
+; too and can start the app directly. This reopens it once the update is in place.
+Filename: "{app}\{#AppExeName}"; Flags: nowait; Check: IsInAppUpdate
 
 [UninstallRun]
 ; Remove the full screen home app registration before its files go, and if it was the selected home
 ; app, clear the setting so Windows falls back to the Xbox app instead of an entry that no longer exists.
-; Braces are doubled because Inno reads single braces as constants.
-Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""Get-AppxPackage -Name 'HandheldOptimiser.HomeApp' | Remove-AppxPackage; $k = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\GamingConfiguration'; if ((Get-ItemProperty $k -ErrorAction SilentlyContinue).GamingHomeApp -eq 'HandheldOptimiser.HomeApp_n7ggsqt1rt3jm!HomeApp') {{ Remove-ItemProperty $k -Name GamingHomeApp }"""; Flags: runhidden; RunOnceId: "RemoveHomeApp"
+; Braces are doubled because Inno reads single braces as constants. The uninstaller runs elevated, so
+; PowerShell is started by full path and only loads modules from its own folder, never from anywhere
+; the user can write to.
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""$env:PSModulePath = $PSHOME + '\Modules'; Get-AppxPackage -Name 'HandheldOptimiser.HomeApp' | Remove-AppxPackage; $k = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\GamingConfiguration'; if ((Get-ItemProperty $k -ErrorAction SilentlyContinue).GamingHomeApp -eq 'HandheldOptimiser.HomeApp_n7ggsqt1rt3jm!HomeApp') {{ Remove-ItemProperty $k -Name GamingHomeApp }"""; Flags: runhidden; RunOnceId: "RemoveHomeApp"
 
 [Code]
+// Set by the app's updater; see the [Run] entry that reopens the app.
+function IsInAppUpdate(): Boolean;
+begin
+  Result := ExpandConstant('{param:UPDATE|0}') = '1';
+end;
+
 // Uninstalling removes the program only. Tweaks stay applied, and the undo journal in
 // HKLM\SOFTWARE\HandheldOptimiser\UndoJournal is kept so a reinstall can still revert them.
 // Lines must not start with '#', or the preprocessor reads them as directives; hence Gap.
