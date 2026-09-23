@@ -92,3 +92,29 @@ if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed ($LASTEXITCODE)" }
 
 $setup = Join-Path $root "artifacts\HandheldOptimiser-Setup-$version.exe"
 Write-Host "Installer: $setup ($([math]::Round((Get-Item $setup).Length / 1MB, 1)) MB)" -ForegroundColor Green
+
+# Sign for the in-app updater, which refuses any installer without a valid <installer>.sig. The key is
+# managed with tools\UpdateSigner and lives outside the repository; a build without it still works, but
+# that release can only be installed by hand.
+$signer = Join-Path $root 'tools\UpdateSigner\UpdateSigner.csproj'
+$signingKey = Join-Path $env:APPDATA 'HandheldOptimiser-Signing\update-signing-key.bin'
+
+if (Test-Path $signingKey) {
+    dotnet build $signer -c Release -v q --nologo | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "UpdateSigner build failed ($LASTEXITCODE)" }
+
+    Remove-Item "$setup.sig" -ErrorAction SilentlyContinue
+    dotnet run --project $signer -c Release --no-build -- sign $setup $version
+    if ($LASTEXITCODE -ne 0) { throw "Signing failed ($LASTEXITCODE)" }
+
+    # Checked against the key compiled into the app, so a mismatched key fails here, not on users' machines.
+    $updateService = Get-Content (Join-Path $root 'src\HandheldOptimiser\Services\UpdateService.cs') -Raw
+    if ($updateService -notmatch 'SigningPublicKey = "([^"]+)"') { throw 'SigningPublicKey not found in UpdateService.cs' }
+    dotnet run --project $signer -c Release --no-build -- verify $setup --public-key $Matches[1]
+    if ($LASTEXITCODE -ne 0) { throw 'The signature does not match the public key built into the app.' }
+
+    Write-Host "Signature: $setup.sig (upload it to the release beside the installer)" -ForegroundColor Green
+}
+else {
+    Write-Warning "No update signing key at $signingKey, so the installer is not signed. The in-app updater will not install this release."
+}
