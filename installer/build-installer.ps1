@@ -45,10 +45,13 @@ dotnet publish $project `
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed ($LASTEXITCODE)" }
 
 # The full screen home app launcher shares the folder and the bundled runtime.
+# ReadyToRun here too: the game library opens on every home button press and stays open behind games,
+# and precompiled code starts faster and leaves less JIT memory behind.
 dotnet publish $launcherProject `
     -c Release `
     -r win-x64 `
     --self-contained true `
+    -p:PublishReadyToRun=true `
     -o $publishDir
 if ($LASTEXITCODE -ne 0) { throw "Launcher publish failed ($LASTEXITCODE)" }
 

@@ -20,7 +20,7 @@ public sealed partial class HomeAppPickerViewModel : ObservableObject, IPageSect
     }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsSteam), nameof(IsArmouryCrate), nameof(IsCustom))]
+    [NotifyPropertyChangedFor(nameof(IsSteam), nameof(IsLibrary), nameof(IsArmouryCrate), nameof(IsCustom))]
     private HomeAppTarget _target;
 
     [ObservableProperty]
@@ -46,6 +46,12 @@ public sealed partial class HomeAppPickerViewModel : ObservableObject, IPageSect
     {
         get => Target == HomeAppTarget.Steam;
         set { if (value) Target = HomeAppTarget.Steam; }
+    }
+
+    public bool IsLibrary
+    {
+        get => Target == HomeAppTarget.Library;
+        set { if (value) Target = HomeAppTarget.Library; }
     }
 
     public bool IsArmouryCrate
