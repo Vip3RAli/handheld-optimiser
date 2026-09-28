@@ -24,7 +24,7 @@
 
   <Identity Name="HandheldOptimiser.HomeApp"
             Publisher="CN=Handheld Optimiser"
-            Version="0.2.0.0"
+            Version="0.2.1.0"
             ProcessorArchitecture="x64" />
 
   <Properties>
@@ -48,11 +48,14 @@
                  Executable="HandheldOptimiser.HomeLauncher.exe"
                  uap10:TrustLevel="mediumIL"
                  uap10:RuntimeBehavior="win32App">
+      <!-- AppListEntry none: kept out of Start, where it would sit beside the main app's own shortcut
+           under the same name. Full screen mode still lists and opens it by its app ID. -->
       <uap:VisualElements DisplayName="Handheld Optimiser"
                           Description="Opens your chosen app as the full screen experience home"
                           BackgroundColor="transparent"
                           Square150x150Logo="Assets\Square150x150Logo.png"
-                          Square44x44Logo="Assets\Square44x44Logo.png" />
+                          Square44x44Logo="Assets\Square44x44Logo.png"
+                          AppListEntry="none" />
       <Extensions>
         <!-- What the "Choose home app" list is built from. -->
         <uap3:Extension Category="windows.appExtension">

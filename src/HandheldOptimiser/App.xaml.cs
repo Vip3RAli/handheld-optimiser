@@ -18,6 +18,7 @@ public partial class App : Application
 
         DispatcherUnhandledException += OnUnhandledException;
 
+        Views.TouchSizing.Apply();
         ApplyBrandAccent();
 
         if (!IsRunningElevated())
