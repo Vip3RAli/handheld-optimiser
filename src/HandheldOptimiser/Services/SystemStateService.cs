@@ -41,7 +41,17 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
             @"HARDWARE\DESCRIPTION\System\BIOS",
             "SystemFamily")?.ToString();
 
-        return string.IsNullOrWhiteSpace(product) ? "Unknown device" : $"{product} ({family})".Trim();
+        if (string.IsNullOrWhiteSpace(product))
+        {
+            return "Unknown device";
+        }
+
+        // ASUS reports the model code twice ("ROG Ally RC71L_RC71L"), and the family usually repeats
+        // the start of the product name ("ROG Ally"), so both are only shown once.
+        var name = System.Text.RegularExpressions.Regex.Replace(product.Trim(), @"\b(\w+)_\1\b", "$1");
+        return string.IsNullOrWhiteSpace(family) || name.Contains(family.Trim(), StringComparison.OrdinalIgnoreCase)
+            ? name
+            : $"{name} ({family.Trim()})";
     }
 
     public bool IsRogAlly()
