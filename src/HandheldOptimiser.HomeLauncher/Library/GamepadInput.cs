@@ -125,10 +125,23 @@ internal sealed class GamepadInput
         return buttons;
     }
 
-    private static FocusNavigationDirection? DirectionOf(ushort buttons) =>
-        (buttons & DpadUp) != 0 ? FocusNavigationDirection.Up
+    /// <summary>
+    /// The held direction wins while it is still pressed: the Ally's d-pad flickers into diagonals (left
+    /// briefly reads as left+down), which would otherwise turn a held Left into a Down.
+    /// </summary>
+    private FocusNavigationDirection? DirectionOf(ushort buttons) =>
+        _heldDirection is { } held && (buttons & BitOf(held)) != 0 ? held
+        : (buttons & DpadUp) != 0 ? FocusNavigationDirection.Up
         : (buttons & DpadDown) != 0 ? FocusNavigationDirection.Down
         : (buttons & DpadLeft) != 0 ? FocusNavigationDirection.Left
         : (buttons & DpadRight) != 0 ? FocusNavigationDirection.Right
         : null;
+
+    private static ushort BitOf(FocusNavigationDirection direction) => direction switch
+    {
+        FocusNavigationDirection.Up => DpadUp,
+        FocusNavigationDirection.Down => DpadDown,
+        FocusNavigationDirection.Left => DpadLeft,
+        _ => DpadRight
+    };
 }

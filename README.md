@@ -95,7 +95,14 @@ A lightweight game library that replaces Big Picture as the home screen. It find
 
 Each store's own app still starts when one of its games needs it: Steam runs silently in the background (so Steam Input and the overlay still work), Epic opens minimised, and Blizzard games go through Battle.net. Most GOG games are DRM-free and start directly, with no client at all. The library stays open behind the game, so quitting a game or pressing the home button lands back on it. While a game is in front, it stops reading the controller and gives its memory back to Windows.
 
-How it works: the app registers a small unsigned package that adds it to Windows' home app list and points at a lightweight launcher, which runs without administrator rights so full screen mode never shows a UAC prompt. No certificates are installed. Windows only accepts this kind of registration while developer mode is on, so developer mode is switched on for the few seconds registration takes and then restored to its previous setting.
+Controller tips:
+
+- Keep the controller in **Gamepad** mode (Command Center in Armoury Crate SE). In Desktop mode the d-pad still works, as arrow keys, but the sticks turn into a mouse.
+- Steam can take over the Xbox button and third-party controllers while it runs. If the home button opens Steam, or an external controller moves the wrong way, turn off Steam's guide button setting under **Steam > Settings > Controller**, and turn off Steam Input for that controller.
+
+How it works: the app registers a small package that adds it to Windows' home app list and points at a lightweight launcher, which runs without administrator rights so full screen mode never shows a UAC prompt. Windows only accepts this kind of registration while developer mode is on and the package's certificate is trusted, so for the few seconds registration takes, developer mode is switched on and the certificate is trusted, then both are put back. No certificate is left installed. If Handheld Optimiser is closed midway, the next start finishes putting them back.
+
+**Updating from 0.4.0 or earlier:** those versions registered an unsigned package that Windows rejects after a restart, so full screen mode opened to a blank grey screen. Open **Full Screen Mode** and switch on **Use Handheld Optimiser as the full screen home app** once to replace it. If you are stuck on the grey screen, press Ctrl+Alt+Del, open Task Manager, choose **Run new task** and run `explorer` to get the desktop back.
 
 ### Bloatware
 Remove preinstalled apps such as TikTok, Candy Crush, Disney+, Bing News and Copilot. Nothing is selected until you choose it, and apps you may want to keep are marked with a note. Store, Xbox, Game Pass, codec and vendor packages are protected.

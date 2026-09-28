@@ -80,8 +80,30 @@ $makePri = Join-Path (Split-Path $makeAppx -Parent) 'makepri.exe'
 if ($LASTEXITCODE -ne 0) { throw "MakePri failed ($LASTEXITCODE)" }
 
 New-Item -ItemType Directory -Force (Join-Path $publishDir 'HomeApp') | Out-Null
-& $makeAppx pack /d $staging /p (Join-Path $publishDir 'HomeApp\HomeApp.msix') /nv /o | Out-Null
+$homeAppMsix = Join-Path $publishDir 'HomeApp\HomeApp.msix'
+& $makeAppx pack /d $staging /p $homeAppMsix /nv /o | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "MakeAppx failed ($LASTEXITCODE)" }
+
+# The package must be signed: Windows re-checks an unsigned one at every sign-in and breaks full screen
+# mode once developer mode is off. The certificate is self-signed and lives in this user's certificate
+# store, never in the repository; the app trusts its public half (HomeApp.cer) only while registering.
+# The package family comes from the subject alone, so a replacement certificate keeps the same one.
+$signingSubject = 'CN=Handheld Optimiser'
+$signingCert = Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert |
+    Where-Object { $_.Subject -eq $signingSubject -and $_.HasPrivateKey -and $_.NotAfter -gt (Get-Date).AddMonths(1) } |
+    Sort-Object NotAfter -Descending | Select-Object -First 1
+
+if (-not $signingCert) {
+    Write-Host "Creating the home app signing certificate ($signingSubject)" -ForegroundColor Cyan
+    $signingCert = New-SelfSignedCertificate -Type CodeSigningCert -Subject $signingSubject `
+        -CertStoreLocation Cert:\CurrentUser\My -TextExtension @('2.5.29.19={text}') `
+        -KeyExportPolicy NonExportable -NotAfter (Get-Date).AddYears(10)
+}
+
+$signTool = Join-Path (Split-Path $makeAppx -Parent) 'signtool.exe'
+& $signTool sign /fd SHA256 /sha1 $signingCert.Thumbprint /s My $homeAppMsix | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "Signing the home app package failed ($LASTEXITCODE)" }
+Export-Certificate -Cert $signingCert -FilePath (Join-Path $publishDir 'HomeApp\HomeApp.cer') | Out-Null
 
 # Because the package points at the program folder (AllowExternalContent), Windows reads the capability
 # file, the logos and resources.pri from there rather than from inside the package. Without the logos

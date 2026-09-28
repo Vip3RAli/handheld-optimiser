@@ -4,9 +4,12 @@
   in the install folder a package identity, which is what puts "Handheld Optimiser" on the list under
   Settings > Gaming > Full screen experience > Choose home app.
 
-  Unsigned on purpose. The OID in Publisher marks it as an unsigned package, installed with
-  Add-AppxPackage -AllowUnsigned, so no certificate has to be trusted on the machine.
+  Signed by build-installer.ps1 with a self-signed "CN=Handheld Optimiser" certificate, which the app
+  trusts only while it adds the package (HomeAppRegistration.RegisterAsync). It must not be unsigned:
+  Windows re-checks an unsigned package's capability file at every sign-in, which fails once developer
+  mode is off again, and full screen mode then opens to a blank screen.
   Identity Name, Publisher and Application Id must match the <msix> element in the launcher's app.manifest.
+  Changing Publisher changes the package family (HomeAppRegistration.PublisherId).
   Bump Version (and HomeAppRegistration.PackageVersion) whenever anything in this folder changes: Windows
   caches logos per version, and the app re-registers only when the registered version is older.
 -->
@@ -20,8 +23,8 @@
          IgnorableNamespaces="uap uap3 uap4 uap10 uap18 rescap">
 
   <Identity Name="HandheldOptimiser.HomeApp"
-            Publisher="CN=Handheld Optimiser, OID.2.25.311729368913984317654407730594956997722=1"
-            Version="0.1.2.0"
+            Publisher="CN=Handheld Optimiser"
+            Version="0.2.0.0"
             ProcessorArchitecture="x64" />
 
   <Properties>
