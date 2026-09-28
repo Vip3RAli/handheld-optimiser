@@ -7,7 +7,7 @@
     identity. publisher, packageName and applicationId must match installer\HomeApp\AppxManifest.xml.
   -->
   <msix xmlns="urn:schemas-microsoft-com:msix.v1"
-        publisher="CN=Handheld Optimiser, OID.2.25.311729368913984317654407730594956997722=1"
+        publisher="CN=Handheld Optimiser"
         packageName="HandheldOptimiser.HomeApp"
         applicationId="HomeApp" />
 

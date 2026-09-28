@@ -41,7 +41,7 @@ public partial class LibraryWindow : Window
         Loaded += (_, _) => _ = ScanAsync();
         Activated += OnActivated;
         Deactivated += OnDeactivated;
-        KeyDown += OnKeyDown;
+        PreviewKeyDown += OnKeyDown;
     }
 
     /// <summary>Brings the library to the front; called when the home button starts a second instance.</summary>
@@ -128,28 +128,76 @@ public partial class LibraryWindow : Window
         }
 
         // Wait for the item containers to exist after ItemsSource changes.
-        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
-        {
-            var index = Math.Max(0, _tiles.FindIndex(t => t.Game.Key == _focusedKey));
-            if (Tiles.ItemContainerGenerator.ContainerFromIndex(index) is ContentPresenter presenter
-                && VisualChild<Button>(presenter) is { } button)
-            {
-                button.Focus();
-            }
-        });
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded,
+            () => FocusTile(Math.Max(0, _tiles.FindIndex(t => t.Game.Key == _focusedKey))));
     }
 
+    /// <summary>
+    /// Moves through the grid by row and column. WPF's own directional navigation only moves to a tile
+    /// directly in line, so Down did nothing from a column past the end of a shorter last row.
+    /// </summary>
     private void OnNavigate(FocusNavigationDirection direction)
     {
-        if (Keyboard.FocusedElement is Button { DataContext: GameTile } focused)
-        {
-            focused.MoveFocus(new TraversalRequest(direction));
-        }
-        else
+        if (Keyboard.FocusedElement is not Button { DataContext: GameTile tile })
         {
             RestoreFocus();
+            return;
+        }
+
+        var index = _tiles.IndexOf(tile);
+        var columns = ColumnCount();
+        var last = _tiles.Count - 1;
+
+        var target = direction switch
+        {
+            FocusNavigationDirection.Left => index - 1,
+            FocusNavigationDirection.Right => index + 1,
+            FocusNavigationDirection.Up => index - columns,
+            // From a column the shorter last row does not reach, land on its last game.
+            FocusNavigationDirection.Down when index / columns < last / columns => Math.Min(index + columns, last),
+            _ => -1
+        };
+
+        if (target >= 0 && target <= last)
+        {
+            FocusTile(target);
         }
     }
+
+    /// <summary>
+    /// Tiles in the first row, which is the column count since every tile is the same width. Measured on
+    /// the item containers: the focused button is scaled up, which shifts its own position.
+    /// </summary>
+    private int ColumnCount()
+    {
+        double? firstTop = null;
+        var columns = 0;
+
+        while (columns < _tiles.Count && TileContainer(columns) is { } container)
+        {
+            var top = container.TranslatePoint(default, Tiles).Y;
+            firstTop ??= top;
+            if (Math.Abs(top - firstTop.Value) >= 1)
+            {
+                break;
+            }
+
+            columns++;
+        }
+
+        return Math.Max(1, columns);
+    }
+
+    private void FocusTile(int index)
+    {
+        if (TileContainer(index) is { } container)
+        {
+            VisualChild<Button>(container)?.Focus();
+        }
+    }
+
+    private ContentPresenter? TileContainer(int index) =>
+        Tiles.ItemContainerGenerator.ContainerFromIndex(index) as ContentPresenter;
 
     private void OnGamepadPressed(GamepadAction action)
     {
@@ -166,7 +214,22 @@ public partial class LibraryWindow : Window
 
     private void OnKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key == Key.F5)
+        FocusNavigationDirection? direction = e.Key switch
+        {
+            Key.Left => FocusNavigationDirection.Left,
+            Key.Right => FocusNavigationDirection.Right,
+            Key.Up => FocusNavigationDirection.Up,
+            Key.Down => FocusNavigationDirection.Down,
+            _ => null
+        };
+
+        if (direction is { } d)
+        {
+            // Same grid movement as the controller, instead of WPF's in-line-only navigation.
+            OnNavigate(d);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.F5)
         {
             _ = ScanAsync();
             e.Handled = true;

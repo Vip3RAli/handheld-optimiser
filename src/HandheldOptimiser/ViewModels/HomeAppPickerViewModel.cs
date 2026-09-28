@@ -89,6 +89,8 @@ public sealed partial class HomeAppPickerViewModel : ObservableObject, IPageSect
         IsAvailable = HomeAppRegistration.IsFullScreenExperienceAvailable();
         AvailabilityText = !IsAvailable
             ? "The full screen experience is not available on this version of Windows. It needs Windows 11 24H2 or later on a handheld."
+            : HomeAppRegistration.IsLegacyHomeApp()
+                ? "This version fixes full screen mode opening to a blank screen after a restart. Switch on \"Use Handheld Optimiser as the full screen home app\" below to apply the fix."
             : HomeAppRegistration.IsCurrentHomeApp() && !HomeAppRegistration.IsRegistered()
                 ? "This version of the app has an updated home app registration. Switch on \"Use Handheld Optimiser as the full screen home app\" below to refresh it."
                 : HomeAppRegistration.IsCurrentHomeApp()

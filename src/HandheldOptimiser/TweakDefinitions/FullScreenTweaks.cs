@@ -36,8 +36,9 @@ public static class FullScreenTweaks
         Id = HomeAppId,
         Name = "Use Handheld Optimiser as the full screen home app",
         Description =
-            "Full screen mode opens the app you choose above (Steam Big Picture, Armoury Crate SE or your own) " +
-            "instead of the Xbox app, both at sign-in and whenever you press the home button.",
+            "Full screen mode opens the app you choose above (Steam Big Picture, the Handheld Optimiser library, " +
+            "Armoury Crate SE or your own) instead of the Xbox app, both at sign-in and whenever you press the " +
+            "home button.",
         Category = TweakCategory.FullScreen,
         Risk = RiskLevel.Moderate,
         IncludeInOneClick = false,
@@ -51,9 +52,10 @@ public static class FullScreenTweaks
 
             var selected = HomeAppRegistration.IsCurrentHomeApp();
 
-            // An older registration from a previous version counts as partial, so applying refreshes it.
+            // An older registration from a previous version, or a home app still pointed at the unsigned one
+            // that breaks on restart, counts as partial, so applying replaces it.
             return Task.FromResult(HomeAppRegistration.IsRegistered() && selected ? TweakState.Applied
-                : !HomeAppRegistration.IsAnyVersionRegistered() && !selected ? TweakState.NotApplied
+                : !HomeAppRegistration.IsAnyVersionRegistered() && !selected && !HomeAppRegistration.IsLegacyHomeApp() ? TweakState.NotApplied
                 : TweakState.Partial);
         },
         ScriptApply = async (ctx, journal, ct) =>

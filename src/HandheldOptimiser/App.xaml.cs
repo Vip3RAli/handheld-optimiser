@@ -51,7 +51,7 @@ public partial class App : Application
         log.Info($"Handheld Optimiser {UpdateService.Display(updates.CurrentVersion)} started (elevated).");
         log.Info($"Session log: {log.LogFilePath}");
 
-        HomeAppRegistration.RestoreDeveloperModeIfInterrupted(registry, log);
+        HomeAppRegistration.RestoreIfInterrupted(registry, log);
         journal.ImportLegacyFile(id => engine.FindById(id) is not null);
         UpdateService.CleanUpOldDownloads(log);
 
