@@ -8,6 +8,7 @@ namespace HandheldOptimiser.Services;
 public enum HomeAppTarget
 {
     Steam,
+    Library,
     ArmouryCrate,
     Custom
 }
@@ -110,6 +111,7 @@ public static class HomeAppRegistration
 
         var target = (key?.GetValue("Target") as string)?.ToLowerInvariant() switch
         {
+            "library" => HomeAppTarget.Library,
             "armourycrate" => HomeAppTarget.ArmouryCrate,
             "custom" => HomeAppTarget.Custom,
             _ => HomeAppTarget.Steam
@@ -127,6 +129,7 @@ public static class HomeAppRegistration
         using var key = Registry.CurrentUser.CreateSubKey(SettingsKey);
         key.SetValue("Target", target switch
         {
+            HomeAppTarget.Library => "library",
             HomeAppTarget.ArmouryCrate => "armourycrate",
             HomeAppTarget.Custom => "custom",
             _ => "steam"

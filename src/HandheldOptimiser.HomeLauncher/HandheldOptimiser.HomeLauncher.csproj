@@ -3,12 +3,16 @@
   <!--
     Started by Windows as the full screen experience home app. Kept separate from the main app because
     that one requires administrator, which would show a UAC prompt every time full screen mode starts.
+    WPF is only loaded when the game library is the chosen home app; the other choices open and exit.
   -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Source-generated P/Invoke for XInput and the icon helpers. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
@@ -18,7 +22,10 @@
     <AssemblyName>HandheldOptimiser.HomeLauncher</AssemblyName>
     <RootNamespace>HandheldOptimiser.HomeLauncher</RootNamespace>
     <Product>Handheld Optimiser</Product>
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
+
+    <!-- The library stays open behind games, so a small footprint matters more than GC throughput. -->
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
   </PropertyGroup>
 
 </Project>

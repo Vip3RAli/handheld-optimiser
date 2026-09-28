@@ -77,11 +77,23 @@ Windows 11's full screen experience normally opens the Xbox app. Handheld Optimi
   <img src="docs/full-screen-mode.png" alt="Full Screen Mode page with the home app choices and the two toggles" width="900">
 </p>
 
-1. Open **Full Screen Mode** and choose **Steam Big Picture**, **Armoury Crate SE**, or **Another app** (any program or shortcut, such as Playnite).
+1. Open **Full Screen Mode** and choose **Steam Big Picture**, **Handheld Optimiser library**, **Armoury Crate SE**, or **Another app** (any program or shortcut, such as Playnite).
 2. Switch on **Use Handheld Optimiser as the full screen home app**.
 3. Optionally switch on **Enter full screen mode at sign-in** to boot straight into it like a console.
 
 Handheld Optimiser then appears under **Settings > Gaming > Xbox mode > Choose home app**. Your choice can be changed at any time and applies the next time the home app opens. If the chosen app cannot start, the Xbox app opens instead, so you never land on a blank screen.
+
+#### Handheld Optimiser library
+
+A lightweight game library that replaces Big Picture as the home screen. It finds installed games from **Steam**, **Epic Games**, **Battle.net** and **GOG**, shows them as one grid with the game you played last first, and is driven with the controller (d-pad or left stick to move, **A** to play, **Y** to refresh) or by touch.
+
+| | RAM |
+|---|---|
+| Steam Big Picture, open | about 1.4 GB |
+| Library, open | about 115 MB |
+| Library, while a game runs | about 25 MB |
+
+Each store's own app still starts when one of its games needs it: Steam runs silently in the background (so Steam Input and the overlay still work), Epic opens minimised, and Blizzard games go through Battle.net. Most GOG games are DRM-free and start directly, with no client at all. The library stays open behind the game, so quitting a game or pressing the home button lands back on it. While a game is in front, it stops reading the controller and gives its memory back to Windows.
 
 How it works: the app registers a small unsigned package that adds it to Windows' home app list and points at a lightweight launcher, which runs without administrator rights so full screen mode never shows a UAC prompt. No certificates are installed. Windows only accepts this kind of registration while developer mode is on, so developer mode is switched on for the few seconds registration takes and then restored to its previous setting.
 

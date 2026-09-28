@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using Microsoft.Win32;
 
 namespace HandheldOptimiser.HomeLauncher;
@@ -8,12 +9,12 @@ namespace HandheldOptimiser.HomeLauncher;
 /// Windows starts this as the full screen experience home app: at sign-in when "enter full screen mode
 /// at startup" is on, and whenever the home button is pressed. It opens the app chosen in Handheld
 /// Optimiser and exits. Opening an app that is already running just brings it to the front, so the home
-/// button always lands back on it.
+/// button always lands back on it. The game library is the exception: it stays running, see LibraryApp.
 /// </summary>
 internal static class Program
 {
     // Written by the main app; see HomeAppSettings there. Per user, like the rest of the FSE settings.
-    private const string SettingsKey = @"Software\HandheldOptimiser\HomeApp";
+    internal const string SettingsKey = @"Software\HandheldOptimiser\HomeApp";
 
     private const string SteamBigPicture = "steam://open/bigpicture";
     private const string ArmouryCrateSe = @"shell:AppsFolder\B9ECED6F.ArmouryCrateSE_qmba6cd70vzyy!App";
@@ -23,12 +24,20 @@ internal static class Program
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "HandheldOptimiser", "logs", "home-launcher.log");
 
-    private static int Main()
+    [STAThread]
+    private static int Main(string[] args)
     {
         var (target, customPath, customArgs) = ReadSettings();
 
+        // Opens the library whatever the saved choice, for a desktop shortcut or for testing.
+        if (args.Contains("--library", StringComparer.OrdinalIgnoreCase))
+        {
+            target = "library";
+        }
+
         var launched = target switch
         {
+            "library" => RunLibrary(),
             "armourycrate" => TryOpen(ArmouryCrateSe),
             "custom" => !string.IsNullOrWhiteSpace(customPath) && TryOpen(customPath, customArgs),
             _ => TryOpen(SteamBigPicture)
@@ -42,6 +51,21 @@ internal static class Program
         // A missing or uninstalled target would otherwise leave an empty full screen with no way home.
         Log($"Could not open \"{target}\"; falling back to the Xbox app.");
         return TryOpen(XboxApp) ? 0 : 1;
+    }
+
+    /// <summary>Runs until the library window closes. A crash falls back to the Xbox app like a failed open.</summary>
+    private static bool RunLibrary()
+    {
+        try
+        {
+            Library.LibraryApp.Run();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log($"Game library failed: {ex}");
+            return false;
+        }
     }
 
     private static (string Target, string? CustomPath, string? CustomArgs) ReadSettings()
@@ -82,7 +106,7 @@ internal static class Program
         }
     }
 
-    private static void Log(string message)
+    internal static void Log(string message)
     {
         try
         {

@@ -22,6 +22,13 @@
                     </StackPanel>
                 </RadioButton>
 
+                <RadioButton GroupName="HomeApp" IsChecked="{Binding IsLibrary, Mode=TwoWay}" MinHeight="40" Margin="0,6,0,0">
+                    <StackPanel>
+                        <TextBlock Text="Handheld Optimiser library" FontWeight="SemiBold" />
+                        <TextBlock Text="A lightweight game library for Steam, Epic Games, Battle.net and GOG games. Uses about 115 MB while open and about 25 MB while you play, against about 1.4 GB for Big Picture." FontSize="11.5" Opacity="0.6" TextWrapping="Wrap" />
+                    </StackPanel>
+                </RadioButton>
+
                 <RadioButton GroupName="HomeApp" IsChecked="{Binding IsArmouryCrate, Mode=TwoWay}" MinHeight="40" Margin="0,6,0,0">
                     <StackPanel>
                         <TextBlock Text="Armoury Crate SE" FontWeight="SemiBold" />
