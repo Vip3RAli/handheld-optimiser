@@ -150,6 +150,14 @@ public sealed partial class MainViewModel : ObservableObject, IShell
             this));
 
         Pages.Add(new TweakListViewModel(
+            "Sleep & Battery",
+            "",
+            "Handhelds only have Modern Standby, which keeps draining the battery. These keep a short sleep, then hibernate, and stop things waking the device.",
+            [TweakCategory.Sleep],
+            engine,
+            this));
+
+        Pages.Add(new TweakListViewModel(
             "Full Screen Mode",
             "",
             "Choose what the Windows full screen experience opens, and whether to sign straight into it.",

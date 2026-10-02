@@ -54,7 +54,8 @@ public sealed class TweakEngine
             .. StorageTweaks.All,
             .. GraphicsTweaks.All,
             .. UsabilityTweaks.All,
-            .. FullScreenTweaks.All
+            .. FullScreenTweaks.All,
+            .. SleepTweaks.All
         ];
 
         PowerActions = TweakDefinitions.PowerActions.All;
