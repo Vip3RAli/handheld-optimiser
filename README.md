@@ -67,6 +67,7 @@ One-Click Optimise includes turning off **Memory Integrity**, which is usually t
 | **Storage** | Disable last access timestamps · Disable 8.3 short file names |
 | **Graphics & Scheduling** | Force Game Mode on · Enable hardware-accelerated GPU scheduling |
 | **Handheld Usability** | Disable the Sticky Keys and Filter Keys shortcuts · Disable power throttling |
+| **Sleep & Battery** | Hibernate after 15 minutes of sleep · Turn Wi-Fi off during sleep · Only the power button wakes the handheld · Turn off the SD card reader |
 | **Full Screen Mode** | Choose the home app · Use Handheld Optimiser as the home app · Enter full screen mode at sign-in |
 
 ### Full Screen Mode (Xbox mode home app)

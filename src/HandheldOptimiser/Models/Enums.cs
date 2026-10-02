@@ -13,7 +13,8 @@ public enum TweakCategory
     Storage,
     Graphics,
     Usability,
-    FullScreen
+    FullScreen,
+    Sleep
 }
 
 /// <summary>
