@@ -86,14 +86,15 @@ Handheld Optimiser then appears under **Settings > Gaming > Xbox mode > Choose h
 
 #### Handheld Optimiser library
 
-A lightweight game library that replaces Big Picture as the home screen. It finds installed games from **Steam**, **Xbox / PC Game Pass**, **Epic Games**, **Battle.net** and **GOG**, shows them as one grid with the game you played last first, and is driven with the controller (d-pad or left stick to move, **A** to play, **Y** to refresh) or by touch. The top bar shows the battery level, whether it is charging, and the Wi-Fi signal beside the clock.
+A lightweight game library that replaces Big Picture as the home screen. It finds installed games from **Steam**, **Xbox / PC Game Pass**, **Epic Games**, **Battle.net**, **GOG**, the **EA App** and **Ubisoft Connect**, shows them as one grid with the game you played last first, and is driven with the controller (d-pad or left stick to move, **A** to play, **Y** to refresh) or by touch. The top bar shows the battery level, whether it is charging, and the Wi-Fi signal beside the clock.
 
 - **Game Library** in the Start menu opens it directly, without changing your full screen home app.
 - **LB / RB** filter the grid by store (All, Steam, Xbox and so on). The tabs can also be tapped.
 - **X** on a game (or press and hold on touch) opens its quick actions: set extra launch arguments, open the install folder, view the executable's properties, or correct its background artwork. Launch arguments apply to Steam and GOG games; the other stores start their games themselves and take none.
+- The power button beside the gear (or **View** on the controller) opens the power menu: sleep, hibernate, restart or shut down. Hibernate is listed only when it is switched on in Windows. Restart and shut down ask for a second press, so a stray button cannot end a session.
 - The background is a gradient in the colours of the selected game's cover or icon, worked out on the device with nothing downloaded.
 - The gear in the top bar (or **Menu** on the controller) opens the library's settings: the background (game colours, game artwork or plain), how strong the colours are, how blurred the artwork is (off, light, medium or strong) and whether it sits at the top or the bottom of the screen, the SteamGridDB key, on / off switches for the battery and Wi-Fi display, the store filter and the quick actions, and **Quit** to close the library.
-- Choose game artwork there, or switch on **Use game artwork as the library background** under **Full Screen Mode**, to show the game's whole banner artwork across the top or bottom of the screen, fading into its colours. Steam games use the artwork Steam already keeps on disk. For the other stores, enter a free [SteamGridDB](https://www.steamgriddb.com) API key and the library fetches each game's artwork once and keeps it in `%LOCALAPPDATA%\HandheldOptimiser\artwork`. Only then does the library go online, and only to SteamGridDB, sending the titles of those games to find them. A game with no artwork keeps its gradient. If a game gets the wrong picture, **Background artwork** in its quick actions lets you give the title to look it up by.
+- Choose game artwork there, or switch on **Use game artwork as the library background** under **Full Screen Mode**, to show the game's whole banner artwork across the top or bottom of the screen, fading into its colours. Steam games use the artwork Steam already keeps on disk. For the other stores, enter a free [SteamGridDB](https://www.steamgriddb.com) API key and the library fetches each game's artwork once and keeps it in `%LOCALAPPDATA%\HandheldOptimiser\artwork`. Only then does the library contact SteamGridDB, sending the titles of those games to find them. Its only other use of the internet is the check for a newer release. A game with no artwork keeps its gradient. If a game gets the wrong picture, **Background artwork** in its quick actions lets you give the title to look it up by.
 
 | | RAM |
 |---|---|
@@ -101,7 +102,7 @@ A lightweight game library that replaces Big Picture as the home screen. It find
 | Library, open | about 115 MB |
 | Library, while a game runs | about 25 MB |
 
-Each store's own app still starts when one of its games needs it: Steam runs silently in the background (so Steam Input and the overlay still work), Epic opens minimised, and Blizzard games go through Battle.net. Most GOG games are DRM-free and start directly, with no client at all. The library stays open behind the game, so quitting a game or pressing the home button lands back on it. While a game is in front, it stops reading the controller and gives its memory back to Windows.
+Each store's own app still starts when one of its games needs it: Steam runs silently in the background (so Steam Input and the overlay still work), Epic opens minimised, Blizzard games go through Battle.net, and EA and Ubisoft games bring up the EA App and Ubisoft Connect. An EA or Ubisoft game bought on Steam or Epic is listed once, under the store it was bought from. Most GOG games are DRM-free and start directly, with no client at all. The library stays open behind the game, so quitting a game or pressing the home button lands back on it. While a game is in front, it stops reading the controller and gives its memory back to Windows.
 
 Controller tips:
 
@@ -138,6 +139,8 @@ Checks that ASUS, AMD, Realtek, Defender, Windows Update and Game Pass services 
 ## Updating
 
 From 0.3.0, the app checks for a newer release each time it starts, and **Check for updates** in the status bar checks on demand. When one is available, a banner offers **Update now**: the app downloads the installer, checks its signature, installs it and reopens by itself. Your applied tweaks and undo history are kept.
+
+From 0.7.1, the game library shows the same banner, and looks for a newer release when it opens and about once a day while it stays open. It only asks GitHub for the latest version number. **Update now** there (also the first row of the library's settings on the controller) opens the main app, which asks for administrator permission and then installs the update as above. The library never downloads or runs an installer itself.
 
 Every release is signed with the developer's own key, and the app refuses to install anything whose signature does not match, even a file that has been swapped on GitHub. Versions before 0.3.0 have no updater, so install 0.3.0 by hand once.
 

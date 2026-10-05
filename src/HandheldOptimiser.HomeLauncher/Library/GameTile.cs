@@ -75,7 +75,9 @@ internal sealed class GameTile
         [GameStore.Xbox] = Gradient("#107C10", "#0A2E0A"),
         [GameStore.Epic] = Gradient("#3A3A3A", "#141414"),
         [GameStore.BattleNet] = Gradient("#1473B8", "#0A2A4A"),
-        [GameStore.Gog] = Gradient("#7A2F80", "#2C1030")
+        [GameStore.Gog] = Gradient("#7A2F80", "#2C1030"),
+        [GameStore.Ea] = Gradient("#E0442E", "#4A1410"),
+        [GameStore.Ubisoft] = Gradient("#0070D1", "#061C3A")
     };
 
     // A game with no usable cover or icon takes its store's colours.

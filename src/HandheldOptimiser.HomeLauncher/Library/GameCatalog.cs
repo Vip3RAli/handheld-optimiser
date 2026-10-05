@@ -20,20 +20,37 @@ internal static class GameCatalog
     {
         var games = new Dictionary<string, Game>(StringComparer.OrdinalIgnoreCase);
 
+        // Install folders already taken by an earlier store. EA and Ubisoft games bought on Steam or Epic
+        // register with the EA App and Ubisoft Connect as well, so those two are scanned last and a game
+        // keeps the store it was bought from.
+        var claimed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var (store, scan) in new (string, Func<IEnumerable<Game>>)[]
         {
             ("Steam", SteamLibrary.Scan),
             ("Xbox", XboxLibrary.Scan),
             ("Epic", EpicLibrary.Scan),
             ("Battle.net", BattleNetLibrary.Scan),
-            ("GOG", GogLibrary.Scan)
+            ("GOG", GogLibrary.Scan),
+            ("EA App", EaLibrary.Scan),
+            ("Ubisoft Connect", UbisoftLibrary.Scan)
         })
         {
+            var folders = new List<string>();
             try
             {
                 foreach (var game in scan())
                 {
-                    games.TryAdd(game.Key, game);
+                    var folder = NormaliseFolder(game.InstallDirectory);
+                    if (folder is not null && claimed.Contains(folder))
+                    {
+                        continue;
+                    }
+
+                    if (games.TryAdd(game.Key, game) && folder is not null)
+                    {
+                        folders.Add(folder);
+                    }
                 }
             }
             catch (Exception ex)
@@ -41,6 +58,8 @@ internal static class GameCatalog
                 // One store's odd install must not empty the whole library.
                 Program.Log($"Scanning {store} failed: {ex.GetType().Name}: {ex.Message}");
             }
+
+            claimed.UnionWith(folders);
         }
 
         var history = ReadHistory();
@@ -121,6 +140,23 @@ internal static class GameCatalog
         {
             Program.Log($"Could not save launch arguments for {game.Key}: {ex.Message}");
             return false;
+        }
+    }
+
+    private static string? NormaliseFolder(string? folder)
+    {
+        if (string.IsNullOrWhiteSpace(folder))
+        {
+            return null;
+        }
+
+        try
+        {
+            return Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder));
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return null;
         }
     }
 
