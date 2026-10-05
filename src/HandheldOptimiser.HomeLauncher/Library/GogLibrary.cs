@@ -49,7 +49,9 @@ internal static class GogLibrary
                 IconPath: gogIcon is not null && File.Exists(gogIcon) ? gogIcon : exe,
                 LaunchTarget: exe,
                 LaunchArguments: key.GetValue("launchParam") as string,
-                WorkingDirectory: workingDir);
+                WorkingDirectory: workingDir,
+                InstallDirectory: installDir ?? Path.GetDirectoryName(exe),
+                ExecutablePath: exe);
         }
     }
 }

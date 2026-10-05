@@ -30,6 +30,12 @@ public sealed partial class HomeAppPickerViewModel : ObservableObject, IPageSect
     private string _customArgs = string.Empty;
 
     [ObservableProperty]
+    private bool _useArtwork;
+
+    [ObservableProperty]
+    private string _artworkKey = string.Empty;
+
+    [ObservableProperty]
     private string _availabilityText = string.Empty;
 
     [ObservableProperty]
@@ -75,6 +81,8 @@ public sealed partial class HomeAppPickerViewModel : ObservableObject, IPageSect
             Target = target;
             CustomPath = path;
             CustomArgs = args;
+            UseArtwork = HomeAppRegistration.LoadUseArtwork();
+            ArtworkKey = HomeAppRegistration.LoadArtworkKey();
         }
         finally
         {
@@ -101,6 +109,28 @@ public sealed partial class HomeAppPickerViewModel : ObservableObject, IPageSect
     partial void OnTargetChanged(HomeAppTarget value) => Save();
     partial void OnCustomPathChanged(string value) => Save();
     partial void OnCustomArgsChanged(string value) => Save();
+
+    // Each writes only its own value: the library's settings menu has a third background choice (plain)
+    // that saving the switch along with the key would overwrite.
+    partial void OnUseArtworkChanged(bool value) => SaveBackground(() => HomeAppRegistration.SaveUseArtwork(value));
+    partial void OnArtworkKeyChanged(string value) => SaveBackground(() => HomeAppRegistration.SaveArtworkKey(value.Trim()));
+
+    private void SaveBackground(Action save)
+    {
+        if (_loading)
+        {
+            return;
+        }
+
+        try
+        {
+            save();
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException or System.IO.IOException)
+        {
+            _log.Error($"Could not save the library background choice: {ex.Message}");
+        }
+    }
 
     private void Save()
     {

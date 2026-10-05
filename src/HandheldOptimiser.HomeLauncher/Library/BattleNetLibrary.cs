@@ -60,7 +60,10 @@ internal static partial class BattleNetLibrary
                 CoverPath: null,
                 IconPath: entry.DisplayIcon,
                 LaunchTarget: clientExe,
-                LaunchArguments: hasCode ? $"--exec=\"launch {code}\"" : null);
+                LaunchArguments: hasCode ? $"--exec=\"launch {code}\"" : null,
+                InstallDirectory: entry.InstallLocation,
+                // Blizzard points the uninstall entry's icon at the game's launcher exe.
+                ExecutablePath: entry.DisplayIcon is { } icon && icon.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? icon : null);
         }
     }
 

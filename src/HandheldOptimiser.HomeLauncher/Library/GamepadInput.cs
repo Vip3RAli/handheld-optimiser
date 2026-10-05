@@ -6,13 +6,20 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 internal enum GamepadAction
 {
     Accept,
-    Refresh
+    Back,
+    Options,
+    Refresh,
+    PreviousFilter,
+    NextFilter,
+    Menu,
+    View
 }
 
 /// <summary>
 /// Polls XInput controllers while the library is in front, so the d-pad or left stick moves between
-/// tiles and A launches. Polling stops whenever the library loses focus: the game owns the controller
-/// then, and the library must not react to in-game presses.
+/// tiles, A launches, X opens a game's options and the bumpers change the store filter. Polling stops
+/// whenever the library loses focus: the game owns the controller then, and the library must not react
+/// to in-game presses.
 /// </summary>
 internal sealed class GamepadInput
 {
@@ -20,8 +27,18 @@ internal sealed class GamepadInput
     private const ushort DpadDown = 0x0002;
     private const ushort DpadLeft = 0x0004;
     private const ushort DpadRight = 0x0008;
-    private const ushort ButtonA = 0x1000;
-    private const ushort ButtonY = 0x8000;
+
+    private static readonly (ushort Bit, GamepadAction Action)[] Buttons =
+    [
+        (0x1000, GamepadAction.Accept),
+        (0x2000, GamepadAction.Back),
+        (0x4000, GamepadAction.Options),
+        (0x8000, GamepadAction.Refresh),
+        (0x0100, GamepadAction.PreviousFilter),
+        (0x0200, GamepadAction.NextFilter),
+        (0x0010, GamepadAction.Menu),
+        (0x0020, GamepadAction.View)
+    ];
 
     private const short StickThreshold = 16000;
     private const uint MaxControllers = 4;
@@ -65,14 +82,12 @@ internal sealed class GamepadInput
         var pressed = (ushort)(buttons & ~_previous);
         _previous = buttons;
 
-        if ((pressed & ButtonA) != 0)
+        foreach (var (bit, action) in Buttons)
         {
-            Pressed?.Invoke(GamepadAction.Accept);
-        }
-
-        if ((pressed & ButtonY) != 0)
-        {
-            Pressed?.Invoke(GamepadAction.Refresh);
+            if ((pressed & bit) != 0)
+            {
+                Pressed?.Invoke(action);
+            }
         }
 
         var direction = DirectionOf(buttons);
