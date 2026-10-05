@@ -39,8 +39,8 @@ public partial class LibraryWindow : Window
     private GameStore? _filter;
 
     // Long enough that holding a direction across a row does not load every game passed on the way.
-    private static readonly TimeSpan BackdropDelay = TimeSpan.FromMilliseconds(200);
-    private static readonly Duration BackdropFade = TimeSpan.FromMilliseconds(250);
+    private static readonly TimeSpan BackdropDelay = TimeSpan.FromMilliseconds(150);
+    private static readonly Duration BackdropFade = TimeSpan.FromMilliseconds(200);
 
     private enum MenuEditor
     {
@@ -63,6 +63,8 @@ public partial class LibraryWindow : Window
     // The player's choices, from the settings menu here or the main app.
     private BackgroundKind _background = LibrarySettings.Background;
     private ColourStrength _strength = LibrarySettings.Strength;
+    private ArtworkBlur _blur = LibrarySettings.Blur;
+    private ArtworkPosition _position = LibrarySettings.Position;
     private bool _showStatus = LibrarySettings.ShowStatus;
     private bool _showFilter = LibrarySettings.ShowFilter;
     private bool _quickActions = LibrarySettings.QuickActions;
@@ -107,6 +109,8 @@ public partial class LibraryWindow : Window
         _gamepad.Start();
         _background = LibrarySettings.Background;
         _strength = LibrarySettings.Strength;
+        _blur = LibrarySettings.Blur;
+        _position = LibrarySettings.Position;
         _showStatus = LibrarySettings.ShowStatus;
         _quickActions = LibrarySettings.QuickActions;
         OptionsHint.Visibility = _quickActions ? Visibility.Visible : Visibility.Collapsed;
@@ -273,8 +277,8 @@ public partial class LibraryWindow : Window
     }
 
     /// <summary>
-    /// Puts the game's colours behind the grid, or its artwork when the player chose that. Artwork waits
-    /// for the focus to settle and falls back to the colours for a game with none.
+    /// Puts the game's colours, or its artwork when the player chose that, behind the grid once the
+    /// focus has settled on it. Artwork falls back to the colours for a game with none.
     /// </summary>
     private void QueueBackdrop(GameTile tile)
     {
@@ -285,20 +289,8 @@ public partial class LibraryWindow : Window
 
         _backdropKey = tile.Game.Key;
         _backdropLoad?.Cancel();
-
-        switch (_background)
-        {
-            case BackgroundKind.Artwork:
-                _backdropLoad = new CancellationTokenSource();
-                _ = LoadArtworkAsync(tile, _backdropLoad.Token);
-                break;
-            case BackgroundKind.Colours:
-                ShowBackdrop(tile.Backdrop);
-                break;
-            default:
-                ShowBackdrop(null);
-                break;
-        }
+        _backdropLoad = new CancellationTokenSource();
+        _ = LoadBackdropAsync(tile, _backdropLoad.Token);
     }
 
     /// <summary>Shows the focused game's background again, after a setting that affects it changed.</summary>
@@ -311,7 +303,7 @@ public partial class LibraryWindow : Window
         }
     }
 
-    private async Task LoadArtworkAsync(GameTile tile, CancellationToken superseded)
+    private async Task LoadBackdropAsync(GameTile tile, CancellationToken superseded)
     {
         try
         {
@@ -322,52 +314,110 @@ public partial class LibraryWindow : Window
             return;
         }
 
-        var image = await Artwork.LoadAsync(tile.Game);
-        if (superseded.IsCancellationRequested)
-        {
-            return;
-        }
-
-        if (image is null)
-        {
-            ShowBackdrop(tile.Backdrop);
-            return;
-        }
-
-        var artwork = new ImageBrush(image) { Stretch = Stretch.UniformToFill };
-        artwork.Freeze();
-        ShowBackdrop(artwork);
-    }
-
-    /// <summary>Fades the new background in over the old. Null fades to the plain background.</summary>
-    private void ShowBackdrop(Brush? backdrop)
-    {
-        // Artwork has bright detail that needs the full shade; a smooth gradient can show through more.
-        var shade = backdrop is ImageBrush ? 1 : _strength switch
+        var background = _background;
+        var blur = _blur;
+        var position = _position;
+        var (width, height) = BackdropPixels();
+        var (from, to) = tile.BackdropColours;
+        var shade = _strength switch
         {
             ColourStrength.Subtle => 1,
             ColourStrength.Strong => 0.55,
             _ => 0.7
         };
-        BackdropShade.BeginAnimation(OpacityProperty, Fade(BackdropShade.Opacity, shade));
 
-        if (ReferenceEquals(backdrop, BackdropFront.Fill))
+        // Built at the screen's own size off the UI thread, so showing it is only a copy.
+        var backdrop = await Task.Run(async () =>
+        {
+            if (background == BackgroundKind.Plain)
+            {
+                return null;
+            }
+
+            if (background == BackgroundKind.Artwork && await Artwork.FindAsync(tile.Game) is { } path
+                && Backdrops.FromArtwork(path, width, height, blur, position, from, to, shade) is { } artwork)
+            {
+                // Decoding artwork (up to 4K) leaves tens of MB of buffers behind, some of them outside
+                // the managed heap where only a collection frees them. Left alone they pile up with
+                // every game passed, in a process that is meant to stay small.
+                GC.Collect();
+                return artwork;
+            }
+
+            return Backdrops.Gradient(from, to, width, height, shade);
+        });
+
+        if (!superseded.IsCancellationRequested)
+        {
+            ShowBackdrop(backdrop);
+        }
+    }
+
+    /// <summary>The backdrop layer's size in real pixels, which is what the picture is made at.</summary>
+    private (int Width, int Height) BackdropPixels()
+    {
+        var toDevice = PresentationSource.FromVisual(this)?.CompositionTarget?.TransformToDevice ?? Matrix.Identity;
+        var width = (int)Math.Round(BackdropFront.ActualWidth * toDevice.M11);
+        var height = (int)Math.Round(BackdropFront.ActualHeight * toDevice.M22);
+
+        // Before the first layout pass there is no size yet; any sensible one will do until the next.
+        return width > 0 && height > 0 ? (width, height) : (1920, 1080);
+    }
+
+    /// <summary>
+    /// Fades the new background in over the old, which stays solid underneath: one see-through layer
+    /// costs far less to draw than two. Null fades to the plain background.
+    /// </summary>
+    private void ShowBackdrop(ImageSource? backdrop)
+    {
+        Brush? brush = null;
+        if (backdrop is not null)
+        {
+            brush = new ImageBrush(backdrop) { Stretch = Stretch.Fill };
+            brush.Freeze();
+        }
+
+        var previous = BackdropFront.Fill;
+        if (brush is null && previous is null)
         {
             return;
         }
 
-        BackdropBack.Fill = BackdropFront.Fill;
-        BackdropFront.Fill = backdrop;
-        BackdropBack.BeginAnimation(OpacityProperty, Fade(1, 0));
-        BackdropFront.BeginAnimation(OpacityProperty, Fade(0, 1));
+        BackdropBack.BeginAnimation(OpacityProperty, null);
+        BackdropFront.BeginAnimation(OpacityProperty, null);
+
+        if (brush is null)
+        {
+            // Nothing new to show: the old one fades away on the back layer.
+            BackdropFront.Fill = null;
+            BackdropFront.Opacity = 0;
+            BackdropBack.Fill = previous;
+            BackdropBack.BeginAnimation(OpacityProperty, Fade(1, 0, () => BackdropBack.Fill = null));
+            return;
+        }
+
+        BackdropBack.Fill = previous;
+        BackdropBack.Opacity = previous is null ? 0 : 1;
+        BackdropFront.Fill = brush;
+
+        // Once the new one is solid the old one is covered, and can go.
+        BackdropFront.BeginAnimation(OpacityProperty, Fade(0, 1, () =>
+        {
+            if (ReferenceEquals(BackdropFront.Fill, brush))
+            {
+                BackdropBack.Fill = null;
+                BackdropBack.Opacity = 0;
+            }
+        }));
     }
 
-    private static DoubleAnimation Fade(double from, double to)
+    private static DoubleAnimation Fade(double from, double to, Action done)
     {
         var fade = new DoubleAnimation(from, to, BackdropFade);
 
         // Software rendering redraws the whole window for each step, so take fewer of them.
         Timeline.SetDesiredFrameRate(fade, 30);
+        fade.Completed += (_, _) => done();
         return fade;
     }
 
@@ -697,6 +747,12 @@ public partial class LibraryWindow : Window
         StrengthSetting.IsEnabled = _background != BackgroundKind.Plain;
         StrengthSetting.Tag = _strength.ToString();
 
+        BlurSetting.Visibility = _background == BackgroundKind.Artwork ? Visibility.Visible : Visibility.Collapsed;
+        BlurSetting.Tag = _blur.ToString();
+
+        PositionSetting.Visibility = BlurSetting.Visibility;
+        PositionSetting.Tag = _position.ToString();
+
         StatusSetting.Tag = OnOff(_showStatus);
         FilterSetting.Tag = OnOff(_showFilter);
         QuickActionsSetting.Tag = OnOff(_quickActions);
@@ -738,32 +794,90 @@ public partial class LibraryWindow : Window
         RefreshSettings();
     }
 
-    private void OnCycleBackground(object sender, RoutedEventArgs e)
-    {
-        _background = _background switch
-        {
-            BackgroundKind.Colours => BackgroundKind.Artwork,
-            BackgroundKind.Artwork => BackgroundKind.Plain,
-            _ => BackgroundKind.Colours
-        };
+    private void OnCycleBackground(object sender, RoutedEventArgs e) => StepBackground(1);
 
+    private void OnCycleStrength(object sender, RoutedEventArgs e) => StepStrength(1);
+
+    private void OnCycleBlur(object sender, RoutedEventArgs e) => StepBlur(1);
+
+    private void OnCyclePosition(object sender, RoutedEventArgs e) => StepPosition(1);
+
+    /// <summary>Closes the library. Windows starts it again on the next home button press.</summary>
+    private void OnQuit(object sender, RoutedEventArgs e)
+    {
+        Program.Log("Game library closed from its settings");
+        Close();
+    }
+
+    private void StepBackground(int step)
+    {
+        _background = Step(_background, step);
         LibrarySettings.Background = _background;
         RefreshSettings();
         ReloadBackdrop();
     }
 
-    private void OnCycleStrength(object sender, RoutedEventArgs e)
+    private void StepStrength(int step)
     {
-        _strength = _strength switch
-        {
-            ColourStrength.Subtle => ColourStrength.Medium,
-            ColourStrength.Medium => ColourStrength.Strong,
-            _ => ColourStrength.Subtle
-        };
-
+        _strength = Step(_strength, step);
         LibrarySettings.Strength = _strength;
         RefreshSettings();
         ReloadBackdrop();
+    }
+
+    private void StepPosition(int step)
+    {
+        _position = Step(_position, step);
+        LibrarySettings.Position = _position;
+        RefreshSettings();
+        ReloadBackdrop();
+    }
+
+    private void StepBlur(int step)
+    {
+        _blur = Step(_blur, step);
+        LibrarySettings.Blur = _blur;
+        RefreshSettings();
+        ReloadBackdrop();
+    }
+
+    /// <summary>The next or previous choice of a setting, going round at either end.</summary>
+    private static T Step<T>(T value, int step) where T : struct, Enum
+    {
+        var choices = Enum.GetValues<T>();
+        return choices[(Array.IndexOf(choices, value) + step + choices.Length) % choices.Length];
+    }
+
+    /// <summary>Left and right on a settings row with several choices step through them, like a slider.</summary>
+    private bool StepFocusedSetting(int step)
+    {
+        if (!ReferenceEquals(_menu, SettingsItems) || Keyboard.FocusedElement is not Button row)
+        {
+            return false;
+        }
+
+        if (ReferenceEquals(row, BackgroundSetting))
+        {
+            StepBackground(step);
+        }
+        else if (ReferenceEquals(row, StrengthSetting))
+        {
+            StepStrength(step);
+        }
+        else if (ReferenceEquals(row, PositionSetting))
+        {
+            StepPosition(step);
+        }
+        else if (ReferenceEquals(row, BlurSetting))
+        {
+            StepBlur(step);
+        }
+        else
+        {
+            return false;
+        }
+
+        return true;
     }
 
     private void OnEditArtworkKey(object sender, RoutedEventArgs e) =>
@@ -804,6 +918,12 @@ public partial class LibraryWindow : Window
 
     private void MoveMenuFocus(FocusNavigationDirection direction)
     {
+        if (direction is FocusNavigationDirection.Left or FocusNavigationDirection.Right)
+        {
+            StepFocusedSetting(direction == FocusNavigationDirection.Right ? 1 : -1);
+            return;
+        }
+
         var step = direction switch
         {
             FocusNavigationDirection.Up => -1,

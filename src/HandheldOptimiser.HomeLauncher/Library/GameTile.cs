@@ -24,8 +24,8 @@ internal sealed class GameTile
     public bool HasCover => Cover is not null;
     public bool ShowsIcon => Cover is null;
 
-    /// <summary>The gradient behind the grid while this game has the focus, in its artwork's colours.</summary>
-    public required Brush Backdrop { get; init; }
+    /// <summary>The two ends of the gradient behind the grid while this game has the focus.</summary>
+    public required (Color From, Color To) BackdropColours { get; init; }
 
     public static GameTile Create(Game game)
     {
@@ -38,7 +38,7 @@ internal sealed class GameTile
             Cover = cover,
             Icon = icon,
             Background = StoreBrushes[game.Store],
-            Backdrop = Palette.Gradient(cover ?? icon) ?? StoreBrushes[game.Store]
+            BackdropColours = Palette.Colours(cover ?? icon) ?? StoreColours(game.Store)
         };
     }
 
@@ -73,10 +73,17 @@ internal sealed class GameTile
     {
         [GameStore.Steam] = Gradient("#2A475E", "#171A21"),
         [GameStore.Xbox] = Gradient("#107C10", "#0A2E0A"),
-        [GameStore.Epic] =Gradient("#3A3A3A", "#141414"),
+        [GameStore.Epic] = Gradient("#3A3A3A", "#141414"),
         [GameStore.BattleNet] = Gradient("#1473B8", "#0A2A4A"),
         [GameStore.Gog] = Gradient("#7A2F80", "#2C1030")
     };
+
+    // A game with no usable cover or icon takes its store's colours.
+    private static (Color From, Color To) StoreColours(GameStore store)
+    {
+        var stops = ((LinearGradientBrush)StoreBrushes[store]).GradientStops;
+        return (stops[0].Color, stops[^1].Color);
+    }
 
     private static Brush Gradient(string top, string bottom)
     {

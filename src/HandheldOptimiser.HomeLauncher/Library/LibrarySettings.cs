@@ -19,6 +19,22 @@ internal enum ColourStrength
     Strong
 }
 
+/// <summary>Which end of the screen the artwork sits at; the game's colours fill the rest.</summary>
+internal enum ArtworkPosition
+{
+    Top,
+    Bottom
+}
+
+/// <summary>How soft the artwork behind the grid is.</summary>
+internal enum ArtworkBlur
+{
+    Off,
+    Light,
+    Medium,
+    Strong
+}
+
 /// <summary>
 /// The library's own preferences, changed from its settings menu. They live in the per-user key the main
 /// app writes the home app choice to, so the background options on its Full Screen Mode page and the
@@ -30,6 +46,8 @@ internal static class LibrarySettings
     private const string BackgroundValue = "Background";
     private const string StrengthValue = "ColourStrength";
     private const string ArtworkKeyValue = "SteamGridDbKey";
+    private const string BlurValue = "ArtworkBlur";
+    private const string PositionValue = "ArtworkPosition";
     private const string StatusValue = "StatusBar";
     private const string FilterValue = "StoreFilter";
     private const string QuickActionsValue = "QuickActions";
@@ -59,6 +77,22 @@ internal static class LibrarySettings
             _ => ColourStrength.Medium
         };
         set => Write(StrengthValue, value.ToString().ToLowerInvariant());
+    }
+
+    public static ArtworkBlur Blur
+    {
+        get => Enum.TryParse<ArtworkBlur>(Read(BlurValue), ignoreCase: true, out var blur) && Enum.IsDefined(blur)
+            ? blur
+            : ArtworkBlur.Light;
+        set => Write(BlurValue, value.ToString().ToLowerInvariant());
+    }
+
+    public static ArtworkPosition Position
+    {
+        get => string.Equals(Read(PositionValue), "bottom", StringComparison.OrdinalIgnoreCase)
+            ? ArtworkPosition.Bottom
+            : ArtworkPosition.Top;
+        set => Write(PositionValue, value.ToString().ToLowerInvariant());
     }
 
     /// <summary>Battery and Wi-Fi beside the clock.</summary>

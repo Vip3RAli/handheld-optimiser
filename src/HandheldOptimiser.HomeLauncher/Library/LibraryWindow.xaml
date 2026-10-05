@@ -208,23 +208,14 @@
         </Grid.RowDefinitions>
 
         <!--
-            The focused game's background: a gradient of its colours, or its artwork. Two layers so one
-            can fade in over the other, under a shade that keeps the tiles and text readable. Artwork is
-            decoded small, which is what blurs it.
+            The focused game's background, as a finished picture the size of the screen (see Backdrops):
+            its colours or its artwork, with the shade that keeps tiles and text readable already in it.
+            Two layers, so a new one can fade in over the old. Drawn pixel for pixel, never scaled.
         -->
         <Rectangle x:Name="BackdropBack" Grid.RowSpan="4" Opacity="0" IsHitTestVisible="False"
-                   RenderOptions.BitmapScalingMode="Linear" />
+                   RenderOptions.BitmapScalingMode="NearestNeighbor" />
         <Rectangle x:Name="BackdropFront" Grid.RowSpan="4" Opacity="0" IsHitTestVisible="False"
-                   RenderOptions.BitmapScalingMode="Linear" />
-        <Rectangle x:Name="BackdropShade" Grid.RowSpan="4" IsHitTestVisible="False">
-            <Rectangle.Fill>
-                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                    <GradientStop Offset="0" Color="#D00F1115" />
-                    <GradientStop Offset="0.45" Color="#A80F1115" />
-                    <GradientStop Offset="1" Color="#E60F1115" />
-                </LinearGradientBrush>
-            </Rectangle.Fill>
-        </Rectangle>
+                   RenderOptions.BitmapScalingMode="NearestNeighbor" />
 
         <Grid Grid.Row="0" Margin="48,32,48,12">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
@@ -323,9 +314,11 @@
         <!-- Quick actions for one game, over the dimmed library. Tapping outside the panel closes it. -->
         <Grid x:Name="MenuOverlay" Grid.RowSpan="4" Background="#C0000000" Visibility="Collapsed"
               MouseLeftButtonDown="OnMenuBackdropClick">
-            <Border Width="560" Padding="28,24,28,20" CornerRadius="12" Background="#181B22"
+            <Border Width="560" Margin="0,24" Padding="28,24,28,20" CornerRadius="12" Background="#181B22"
                     HorizontalAlignment="Center" VerticalAlignment="Center"
                     KeyboardNavigation.TabNavigation="Cycle" KeyboardNavigation.DirectionalNavigation="Contained">
+                <!-- Scrolls when the list is taller than the screen, as on a small or heavily scaled display. -->
+                <ScrollViewer VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly" Focusable="False">
                 <StackPanel>
                     <TextBlock x:Name="MenuTitle" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                     <TextBlock x:Name="MenuStore" Margin="0,2,0,18" FontSize="13" Opacity="0.55" />
@@ -358,6 +351,10 @@
                                 Click="OnCycleBackground" />
                         <Button x:Name="StrengthSetting" Style="{StaticResource MenuButton}" Content="Colour strength"
                                 Click="OnCycleStrength" />
+                        <Button x:Name="BlurSetting" Style="{StaticResource MenuButton}" Content="Artwork blur"
+                                Click="OnCycleBlur" />
+                        <Button x:Name="PositionSetting" Style="{StaticResource MenuButton}" Content="Artwork position"
+                                Click="OnCyclePosition" />
                         <Button x:Name="ArtworkKeySetting" Style="{StaticResource MenuButton}" Content="SteamGridDB API key"
                                 Click="OnEditArtworkKey" />
                         <Button x:Name="StatusSetting" Style="{StaticResource MenuButton}" Content="Battery and Wi-Fi"
@@ -366,6 +363,8 @@
                                 Click="OnToggleFilter" />
                         <Button x:Name="QuickActionsSetting" Style="{StaticResource MenuButton}" Content="Quick actions"
                                 Click="OnToggleQuickActions" />
+                        <Button x:Name="QuitSetting" Style="{StaticResource MenuButton}" Content="Quit"
+                                Tag="Close the game library" Click="OnQuit" />
 
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
                             <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
@@ -393,6 +392,7 @@
                         </Grid>
                     </StackPanel>
                 </StackPanel>
+                </ScrollViewer>
             </Border>
         </Grid>
     </Grid>

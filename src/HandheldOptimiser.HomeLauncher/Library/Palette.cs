@@ -24,8 +24,8 @@ internal static class Palette
     private const int MinBinsApart = 2;
     private const double MinSecondShare = 0.12;
 
-    /// <returns>A frozen diagonal gradient, or null when the image cannot be read.</returns>
-    public static Brush? Gradient(ImageSource? image)
+    /// <returns>The two ends of the gradient, or null when the image cannot be read.</returns>
+    public static (Color From, Color To)? Colours(ImageSource? image)
     {
         if (image is not BitmapSource bitmap || Pixels(bitmap) is not { } pixels)
         {
@@ -71,7 +71,7 @@ internal static class Palette
         {
             // Black and white artwork: a gradient of its overall tone.
             var tone = Color.FromRgb((byte)(all.R / counted), (byte)(all.G / counted), (byte)(all.B / counted));
-            return Diagonal(Shade(tone, 1.25), Shade(tone, 0.6));
+            return (Shade(tone, 1.25), Shade(tone, 0.6));
         }
 
         var second = -1;
@@ -88,7 +88,7 @@ internal static class Palette
         var primary = Lift(Average(sums[first], weight[first]));
 
         // Artwork that is all one hue fades into a darker shade of it.
-        return Diagonal(primary, second < 0 ? Shade(primary, 0.45) : Lift(Average(sums[second], weight[second])));
+        return (primary, second < 0 ? Shade(primary, 0.45) : Lift(Average(sums[second], weight[second])));
     }
 
     private static byte[]? Pixels(BitmapSource bitmap)
@@ -130,13 +130,6 @@ internal static class Palette
         (byte)Math.Clamp(colour.R * factor, 0, 255),
         (byte)Math.Clamp(colour.G * factor, 0, 255),
         (byte)Math.Clamp(colour.B * factor, 0, 255));
-
-    private static Brush Diagonal(Color from, Color to)
-    {
-        var brush = new LinearGradientBrush(from, to, new Point(0, 0), new Point(1, 1));
-        brush.Freeze();
-        return brush;
-    }
 
     private static (double Hue, double Saturation, double Value) ToHsv(double r, double g, double b)
     {
