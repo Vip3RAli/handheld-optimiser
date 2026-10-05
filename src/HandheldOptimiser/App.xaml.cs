@@ -63,7 +63,9 @@ public partial class App : Application
         MainWindow = window;
         window.Show();
 
-        _ = viewModel.CheckForUpdatesOnStartupAsync();
+        // The game library cannot install updates itself, so its Update now starts this app with --update.
+        var installUpdate = e.Args.Contains("--update", StringComparer.OrdinalIgnoreCase);
+        _ = viewModel.CheckForUpdatesOnStartupAsync(installUpdate);
     }
 
     /// <summary>

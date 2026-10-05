@@ -4,6 +4,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
@@ -49,8 +50,12 @@ public partial class LibraryWindow : Window
         ArtworkKey
     }
 
-    // The list showing in the overlay: a game's quick actions or the library's settings. Null when closed.
+    // The list showing in the overlay: a game's quick actions, the library's settings or the power menu.
+    // Null when closed.
     private StackPanel? _menu;
+
+    // The Restart or Shut down row that has been pressed once and acts on the next press.
+    private Button? _confirming;
 
     // The game the quick actions are for, and which text setting is being typed.
     private GameTile? _menuTile;
@@ -68,6 +73,14 @@ public partial class LibraryWindow : Window
     private bool _showStatus = LibrarySettings.ShowStatus;
     private bool _showFilter = LibrarySettings.ShowFilter;
     private bool _quickActions = LibrarySettings.QuickActions;
+
+    // The library stays open for days, so it looks for a newer release again now and then.
+    private static readonly TimeSpan UpdateCheckEvery = TimeSpan.FromHours(24);
+    private DateTime _lastUpdateCheck = DateTime.MinValue;
+
+    // The newer release a check found, and the one whose banner the player closed.
+    private Version? _update;
+    private Version? _dismissedUpdate;
 
     private string? _focusedKey;
     private DateTime _lastScan = DateTime.MinValue;
@@ -87,6 +100,7 @@ public partial class LibraryWindow : Window
 
         // Scan on load, not only on activation: Windows can start the home app without giving it focus.
         Loaded += (_, _) => _ = ScanAsync();
+        Loaded += (_, _) => _ = CheckForUpdateAsync();
         Activated += OnActivated;
         Deactivated += OnDeactivated;
         PreviewKeyDown += OnKeyDown;
@@ -123,6 +137,7 @@ public partial class LibraryWindow : Window
         }
         _clock.Start();
         UpdateTopBar();
+        _ = CheckForUpdateAsync();
 
         if (DateTime.UtcNow - _lastScan > RescanAfter)
         {
@@ -144,6 +159,36 @@ public partial class LibraryWindow : Window
 
         // Once the rendering of the focus change has gone out, nothing here is needed until we are back.
         Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, Native.TrimWorkingSet);
+    }
+
+    private async Task CheckForUpdateAsync()
+    {
+        if (DateTime.UtcNow - _lastUpdateCheck < UpdateCheckEvery)
+        {
+            return;
+        }
+
+        _lastUpdateCheck = DateTime.UtcNow;
+        if (await Updates.CheckAsync() is { } newer)
+        {
+            _update = newer;
+            UpdateText.Text = $"Handheld Optimiser {Updates.Display(newer)} is available";
+            UpdateBanner.Visibility = newer == _dismissedUpdate ? Visibility.Collapsed : Visibility.Visible;
+        }
+    }
+
+    /// <summary>From the banner or the settings row. The main app does the installing, and reopens when done.</summary>
+    private void OnUpdateNow(object sender, RoutedEventArgs e)
+    {
+        CloseMenu();
+        StatusText.Text = Updates.StartUpdate() ?? "Opening Handheld Optimiser to install the update...";
+    }
+
+    /// <summary>Hides the banner for this release. The update stays in Settings.</summary>
+    private void OnDismissUpdate(object sender, RoutedEventArgs e)
+    {
+        _dismissedUpdate = _update;
+        UpdateBanner.Visibility = Visibility.Collapsed;
     }
 
     private async Task ScanAsync()
@@ -172,7 +217,7 @@ public partial class LibraryWindow : Window
             }
 
             EmptyText.Text = _allTiles.Count == 0
-                ? "No installed games were found in Steam, Xbox, Epic Games, Battle.net or GOG.\nInstall a game, then press Y to refresh."
+                ? "No installed games were found in Steam, Xbox, Epic Games, Battle.net, GOG, the EA App or Ubisoft Connect.\nInstall a game, then press Y to refresh."
                 : string.Empty;
         }
         finally
@@ -560,6 +605,9 @@ public partial class LibraryWindow : Window
             case GamepadAction.Menu:
                 OpenSettings();
                 break;
+            case GamepadAction.View:
+                OpenPower();
+                break;
             case GamepadAction.PreviousFilter:
                 CycleFilter(-1);
                 break;
@@ -619,6 +667,11 @@ public partial class LibraryWindow : Window
         else if (e.Key == Key.F1)
         {
             OpenSettings();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.F2)
+        {
+            OpenPower();
             e.Handled = true;
         }
         else if (e.Key is Key.PageUp or Key.PageDown)
@@ -687,6 +740,7 @@ public partial class LibraryWindow : Window
         _focusedKey = game.Key;
         _menu = GameItems;
         SettingsItems.Visibility = Visibility.Collapsed;
+        PowerItems.Visibility = Visibility.Collapsed;
 
         MenuTitle.Text = tile.Title;
         MenuStore.Text = tile.StoreName;
@@ -725,6 +779,7 @@ public partial class LibraryWindow : Window
         _menuTile = null;
         _menu = SettingsItems;
         GameItems.Visibility = Visibility.Collapsed;
+        PowerItems.Visibility = Visibility.Collapsed;
 
         MenuTitle.Text = "Settings";
         MenuStore.Text = "Game library";
@@ -734,8 +789,96 @@ public partial class LibraryWindow : Window
         ShowMenuItems();
     }
 
+    /// <summary>The power menu, from the power button in the top bar or the controller's View button.</summary>
+    private void OpenPower()
+    {
+        _menuTile = null;
+        _menu = PowerItems;
+        GameItems.Visibility = Visibility.Collapsed;
+        SettingsItems.Visibility = Visibility.Collapsed;
+
+        MenuTitle.Text = "Power";
+        MenuStore.Text = "This device";
+
+        // Asked each time, so switching hibernate on or off in Windows shows here without a restart.
+        HibernateItem.Visibility = Power.CanHibernate ? Visibility.Visible : Visibility.Collapsed;
+        _confirming = null;
+        RefreshPower();
+
+        MenuOverlay.Visibility = Visibility.Visible;
+        ShowMenuItems();
+    }
+
+    private void RefreshPower()
+    {
+        const string confirm = "Press again to confirm";
+        RestartItem.Tag = ReferenceEquals(_confirming, RestartItem) ? confirm : "Close everything and start Windows again";
+        ShutDownItem.Tag = ReferenceEquals(_confirming, ShutDownItem) ? confirm : "Close everything and power off";
+    }
+
+    private void OnOpenPower(object sender, RoutedEventArgs e) => OpenPower();
+
+    private async void OnSleep(object sender, RoutedEventArgs e)
+    {
+        // Closed first, so the device does not wake up on the power menu.
+        CloseMenu();
+        Program.Log("Sleep chosen in the power menu");
+
+        // Off the UI thread: the call does not return until the device is awake again.
+        var window = new WindowInteropHelper(this).Handle;
+        ReportPower(await Task.Run(() => Power.Sleep(window)));
+    }
+
+    private async void OnHibernate(object sender, RoutedEventArgs e)
+    {
+        CloseMenu();
+        Program.Log("Hibernate chosen in the power menu");
+        ReportPower(await Task.Run(Power.Hibernate));
+    }
+
+    private void OnRestart(object sender, RoutedEventArgs e) => ConfirmPower(RestartItem, "Restart", Power.Restart);
+
+    private void OnShutDown(object sender, RoutedEventArgs e) => ConfirmPower(ShutDownItem, "Shut down", Power.ShutDown);
+
+    /// <summary>Arms a row on its first press and acts on its second.</summary>
+    private void ConfirmPower(Button row, string name, Func<string?> action)
+    {
+        if (!ReferenceEquals(_confirming, row))
+        {
+            _confirming = row;
+            RefreshPower();
+            return;
+        }
+
+        CloseMenu();
+        Program.Log($"{name} chosen in the power menu");
+        ReportPower(action());
+    }
+
+    /// <summary>Moving off an armed row disarms it, so the second press is always a deliberate one.</summary>
+    private void OnPowerRowLostFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (ReferenceEquals(_confirming, sender))
+        {
+            _confirming = null;
+            RefreshPower();
+        }
+    }
+
+    private void ReportPower(string? error)
+    {
+        if (error is not null)
+        {
+            Program.Log(error);
+            StatusText.Text = error;
+        }
+    }
+
     private void RefreshSettings()
     {
+        UpdateSetting.Visibility = _update is null ? Visibility.Collapsed : Visibility.Visible;
+        UpdateSetting.Tag = _update is null ? null : $"Handheld Optimiser {Updates.Display(_update)} is available";
+
         BackgroundSetting.Tag = _background switch
         {
             BackgroundKind.Artwork => "Game artwork",
@@ -912,6 +1055,7 @@ public partial class LibraryWindow : Window
         _menu = null;
         _menuTile = null;
         _editing = null;
+        _confirming = null;
         MenuOverlay.Visibility = Visibility.Collapsed;
         RestoreFocus();
     }

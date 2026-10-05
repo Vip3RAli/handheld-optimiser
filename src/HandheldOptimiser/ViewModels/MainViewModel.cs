@@ -328,7 +328,11 @@ public sealed partial class MainViewModel : ObservableObject, IShell
     /// Runs once after the window opens. Quiet on purpose: being offline or rate-limited by GitHub is
     /// not something to interrupt anyone about, so failures only reach the log.
     /// </summary>
-    public async Task CheckForUpdatesOnStartupAsync()
+    /// <param name="installNow">
+    /// True when the game library's Update now opened the app. The update was already chosen there and
+    /// the administrator prompt accepted, so it installs without asking again, and a failed check is said.
+    /// </param>
+    public async Task CheckForUpdatesOnStartupAsync(bool installNow = false)
     {
         try
         {
@@ -337,6 +341,18 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         catch (Exception ex) when (IsUpdateCheckFailure(ex))
         {
             Log.Info($"Could not check for updates: {ex.Message}");
+
+            if (installNow)
+            {
+                await ConfirmAsync("Could not check for updates", $"{ex.Message}\n\nCheck the internet connection and try again.", "OK");
+            }
+
+            return;
+        }
+
+        if (installNow && AvailableUpdate is { CanInstallInApp: true } offer)
+        {
+            await DownloadAndInstallAsync(offer);
         }
     }
 
@@ -390,6 +406,11 @@ public sealed partial class MainViewModel : ObservableObject, IShell
             return;
         }
 
+        await DownloadAndInstallAsync(offer);
+    }
+
+    private async Task DownloadAndInstallAsync(UpdateOffer offer)
+    {
         string? installer = null;
         string? failure = null;
 

@@ -6,7 +6,9 @@ public enum GameStore
     Xbox,
     Epic,
     BattleNet,
-    Gog
+    Gog,
+    Ea,
+    Ubisoft
 }
 
 /// <summary>
@@ -40,6 +42,8 @@ public sealed record Game(
         GameStore.Xbox => "Xbox",
         GameStore.Epic => "Epic Games",
         GameStore.BattleNet => "Battle.net",
+        GameStore.Ea => "EA App",
+        GameStore.Ubisoft => "Ubisoft Connect",
         _ => "GOG"
     };
 }

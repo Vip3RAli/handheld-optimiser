@@ -68,6 +68,46 @@ internal static partial class Native
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool GetSystemPowerStatus(out SystemPowerStatus status);
 
+    [LibraryImport("powrprof.dll")]
+    [return: MarshalAs(UnmanagedType.U1)]
+    public static partial bool IsPwrHibernateAllowed();
+
+    /// <summary>Sleeps or hibernates, and only returns once the device is awake again.</summary>
+    [LibraryImport("powrprof.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.U1)]
+    public static partial bool SetSuspendState(
+        [MarshalAs(UnmanagedType.U1)] bool hibernate,
+        [MarshalAs(UnmanagedType.U1)] bool force,
+        [MarshalAs(UnmanagedType.U1)] bool wakeupEventsDisabled);
+
+    // SYSTEM_POWER_CAPABILITIES, of which only the AoAc flag is read.
+    private const int PowerCapabilitiesSize = 76;
+    private const int AoAcOffset = 20;
+
+    [LibraryImport("powrprof.dll")]
+    [return: MarshalAs(UnmanagedType.U1)]
+    private static unsafe partial bool GetPwrCapabilities(byte* capabilities);
+
+    /// <summary>
+    /// Whether the device sleeps with Modern Standby (always on, always connected), as most handhelds do.
+    /// </summary>
+    public static unsafe bool UsesModernStandby()
+    {
+        var capabilities = stackalloc byte[PowerCapabilitiesSize];
+        return GetPwrCapabilities(capabilities) && capabilities[AoAcOffset] != 0;
+    }
+
+    private const uint WmSysCommand = 0x0112;
+    private const nint ScMonitorPower = 0xF170;
+    private const nint MonitorOff = 2;
+
+    [LibraryImport("user32.dll", EntryPoint = "PostMessageW", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool PostMessage(nint window, uint message, nint wParam, nint lParam);
+
+    /// <summary>Switches the display off, which is what sends a Modern Standby device to sleep.</summary>
+    public static bool TurnDisplayOff(nint window) => PostMessage(window, WmSysCommand, ScMonitorPower, MonitorOff);
+
     public const uint WlanClientVersion = 2;
     public const int WlanInterfaceConnected = 1;
     public const int WlanOpcodeCurrentConnection = 7;
