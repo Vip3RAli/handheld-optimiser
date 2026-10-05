@@ -86,7 +86,13 @@ Handheld Optimiser then appears under **Settings > Gaming > Xbox mode > Choose h
 
 #### Handheld Optimiser library
 
-A lightweight game library that replaces Big Picture as the home screen. It finds installed games from **Steam**, **Epic Games**, **Battle.net** and **GOG**, shows them as one grid with the game you played last first, and is driven with the controller (d-pad or left stick to move, **A** to play, **Y** to refresh) or by touch.
+A lightweight game library that replaces Big Picture as the home screen. It finds installed games from **Steam**, **Xbox / PC Game Pass**, **Epic Games**, **Battle.net** and **GOG**, shows them as one grid with the game you played last first, and is driven with the controller (d-pad or left stick to move, **A** to play, **Y** to refresh) or by touch. The top bar shows the battery level, whether it is charging, and the Wi-Fi signal beside the clock.
+
+- **LB / RB** filter the grid by store (All, Steam, Xbox and so on). The tabs can also be tapped.
+- **X** on a game (or press and hold on touch) opens its quick actions: set extra launch arguments, open the install folder, view the executable's properties, or correct its background artwork. Launch arguments apply to Steam and GOG games; the other stores start their games themselves and take none.
+- The background is a gradient in the colours of the selected game's cover or icon, worked out on the device with nothing downloaded.
+- The gear in the top bar (or **Menu** on the controller) opens the library's settings: the background (game colours, game artwork or plain), how strong the colours are, the SteamGridDB key, and on / off switches for the battery and Wi-Fi display, the store filter and the quick actions.
+- Choose game artwork there, or switch on **Use game artwork as the library background** under **Full Screen Mode**, to show the game's artwork instead, softly blurred. Steam games use the artwork Steam already keeps on disk. For the other stores, enter a free [SteamGridDB](https://www.steamgriddb.com) API key and the library fetches each game's artwork once and keeps it in `%LOCALAPPDATA%\HandheldOptimiser\artwork`. Only then does the library go online, and only to SteamGridDB, sending the titles of those games to find them. A game with no artwork keeps its gradient. If a game gets the wrong picture, **Background artwork** in its quick actions lets you give the title to look it up by.
 
 | | RAM |
 |---|---|

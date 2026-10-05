@@ -71,7 +71,9 @@ internal static class EpicLibrary
                 Store: GameStore.Epic,
                 CoverPath: null,
                 IconPath: exePath,
-                LaunchTarget: $"com.epicgames.launcher://apps/{Uri.EscapeDataString($"{ns}:{itemId}:{appName}")}?action=launch&silent=true");
+                LaunchTarget: $"com.epicgames.launcher://apps/{Uri.EscapeDataString($"{ns}:{itemId}:{appName}")}?action=launch&silent=true",
+                InstallDirectory: installDir,
+                ExecutablePath: exePath);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {

@@ -13,6 +13,9 @@ internal static class GameCatalog
     // Launch times, one value per game key, so the last game played is always the first tile.
     private const string HistoryKey = Program.SettingsKey + @"\LastLaunched";
 
+    // The player's extra launch arguments, one value per game key.
+    private const string ArgumentsKey = Program.SettingsKey + @"\LaunchArguments";
+
     public static List<Game> Scan()
     {
         var games = new Dictionary<string, Game>(StringComparer.OrdinalIgnoreCase);
@@ -20,6 +23,7 @@ internal static class GameCatalog
         foreach (var (store, scan) in new (string, Func<IEnumerable<Game>>)[]
         {
             ("Steam", SteamLibrary.Scan),
+            ("Xbox", XboxLibrary.Scan),
             ("Epic", EpicLibrary.Scan),
             ("Battle.net", BattleNetLibrary.Scan),
             ("GOG", GogLibrary.Scan)
@@ -51,9 +55,11 @@ internal static class GameCatalog
     {
         try
         {
+            var arguments = new[] { game.LaunchArguments, CustomArguments(game) }.Where(a => !string.IsNullOrWhiteSpace(a));
+
             Process.Start(new ProcessStartInfo(game.LaunchTarget)
             {
-                Arguments = game.LaunchArguments ?? string.Empty,
+                Arguments = string.Join(' ', arguments),
                 WorkingDirectory = game.WorkingDirectory ?? string.Empty,
                 UseShellExecute = true
             })?.Dispose();
@@ -67,6 +73,55 @@ internal static class GameCatalog
         Program.Log($"Launched {game.Key}");
         RecordLaunch(game);
         return null;
+    }
+
+    /// <summary>
+    /// Whether the player's own arguments can reach the game. Steam passes on whatever follows
+    /// -applaunch and GOG games are started from their exe; the other stores start the game themselves.
+    /// </summary>
+    public static bool SupportsCustomArguments(Game game) => game.Store is GameStore.Steam or GameStore.Gog;
+
+    /// <summary>The arguments the player added for this game in the quick actions menu, if any.</summary>
+    public static string? CustomArguments(Game game)
+    {
+        if (!SupportsCustomArguments(game))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(ArgumentsKey);
+            return key?.GetValue(game.Key) as string;
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+        {
+            return null;
+        }
+    }
+
+    /// <returns>False when the arguments could not be stored.</returns>
+    public static bool SaveCustomArguments(Game game, string arguments)
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(ArgumentsKey);
+            if (arguments.Length == 0)
+            {
+                key.DeleteValue(game.Key, throwOnMissingValue: false);
+            }
+            else
+            {
+                key.SetValue(game.Key, arguments, RegistryValueKind.String);
+            }
+
+            return true;
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+        {
+            Program.Log($"Could not save launch arguments for {game.Key}: {ex.Message}");
+            return false;
+        }
     }
 
     private static Dictionary<string, long> ReadHistory()

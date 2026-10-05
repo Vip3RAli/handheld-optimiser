@@ -53,6 +53,87 @@ internal static partial class Native
     [LibraryImport("kernel32.dll")]
     private static partial nint GetCurrentProcess();
 
+    [StructLayout(LayoutKind.Sequential)]
+    public struct SystemPowerStatus
+    {
+        public byte AcLineStatus;
+        public byte BatteryFlag;
+        public byte BatteryLifePercent;
+        public byte SystemStatusFlag;
+        public uint BatteryLifeTime;
+        public uint BatteryFullLifeTime;
+    }
+
+    [LibraryImport("kernel32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetSystemPowerStatus(out SystemPowerStatus status);
+
+    public const uint WlanClientVersion = 2;
+    public const int WlanInterfaceConnected = 1;
+    public const int WlanOpcodeCurrentConnection = 7;
+
+    [LibraryImport("wlanapi.dll")]
+    public static partial uint WlanOpenHandle(uint clientVersion, nint reserved, out uint negotiatedVersion, out nint handle);
+
+    [LibraryImport("wlanapi.dll")]
+    public static partial uint WlanCloseHandle(nint handle, nint reserved);
+
+    [LibraryImport("wlanapi.dll")]
+    public static partial uint WlanEnumInterfaces(nint handle, nint reserved, out nint interfaceList);
+
+    [LibraryImport("wlanapi.dll")]
+    public static partial uint WlanQueryInterface(nint handle, in Guid interfaceGuid, int opcode, nint reserved,
+        out uint dataSize, out nint data, nint opcodeValueType);
+
+    [LibraryImport("wlanapi.dll")]
+    public static partial void WlanFreeMemory(nint memory);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private unsafe struct ShellExecuteInfo
+    {
+        public uint Size;
+        public uint Mask;
+        public nint Window;
+        public char* Verb;
+        public char* File;
+        public char* Parameters;
+        public char* Directory;
+        public int Show;
+        public nint InstApp;
+        public nint IdList;
+        public char* Class;
+        public nint ClassKey;
+        public uint HotKey;
+        public nint Icon;
+        public nint Process;
+    }
+
+    // Needed for verbs such as "properties" that come from the shell rather than the file type.
+    private const uint SeeMaskInvokeIdList = 0x0000000C;
+    private const int SwShow = 5;
+
+    [LibraryImport("shell32.dll", EntryPoint = "ShellExecuteExW", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool ShellExecuteEx(ref ShellExecuteInfo info);
+
+    /// <summary>Opens Explorer's Properties dialog for a file or folder.</summary>
+    public static unsafe bool ShowProperties(string path)
+    {
+        fixed (char* verb = "properties", file = path)
+        {
+            var info = new ShellExecuteInfo
+            {
+                Size = (uint)sizeof(ShellExecuteInfo),
+                Mask = SeeMaskInvokeIdList,
+                Verb = verb,
+                File = file,
+                Show = SwShow
+            };
+
+            return ShellExecuteEx(ref info);
+        }
+    }
+
     /// <summary>
     /// The first icon in an exe or .ico at up to 256 px, which is what the store tiles show when a store
     /// keeps no cover art. Frozen, so it can be built off the UI thread.

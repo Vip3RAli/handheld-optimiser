@@ -25,9 +25,23 @@
                 <RadioButton GroupName="HomeApp" IsChecked="{Binding IsLibrary, Mode=TwoWay}" MinHeight="40" Margin="0,6,0,0">
                     <StackPanel>
                         <TextBlock Text="Handheld Optimiser library" FontWeight="SemiBold" />
-                        <TextBlock Text="A lightweight game library for Steam, Epic Games, Battle.net and GOG games. Uses about 115 MB while open and about 25 MB while you play, against about 1.4 GB for Big Picture." FontSize="11.5" Opacity="0.6" TextWrapping="Wrap" />
+                        <TextBlock Text="A lightweight game library for Steam, Xbox, Epic Games, Battle.net and GOG games. Uses about 115 MB while open and about 25 MB while you play, against about 1.4 GB for Big Picture." FontSize="11.5" Opacity="0.6" TextWrapping="Wrap" />
                     </StackPanel>
                 </RadioButton>
+
+                <StackPanel Margin="28,8,0,0" Visibility="{Binding IsLibrary, Converter={StaticResource BoolToVis}}">
+                    <ui:ToggleSwitch IsChecked="{Binding UseArtwork, Mode=TwoWay}" MinHeight="36"
+                                     Content="Use game artwork as the library background" />
+                    <TextBlock Margin="0,2,0,0" FontSize="11.5" Opacity="0.6" TextWrapping="Wrap"
+                               Text="When off, the background is a gradient in the colours of the selected game's cover or icon." />
+
+                    <StackPanel Margin="0,8,0,0" Visibility="{Binding UseArtwork, Converter={StaticResource BoolToVis}}">
+                        <ui:TextBox PlaceholderText="SteamGridDB API key (optional)"
+                                    Text="{Binding ArtworkKey, UpdateSourceTrigger=LostFocus}" />
+                        <TextBlock Margin="0,4,0,0" FontSize="11.5" Opacity="0.6" TextWrapping="Wrap"
+                                   Text="Steam games use the artwork Steam already has. With a free key from steamgriddb.com (Preferences, then API), games from the other stores get artwork too; their titles are sent to SteamGridDB to find it. A game with no artwork keeps the gradient." />
+                    </StackPanel>
+                </StackPanel>
 
                 <RadioButton GroupName="HomeApp" IsChecked="{Binding IsArmouryCrate, Mode=TwoWay}" MinHeight="40" Margin="0,6,0,0">
                     <StackPanel>

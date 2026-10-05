@@ -24,22 +24,38 @@ internal sealed class GameTile
     public bool HasCover => Cover is not null;
     public bool ShowsIcon => Cover is null;
 
-    public static GameTile Create(Game game) => new()
-    {
-        Game = game,
-        Cover = game.CoverPath is null ? null : LoadCover(game.CoverPath),
-        Icon = game.CoverPath is null && game.IconPath is not null ? Native.LoadIcon(game.IconPath, IconSize) : null,
-        Background = StoreBrushes[game.Store]
-    };
+    /// <summary>The gradient behind the grid while this game has the focus, in its artwork's colours.</summary>
+    public required Brush Backdrop { get; init; }
 
-    private static ImageSource? LoadCover(string path)
+    public static GameTile Create(Game game)
+    {
+        var cover = game.CoverPath is null ? null : LoadCover(game.CoverPath);
+        var icon = game.CoverPath is null && game.IconPath is not null ? LoadIcon(game.IconPath) : null;
+
+        return new()
+        {
+            Game = game,
+            Cover = cover,
+            Icon = icon,
+            Background = StoreBrushes[game.Store],
+            Backdrop = Palette.Gradient(cover ?? icon) ?? StoreBrushes[game.Store]
+        };
+    }
+
+    // Xbox games ship their logo as a png rather than inside an exe or .ico.
+    private static ImageSource? LoadIcon(string path) =>
+        Path.GetExtension(path).Equals(".png", StringComparison.OrdinalIgnoreCase)
+            ? LoadCover(path, decodeWidth: 0)
+            : Native.LoadIcon(path, IconSize);
+
+    private static ImageSource? LoadCover(string path, int decodeWidth = CoverDecodeWidth)
     {
         try
         {
             var image = new BitmapImage();
             image.BeginInit();
             image.UriSource = new Uri(path);
-            image.DecodePixelWidth = CoverDecodeWidth;
+            image.DecodePixelWidth = decodeWidth;
             // OnLoad reads the file now and releases it, so Steam can replace its art while we are open.
             image.CacheOption = BitmapCacheOption.OnLoad;
             image.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
@@ -56,7 +72,8 @@ internal sealed class GameTile
     private static readonly Dictionary<GameStore, Brush> StoreBrushes = new()
     {
         [GameStore.Steam] = Gradient("#2A475E", "#171A21"),
-        [GameStore.Epic] = Gradient("#3A3A3A", "#141414"),
+        [GameStore.Xbox] = Gradient("#107C10", "#0A2E0A"),
+        [GameStore.Epic] =Gradient("#3A3A3A", "#141414"),
         [GameStore.BattleNet] = Gradient("#1473B8", "#0A2A4A"),
         [GameStore.Gog] = Gradient("#7A2F80", "#2C1030")
     };

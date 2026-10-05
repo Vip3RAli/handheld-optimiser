@@ -79,24 +79,202 @@
             <Setter Property="CornerRadius" Value="13" />
             <Setter Property="Margin" Value="22,0,8,0" />
         </Style>
+
+        <!-- Bumper hint at either end of the store filter. -->
+        <Style x:Key="BumperGlyph" TargetType="Border">
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="8,3" />
+            <Setter Property="Background" Value="#2A2F3A" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <!-- A store in the filter strip. Not focusable, so keyboard focus stays on the tiles. -->
+        <Style x:Key="FilterTab" TargetType="RadioButton">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Foreground" Value="#F2F3F5" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Pill" CornerRadius="20" Padding="18,0" MinHeight="40" Background="Transparent" Opacity="0.7">
+                            <ContentPresenter VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Pill" Property="Background" Value="#22FFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Pill" Property="Background" Value="#F2F3F5" />
+                                <Setter TargetName="Pill" Property="Opacity" Value="1" />
+                                <Setter Property="Foreground" Value="#101010" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- A row in the quick actions menu: the action, and under it what it applies to. -->
+        <Style x:Key="MenuButton" TargetType="Button">
+            <Setter Property="Foreground" Value="#F2F3F5" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Row" CornerRadius="8" Padding="16,10" Margin="0,0,0,8" MinHeight="60"
+                                Background="#222630" BorderThickness="2" BorderBrush="Transparent">
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
+                                           FontSize="16" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
+                                           Margin="0,2,0,0" FontSize="12.5" Opacity="0.6" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Row" Property="Background" Value="#2C3240" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Row" Property="Background" Value="#2C3240" />
+                                <Setter TargetName="Row" Property="BorderBrush" Value="#F2F3F5" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Row" Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- A round glyph button in the top bar. Not focusable, so keyboard focus stays on the tiles. -->
+        <Style x:Key="IconButton" TargetType="Button">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Foreground" Value="#F2F3F5" />
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" />
+            <Setter Property="FontSize" Value="18" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Disc" Width="44" Height="44" CornerRadius="22" Background="Transparent" Opacity="0.8">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Disc" Property="Background" Value="#22FFFFFF" />
+                                <Setter TargetName="Disc" Property="Opacity" Value="1" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Save and Cancel under the launch arguments box, sized for a finger. -->
+        <Style x:Key="DialogButton" TargetType="Button">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Foreground" Value="#F2F3F5" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="Margin" Value="8,0,0,0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Pill" CornerRadius="8" Padding="22,0" MinHeight="44" Background="#2C3240">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Pill" Property="Background" Value="#3A4254" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
+
+        <!--
+            The focused game's background: a gradient of its colours, or its artwork. Two layers so one
+            can fade in over the other, under a shade that keeps the tiles and text readable. Artwork is
+            decoded small, which is what blurs it.
+        -->
+        <Rectangle x:Name="BackdropBack" Grid.RowSpan="4" Opacity="0" IsHitTestVisible="False"
+                   RenderOptions.BitmapScalingMode="Linear" />
+        <Rectangle x:Name="BackdropFront" Grid.RowSpan="4" Opacity="0" IsHitTestVisible="False"
+                   RenderOptions.BitmapScalingMode="Linear" />
+        <Rectangle x:Name="BackdropShade" Grid.RowSpan="4" IsHitTestVisible="False">
+            <Rectangle.Fill>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                    <GradientStop Offset="0" Color="#D00F1115" />
+                    <GradientStop Offset="0.45" Color="#A80F1115" />
+                    <GradientStop Offset="1" Color="#E60F1115" />
+                </LinearGradientBrush>
+            </Rectangle.Fill>
+        </Rectangle>
 
         <Grid Grid.Row="0" Margin="48,32,48,12">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
                 <TextBlock Text="Library" FontSize="32" FontWeight="SemiBold" />
                 <TextBlock x:Name="CountText" Margin="14,0,0,5" FontSize="15" Opacity="0.55" VerticalAlignment="Bottom" />
             </StackPanel>
-            <TextBlock x:Name="ClockText" HorizontalAlignment="Right" VerticalAlignment="Bottom" FontSize="20" Opacity="0.8" />
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                <!-- The library's settings, also on the controller's Menu button. Sized for a finger. -->
+                <Button Style="{StaticResource IconButton}" Margin="0,-10,14,-10" VerticalAlignment="Center"
+                        Content="&#xE713;" ToolTip="Settings" Click="OnOpenSettings" />
+
+                <!-- Wi-Fi signal: four bars, lit up to the current strength. -->
+                <StackPanel x:Name="WifiBars" Orientation="Horizontal" Height="16" Margin="0,0,20,0"
+                            VerticalAlignment="Center" Visibility="Collapsed">
+                    <Rectangle Width="4" Height="4" Margin="0,0,2,0" RadiusX="1" RadiusY="1" Fill="#F2F3F5" VerticalAlignment="Bottom" />
+                    <Rectangle Width="4" Height="8" Margin="0,0,2,0" RadiusX="1" RadiusY="1" Fill="#F2F3F5" VerticalAlignment="Bottom" />
+                    <Rectangle Width="4" Height="12" Margin="0,0,2,0" RadiusX="1" RadiusY="1" Fill="#F2F3F5" VerticalAlignment="Bottom" />
+                    <Rectangle Width="4" Height="16" RadiusX="1" RadiusY="1" Fill="#F2F3F5" VerticalAlignment="Bottom" />
+                </StackPanel>
+
+                <StackPanel x:Name="BatteryPanel" Orientation="Horizontal" Margin="0,0,20,0"
+                            VerticalAlignment="Center" Visibility="Collapsed">
+                    <Path x:Name="ChargingBolt" Data="M7,0 L1,9 L5,9 L3,16 L10,6 L6,6 Z" Fill="#F2F3F5" Opacity="0.8"
+                          Margin="0,0,6,0" VerticalAlignment="Center" />
+                    <Border Width="28" Height="14" CornerRadius="3" BorderThickness="1.5" BorderBrush="#CCF2F3F5"
+                            VerticalAlignment="Center">
+                        <Rectangle x:Name="BatteryFill" Margin="1.5" RadiusX="1" RadiusY="1" Fill="#F2F3F5"
+                                   HorizontalAlignment="Left" />
+                    </Border>
+                    <Rectangle Width="2" Height="6" Margin="1,0,0,0" Fill="#CCF2F3F5" VerticalAlignment="Center" />
+                    <TextBlock x:Name="BatteryText" Margin="8,0,0,0" FontSize="16" Opacity="0.8" VerticalAlignment="Center" />
+                </StackPanel>
+
+                <TextBlock x:Name="ClockText" FontSize="20" Opacity="0.8" VerticalAlignment="Center" />
+            </StackPanel>
         </Grid>
 
-        <ScrollViewer x:Name="Scroller" Grid.Row="1" VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly"
+        <!-- Store filter, hidden until games from more than one store are installed. -->
+        <StackPanel x:Name="FilterStrip" Grid.Row="1" Orientation="Horizontal" Margin="48,0,48,10" Visibility="Collapsed">
+            <Border Style="{StaticResource BumperGlyph}" Margin="0,0,12,0">
+                <TextBlock Text="LB" FontSize="12" FontWeight="Bold" />
+            </Border>
+            <StackPanel x:Name="FilterTabs" Orientation="Horizontal" />
+            <Border Style="{StaticResource BumperGlyph}" Margin="4,0,0,0">
+                <TextBlock Text="RB" FontSize="12" FontWeight="Bold" />
+            </Border>
+        </StackPanel>
+
+        <ScrollViewer x:Name="Scroller" Grid.Row="2" VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly"
                       Padding="38,4,38,24" Focusable="False">
             <ItemsControl x:Name="Tiles" Focusable="False" KeyboardNavigation.DirectionalNavigation="Contained">
                 <ItemsControl.ItemsPanel>
@@ -106,28 +284,116 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Button Style="{StaticResource TileButton}" Click="OnTileClick" GotKeyboardFocus="OnTileFocused" />
+                        <!-- Press and hold arrives as a right click, so touch reaches the quick actions too. -->
+                        <Button Style="{StaticResource TileButton}" Click="OnTileClick" GotKeyboardFocus="OnTileFocused"
+                                MouseRightButtonUp="OnTileRightClick" />
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
         </ScrollViewer>
 
-        <TextBlock x:Name="EmptyText" Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center"
+        <TextBlock x:Name="EmptyText" Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Center"
                    FontSize="18" Opacity="0.6" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="560" />
 
-        <Grid Grid.Row="2" Margin="48,8,48,24">
+        <Grid Grid.Row="3" Margin="48,8,48,24">
             <TextBlock x:Name="StatusText" VerticalAlignment="Center" FontSize="15" Opacity="0.8" TextTrimming="CharacterEllipsis" />
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                 <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
                     <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
                 <TextBlock Text="Play" FontSize="15" VerticalAlignment="Center" />
+                <StackPanel x:Name="OptionsHint" Orientation="Horizontal">
+                    <Border Style="{StaticResource HintGlyph}" Background="#2F6FD0">
+                        <TextBlock Text="X" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <TextBlock Text="Options" FontSize="15" VerticalAlignment="Center" />
+                </StackPanel>
                 <Border Style="{StaticResource HintGlyph}" Background="#D9A520">
                     <TextBlock Text="Y" FontWeight="Bold" FontSize="13" Foreground="#101010"
                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
                 <TextBlock Text="Refresh" FontSize="15" VerticalAlignment="Center" />
+                <Border Style="{StaticResource BumperGlyph}" Margin="22,0,8,0">
+                    <TextBlock Text="MENU" FontSize="11" FontWeight="Bold" />
+                </Border>
+                <TextBlock Text="Settings" FontSize="15" VerticalAlignment="Center" />
             </StackPanel>
+        </Grid>
+
+        <!-- Quick actions for one game, over the dimmed library. Tapping outside the panel closes it. -->
+        <Grid x:Name="MenuOverlay" Grid.RowSpan="4" Background="#C0000000" Visibility="Collapsed"
+              MouseLeftButtonDown="OnMenuBackdropClick">
+            <Border Width="560" Padding="28,24,28,20" CornerRadius="12" Background="#181B22"
+                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                    KeyboardNavigation.TabNavigation="Cycle" KeyboardNavigation.DirectionalNavigation="Contained">
+                <StackPanel>
+                    <TextBlock x:Name="MenuTitle" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <TextBlock x:Name="MenuStore" Margin="0,2,0,18" FontSize="13" Opacity="0.55" />
+
+                    <StackPanel x:Name="GameItems">
+                        <Button x:Name="ArgumentsItem" Style="{StaticResource MenuButton}" Content="Launch arguments"
+                                Click="OnEditArguments" />
+                        <Button x:Name="FolderItem" Style="{StaticResource MenuButton}" Content="Open install folder"
+                                Click="OnOpenFolder" />
+                        <Button x:Name="PropertiesItem" Style="{StaticResource MenuButton}" Content="Executable properties"
+                                Click="OnShowProperties" />
+                        <Button x:Name="ArtworkItem" Style="{StaticResource MenuButton}" Content="Background artwork"
+                                Click="OnEditArtworkTitle" />
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                            <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                                <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Select" FontSize="15" VerticalAlignment="Center" />
+                            <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                                <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- The library's settings. A steps a row to its next value. -->
+                    <StackPanel x:Name="SettingsItems" Visibility="Collapsed">
+                        <Button x:Name="BackgroundSetting" Style="{StaticResource MenuButton}" Content="Background"
+                                Click="OnCycleBackground" />
+                        <Button x:Name="StrengthSetting" Style="{StaticResource MenuButton}" Content="Colour strength"
+                                Click="OnCycleStrength" />
+                        <Button x:Name="ArtworkKeySetting" Style="{StaticResource MenuButton}" Content="SteamGridDB API key"
+                                Click="OnEditArtworkKey" />
+                        <Button x:Name="StatusSetting" Style="{StaticResource MenuButton}" Content="Battery and Wi-Fi"
+                                Click="OnToggleStatus" />
+                        <Button x:Name="FilterSetting" Style="{StaticResource MenuButton}" Content="Store filter"
+                                Click="OnToggleFilter" />
+                        <Button x:Name="QuickActionsSetting" Style="{StaticResource MenuButton}" Content="Quick actions"
+                                Click="OnToggleQuickActions" />
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                            <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                                <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Change" FontSize="15" VerticalAlignment="Center" />
+                            <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                                <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel x:Name="TextEditor" Visibility="Collapsed">
+                        <TextBlock x:Name="EditorTitle" FontSize="16" FontWeight="SemiBold" />
+                        <TextBlock x:Name="EditorHint" Margin="0,2,0,12" FontSize="12.5" Opacity="0.6" TextWrapping="Wrap" />
+                        <TextBox x:Name="EditorBox" Padding="12,10" FontSize="17" MaxLength="512"
+                                 Background="#0F1115" Foreground="#F2F3F5" CaretBrush="#F2F3F5" BorderBrush="#3A4050" />
+                        <Grid Margin="0,16,0,0">
+                            <TextBlock Text="Menu saves, View cancels" FontSize="12.5" Opacity="0.6" VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button Style="{StaticResource DialogButton}" Content="Cancel" Click="OnCancelEdit" />
+                                <Button Style="{StaticResource DialogButton}" Content="Save" Click="OnSaveEdit" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
         </Grid>
     </Grid>
 </Window>

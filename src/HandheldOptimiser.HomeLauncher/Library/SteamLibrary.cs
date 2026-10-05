@@ -98,7 +98,11 @@ internal static partial class SteamLibrary
             return null;
         }
 
-        var cover = FindCover(artDir, appId);
+        var installDir = Field(text, "installdir") is { Length: > 0 } dir
+            ? Path.Combine(Path.GetDirectoryName(path)!, "common", dir)
+            : null;
+
+        var cover = FindArt(artDir, appId, CoverNames);
         return new Game(
             Key: $"steam:{appId}",
             Title: name,
@@ -106,34 +110,39 @@ internal static partial class SteamLibrary
             CoverPath: cover,
             IconPath: cover is null ? FindIcon(Path.GetDirectoryName(steamExe)!, artDir, appId) : null,
             LaunchTarget: steamExe,
-            LaunchArguments: $"-silent -applaunch {appId}");
+            LaunchArguments: $"-silent -applaunch {appId}",
+            InstallDirectory: installDir,
+            HeroPath: FindArt(artDir, appId, HeroNames));
     }
 
     // Portrait art names, newest Steam first.
     private static readonly string[] CoverNames = ["library_600x900.jpg", "library_capsule.jpg"];
 
+    // The wide banner Steam shows at the top of a game's library page.
+    private static readonly string[] HeroNames = ["library_hero.jpg"];
+
     /// <summary>
     /// Newer Steam keeps art in a folder per app, sometimes one level deeper under a hash; older Steam
     /// used flat "{appid}_library_600x900.jpg" files.
     /// </summary>
-    private static string? FindCover(string artDir, string appId)
+    private static string? FindArt(string artDir, string appId, string[] names)
     {
         try
         {
             var appDir = Path.Combine(artDir, appId);
             if (Directory.Exists(appDir))
             {
-                foreach (var name in CoverNames)
+                foreach (var name in names)
                 {
-                    var cover = Directory.EnumerateFiles(appDir, name, SearchOption.AllDirectories).FirstOrDefault();
-                    if (cover is not null)
+                    var art = Directory.EnumerateFiles(appDir, name, SearchOption.AllDirectories).FirstOrDefault();
+                    if (art is not null)
                     {
-                        return cover;
+                        return art;
                     }
                 }
             }
 
-            var flat = Path.Combine(artDir, $"{appId}_library_600x900.jpg");
+            var flat = Path.Combine(artDir, $"{appId}_{names[0]}");
             return File.Exists(flat) ? flat : null;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

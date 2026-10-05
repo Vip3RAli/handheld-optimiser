@@ -160,6 +160,45 @@ public static class HomeAppRegistration
         key.SetValue("CustomArgs", customArgs);
     }
 
+    private const string ArtworkKeyValue = "SteamGridDbKey";
+    private const string BackgroundValue = "Background";
+
+    /// <summary>
+    /// Whether the library shows the focused game's artwork behind its grid, rather than the default
+    /// gradient of that game's colours.
+    /// </summary>
+    public static bool LoadUseArtwork()
+    {
+        using var key = Registry.CurrentUser.OpenSubKey(SettingsKey);
+        return string.Equals(key?.GetValue(BackgroundValue) as string, "artwork", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static void SaveUseArtwork(bool useArtwork)
+    {
+        using var key = Registry.CurrentUser.CreateSubKey(SettingsKey);
+        key.SetValue(BackgroundValue, useArtwork ? "artwork" : "gradient");
+    }
+
+    /// <summary>The player's own SteamGridDB API key, which the library uses to fetch game backgrounds.</summary>
+    public static string LoadArtworkKey()
+    {
+        using var key = Registry.CurrentUser.OpenSubKey(SettingsKey);
+        return key?.GetValue(ArtworkKeyValue) as string ?? string.Empty;
+    }
+
+    public static void SaveArtworkKey(string apiKey)
+    {
+        using var key = Registry.CurrentUser.CreateSubKey(SettingsKey);
+        if (apiKey.Length == 0)
+        {
+            key.DeleteValue(ArtworkKeyValue, throwOnMissingValue: false);
+        }
+        else
+        {
+            key.SetValue(ArtworkKeyValue, apiKey);
+        }
+    }
+
     private const string AppModelUnlockKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock";
     private const string DeveloperModeValue = "AllowDevelopmentWithoutDevLicense";
 
