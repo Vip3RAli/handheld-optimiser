@@ -25,9 +25,6 @@ internal static class Artwork
     // The player's corrections for games SteamGridDB matched wrongly, one value per game key.
     private const string TitlesKey = Program.SettingsKey + @"\ArtworkTitles";
 
-    // The background is stretched over the whole screen, and decoding it this small is what blurs it.
-    private const int DecodeWidth = 640;
-
     private const int CandidatesToTry = 3;
     private const long MaxDownloadBytes = 20 * 1024 * 1024;
 
@@ -79,6 +76,7 @@ internal static class Artwork
             }
 
             File.Delete(CachePath(game));
+            File.Delete(PreviewPath(game));
             File.Delete(NotFoundPath(game));
             return true;
         }
@@ -89,20 +87,23 @@ internal static class Artwork
         }
     }
 
-    /// <summary>The game's background, frozen and ready for the UI thread, or null when it has none.</summary>
-    public static Task<ImageSource?> LoadAsync(Game game) => Task.Run(async () =>
+    /// <summary>
+    /// The file holding the game's artwork, downloading it first if need be, or null when it has none.
+    /// Call it off the UI thread.
+    /// </summary>
+    public static async Task<string?> FindAsync(Game game)
     {
         // A corrected title means the player wants SteamGridDB's answer, not the store's own art.
         var corrected = SearchTitle(game);
-        if (corrected is null && game.HeroPath is { } hero && Decode(hero) is { } local)
+        if (corrected is null && game.HeroPath is { } hero && File.Exists(hero))
         {
-            return local;
+            return hero;
         }
 
         var cached = CachePath(game);
-        if (File.Exists(cached) && Decode(cached) is { } saved)
+        if (File.Exists(cached))
         {
-            return saved;
+            return cached;
         }
 
         if (LibrarySettings.ArtworkKey is not { } apiKey || RecentlyNotFound(game))
@@ -113,13 +114,13 @@ internal static class Artwork
         var fetch = Fetches.GetOrAdd(game.Key, _ => FetchAsync(game, corrected, apiKey));
         try
         {
-            return await fetch is { } path ? Decode(path) : null;
+            return await fetch;
         }
         finally
         {
             Fetches.TryRemove(game.Key, out _);
         }
-    });
+    }
 
     /// <returns>The cached file, or null when there is no artwork or SteamGridDB could not be reached.</returns>
     private static async Task<string?> FetchAsync(Game game, string? corrected, string apiKey)
@@ -159,6 +160,7 @@ internal static class Artwork
                 var temp = path + ".tmp";
                 await File.WriteAllBytesAsync(temp, bytes);
                 File.Move(temp, path, overwrite: true);
+                File.Delete(PreviewPath(game));
                 return path;
             }
 
@@ -194,12 +196,15 @@ internal static class Artwork
         Data(search).Select(game => game.TryGetProperty("id", out var id) && id.TryGetInt64(out var value) ? value : (long?)null)
             .FirstOrDefault(id => id is not null);
 
-    /// <summary>Best rated first, as SteamGridDB lists them: each one's small version, then its full size.</summary>
+    /// <summary>
+    /// Best rated first, as SteamGridDB lists them: each one at full size, then its small preview in case
+    /// the full one will not download. The preview alone is too small to fill a screen cleanly.
+    /// </summary>
     private static IEnumerable<Uri> ImageUrls(JsonDocument? list)
     {
         foreach (var art in Data(list))
         {
-            foreach (var name in new[] { "thumb", "url" })
+            foreach (var name in new[] { "url", "thumb" })
             {
                 // Only ever download from SteamGridDB itself, whatever the response says.
                 if (art.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
@@ -246,29 +251,6 @@ internal static class Artwork
         }
     }
 
-    private static ImageSource? Decode(string path)
-    {
-        try
-        {
-            // From memory rather than the path: the cached files carry no extension to pick a decoder by.
-            using var stream = new MemoryStream(File.ReadAllBytes(path));
-            var image = new BitmapImage();
-            image.BeginInit();
-            image.StreamSource = stream;
-            image.DecodePixelWidth = DecodeWidth;
-            image.CacheOption = BitmapCacheOption.OnLoad;
-            image.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
-            image.EndInit();
-            image.Freeze();
-            return image;
-        }
-        catch (Exception ex) when (ex is IOException or NotSupportedException or UnauthorizedAccessException
-            or ArgumentException or FormatException or COMException)
-        {
-            return null;
-        }
-    }
-
     // Store titles carry trademark signs that SteamGridDB's names do not.
     private static string Clean(string title) =>
         string.Concat(title.Where(c => c is not ('™' or '®' or '©'))).Trim();
@@ -292,7 +274,10 @@ internal static class Artwork
         File.WriteAllBytes(NotFoundPath(game), []);
     }
 
-    private static string CachePath(Game game) => Path.Combine(CacheDir, FileName(game) + ".img");
+    private static string CachePath(Game game) => Path.Combine(CacheDir, FileName(game) + ".hero");
+
+    // What 0.6.0 to 0.6.2 saved: SteamGridDB's small preview, replaced by the full artwork when it is fetched.
+    private static string PreviewPath(Game game) => Path.Combine(CacheDir, FileName(game) + ".img");
 
     private static string NotFoundPath(Game game) => Path.Combine(CacheDir, FileName(game) + ".none");
 
