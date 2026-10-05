@@ -18,11 +18,12 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>false</SelfContained>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <ApplicationIcon>..\HandheldOptimiser\Assets\app.ico</ApplicationIcon>
+    <!-- The game library's own icon, which its Start menu shortcut and window show. -->
+    <ApplicationIcon>Assets\library.ico</ApplicationIcon>
     <AssemblyName>HandheldOptimiser.HomeLauncher</AssemblyName>
     <RootNamespace>HandheldOptimiser.HomeLauncher</RootNamespace>
     <Product>Handheld Optimiser</Product>
-    <Version>0.6.1</Version>
+    <Version>0.6.2</Version>
 
     <!-- The library stays open behind games, so a small footprint matters more than GC throughput. -->
     <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>

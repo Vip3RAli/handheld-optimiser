@@ -88,6 +88,7 @@ Handheld Optimiser then appears under **Settings > Gaming > Xbox mode > Choose h
 
 A lightweight game library that replaces Big Picture as the home screen. It finds installed games from **Steam**, **Xbox / PC Game Pass**, **Epic Games**, **Battle.net** and **GOG**, shows them as one grid with the game you played last first, and is driven with the controller (d-pad or left stick to move, **A** to play, **Y** to refresh) or by touch. The top bar shows the battery level, whether it is charging, and the Wi-Fi signal beside the clock.
 
+- **Game Library** in the Start menu opens it directly, without changing your full screen home app.
 - **LB / RB** filter the grid by store (All, Steam, Xbox and so on). The tabs can also be tapped.
 - **X** on a game (or press and hold on touch) opens its quick actions: set extra launch arguments, open the install folder, view the executable's properties, or correct its background artwork. Launch arguments apply to Steam and GOG games; the other stores start their games themselves and take none.
 - The background is a gradient in the colours of the selected game's cover or icon, worked out on the device with nothing downloaded.

@@ -11,6 +11,8 @@
 
 #define AppName "Handheld Optimiser"
 #define AppExeName "HandheldOptimiser.exe"
+#define LibraryName "Game Library"
+#define LauncherExeName "HandheldOptimiser.HomeLauncher.exe"
 
 [Setup]
 ; Never change AppId: upgrades find the existing install by it.
@@ -47,6 +49,9 @@ Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
+; Opens the game library directly, whatever the chosen full screen home app. The launcher carries the
+; library's own icon, and does not need administrator, so this starts without a UAC prompt.
+Name: "{group}\{#LibraryName}"; Filename: "{app}\{#LauncherExeName}"; Parameters: "--library"; Comment: "Open the Handheld Optimiser game library"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
 
 [Run]
