@@ -63,21 +63,25 @@
         </ui:TitleBar>
 
         <StackPanel Grid.Row="1">
+            <!--
+                The buttons sit under each banner, not inside it: InfoBar only draws its title, message
+                and close button, so anything placed in its Content is never shown.
+            -->
+
             <!-- Restart banner: only appears once a change needs a reboot to take effect. -->
             <ui:InfoBar Margin="16,0,16,8"
                         Severity="Warning"
                         IsClosable="False"
                         Title="Restart required"
                         Message="Some applied changes only take effect after a restart."
-                        IsOpen="{Binding RebootRequired}">
-                <ui:InfoBar.Content>
-                    <ui:Button Content="Restart now"
-                               Margin="0,8,0,0"
-                               HorizontalAlignment="Left"
-                               Appearance="Primary"
-                               Command="{Binding RestartNowCommand}" />
-                </ui:InfoBar.Content>
-            </ui:InfoBar>
+                        IsOpen="{Binding RebootRequired}" />
+            <ui:Button Content="Restart now"
+                       Margin="16,0,16,8"
+                       MinHeight="36"
+                       HorizontalAlignment="Left"
+                       Appearance="Primary"
+                       Command="{Binding RestartNowCommand}"
+                       Visibility="{Binding RebootRequired, Converter={StaticResource BoolToVis}}" />
 
             <!-- Update banner: a newer release was found on GitHub. -->
             <ui:InfoBar Margin="16,0,16,8"
@@ -85,19 +89,19 @@
                         IsClosable="True"
                         Title="{Binding UpdateTitle}"
                         Message="{Binding UpdateMessage}"
-                        IsOpen="{Binding IsUpdateBannerOpen, Mode=TwoWay}">
-                <ui:InfoBar.Content>
-                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                        <ui:Button Content="Update now"
-                                   Margin="0,0,8,0"
-                                   Appearance="Primary"
-                                   Command="{Binding InstallUpdateCommand}"
-                                   Visibility="{Binding CanInstallUpdate, Converter={StaticResource BoolToVis}}" />
-                        <ui:Button Content="Open release page"
-                                   Command="{Binding OpenReleasePageCommand}" />
-                    </StackPanel>
-                </ui:InfoBar.Content>
-            </ui:InfoBar>
+                        IsOpen="{Binding IsUpdateBannerOpen, Mode=TwoWay}" />
+            <StackPanel Orientation="Horizontal" Margin="16,0,16,8"
+                        Visibility="{Binding IsUpdateBannerOpen, Converter={StaticResource BoolToVis}}">
+                <ui:Button Content="Update now"
+                           Margin="0,0,8,0"
+                           MinHeight="36"
+                           Appearance="Primary"
+                           Command="{Binding InstallUpdateCommand}"
+                           Visibility="{Binding CanInstallUpdate, Converter={StaticResource BoolToVis}}" />
+                <ui:Button Content="Open release page"
+                           MinHeight="36"
+                           Command="{Binding OpenReleasePageCommand}" />
+            </StackPanel>
         </StackPanel>
 
         <!-- Sidebar + page content -->
