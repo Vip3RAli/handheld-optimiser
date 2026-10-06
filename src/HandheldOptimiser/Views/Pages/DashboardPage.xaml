@@ -7,21 +7,73 @@
     <UserControl.Resources>
         <views:BooleanToVisibilityConverter x:Key="BoolToVis" />
         <views:InverseBooleanConverter x:Key="InverseBool" />
+        <views:StringNotEmptyToVisibilityConverter x:Key="StringToVis" />
+
+        <!-- One card of the three. They share a row, so each fills its cell to line up top and bottom. -->
+        <Style x:Key="DashCard" TargetType="ui:Card" BasedOn="{StaticResource {x:Type ui:Card}}">
+            <Setter Property="Margin" Value="0,0,12,12" />
+            <Setter Property="Padding" Value="18,16" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+        </Style>
+
+        <Style x:Key="CardTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontFamily" Value="{StaticResource AppDisplayFont}" />
+        </Style>
+
+        <!-- A hardware tile: an outline icon and a label, the figure, then a word or two about it. -->
+        <Style x:Key="TileIcon" TargetType="ui:FontIcon" BasedOn="{StaticResource {x:Type ui:FontIcon}}">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="Margin" Value="0,0,7,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{StaticResource BrandAccent}" />
+        </Style>
+
+        <Style x:Key="TileLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Opacity" Value="0.65" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="TileValue" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="19" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontFamily" Value="{StaticResource AppDisplayFont}" />
+            <Setter Property="Margin" Value="0,4,0,0" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+
+        <Style x:Key="TileDetail" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="Opacity" Value="0.75" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+
+        <!-- Outlined, as wide as its card. -->
+        <Style x:Key="OutlineButton" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="#59FFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="MinHeight" Value="46" />
+        </Style>
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="4,0,4,8">
 
-            <TextBlock Text="Dashboard" FontSize="26" FontWeight="SemiBold" Margin="0,0,0,2" />
+            <TextBlock Text="Dashboard" FontSize="28" FontWeight="SemiBold" FontFamily="{StaticResource AppDisplayFont}" Margin="0,0,0,2" />
             <TextBlock Text="{Binding HardwareModel}" Opacity="0.7" FontSize="13" Margin="0,0,0,14" />
 
-            <!-- Warned about early: this tool assumes ROG Ally behaviour. -->
+            <!-- Warned about early: this tool assumes handheld behaviour. -->
             <ui:InfoBar Severity="Warning"
                         IsClosable="False"
                         Margin="0,0,0,12"
                         Title="Unrecognised hardware"
-                        Message="This device does not report as a ROG Ally. The tweaks are still valid Windows 11 changes, but they are tuned for Ally hardware."
-                        IsOpen="{Binding IsRogAlly, Converter={StaticResource InverseBool}}" />
+                        Message="This device does not report as a handheld this app knows (ROG Ally, Legion Go, MSI Claw, Steam Deck, AYANEO, GPD or OneXPlayer). The tweaks are still valid Windows 11 changes, but they are tuned for handheld hardware."
+                        IsOpen="{Binding IsRecognisedDevice, Converter={StaticResource InverseBool}}" />
 
             <ui:InfoBar Severity="Error"
                         IsClosable="False"
@@ -31,83 +83,152 @@
                         IsOpen="{Binding ProtectionEnabled, Converter={StaticResource InverseBool}}" />
 
             <!-- The headline action. -->
-            <ui:Card Margin="0,0,0,12">
-                <StackPanel>
-                    <TextBlock Text="Recommended Tweaks" FontSize="20" FontWeight="SemiBold" />
-                    <TextBlock TextWrapping="Wrap" Opacity="0.75" Margin="0,4,0,0"
-                               Text="Applies the performance and debloat tweaks in one pass. Creates a System Restore point first, and refuses to change anything if that fails. Bloatware removal stays separate so you can review it, and Virtual Machine Platform is left on because some anti-cheat games need it. Turn that off from Gaming Tweaks if you don't." />
+            <Border CornerRadius="8" Padding="24,22" Margin="0,0,0,12" BorderBrush="#26FFFFFF" BorderThickness="1">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#0B4A5C" Offset="0" />
+                        <GradientStop Color="#0D3A5E" Offset="0.55" />
+                        <GradientStop Color="#152A5C" Offset="1" />
+                    </LinearGradientBrush>
+                </Border.Background>
 
-                    <ui:Button Command="{Binding RunOneClickCommand}"
-                               Appearance="Primary"
-                               Height="68"
-                               FontSize="17"
-                               Margin="0,16,0,0"
-                               HorizontalAlignment="Stretch"
-                               HorizontalContentAlignment="Center"
-                               IsEnabled="{Binding DataContext.IsBusy, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource InverseBool}}">
-                        <StackPanel Orientation="Horizontal">
-                            <ui:FontIcon Glyph="&#xE945;" FontSize="22" Margin="0,0,12,0" VerticalAlignment="Center" />
-                            <TextBlock Text="One-Click Optimise" VerticalAlignment="Center" FontSize="17" FontWeight="SemiBold" />
-                        </StackPanel>
-                    </ui:Button>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
 
-                    <TextBlock Margin="0,12,0,0" TextWrapping="Wrap" FontSize="12" Opacity="0.6"
-                               Text="Never touched: Windows Update, Microsoft Defender, the firewall, Armoury Crate SE, ASUS services, AMD drivers, Realtek audio, Game Pass." />
-                </StackPanel>
-            </ui:Card>
-
-            <!-- Current state -->
-            <ui:Card Margin="0,0,0,12">
-                <StackPanel>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Current state" FontSize="16" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding OptimisationStatus}" Opacity="0.75" Margin="0,4,0,0"
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
-
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
-                            <TextBlock HorizontalAlignment="Right" FontSize="24" FontWeight="SemiBold">
-                                <Run Text="{Binding AppliedCount, Mode=OneWay}" />
-                                <Run Text="/" Foreground="Gray" />
-                                <Run Text="{Binding TotalCount, Mode=OneWay}" Foreground="Gray" />
-                            </TextBlock>
-                            <TextBlock Text="tweaks applied" FontSize="11" Opacity="0.6" HorizontalAlignment="Right" />
-                        </StackPanel>
-                    </Grid>
-
-                    <ui:Button Content="Re-check current state"
-                               Command="{Binding RefreshCommand}"
-                               Margin="0,14,0,0"
-                               HorizontalAlignment="Left" />
-                </StackPanel>
-            </ui:Card>
-
-            <!-- Safety actions -->
-            <ui:Card>
-                <StackPanel>
-                    <TextBlock Text="Safety" FontSize="16" FontWeight="SemiBold" />
-                    <TextBlock Text="{Binding RevertSummary}" Opacity="0.75" Margin="0,4,0,0" TextWrapping="Wrap" />
-
-                    <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
-                        <ui:Button Content="Create restore point now"
-                                   Command="{Binding CreateRestorePointOnlyCommand}"
-                                   Margin="0,0,10,0" />
-                        <ui:Button Content="Revert all tweaks"
-                                   Appearance="Primary"
-                                   Command="{Binding RevertAllCommand}"
-                                   IsEnabled="{Binding CanRevert}" />
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,20,0">
+                        <TextBlock Text="Recommended Tweaks" FontSize="24" FontWeight="SemiBold"
+                                   FontFamily="{StaticResource AppDisplayFont}" />
+                        <TextBlock Text="Optimise your handheld in one click. Restore points are created first."
+                                   TextWrapping="Wrap" Opacity="0.8" FontSize="14" Margin="0,4,0,0" />
                     </StackPanel>
 
-                    <TextBlock Margin="0,12,0,0" TextWrapping="Wrap" FontSize="12" Opacity="0.6"
-                               Text="Reverting restores each registry value to exactly what it was before this app changed it, including deleting values that did not previously exist. Removed bloatware is not restored; reinstall those from the Microsoft Store." />
-                </StackPanel>
-            </ui:Card>
+                    <Button Grid.Column="1"
+                            Style="{StaticResource AccentPill}"
+                            MinHeight="56"
+                            Padding="28,0"
+                            FontSize="16"
+                            FontWeight="SemiBold"
+                            VerticalAlignment="Center"
+                            Command="{Binding RunOneClickCommand}"
+                            IsEnabled="{Binding DataContext.IsBusy, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource InverseBool}}">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:FontIcon Glyph="&#xE945;" FontSize="20" Margin="0,0,10,0" VerticalAlignment="Center" />
+                            <TextBlock Text="One-Click Optimise" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- Three cards in a row on a handheld's screen, one above another when the window is narrow.
+                 The column count is set from the width in the code-behind. -->
+            <UniformGrid x:Name="Cards" Columns="3" Margin="0,0,-12,0">
+
+                <!-- Current state -->
+                <ui:Card Style="{StaticResource DashCard}">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Current state" Style="{StaticResource CardTitle}" />
+
+                        <ui:Button DockPanel.Dock="Bottom"
+                                   Content="Re-check"
+                                   Command="{Binding RefreshCommand}"
+                                   HorizontalAlignment="Center"
+                                   Padding="22,0"
+                                   Margin="0,12,0,0" />
+
+                        <Grid Width="150" Height="150" Margin="0,14,0,0" VerticalAlignment="Center">
+                            <ui:Arc Width="150" Height="150" StartAngle="0" EndAngle="359.99"
+                                    Stroke="#24FFFFFF" StrokeThickness="12" />
+                            <ui:Arc Width="150" Height="150" StartAngle="0" EndAngle="{Binding AppliedAngle}"
+                                    Stroke="{StaticResource BrandAccent}" StrokeThickness="12">
+                                <ui:Arc.Effect>
+                                    <DropShadowEffect Color="#22D3EE" BlurRadius="22" ShadowDepth="0" Opacity="0.9" />
+                                </ui:Arc.Effect>
+                            </ui:Arc>
+
+                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <TextBlock HorizontalAlignment="Center" FontSize="30" FontWeight="SemiBold"
+                                           FontFamily="{StaticResource AppDisplayFont}">
+                                    <Run Text="{Binding AppliedCount, Mode=OneWay}" />
+                                    <Run Text="/" Foreground="#99FFFFFF" />
+                                    <Run Text="{Binding TotalCount, Mode=OneWay}" Foreground="#99FFFFFF" />
+                                </TextBlock>
+                                <TextBlock Text="applied" FontSize="12.5" Opacity="0.65" HorizontalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+                    </DockPanel>
+                </ui:Card>
+
+                <!-- Hardware: read-only. The battery tiles update while the page is showing. -->
+                <ui:Card Style="{StaticResource DashCard}">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Hardware" Style="{StaticResource CardTitle}" />
+
+                        <UniformGrid Columns="2" Rows="2" Margin="0,8,0,0">
+                            <StackPanel Margin="0,8,10,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:FontIcon Glyph="&#xE83F;" Style="{StaticResource TileIcon}" />
+                                    <TextBlock Text="Battery" Style="{StaticResource TileLabel}" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding BatteryChargeText}" Style="{StaticResource TileValue}" />
+                                <TextBlock Text="{Binding BatteryPowerText}" Style="{StaticResource TileDetail}" />
+                            </StackPanel>
+
+                            <StackPanel Margin="0,8,0,0" ToolTip="{Binding BatteryHealthTip}" Background="Transparent">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:FontIcon Glyph="&#xEB51;" Style="{StaticResource TileIcon}" />
+                                    <TextBlock Text="Health" Style="{StaticResource TileLabel}" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding BatteryHealthText}" Style="{StaticResource TileValue}" />
+                                <TextBlock Text="{Binding BatteryHealthDetail}" Style="{StaticResource TileDetail}" />
+                            </StackPanel>
+
+                            <StackPanel Margin="0,8,10,0" ToolTip="{Binding GraphicsMemoryTip}" Background="Transparent">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:FontIcon Glyph="&#xE950;" Style="{StaticResource TileIcon}" />
+                                    <TextBlock Text="GPU memory" Style="{StaticResource TileLabel}" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding GraphicsMemoryText}" Style="{StaticResource TileValue}" />
+                                <TextBlock Text="{Binding GraphicsMemoryDetail}" Style="{StaticResource TileDetail}" />
+                            </StackPanel>
+
+                            <StackPanel Margin="0,8,0,0" ToolTip="{Binding GraphicsDriverTip}" Background="Transparent">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:FontIcon Glyph="&#xE7F4;" Style="{StaticResource TileIcon}" />
+                                    <TextBlock Text="GPU driver" Style="{StaticResource TileLabel}" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding GraphicsDriverText}" Style="{StaticResource TileValue}" FontSize="15" Margin="0,7,0,1" />
+                                <TextBlock Text="{Binding GraphicsDriverDetail}" Style="{StaticResource TileDetail}" />
+                            </StackPanel>
+                        </UniformGrid>
+                    </DockPanel>
+                </ui:Card>
+
+                <!-- Safety & Backup -->
+                <ui:Card Style="{StaticResource DashCard}">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Safety &amp; Backup" Style="{StaticResource CardTitle}" />
+                        <TextBlock DockPanel.Dock="Top" Text="{Binding RevertSummary}" Opacity="0.75" FontSize="12.5"
+                                   Margin="0,4,0,0" TextWrapping="Wrap" />
+
+                        <TextBlock DockPanel.Dock="Bottom" Margin="0,10,0,0" TextWrapping="Wrap" FontSize="11.5" Opacity="0.55"
+                                   Text="Reverting puts every setting back as it was. Removed bloatware is not restored." />
+
+                        <StackPanel VerticalAlignment="Center" Margin="0,12,0,0">
+                            <ui:Button Style="{StaticResource OutlineButton}"
+                                       Content="Create restore point"
+                                       Command="{Binding CreateRestorePointOnlyCommand}"
+                                       Margin="0,0,0,10" />
+                            <ui:Button Style="{StaticResource OutlineButton}"
+                                       Content="Revert all tweaks"
+                                       Command="{Binding RevertAllCommand}"
+                                       IsEnabled="{Binding CanRevert}" />
+                        </StackPanel>
+                    </DockPanel>
+                </ui:Card>
+            </UniformGrid>
 
         </StackPanel>
     </ScrollViewer>

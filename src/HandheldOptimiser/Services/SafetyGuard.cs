@@ -57,6 +57,19 @@ public static class SafetyGuard
         "rog live service",
         "lightingservice",
 
+        // --- Lenovo / Legion Space ---
+        "lenovo",
+        "legion",
+        "\\services\\daservice",
+
+        // --- MSI / MSI Center M. Never a bare "msi": that would also match Windows Installer and the
+        //     MSISupported interrupt values under every device's Enum key. ---
+        "micro-star",
+        "msi center",
+        "msi foundation",
+        "\\services\\msi_",
+        "\\services\\msiapservice",
+
         // --- AMD graphics / chipset ---
         "\\amd\\",
         "\\services\\amd",
@@ -64,6 +77,14 @@ public static class SafetyGuard
         "ati technologies",
         "\\services\\amdppm",
         "\\services\\amdkmdag",
+
+        // --- Intel graphics and platform power (the MSI Claw is Intel) ---
+        "\\intel\\",
+        "\\services\\intel",
+        "\\services\\igfx",
+        "\\services\\igcc",
+        "\\services\\esifsvc",        // Dynamic Tuning: thermal and power limits
+        "\\services\\ipfsvc",         // Innovation Platform Framework, its successor
 
         // --- Realtek / core audio ---
         "realtek",
@@ -100,6 +121,8 @@ public static class SafetyGuard
     [
         // Vendor
         "asus", "armoury", "rog", "myasus",
+        "lenovo", "legion",
+        "micro-star", "msicenter",
         "amd", "realtek", "nvidia", "intel",
 
         // Security surface
@@ -131,8 +154,28 @@ public static class SafetyGuard
         "defender", "smartscreen", "netfx", "windowsupdate"
     ];
 
+    /// <summary>
+    /// The one value let through a protected path: the Delivery Optimization download mode policy, which
+    /// decides whether update files are shared with other PCs and nothing about whether updates arrive.
+    /// Matched exactly, so no other Delivery Optimization or Windows Update setting comes with it.
+    /// </summary>
+    private static bool IsUpdateSharingPolicy(RegistryRoot root, string subKey, string valueName) =>
+        root == RegistryRoot.LocalMachine &&
+        string.Equals(subKey, @"SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization", StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(valueName, "DODownloadMode", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Vets a path on its own. This is what a restore goes through, so the update sharing policy passes
+    /// here whatever its value: undoing it means putting back whatever was there before.
+    /// </summary>
     public static bool IsRegistryPathProtected(RegistryRoot root, string subKey, string valueName, out string? reason)
     {
+        if (IsUpdateSharingPolicy(root, subKey, valueName))
+        {
+            reason = null;
+            return false;
+        }
+
         // StartupApproved values are named after the startup entry they switch on or off, so matching
         // the value name would lock any entry called "SecurityHealth" or "ASUS...". They are only
         // enable/disable flags that Task Manager also writes, so the key path alone is vetted there.
@@ -153,8 +196,22 @@ public static class SafetyGuard
         return false;
     }
 
-    public static bool IsRegistryPathProtected(RegistryValueSpec spec, out string? reason) =>
-        IsRegistryPathProtected(spec.Root, spec.SubKey, spec.ValueName, out reason);
+    /// <summary>
+    /// Vets a write, value included. The update sharing policy may only be set to 0 (no sharing, updates
+    /// still download): its other modes widen sharing, and 100 can stop some downloads altogether.
+    /// </summary>
+    public static bool IsRegistryPathProtected(RegistryValueSpec spec, out string? reason)
+    {
+        if (IsUpdateSharingPolicy(spec.Root, spec.SubKey, spec.ValueName) &&
+            (spec.DesiredValue is not 0 || spec.Kind != Microsoft.Win32.RegistryValueKind.DWord))
+        {
+            reason = "Only download mode 0 (no sharing with other PCs) may be written to the Delivery " +
+                     "Optimization policy. Refusing to write.";
+            return true;
+        }
+
+        return IsRegistryPathProtected(spec.Root, spec.SubKey, spec.ValueName, out reason);
+    }
 
     /// <summary>
     /// Service start-type and stop operations go through the same fragments as the registry, since a

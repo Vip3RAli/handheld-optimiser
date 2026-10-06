@@ -363,11 +363,12 @@ public static class SleepTweaks
         Id = "sleep.sdreader",
         Name = "Turn off the SD card reader",
         Description =
-            "Switches the SD card reader off in Windows. On some handhelds, the ROG Ally among them, the reader " +
-            "keeps the system busy during sleep and drains the battery, even with no card in it.",
+            "Switches the SD card reader off in Windows. On the ROG Ally the reader keeps the system busy during " +
+            "sleep and drains the battery, even with no card in it.",
         Category = TweakCategory.Sleep,
         Risk = RiskLevel.Breaking,
         IncludeInOneClick = false,
+        OnlyFor = HandheldDevice.RogAlly,
         Warning =
             "SD cards stop working until you switch this back off. Do not use it if you keep games or files " +
             "on an SD card.",

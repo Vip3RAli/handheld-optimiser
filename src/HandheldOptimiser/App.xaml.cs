@@ -45,7 +45,8 @@ public partial class App : Application
         var appxService = new AppxService(log, runner);
         var startupService = new StartupService(log, registry);
         var systemState = new SystemStateService(log, runner, registry);
-        var engine = new TweakEngine(log, registry, runner, restorePoints, journal);
+        var hardware = new HardwareInfoService(log, runner);
+        var engine = new TweakEngine(log, registry, runner, restorePoints, journal, systemState.DetectDevice());
         var runtimes = new RuntimeService(log, runner, restorePoints);
         var updates = new UpdateService(log);
 
@@ -57,7 +58,7 @@ public partial class App : Application
         UpdateService.CleanUpOldDownloads(log);
 
         var viewModel = new MainViewModel(
-            log, engine, systemState, restorePoints, appxService, startupService, journal, runtimes, updates);
+            log, engine, systemState, hardware, restorePoints, appxService, startupService, journal, runtimes, updates);
 
         var window = new MainWindow { DataContext = viewModel };
         MainWindow = window;
@@ -69,17 +70,17 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Pins the accent to the app's purple instead of the Windows accent, so primary buttons, toggles,
+    /// Pins the accent to the app's cyan instead of the Windows accent, so primary buttons, toggles,
     /// checkboxes, badges and the sidebar highlight look the same on every device. Dark theme fills
     /// use the lighter steps, matching how Fluent derives them from a system accent.
     /// </summary>
     private static void ApplyBrandAccent()
     {
         ApplicationAccentColorManager.Apply(
-            systemAccent: Color.FromRgb(0x6D, 0x28, 0xD9),
-            primaryAccent: Color.FromRgb(0x7C, 0x3A, 0xED),
-            secondaryAccent: Color.FromRgb(0x8B, 0x5C, 0xF6),
-            tertiaryAccent: Color.FromRgb(0xA7, 0x8B, 0xFA));
+            systemAccent: Color.FromRgb(0x0E, 0x74, 0x90),
+            primaryAccent: Color.FromRgb(0x08, 0x91, 0xB2),
+            secondaryAccent: Color.FromRgb(0x06, 0xB6, 0xD4),
+            tertiaryAccent: Color.FromRgb(0x22, 0xD3, 0xEE));
     }
 
     private static bool IsRunningElevated()

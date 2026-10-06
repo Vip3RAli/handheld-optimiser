@@ -23,7 +23,7 @@
     <AssemblyName>HandheldOptimiser.HomeLauncher</AssemblyName>
     <RootNamespace>HandheldOptimiser.HomeLauncher</RootNamespace>
     <Product>Handheld Optimiser</Product>
-    <Version>0.7.1</Version>
+    <Version>0.8.0</Version>
 
     <!-- The library stays open behind games, so a small footprint matters more than GC throughput. -->
     <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>

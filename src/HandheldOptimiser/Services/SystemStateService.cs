@@ -19,27 +19,26 @@ public sealed class HealthCheck
 }
 
 /// <summary>
-/// Read-only inspection of the machine. Backs the ASUS page, which deliberately contains no toggles: the
-/// user's constraints forbid touching ASUS, AMD and Realtek software, so the useful thing this app can
-/// offer for that hardware is proof that it left everything alone.
+/// Read-only inspection of the machine. Backs the Device &amp; System Health page, which deliberately
+/// contains no toggles: the user's constraints forbid touching the handheld vendor's software and the
+/// AMD, Intel and Realtek drivers, so the useful thing this app can offer for that hardware is proof that
+/// it left everything alone.
 /// </summary>
 public sealed class SystemStateService(LogService log, PowerShellRunner runner, RegistryHelper registry)
 {
+    private const string BiosKey = @"HARDWARE\DESCRIPTION\System\BIOS";
+
     private readonly LogService _log = log;
     private readonly PowerShellRunner _runner = runner;
     private readonly RegistryHelper _registry = registry;
 
+    private string? ReadBios(string valueName) =>
+        _registry.ReadValue(RegistryRoot.LocalMachine, BiosKey, valueName)?.ToString();
+
     public string GetHardwareModel()
     {
-        var product = _registry.ReadValue(
-            RegistryRoot.LocalMachine,
-            @"HARDWARE\DESCRIPTION\System\BIOS",
-            "SystemProductName")?.ToString();
-
-        var family = _registry.ReadValue(
-            RegistryRoot.LocalMachine,
-            @"HARDWARE\DESCRIPTION\System\BIOS",
-            "SystemFamily")?.ToString();
+        var product = ReadBios("SystemProductName");
+        var family = ReadBios("SystemFamily");
 
         if (string.IsNullOrWhiteSpace(product))
         {
@@ -54,19 +53,25 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
             : $"{name} ({family.Trim()})";
     }
 
-    public bool IsRogAlly()
-    {
-        var model = GetHardwareModel();
-        return model.Contains("ROG Ally", StringComparison.OrdinalIgnoreCase) ||
-               model.Contains("RC71", StringComparison.OrdinalIgnoreCase) ||
-               model.Contains("RC72", StringComparison.OrdinalIgnoreCase);
-    }
+    public HandheldDevice DetectDevice() => HandheldDevices.Identify(
+        ReadBios("SystemManufacturer"),
+        ReadBios("SystemProductName"),
+        ReadBios("SystemFamily"),
+        ReadBios("BaseBoardProduct"));
 
     /// <summary>
-    /// Services that must be running or at least not disabled. Split into the ones the user named as
-    /// untouchable and the security stack this app refuses to weaken.
+    /// The vendor whose software is inspected on this device and the app it ships, or null where there is
+    /// none to inspect (the Steam Deck has only drivers, and the smaller makers are not covered yet).
     /// </summary>
-    private static readonly (string ServiceName, string Friendly, string Group)[] WatchedServices =
+    public (string Vendor, string App)? GetVendorSoftware() => DetectDevice() switch
+    {
+        HandheldDevice.RogAlly => ("ASUS", "Armoury Crate SE"),
+        HandheldDevice.LegionGo => ("Lenovo", "Legion Space"),
+        HandheldDevice.MsiClaw => ("MSI", "MSI Center M"),
+        _ => null
+    };
+
+    private static readonly (string ServiceName, string Friendly, string Group)[] AsusServices =
     [
         ("ArmouryCrateControlInterface", "Armoury Crate Control Interface", "ASUS"),
         ("ARMOURY CRATE Service",        "Armoury Crate Service",           "ASUS"),
@@ -74,7 +79,27 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
         ("ASUSSoftwareManager",          "ASUS Software Manager",           "ASUS"),
         ("ASUSSwitch",                   "ASUS Switch",                     "ASUS"),
         ("ASUSSystemAnalysis",           "ASUS System Analysis",            "ASUS"),
-        ("AsusAppService",               "ASUS App Service",                "ASUS"),
+        ("AsusAppService",               "ASUS App Service",                "ASUS")
+    ];
+
+    // DAService is the service that starts Legion Space's background daemon and keeps it running.
+    private static readonly (string ServiceName, string Friendly, string Group)[] LenovoServices =
+    [
+        ("DAService", "Legion Space Service (DAService)", "Lenovo")
+    ];
+
+    private static readonly (string ServiceName, string Friendly, string Group)[] MsiServices =
+    [
+        ("MSI Foundation Service", "MSI Foundation Service", "MSI"),
+        ("MSI_Center_Service",     "MSI Center Service",     "MSI")
+    ];
+
+    /// <summary>
+    /// Services that must be running or at least not disabled on any handheld: the drivers the user named
+    /// as untouchable and the security stack this app refuses to weaken.
+    /// </summary>
+    private static readonly (string ServiceName, string Friendly, string Group)[] CommonServices =
+    [
         ("AMD External Events Utility",  "AMD External Events",             "AMD / Realtek"),
         ("AMDRyzenMasterDriverV24",      "AMD Ryzen Master Driver",         "AMD / Realtek"),
         ("RtkAudUService",               "Realtek Audio Universal Service", "AMD / Realtek"),
@@ -89,13 +114,27 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
         ("XblAuthManager",               "Xbox Live Auth Manager",          "Xbox / Game Pass")
     ];
 
+    /// <summary>The detected vendor's services first, then the ones every handheld shares.</summary>
+    private (string ServiceName, string Friendly, string Group)[] WatchedServices() =>
+    [
+        .. DetectDevice() switch
+        {
+            HandheldDevice.RogAlly => AsusServices,
+            HandheldDevice.LegionGo => LenovoServices,
+            HandheldDevice.MsiClaw => MsiServices,
+            _ => []
+        },
+        .. CommonServices
+    ];
+
     public async Task<IReadOnlyList<HealthCheck>> RunHealthChecksAsync(CancellationToken ct = default)
     {
         _log.Info("Running protected-component health check…");
 
         var checks = new List<HealthCheck>();
 
-        var serviceNames = string.Join(",", WatchedServices.Select(s => $"'{s.ServiceName.Replace("'", "''")}'"));
+        var watched = WatchedServices();
+        var serviceNames = string.Join(",", watched.Select(s => $"'{s.ServiceName.Replace("'", "''")}'"));
 
         var outcome = await _runner.RunScriptAsync(
             $$"""
@@ -124,12 +163,12 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
             }
         }
 
-        foreach (var (serviceName, friendly, group) in WatchedServices)
+        foreach (var (serviceName, friendly, group) in watched)
         {
             if (!serviceStates.TryGetValue(serviceName, out var state) || state.Status == "ABSENT")
             {
-                // Not every ASUS service exists on every firmware revision, so absence is only
-                // noteworthy for the security and update stack.
+                // Not every vendor or driver service exists on every model and firmware revision, so
+                // absence is only noteworthy for the security and update stack.
                 var absentStatus = group is "Security" or "Windows Update" ? HealthStatus.Bad : HealthStatus.Unknown;
 
                 checks.Add(new HealthCheck
@@ -232,9 +271,9 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
     /// </summary>
     public async Task<bool> RepairProtectedServicesAsync(CancellationToken ct = default)
     {
-        _log.Info("Repairing any disabled ASUS / AMD / security / update services…");
+        _log.Info("Repairing any disabled vendor / driver / security / update services…");
 
-        var names = string.Join(",", WatchedServices.Select(s => $"'{s.ServiceName.Replace("'", "''")}'"));
+        var names = string.Join(",", WatchedServices().Select(s => $"'{s.ServiceName.Replace("'", "''")}'"));
 
         var outcome = await _runner.RunScriptAsync(
             $$"""

@@ -392,6 +392,8 @@
                                 Click="OnToggleFilter" />
                         <Button x:Name="QuickActionsSetting" Style="{StaticResource MenuButton}" Content="Quick actions"
                                 Click="OnToggleQuickActions" />
+                        <Button x:Name="OpenMainAppSetting" Style="{StaticResource MenuButton}" Content="Open Handheld Optimiser"
+                                Tag="Tweaks and tools. Windows asks for administrator permission" Click="OnOpenMainApp" />
                         <Button x:Name="QuitSetting" Style="{StaticResource MenuButton}" Content="Quit"
                                 Tag="Close the game library" Click="OnQuit" />
 

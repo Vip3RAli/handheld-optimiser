@@ -12,15 +12,20 @@ using Microsoft.Win32;
 namespace HandheldOptimiser.HomeLauncher.Library;
 
 /// <summary>
-/// The wide artwork shown behind the grid for the focused game, for players who chose artwork over the
-/// default gradient of the game's colours. Steam keeps one on disk for most of its
-/// games; anything else comes from SteamGridDB when the player has entered an API key in the main app,
-/// and is kept on disk so each game is only ever fetched once.
+/// A game's artwork from SteamGridDB, for the art its store does not keep on disk: the wide picture
+/// shown behind the grid for the focused game, for players who chose artwork over the default gradient
+/// of the game's colours, and the portrait cover on its tile. Steam keeps both for most of its games;
+/// anything else is fetched when the player has entered an API key, and is kept on disk so each game is
+/// only ever fetched once.
 /// </summary>
 internal static class Artwork
 {
     private const string ApiBase = "https://www.steamgriddb.com/api/v2/";
     private const string ArtFilter = "?types=static&mimes=image/jpeg,image/png&nsfw=false&humor=false";
+
+    // Tiles are two wide by three tall. 600x900 is that shape and what most games have; the others are
+    // the portrait sizes SteamGridDB also takes, asked for only when a game has nothing at 600x900.
+    private static readonly string[] CoverSizes = ["600x900", "660x930,342x482"];
 
     // The player's corrections for games SteamGridDB matched wrongly, one value per game key.
     private const string TitlesKey = Program.SettingsKey + @"\ArtworkTitles";
@@ -78,6 +83,10 @@ internal static class Artwork
             File.Delete(CachePath(game));
             File.Delete(PreviewPath(game));
             File.Delete(NotFoundPath(game));
+
+            // The cover was found under the same title, so it is as wrong as the background was.
+            File.Delete(CoverCachePath(game));
+            File.Delete(NoCoverPath(game));
             return true;
         }
         catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
@@ -106,7 +115,7 @@ internal static class Artwork
             return cached;
         }
 
-        if (LibrarySettings.ArtworkKey is not { } apiKey || RecentlyNotFound(game))
+        if (LibrarySettings.ArtworkKey is not { } apiKey || RecentlyNotFound(NotFoundPath(game)))
         {
             return null;
         }
@@ -127,44 +136,21 @@ internal static class Artwork
     {
         try
         {
-            string heroes;
-            if (corrected is null && game.Store == GameStore.Steam)
+            if (await ArtListAsync(game, "heroes", corrected, apiKey) is not { } heroes)
             {
-                // An exact match by Steam app id, for the Steam games with no hero in Steam's own cache.
-                heroes = $"heroes/steam/{game.Key[(game.Key.IndexOf(':') + 1)..]}";
-            }
-            else
-            {
-                var term = Uri.EscapeDataString(Clean(corrected ?? game.Title));
-                using var search = await GetAsync($"search/autocomplete/{term}", apiKey);
-                if (FirstMatchId(search) is not { } id)
-                {
-                    MarkNotFound(game);
-                    return null;
-                }
-
-                heroes = $"heroes/game/{id}";
+                MarkNotFound(NotFoundPath(game));
+                return null;
             }
 
             using var list = await GetAsync(heroes + ArtFilter, apiKey);
-            foreach (var url in ImageUrls(list).Take(CandidatesToTry * 2))
+            var path = CachePath(game);
+            if (await SaveFirstAsync(list, path))
             {
-                var bytes = await DownloadAsync(url);
-                if (bytes is null || !IsImage(bytes))
-                {
-                    continue;
-                }
-
-                Directory.CreateDirectory(CacheDir);
-                var path = CachePath(game);
-                var temp = path + ".tmp";
-                await File.WriteAllBytesAsync(temp, bytes);
-                File.Move(temp, path, overwrite: true);
                 File.Delete(PreviewPath(game));
                 return path;
             }
 
-            MarkNotFound(game);
+            MarkNotFound(NotFoundPath(game));
             return null;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException
@@ -174,6 +160,107 @@ internal static class Artwork
             Program.Log($"Artwork for {game.Key} could not be fetched: {ex.Message}");
             return null;
         }
+    }
+
+    /// <summary>The portrait cover already on disk for a game whose store keeps none, if it has been fetched.</summary>
+    public static string? CachedCover(Game game)
+    {
+        var path = CoverCachePath(game);
+        return File.Exists(path) ? path : null;
+    }
+
+    /// <summary>
+    /// The file holding a portrait cover for a game whose store keeps none, downloading it first if need
+    /// be. Call it off the UI thread.
+    /// </summary>
+    /// <returns>
+    /// The file, or null when there is no cover or SteamGridDB could not be reached. KeyRejected is set
+    /// when SteamGridDB turned the API key away, which no amount of asking again will change.
+    /// </returns>
+    public static async Task<(string? Path, bool KeyRejected)> FindCoverAsync(Game game)
+    {
+        if (CachedCover(game) is { } cached)
+        {
+            return (cached, false);
+        }
+
+        if (LibrarySettings.ArtworkKey is not { } apiKey || RecentlyNotFound(NoCoverPath(game)))
+        {
+            return (null, false);
+        }
+
+        try
+        {
+            if (await ArtListAsync(game, "grids", SearchTitle(game), apiKey) is not { } grids)
+            {
+                MarkNotFound(NoCoverPath(game));
+                return (null, false);
+            }
+
+            var path = CoverCachePath(game);
+            foreach (var size in CoverSizes)
+            {
+                using var list = await GetAsync($"{grids}{ArtFilter}&dimensions={size}", apiKey);
+                if (await SaveFirstAsync(list, path))
+                {
+                    return (path, false);
+                }
+            }
+
+            MarkNotFound(NoCoverPath(game));
+            return (null, false);
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+        {
+            Program.Log($"SteamGridDB did not accept the API key ({(int)ex.StatusCode.Value}), so no covers were fetched.");
+            return (null, true);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException
+            or IOException or UnauthorizedAccessException)
+        {
+            // Offline or a full disk: the tile keeps its icon, and the next start tries again.
+            Program.Log($"The cover for {game.Key} could not be fetched: {ex.Message}");
+            return (null, false);
+        }
+    }
+
+    /// <summary>
+    /// Where SteamGridDB lists one kind of art ("heroes" or "grids") for the game, or null when it does
+    /// not know the game.
+    /// </summary>
+    private static async Task<string?> ArtListAsync(Game game, string kind, string? corrected, string apiKey)
+    {
+        if (corrected is null && game.Store == GameStore.Steam)
+        {
+            // An exact match by Steam app id, for the Steam games with no art in Steam's own cache.
+            return $"{kind}/steam/{game.Key[(game.Key.IndexOf(':') + 1)..]}";
+        }
+
+        var term = Uri.EscapeDataString(Clean(corrected ?? game.Title));
+        using var search = await GetAsync($"search/autocomplete/{term}", apiKey);
+        return FirstMatchId(search) is { } id ? $"{kind}/game/{id}" : null;
+    }
+
+    /// <summary>Saves the best listed picture that downloads and really is a picture.</summary>
+    /// <returns>False when none of them did.</returns>
+    private static async Task<bool> SaveFirstAsync(JsonDocument? list, string path)
+    {
+        foreach (var url in ImageUrls(list).Take(CandidatesToTry * 2))
+        {
+            var bytes = await DownloadAsync(url);
+            if (bytes is null || !IsImage(bytes))
+            {
+                continue;
+            }
+
+            Directory.CreateDirectory(CacheDir);
+            var temp = path + ".tmp";
+            await File.WriteAllBytesAsync(temp, bytes);
+            File.Move(temp, path, overwrite: true);
+            return true;
+        }
+
+        return false;
     }
 
     /// <returns>The response, or null when SteamGridDB does not know the game.</returns>
@@ -255,11 +342,10 @@ internal static class Artwork
     private static string Clean(string title) =>
         string.Concat(title.Where(c => c is not ('™' or '®' or '©'))).Trim();
 
-    private static bool RecentlyNotFound(Game game)
+    private static bool RecentlyNotFound(string marker)
     {
         try
         {
-            var marker = NotFoundPath(game);
             return File.Exists(marker) && DateTime.UtcNow - File.GetLastWriteTimeUtc(marker) < RetryNotFoundAfter;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -268,10 +354,10 @@ internal static class Artwork
         }
     }
 
-    private static void MarkNotFound(Game game)
+    private static void MarkNotFound(string marker)
     {
         Directory.CreateDirectory(CacheDir);
-        File.WriteAllBytes(NotFoundPath(game), []);
+        File.WriteAllBytes(marker, []);
     }
 
     private static string CachePath(Game game) => Path.Combine(CacheDir, FileName(game) + ".hero");
@@ -280,6 +366,10 @@ internal static class Artwork
     private static string PreviewPath(Game game) => Path.Combine(CacheDir, FileName(game) + ".img");
 
     private static string NotFoundPath(Game game) => Path.Combine(CacheDir, FileName(game) + ".none");
+
+    private static string CoverCachePath(Game game) => Path.Combine(CacheDir, FileName(game) + ".cover");
+
+    private static string NoCoverPath(Game game) => Path.Combine(CacheDir, FileName(game) + ".nocover");
 
     // Game keys look like "steam:620", and a colon cannot be in a file name.
     private static string FileName(Game game) =>

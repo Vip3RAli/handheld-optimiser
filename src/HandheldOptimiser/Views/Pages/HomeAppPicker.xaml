@@ -39,7 +39,7 @@
                         <ui:TextBox PlaceholderText="SteamGridDB API key (optional)"
                                     Text="{Binding ArtworkKey, UpdateSourceTrigger=LostFocus}" />
                         <TextBlock Margin="0,4,0,0" FontSize="11.5" Opacity="0.6" TextWrapping="Wrap"
-                                   Text="Steam games use the artwork Steam already has. With a free key from steamgriddb.com (Preferences, then API), games from the other stores get artwork too; their titles are sent to SteamGridDB to find it. A game with no artwork keeps the gradient." />
+                                   Text="Steam games use the artwork Steam already has. With a free key from steamgriddb.com (Preferences, then API), games from the other stores get covers and artwork too; their titles are sent to SteamGridDB to find them. A game with no artwork keeps the gradient." />
                     </StackPanel>
                 </StackPanel>
 

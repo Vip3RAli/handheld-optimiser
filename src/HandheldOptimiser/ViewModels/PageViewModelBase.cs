@@ -29,6 +29,15 @@ public abstract partial class PageViewModelBase(IShell shell) : ObservableObject
 
     public virtual string Subtitle => string.Empty;
 
+    /// <summary>Whether this is the page on screen, which is what highlights its tab.</summary>
+    [ObservableProperty]
+    private bool _isCurrent;
+
     /// <summary>Called when the page becomes visible. Used to lazily scan system state.</summary>
     public virtual Task OnNavigatedToAsync() => Task.CompletedTask;
+
+    /// <summary>Called when another page takes over. Used to stop anything that only runs while visible.</summary>
+    public virtual void OnNavigatedFrom()
+    {
+    }
 }
