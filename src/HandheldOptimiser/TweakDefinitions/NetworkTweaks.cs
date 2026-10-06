@@ -8,8 +8,38 @@ public static class NetworkTweaks
     public static IReadOnlyList<Tweak> All =>
     [
         NetworkThrottling,
-        Ndu
+        Ndu,
+        UpdateSharing
     ];
+
+    /// <summary>
+    /// DODownloadMode 0 is "HTTP only": Delivery Optimization still downloads updates from Microsoft, it
+    /// just stops trading pieces with other PCs. Everything else about Delivery Optimization is behind
+    /// <see cref="Services.SafetyGuard"/>, which lets this one value through and nothing else.
+    /// </summary>
+    public static Tweak UpdateSharing => new()
+    {
+        Id = "network.updatesharing",
+        Name = "Turn off update sharing with other PCs",
+        Description =
+            "Stops Windows sending and fetching pieces of Windows and Store updates to and from other PCs. " +
+            "Updates still download from Microsoft as normal. Windows only shares on mains power, and by " +
+            "default only with PCs on your own network, so this matters most when the handheld is docked " +
+            "alongside other Windows PCs.",
+        Category = TweakCategory.Network,
+        Risk = RiskLevel.Moderate,
+        RequiresReboot = true,
+        IncludeInOneClick = false,
+        Warning =
+            "This is set as a policy, so Settings > Windows Update > Delivery Optimization shows \"Some " +
+            "settings are managed by your organization\" and its sharing switch is greyed out until you " +
+            "switch this back off.",
+        RegistryValues =
+        [
+            new(RegistryRoot.LocalMachine, @"SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization",
+                "DODownloadMode", 0, RegistryValueKind.DWord)
+        ]
+    };
 
     /// <summary>
     /// The multimedia scheduler caps non-multimedia network packet processing at 10 packets/ms while

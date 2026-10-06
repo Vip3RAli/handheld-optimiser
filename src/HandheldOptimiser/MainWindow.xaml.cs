@@ -1,6 +1,8 @@
 using System.Collections.Specialized;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 using HandheldOptimiser.ViewModels;
 using Wpf.Ui.Controls;
 
@@ -8,11 +10,58 @@ namespace HandheldOptimiser;
 
 public partial class MainWindow : FluentWindow
 {
+    // The same name is registered by the game library; see MainApp.ShowIfRunning there.
+    private const string ShowMessageName = "HandheldOptimiser.ShowMainWindow";
+    private const uint MessageFilterAllow = 1;
+
+    private static readonly uint ShowMessage = RegisterWindowMessageW(ShowMessageName);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern uint RegisterWindowMessageW(string name);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ChangeWindowMessageFilterEx(IntPtr window, uint message, uint action, IntPtr changeInfo);
+
     public MainWindow()
     {
         InitializeComponent();
         FitToWorkArea();
         DataContextChanged += OnDataContextChanged;
+    }
+
+    /// <summary>
+    /// Lets the game library bring this window back when the app is already open. The library does not
+    /// run as administrator, and Windows stops such a program restoring or messaging this window, so the
+    /// one message that asks for it is let through. It carries nothing and only ever shows the window,
+    /// which is no more than the taskbar lets any program's user do.
+    /// </summary>
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+
+        if (ShowMessage != 0 && PresentationSource.FromVisual(this) is HwndSource source)
+        {
+            ChangeWindowMessageFilterEx(source.Handle, ShowMessage, MessageFilterAllow, IntPtr.Zero);
+            source.AddHook(OnWindowMessage);
+        }
+    }
+
+    private IntPtr OnWindowMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if ((uint)message == ShowMessage)
+        {
+            // Restore rather than set a state, so a window that was maximised comes back maximised.
+            if (WindowState == WindowState.Minimized)
+            {
+                SystemCommands.RestoreWindow(this);
+            }
+
+            Activate();
+            handled = true;
+        }
+
+        return IntPtr.Zero;
     }
 
     /// <summary>

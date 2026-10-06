@@ -1,6 +1,3 @@
-using System.ComponentModel;
-using System.Diagnostics;
-using System.IO;
 using System.Net.Http;
 using System.Reflection;
 using System.Text.Json;
@@ -15,7 +12,6 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 internal static class Updates
 {
     private const string LatestReleaseApi = "https://api.github.com/repos/Vip3RAli/handheld-optimiser/releases/latest";
-    private const string MainAppName = "HandheldOptimiser.exe";
 
     // Makes the main app go straight to installing the update; see App.OnStartup there.
     private const string UpdateArgument = "--update";
@@ -59,29 +55,14 @@ internal static class Updates
     /// <returns>An error message, or null when the main app was started.</returns>
     public static string? StartUpdate()
     {
-        var mainApp = Path.Combine(AppContext.BaseDirectory, MainAppName);
-        if (!File.Exists(mainApp))
+        if (MainApp.Start(UpdateArgument) is { } problem)
         {
-            return "The update could not be started: Handheld Optimiser was not found beside the library.";
+            Program.Log($"Could not open the main app to update: {problem}");
+            return $"The update was not started: {problem}";
         }
 
-        try
-        {
-            Process.Start(new ProcessStartInfo(mainApp)
-            {
-                Arguments = UpdateArgument,
-                UseShellExecute = true
-            })?.Dispose();
-
-            Program.Log("Opened the main app to install the update");
-            return null;
-        }
-        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
-        {
-            // Declining the administrator prompt lands here too.
-            Program.Log($"Could not open the main app to update: {ex.Message}");
-            return $"The update was not started: {ex.Message}";
-        }
+        Program.Log("Opened the main app to install the update");
+        return null;
     }
 
     private static HttpClient CreateClient()

@@ -7,7 +7,7 @@ namespace HandheldOptimiser.TweakDefinitions;
 /// allowlist": the user sees each package ID before it goes, and a new Windows build cannot silently
 /// widen the blast radius.
 ///
-/// Anything ASUS, AMD, Realtek, Xbox/Game Pass, Store or codec-related is absent here by design and
+/// Anything ASUS, Lenovo, MSI, AMD, Intel, Realtek, Xbox/Game Pass, Store or codec-related is absent here by design and
 /// additionally blocked at removal time by <see cref="Services.SafetyGuard"/>.
 /// </summary>
 public static class AppxCatalog

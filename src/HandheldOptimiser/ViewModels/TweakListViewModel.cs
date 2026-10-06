@@ -75,17 +75,24 @@ public sealed partial class TweakListViewModel : PageViewModelBase
     [RelayCommand]
     private async Task ApplyAllInCategoryAsync()
     {
-        var pending = Tweaks.Where(t => t.State != TweakState.Applied).Select(t => t.Tweak).ToList();
+        var pending = Tweaks.Where(t => t.State != TweakState.Applied && t.IsForThisDevice).Select(t => t.Tweak).ToList();
+
+        // A workaround for another device's fault is never part of a bulk run; it has to be switched on by hand.
+        var skipped = Tweaks.Where(t => t.State != TweakState.Applied && !t.IsForThisDevice).ToList();
+        var skippedNote = skipped.Count == 0
+            ? string.Empty
+            : "\n\nLeft out because they are for another device:\n" +
+              string.Join("\n", skipped.Select(t => $"  • {t.Name} ({t.DeviceBadge})"));
 
         if (pending.Count == 0)
         {
-            await Shell.ConfirmAsync("Already optimised", $"Every tweak on this page is already applied.", "OK");
+            await Shell.ConfirmAsync("Already optimised", "Every tweak on this page is already applied." + skippedNote, "OK");
             return;
         }
 
         var risky = pending.Where(t => t.Risk is RiskLevel.SecurityTradeoff or RiskLevel.Breaking).ToList();
 
-        var message = $"{pending.Count} tweak(s) will be applied after a System Restore point is created.";
+        var message = $"{pending.Count} tweak(s) will be applied after a System Restore point is created." + skippedNote;
 
         if (risky.Count > 0)
         {

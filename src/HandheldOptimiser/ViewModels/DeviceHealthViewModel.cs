@@ -8,16 +8,18 @@ namespace HandheldOptimiser.ViewModels;
 /// <summary>
 /// Read-only verification page.
 ///
-/// This app is forbidden from disabling anything ASUS, AMD, Realtek, Defender or Windows Update, so this
-/// page has no toggles at all. Its job is to show that those components are present and healthy, and to
-/// repair them if some other debloat tool got there first.
+/// This app is forbidden from disabling the handheld vendor's software, the AMD, Intel and Realtek
+/// drivers, Defender or Windows Update, so this page has no toggles at all. Its job is to show that those
+/// components are present and healthy, and to repair them if some other debloat tool got there first.
+/// Which vendor it inspects follows the device: Armoury Crate on a ROG Ally, Legion Space on a Legion Go,
+/// MSI Center M on an MSI Claw.
 /// </summary>
-public sealed partial class AsusHealthViewModel(SystemStateService systemState, IShell shell)
+public sealed partial class DeviceHealthViewModel(SystemStateService systemState, IShell shell)
     : PageViewModelBase(shell)
 {
     private readonly SystemStateService _systemState = systemState;
 
-    public override string Title => "ASUS & Health";
+    public override string Title => "Device & System Health";
     public override string Glyph => "";
     public override string Subtitle => "Verify protected components are untouched. No toggles here by design.";
 
@@ -27,7 +29,7 @@ public sealed partial class AsusHealthViewModel(SystemStateService systemState, 
     private string _hardwareModel = "Detecting…";
 
     [ObservableProperty]
-    private bool _isRogAlly;
+    private string _protectionNote = ProtectionNoteFor(null);
 
     [ObservableProperty]
     private string _summaryText = "Not checked yet.";
@@ -50,7 +52,7 @@ public sealed partial class AsusHealthViewModel(SystemStateService systemState, 
     private async Task LoadChecksAsync(CancellationToken ct)
     {
         HardwareModel = _systemState.GetHardwareModel();
-        IsRogAlly = _systemState.IsRogAlly();
+        ProtectionNote = ProtectionNoteFor(_systemState.GetVendorSoftware());
 
         var results = await _systemState.RunHealthChecksAsync(ct);
 
@@ -72,12 +74,20 @@ public sealed partial class AsusHealthViewModel(SystemStateService systemState, 
                 : "All protected components healthy and fully optimised.";
     }
 
+    private static string ProtectionNoteFor((string Vendor, string App)? vendor) =>
+        (vendor is var (name, app) ? $"{app}, {name} services, " : string.Empty) +
+        "AMD and Intel drivers, Realtek audio, Defender and Windows Update are all on a hard denylist that " +
+        "blocks modification at write time. This page verifies they are intact, and can re-enable them if " +
+        "another tool disabled them.";
+
     [RelayCommand]
     private async Task RepairAsync()
     {
+        var vendor = _systemState.GetVendorSoftware() is var (name, _) ? $"{name}, " : string.Empty;
+
         var confirmed = await Shell.ConfirmAsync(
             "Repair protected services",
-            "Any ASUS, AMD, Realtek, Defender, Windows Update or Game Pass service currently set to " +
+            $"Any {vendor}AMD, Realtek, Defender, Windows Update or Game Pass service currently set to " +
             "Disabled will be set back to Automatic and started.\n\nThis only ever re-enables services; " +
             "it cannot disable anything.",
             "Repair now");

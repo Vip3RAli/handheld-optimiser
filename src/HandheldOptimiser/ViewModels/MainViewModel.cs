@@ -15,7 +15,14 @@ public sealed partial class MainViewModel : ObservableObject, IShell
 
     public LogService Log { get; }
 
+    /// <summary>Every page, in the order they are built. The sidebar shows them through <see cref="Groups"/>.</summary>
     public ObservableCollection<PageViewModelBase> Pages { get; } = [];
+
+    /// <summary>The sidebar: four groups, each showing its pages as tabs.</summary>
+    public ObservableCollection<NavGroup> Groups { get; } = [];
+
+    [ObservableProperty]
+    private NavGroup? _selectedGroup;
 
     [ObservableProperty]
     private PageViewModelBase? _selectedPage;
@@ -65,6 +72,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         LogService log,
         TweakEngine engine,
         SystemStateService systemState,
+        HardwareInfoService hardware,
         RestorePointService restorePoints,
         AppxService appxService,
         StartupService startupService,
@@ -75,7 +83,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         Log = log;
         _updates = updates;
 
-        Pages.Add(new DashboardViewModel(engine, systemState, restorePoints, log, this));
+        Pages.Add(new DashboardViewModel(engine, systemState, hardware, restorePoints, log, this));
 
         Pages.Add(new TweakListViewModel(
             "Gaming Tweaks",
@@ -170,9 +178,79 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         Pages.Add(new StartupViewModel(startupService, this));
         Pages.Add(new PowerActionsViewModel(engine, this));
         Pages.Add(new GameRuntimesViewModel(runtimeService, this));
-        Pages.Add(new AsusHealthViewModel(systemState, this));
+        Pages.Add(new DeviceHealthViewModel(systemState, this));
 
-        SelectedPage = Pages[0];
+        // Looked up by title so a page that is renamed or removed fails here, at start-up, rather than
+        // quietly dropping out of the sidebar.
+        PageViewModelBase Page(string title) => Pages.First(p => p.Title == title);
+
+        Groups.Add(new NavGroup("Dashboard", Page("Dashboard").Glyph, [Page("Dashboard")]));
+
+        Groups.Add(new NavGroup("Performance Tweaks", "",
+        [
+            Page("Gaming Tweaks"),
+            Page("CPU & Kernel"),
+            Page("Graphics & Scheduling"),
+            Page("Network"),
+            Page("Storage"),
+            Page("Sleep & Battery"),
+            Page("Interface")
+        ]));
+
+        Groups.Add(new NavGroup("Debloat Tool", "",
+        [
+            Page("System Debloat"),
+            Page("Deep Services"),
+            Page("Bloatware"),
+            Page("Startup Apps")
+        ]));
+
+        Groups.Add(new NavGroup("Settings & Hardware", "",
+        [
+            Page("Full Screen Mode"),
+            Page("Power Actions"),
+            Page("Game Runtimes"),
+            Page("Device & System Health"),
+            Page("Handheld Usability")
+        ]));
+
+        SelectedGroup = Groups[0];
+    }
+
+    /// <summary>Choosing a group in the sidebar opens the tab that was last open in it.</summary>
+    partial void OnSelectedGroupChanged(NavGroup? value)
+    {
+        // A list's selection can be cleared (Ctrl+click); the page on screen stays where it is then.
+        if (value is not null)
+        {
+            SelectedPage = value.SelectedPage;
+        }
+    }
+
+    /// <summary>A tab was pressed.</summary>
+    [RelayCommand]
+    private void OpenPage(PageViewModelBase page)
+    {
+        if (SelectedGroup is { } group && group.Pages.Contains(page))
+        {
+            group.SelectedPage = page;
+        }
+
+        SelectedPage = page;
+    }
+
+    partial void OnSelectedPageChanged(PageViewModelBase? oldValue, PageViewModelBase? newValue)
+    {
+        if (oldValue is not null)
+        {
+            oldValue.IsCurrent = false;
+            oldValue.OnNavigatedFrom();
+        }
+
+        if (newValue is not null)
+        {
+            newValue.IsCurrent = true;
+        }
     }
 
     partial void OnSelectedPageChanged(PageViewModelBase? value)

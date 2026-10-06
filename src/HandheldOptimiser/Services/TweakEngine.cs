@@ -31,17 +31,22 @@ public sealed class TweakEngine
 
     public IReadOnlyList<Tweak> AllTweaks { get; }
 
+    /// <summary>The handheld this is running on, which decides whether device-specific tweaks apply.</summary>
+    public HandheldDevice Device { get; }
+
     public TweakEngine(
         LogService log,
         RegistryHelper registry,
         PowerShellRunner runner,
         RestorePointService restorePoints,
-        TweakJournalService journal)
+        TweakJournalService journal,
+        HandheldDevice device)
     {
         _log = log;
         _restorePoints = restorePoints;
         _journal = journal;
         _context = new TweakContext(log, registry, runner);
+        Device = device;
 
         AllTweaks =
         [
@@ -67,7 +72,9 @@ public sealed class TweakEngine
 
     public Tweak? FindById(string id) => AllTweaks.FirstOrDefault(t => t.Id == id);
 
-    public IEnumerable<Tweak> OneClickTweaks => AllTweaks.Where(t => t.IncludeInOneClick);
+    public bool IsForThisDevice(Tweak tweak) => tweak.OnlyFor is null || tweak.OnlyFor == Device;
+
+    public IEnumerable<Tweak> OneClickTweaks => AllTweaks.Where(t => t.IncludeInOneClick && IsForThisDevice(t));
 
     public async Task<TweakState> DetectAsync(Tweak tweak, CancellationToken ct = default) =>
         await tweak.DetectAsync(_context, ct);

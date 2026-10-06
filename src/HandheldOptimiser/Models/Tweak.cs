@@ -36,6 +36,12 @@ public sealed class Tweak
     /// <summary>Whether the One-Click Optimise run includes this tweak.</summary>
     public bool IncludeInOneClick { get; init; } = true;
 
+    /// <summary>
+    /// Set when the tweak works around a fault on one device family. On any other device it is badged,
+    /// left out of every bulk run and only applied by hand, but still shown so it can be reverted.
+    /// </summary>
+    public HandheldDevice? OnlyFor { get; init; }
+
     public IReadOnlyList<RegistryValueSpec> RegistryValues { get; init; } = [];
 
     /// <summary>

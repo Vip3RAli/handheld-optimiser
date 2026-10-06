@@ -34,7 +34,7 @@ Every system change goes through the same safety checks:
 
 - **A System Restore point is created first.** If Windows cannot create one, nothing is changed.
 - **Every tweak records the original setting**, so it can be reverted on its own or all at once with **Revert all tweaks** on the Dashboard, even after restarting or updating the app.
-- **Protected components are never touched**, whatever a tweak asks for: Windows Update, Microsoft Defender, the firewall, Armoury Crate SE, ASUS services, AMD drivers, Realtek audio and Game Pass.
+- **Protected components are never touched**, whatever a tweak asks for: Windows Update, Microsoft Defender, the firewall, your handheld's own software (Armoury Crate SE and ASUS services, Legion Space and Lenovo services, MSI Center M), AMD and Intel drivers, Realtek audio and Game Pass. The one exception is the optional **Turn off update sharing with other PCs** switch, which changes a single Delivery Optimization setting; updates still download as normal.
 - **Trade-offs are shown up front.** Anything that lowers security or turns off a feature is labelled on its card and listed in the confirmation before it runs.
 
 ## Install
@@ -45,12 +45,23 @@ Every system change goes through the same safety checks:
 
 .NET is bundled, so nothing else needs installing. New versions install over the old one and keep your undo history.
 
-**Requirements:** Windows 10 (2004) or Windows 11, 64-bit. Full Screen Mode needs Windows 11 24H2 or later on a device with the Xbox full screen experience. Designed and tested on the ROG Ally; most tweaks apply to any Windows handheld, but the ASUS-specific pages assume ASUS software is installed.
+**Requirements:** Windows 10 (2004) or Windows 11, 64-bit. Full Screen Mode needs Windows 11 24H2 or later on a device with the Xbox full screen experience. Designed and tested on the ROG Ally. The app also recognises the ROG Xbox Ally, Lenovo Legion Go, MSI Claw, Steam Deck (running Windows), AYANEO, GPD and OneXPlayer handhelds, and the tweaks apply to any of them, but those devices have not been tested. A tweak that only fixes a fault on one device is badged with that device's name on any other.
 
 ## Features
 
+The sidebar has four sections, sized for a thumb on a handheld's touch screen. Each section's pages are tabs across the top, and a section reopens on the tab you last used.
+
+| Section | Tabs |
+|---|---|
+| **Dashboard** | One-Click Optimise, current state, hardware and safety |
+| **Performance Tweaks** | Gaming Tweaks · CPU & Kernel · Graphics & Scheduling · Network · Storage · Sleep & Battery · Interface |
+| **Debloat Tool** | System Debloat · Deep Services · Bloatware · Startup Apps |
+| **Settings & Hardware** | Full Screen Mode · Power Actions · Game Runtimes · Device & System Health · Handheld Usability |
+
 ### Dashboard
-One-Click Optimise, the current state of the system, a manual restore point button, and **Revert all tweaks**.
+A **One-Click Optimise** banner, then three cards: a ring showing how many of the recommended tweaks are applied, the hardware readings, and the restore point and **Revert all tweaks** buttons.
+
+A **Hardware** card shows the battery's charge and live power draw in watts, its health (what it holds now against what it was built to hold), the memory set aside for graphics (the UMA buffer) and the installed graphics driver. It only reads; nothing on it changes a setting.
 
 One-Click Optimise includes turning off **Memory Integrity**, which is usually the biggest single frame rate gain on the Ally but lowers protection against malicious drivers. The confirmation lists it, and every other trade-off, before anything runs. Virtual Machine Platform is left on because some anti-cheat games need it.
 
@@ -61,13 +72,13 @@ One-Click Optimise includes turning off **Memory Integrity**, which is usually t
 | **Gaming Tweaks** | Disable Memory Integrity (HVCI) · Disable Virtual Machine Platform & VBS · Disable Game DVR background recording · Remove the Windows startup delay |
 | **System Debloat** | Disable telemetry · Disable web results in Start search · Disable Cortana & Copilot · Stop app suggestions and silent reinstalls · Stop Store apps running in the background |
 | **CPU & Kernel** | Maximise foreground priority, so the game gets the CPU ahead of background work |
-| **Network** | Disable network throttling · Disable the network data usage monitor |
+| **Network** | Disable network throttling · Disable the network data usage monitor · Turn off update sharing with other PCs |
 | **Deep Services** | Disable SysMain, Search Indexer, Print Spooler & Fax, Program Compatibility Assistant, Distributed Link Tracking, and other services a handheld does not use |
 | **Interface** | Instant menus · Disable edge swipe gestures · Disable transparency and window animations |
 | **Storage** | Disable last access timestamps · Disable 8.3 short file names |
-| **Graphics & Scheduling** | Force Game Mode on · Enable hardware-accelerated GPU scheduling |
+| **Graphics & Scheduling** | Force Game Mode on · Optimise windowed and borderless games · Enable hardware-accelerated GPU scheduling |
 | **Handheld Usability** | Disable the Sticky Keys and Filter Keys shortcuts · Disable power throttling |
-| **Sleep & Battery** | Hibernate after 15 minutes of sleep · Turn Wi-Fi off during sleep · Only the power button wakes the handheld · Turn off the SD card reader |
+| **Sleep & Battery** | Hibernate after 15 minutes of sleep · Turn Wi-Fi off during sleep · Only the power button wakes the handheld · Turn off the SD card reader (ROG Ally only) |
 | **Full Screen Mode** | Choose the home app · Use Handheld Optimiser as the home app · Enter full screen mode at sign-in |
 
 ### Full Screen Mode (Xbox mode home app)
@@ -93,8 +104,9 @@ A lightweight game library that replaces Big Picture as the home screen. It find
 - **X** on a game (or press and hold on touch) opens its quick actions: set extra launch arguments, open the install folder, view the executable's properties, or correct its background artwork. Launch arguments apply to Steam and GOG games; the other stores start their games themselves and take none.
 - The power button beside the gear (or **View** on the controller) opens the power menu: sleep, hibernate, restart or shut down. Hibernate is listed only when it is switched on in Windows. Restart and shut down ask for a second press, so a stray button cannot end a session.
 - The background is a gradient in the colours of the selected game's cover or icon, worked out on the device with nothing downloaded.
-- The gear in the top bar (or **Menu** on the controller) opens the library's settings: the background (game colours, game artwork or plain), how strong the colours are, how blurred the artwork is (off, light, medium or strong) and whether it sits at the top or the bottom of the screen, the SteamGridDB key, on / off switches for the battery and Wi-Fi display, the store filter and the quick actions, and **Quit** to close the library.
-- Choose game artwork there, or switch on **Use game artwork as the library background** under **Full Screen Mode**, to show the game's whole banner artwork across the top or bottom of the screen, fading into its colours. Steam games use the artwork Steam already keeps on disk. For the other stores, enter a free [SteamGridDB](https://www.steamgriddb.com) API key and the library fetches each game's artwork once and keeps it in `%LOCALAPPDATA%\HandheldOptimiser\artwork`. Only then does the library contact SteamGridDB, sending the titles of those games to find them. Its only other use of the internet is the check for a newer release. A game with no artwork keeps its gradient. If a game gets the wrong picture, **Background artwork** in its quick actions lets you give the title to look it up by.
+- The gear in the top bar (or **Menu** on the controller) opens the library's settings: the background (game colours, game artwork or plain), how strong the colours are, how blurred the artwork is (off, light, medium or strong) and whether it sits at the top or the bottom of the screen, the SteamGridDB key, on / off switches for the battery and Wi-Fi display, the store filter and the quick actions, **Open Handheld Optimiser** to bring up the main app (Windows asks for administrator permission; if the app is already open it just comes to the front), and **Quit** to close the library.
+- Choose game artwork there, or switch on **Use game artwork as the library background** under **Full Screen Mode**, to show the game's whole banner artwork across the top or bottom of the screen, fading into its colours. Steam games use the artwork Steam already keeps on disk. For the other stores, enter a free [SteamGridDB](https://www.steamgriddb.com) API key and the library fetches each game's artwork once and keeps it in `%LOCALAPPDATA%\HandheldOptimiser\artwork`. Only then does the library contact SteamGridDB, sending the titles of those games to find them. Its only other use of the internet is the check for a newer release. A game with no artwork keeps its gradient. If a game gets the wrong picture or the wrong cover, **Background artwork** in its quick actions lets you give the title to look both up by.
+- **Box art for every store.** Steam games show the cover Steam keeps on disk. With a free [SteamGridDB](https://www.steamgriddb.com) API key entered, games from the other stores (Xbox and Game Pass, Epic, GOG, Battle.net, EA, Ubisoft) get a portrait cover too, in place of their icon. Covers are fetched once, a few at a time when the library opens, and kept in `%LOCALAPPDATA%\HandheldOptimiser\artwork`. This happens whatever background you chose: once a key is set, the titles of games without a cover are sent to SteamGridDB to find them. A game SteamGridDB has no cover for keeps its icon.
 
 | | RAM |
 |---|---|
@@ -133,8 +145,8 @@ One-off jobs, each run with a button:
 ### Game Runtimes
 Scans for the Visual C++, DirectX, .NET, XNA, OpenAL and PhysX runtimes games depend on, and installs or updates them through winget.
 
-### ASUS & Health
-Checks that ASUS, AMD, Realtek, Defender, Windows Update and Game Pass services are running, and can re-enable any that were disabled by other tools.
+### Device & System Health
+Checks that your handheld's own services (Armoury Crate on a ROG Ally, Legion Space on a Legion Go, MSI Center M on an MSI Claw) and the AMD, Realtek, Defender, Windows Update and Game Pass services are running, and can re-enable any that were disabled by other tools.
 
 ## Updating
 

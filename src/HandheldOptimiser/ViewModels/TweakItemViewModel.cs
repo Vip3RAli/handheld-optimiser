@@ -43,6 +43,12 @@ public sealed partial class TweakItemViewModel : ObservableObject
     public bool HasWarning => !string.IsNullOrWhiteSpace(Tweak.Warning);
     public bool RequiresReboot => Tweak.RequiresReboot;
 
+    /// <summary>False when the tweak works around a fault on one device family and this is another device.</summary>
+    public bool IsForThisDevice => _engine.IsForThisDevice(Tweak);
+
+    public bool HasDeviceBadge => !IsForThisDevice;
+    public string DeviceBadge => Tweak.OnlyFor is { } device ? $"{device.DisplayName()} only" : string.Empty;
+
     public string RiskBadge => Tweak.Risk switch
     {
         RiskLevel.Safe => "Safe",
@@ -104,11 +110,21 @@ public sealed partial class TweakItemViewModel : ObservableObject
 
         var turningOn = IsOn;
 
-        if (turningOn && Tweak.Risk is RiskLevel.SecurityTradeoff or RiskLevel.Breaking)
+        if (turningOn && (Tweak.Risk is RiskLevel.SecurityTradeoff or RiskLevel.Breaking || !IsForThisDevice))
         {
+            string?[] parts =
+            [
+                Tweak.Description,
+                Tweak.Warning,
+                IsForThisDevice
+                    ? null
+                    : $"This works around a {Tweak.OnlyFor?.DisplayName()} fault, and this device is not a " +
+                      $"{Tweak.OnlyFor?.DisplayName()}. Only apply it if you know this device has the same problem."
+            ];
+
             var confirmed = await _shell.ConfirmAsync(
                 Tweak.Name,
-                $"{Tweak.Description}\n\n{Tweak.Warning}",
+                string.Join("\n\n", parts.Where(p => !string.IsNullOrWhiteSpace(p))),
                 "Apply anyway");
 
             if (!confirmed)

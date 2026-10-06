@@ -65,6 +65,20 @@ public partial class LibraryWindow : Window
     private string? _backdropKey;
     private CancellationTokenSource? _backdropLoad;
 
+    // Few enough at once to be polite to SteamGridDB, enough that a new library fills in a minute.
+    private const int CoverFetchesAtOnce = 3;
+
+    // Games SteamGridDB has been asked about since the library opened. It stays open for days and
+    // rescans every couple of minutes, so without this a game that cannot be fetched would be asked for
+    // again on every scan.
+    private readonly HashSet<string> _coversAsked = new(StringComparer.OrdinalIgnoreCase);
+    private string? _coversAskedWith;
+    private bool _fetchingCovers;
+    private bool _fetchCoversAgain;
+
+    // The API key SteamGridDB turned away, so nothing more is asked for until the player changes it.
+    private string? _rejectedKey;
+
     // The player's choices, from the settings menu here or the main app.
     private BackgroundKind _background = LibrarySettings.Background;
     private ColourStrength _strength = LibrarySettings.Strength;
@@ -226,6 +240,101 @@ public partial class LibraryWindow : Window
         }
 
         RestoreFocus();
+        _ = FetchCoversAsync();
+    }
+
+    /// <summary>
+    /// Gives a cover to every game whose store keeps none, from disk if it was fetched before and from
+    /// SteamGridDB otherwise. Each tile changes as its own cover arrives; the grid is never rebuilt, so
+    /// the focus and the scroll position stay where they are.
+    /// </summary>
+    private async Task FetchCoversAsync()
+    {
+        if (_fetchingCovers)
+        {
+            // Something changed while covers were on their way; go round again once they are in.
+            _fetchCoversAgain = true;
+            return;
+        }
+
+        var apiKey = LibrarySettings.ArtworkKey;
+        var mayAsk = apiKey is not null && apiKey != _rejectedKey;
+
+        // A different key, set here or in the main app, may get what the last one could not.
+        if (apiKey != _coversAskedWith)
+        {
+            _coversAsked.Clear();
+            _coversAskedWith = apiKey;
+        }
+
+        // A cover already on disk needs no key and no request. This also catches one that finished
+        // downloading for a tile a rescan has since replaced.
+        var wanted = _allTiles
+            .Where(t => t.NeedsCover && (Artwork.CachedCover(t.Game) is not null || (mayAsk && _coversAsked.Add(t.Game.Key))))
+            .ToList();
+
+        if (wanted.Count == 0)
+        {
+            return;
+        }
+
+        _fetchingCovers = true;
+        try
+        {
+            using var slots = new SemaphoreSlim(CoverFetchesAtOnce);
+
+            await Task.WhenAll(wanted.Select(async tile =>
+            {
+                await slots.WaitAsync();
+                try
+                {
+                    if (_rejectedKey is not null && _rejectedKey == apiKey && Artwork.CachedCover(tile.Game) is null)
+                    {
+                        return;
+                    }
+
+                    // Downloaded, decoded and its colours taken off the UI thread; only the swap happens here.
+                    var (cover, colours, keyRejected) = await Task.Run(async () =>
+                    {
+                        var (path, rejected) = await Artwork.FindCoverAsync(tile.Game);
+                        var image = path is null ? null : GameTile.LoadCover(path);
+                        return (image, Palette.Colours(image), rejected);
+                    });
+
+                    if (keyRejected)
+                    {
+                        _rejectedKey = apiKey;
+                    }
+
+                    if (cover is null)
+                    {
+                        return;
+                    }
+
+                    tile.ShowCover(cover, colours);
+
+                    // The colours behind the grid came from the icon, so take them from the cover now.
+                    if (tile.Game.Key == _focusedKey)
+                    {
+                        ReloadBackdrop();
+                    }
+                }
+                finally
+                {
+                    slots.Release();
+                }
+            }));
+        }
+        finally
+        {
+            _fetchingCovers = false;
+        }
+
+        if (_fetchCoversAgain)
+        {
+            _fetchCoversAgain = false;
+            _ = FetchCoversAsync();
+        }
     }
 
     /// <summary>Stores with at least one installed game, in the order their tabs are shown.</summary>
@@ -764,7 +873,7 @@ public partial class LibraryWindow : Window
         var canLookUp = Artwork.HasApiKey;
         ArtworkItem.Visibility = _background == BackgroundKind.Artwork ? Visibility.Visible : Visibility.Collapsed;
         ArtworkItem.IsEnabled = canLookUp;
-        ArtworkItem.Tag = !canLookUp ? "Add a SteamGridDB key in Settings to change this"
+        ArtworkItem.Tag = !canLookUp ? "Add a free SteamGridDB key in Settings to change this"
             : Artwork.SearchTitle(game) is { } corrected ? $"Looked up as \"{corrected}\""
             : game.HeroPath is not null ? "Steam's own artwork. Enter a title to look it up instead"
             : "Looked up by the game's own title";
@@ -902,7 +1011,7 @@ public partial class LibraryWindow : Window
 
         // Only the end of the key is shown: enough to tell which one it is.
         ArtworkKeySetting.Visibility = _background == BackgroundKind.Artwork ? Visibility.Visible : Visibility.Collapsed;
-        ArtworkKeySetting.Tag = LibrarySettings.ArtworkKey is not { } key ? "Not set. Steam games still show their artwork"
+        ArtworkKeySetting.Tag = LibrarySettings.ArtworkKey is not { } key ? "Not set. Free to create at steamgriddb.com"
             : key.Length > 4 ? $"Set, ending in {key[^4..]}"
             : "Set";
     }
@@ -944,6 +1053,32 @@ public partial class LibraryWindow : Window
     private void OnCycleBlur(object sender, RoutedEventArgs e) => StepBlur(1);
 
     private void OnCyclePosition(object sender, RoutedEventArgs e) => StepPosition(1);
+
+    /// <summary>
+    /// Opens the main app over the library, which stays open behind it. If it is already open it is
+    /// brought to the front instead, with no second copy and no administrator prompt.
+    /// </summary>
+    private void OnOpenMainApp(object sender, RoutedEventArgs e)
+    {
+        CloseMenu();
+
+        if (MainApp.ShowIfRunning())
+        {
+            Program.Log("Switched to the main app, which was already open");
+            StatusText.Text = "Handheld Optimiser is already open.";
+            return;
+        }
+
+        if (MainApp.Start() is { } problem)
+        {
+            Program.Log($"Could not open the main app from settings: {problem}");
+            StatusText.Text = $"Handheld Optimiser was not opened: {problem}";
+            return;
+        }
+
+        Program.Log("Opened the main app from settings");
+        StatusText.Text = "Opening Handheld Optimiser...";
+    }
 
     /// <summary>Closes the library. Windows starts it again on the next home button press.</summary>
     private void OnQuit(object sender, RoutedEventArgs e)
@@ -1025,7 +1160,7 @@ public partial class LibraryWindow : Window
 
     private void OnEditArtworkKey(object sender, RoutedEventArgs e) =>
         BeginEdit(MenuEditor.ArtworkKey, "SteamGridDB API key",
-            "From steamgriddb.com, under Preferences then API. It fetches artwork for games outside Steam, whose titles are sent to SteamGridDB to find it. Leave empty to remove the key.",
+            "Free to create at steamgriddb.com, under Preferences then API. It fetches covers and background artwork for games outside Steam, whose titles are sent to SteamGridDB to find them. Leave empty to remove the key.",
             LibrarySettings.ArtworkKey);
 
     /// <summary>The open list of rows, which is also where cancelling the text box goes back to.</summary>
@@ -1145,11 +1280,14 @@ public partial class LibraryWindow : Window
         var text = EditorBox.Text.Trim();
         if (editor == MenuEditor.ArtworkKey)
         {
-            // Back to the settings list, with the focused game's artwork looked up under the new key.
+            // Back to the settings list, with the focused game's artwork looked up under the new key,
+            // and the covers that the old key (or having none) could not get.
             LibrarySettings.ArtworkKey = text;
+            _coversAsked.Clear();
             RefreshSettings();
             ShowMenuItems();
             ReloadBackdrop();
+            _ = FetchCoversAsync();
             return;
         }
 
@@ -1170,6 +1308,15 @@ public partial class LibraryWindow : Window
         else
         {
             var saved = Artwork.SaveSearchTitle(tile.Game, text);
+
+            // The cover was looked up under the old title too, so it goes back to the icon until the
+            // new title's cover arrives.
+            if (saved)
+            {
+                tile.ClearFetchedCover();
+                _coversAsked.Remove(tile.Game.Key);
+                _ = FetchCoversAsync();
+            }
 
             // Closing the menu puts focus back on the tile, which loads its background again.
             _backdropKey = null;

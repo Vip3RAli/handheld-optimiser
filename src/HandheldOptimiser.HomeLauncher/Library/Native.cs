@@ -46,6 +46,74 @@ internal static partial class Native
 
     public const int AsfwAny = -1;
 
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool SetForegroundWindow(nint window);
+
+    [LibraryImport("user32.dll", EntryPoint = "RegisterWindowMessageW", StringMarshalling = StringMarshalling.Utf16)]
+    private static partial uint RegisterWindowMessage(string name);
+
+    /// <summary>
+    /// Puts a window of the main app in front. Windows only allows this from the program the player is
+    /// using, which the library is when a menu row is pressed.
+    ///
+    /// The main app runs as administrator and the library does not, so Windows will not let the library
+    /// restore that window if it is minimised. The window is asked to restore itself instead, with a
+    /// message the main app has agreed to take from the library (<paramref name="showMessage"/>); an
+    /// older main app ignores it and is simply brought forward as it is.
+    /// </summary>
+    /// <returns>False when Windows would not give the window the foreground.</returns>
+    public static bool BringToFront(nint window, int processId, string showMessage)
+    {
+        AllowSetForegroundWindow(processId);
+
+        if (RegisterWindowMessage(showMessage) is var message and not 0)
+        {
+            PostMessage(window, message, 0, 0);
+        }
+
+        return SetForegroundWindow(window);
+    }
+
+    private const uint ProcessQueryLimitedInformation = 0x1000;
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    private static partial nint OpenProcess(uint access, [MarshalAs(UnmanagedType.Bool)] bool inheritHandle, int processId);
+
+    [LibraryImport("kernel32.dll", EntryPoint = "QueryFullProcessImageNameW", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static unsafe partial bool QueryFullProcessImageName(nint process, uint flags, char* name, ref uint size);
+
+    [LibraryImport("kernel32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool CloseHandle(nint handle);
+
+    /// <summary>
+    /// The exe a process was started from, or null when it cannot be read. Asks only for the limited
+    /// information any program may have about another, so it also works for one running as
+    /// administrator, which Process.MainModule does not.
+    /// </summary>
+    public static unsafe string? ProcessPath(int processId)
+    {
+        var process = OpenProcess(ProcessQueryLimitedInformation, false, processId);
+        if (process == 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            const int Capacity = 1024;
+            var name = stackalloc char[Capacity];
+            uint length = Capacity;
+            return QueryFullProcessImageName(process, 0, name, ref length) ? new string(name, 0, (int)length) : null;
+        }
+        finally
+        {
+            CloseHandle(process);
+        }
+    }
+
     [LibraryImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static partial bool SetProcessWorkingSetSize(nint process, nint minimum, nint maximum);

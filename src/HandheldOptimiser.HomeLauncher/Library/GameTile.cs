@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.IO;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -7,16 +8,21 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 /// <summary>
 /// What one tile shows. Built off the UI thread with frozen images, decoded at tile size so a large
 /// library costs a few MB of pixels rather than the full-size artwork.
+///
+/// Only the cover ever changes afterwards: a game whose store keeps none starts on its icon and takes
+/// the cover fetched for it when that arrives, without the grid being rebuilt around it.
 /// </summary>
-internal sealed class GameTile
+internal sealed class GameTile : INotifyPropertyChanged
 {
     // Tiles are 180 x 270 DIPs; 360 px wide covers up to 200% scaling.
     private const int CoverDecodeWidth = 360;
     private const int IconSize = 256;
 
+    public event PropertyChangedEventHandler? PropertyChanged;
+
     public required Game Game { get; init; }
-    public ImageSource? Cover { get; init; }
-    public ImageSource? Icon { get; init; }
+    public ImageSource? Cover { get; private set; }
+    public ImageSource? Icon { get; private set; }
     public required Brush Background { get; init; }
 
     public string Title => Game.Title;
@@ -24,13 +30,17 @@ internal sealed class GameTile
     public bool HasCover => Cover is not null;
     public bool ShowsIcon => Cover is null;
 
+    /// <summary>Whether this is a game whose store keeps no cover and that has not been given one yet.</summary>
+    public bool NeedsCover => Game.CoverPath is null && Cover is null;
+
     /// <summary>The two ends of the gradient behind the grid while this game has the focus.</summary>
-    public required (Color From, Color To) BackdropColours { get; init; }
+    public (Color From, Color To) BackdropColours { get; private set; }
 
     public static GameTile Create(Game game)
     {
-        var cover = game.CoverPath is null ? null : LoadCover(game.CoverPath);
-        var icon = game.CoverPath is null && game.IconPath is not null ? LoadIcon(game.IconPath) : null;
+        // A cover fetched on an earlier run is on disk already, so the tile opens with it.
+        var cover = (game.CoverPath ?? Artwork.CachedCover(game)) is { } path ? LoadCover(path) : null;
+        var icon = cover is null && game.IconPath is not null ? LoadIcon(game.IconPath) : null;
 
         return new()
         {
@@ -42,13 +52,46 @@ internal sealed class GameTile
         };
     }
 
+    /// <summary>
+    /// Swaps the icon for a cover that has just been fetched, taking the backdrop colours from it too.
+    /// Call it on the UI thread, with the picture and its colours already worked out elsewhere.
+    /// </summary>
+    public void ShowCover(ImageSource cover, (Color From, Color To)? colours)
+    {
+        Cover = cover;
+        BackdropColours = colours ?? BackdropColours;
+        CoverChanged();
+    }
+
+    /// <summary>Goes back to the icon, for a fetched cover that turned out to be the wrong game's.</summary>
+    public void ClearFetchedCover()
+    {
+        if (Game.CoverPath is not null || Cover is null)
+        {
+            return;
+        }
+
+        Cover = null;
+        Icon ??= Game.IconPath is not null ? LoadIcon(Game.IconPath) : null;
+        BackdropColours = Palette.Colours(Icon) ?? StoreColours(Game.Store);
+        CoverChanged();
+    }
+
+    private void CoverChanged()
+    {
+        foreach (var name in new[] { nameof(Cover), nameof(Icon), nameof(HasCover), nameof(ShowsIcon) })
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        }
+    }
+
     // Xbox games ship their logo as a png rather than inside an exe or .ico.
     private static ImageSource? LoadIcon(string path) =>
         Path.GetExtension(path).Equals(".png", StringComparison.OrdinalIgnoreCase)
             ? LoadCover(path, decodeWidth: 0)
             : Native.LoadIcon(path, IconSize);
 
-    private static ImageSource? LoadCover(string path, int decodeWidth = CoverDecodeWidth)
+    public static ImageSource? LoadCover(string path, int decodeWidth = CoverDecodeWidth)
     {
         try
         {

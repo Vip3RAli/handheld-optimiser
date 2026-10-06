@@ -17,6 +17,86 @@
                  DynamicResource matches how every other accent brush in the theme is declared. -->
             <SolidColorBrush x:Key="BadgeBackground" Color="{DynamicResource SystemAccentColorPrimary}" />
 
+            <!--
+                The look, set once. WPF-UI reads these keys with DynamicResource, so redefining them here
+                changes every card, button and text box in the app without restyling any of them.
+                Cards are see-through dark grey with a faint light edge, so the window's Mica backdrop shows
+                behind them and they still read as raised. Everything has the same 8 px corner.
+            -->
+            <CornerRadius x:Key="ControlCornerRadius">8</CornerRadius>
+            <SolidColorBrush x:Key="CardBackground" Color="#A61E1E1E" />
+            <SolidColorBrush x:Key="CardBorderBrush" Color="#1FFFFFFF" />
+
+            <!-- Segoe UI Variable is Windows 11's own font; Segoe UI stands in on Windows 10. -->
+            <FontFamily x:Key="ContentControlThemeFontFamily">Segoe UI Variable Text, Segoe UI</FontFamily>
+            <FontFamily x:Key="AppFont">Segoe UI Variable Text, Segoe UI</FontFamily>
+            <FontFamily x:Key="AppDisplayFont">Segoe UI Variable Display, Segoe UI</FontFamily>
+
+            <!-- The brand cyan, for accents drawn by hand rather than by a themed control. Cyan is a light
+                 colour, so anything written on a cyan fill is dark, as the themed primary buttons are. -->
+            <SolidColorBrush x:Key="BrandAccent" Color="#22D3EE" />
+            <SolidColorBrush x:Key="BrandAccentStrong" Color="#06B6D4" />
+            <SolidColorBrush x:Key="BrandOnAccent" Color="#06222B" />
+
+            <!-- For panels that are plain Borders rather than ui:Card, so they match the cards. -->
+            <Style x:Key="Panel" TargetType="Border">
+                <Setter Property="Background" Value="{DynamicResource CardBackground}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="8" />
+            </Style>
+
+            <!--
+                A pill: the tabs across the top of a section, and the one-click button. A plain Button with
+                its own template, because the rounded-rectangle look of the themed button is the thing
+                being replaced.
+            -->
+            <Style x:Key="Pill" TargetType="Button">
+                <Setter Property="MinHeight" Value="40" />
+                <Setter Property="Padding" Value="18,0" />
+                <Setter Property="FontSize" Value="13.5" />
+                <Setter Property="Foreground" Value="#F2FFFFFF" />
+                <Setter Property="Background" Value="#14FFFFFF" />
+                <Setter Property="BorderBrush" Value="#1FFFFFFF" />
+                <Setter Property="Cursor" Value="Hand" />
+                <!-- Half the height, for fully round ends. A larger figure does not do it: WPF scales an
+                     oversized radius down unevenly and the ends come out as part of an ellipse. -->
+                <Setter Property="Border.CornerRadius" Value="20" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Shape"
+                                    CornerRadius="{TemplateBinding Border.CornerRadius}"
+                                    Padding="{TemplateBinding Padding}"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="1">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Shape" Property="Opacity" Value="0.85" />
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="Shape" Property="Opacity" Value="0.7" />
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter TargetName="Shape" Property="Opacity" Value="0.4" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="AccentPill" TargetType="Button" BasedOn="{StaticResource Pill}">
+                <Setter Property="MinHeight" Value="56" />
+                <Setter Property="Border.CornerRadius" Value="28" />
+                <Setter Property="Background" Value="{StaticResource BrandAccentStrong}" />
+                <Setter Property="BorderBrush" Value="Transparent" />
+                <Setter Property="Foreground" Value="{StaticResource BrandOnAccent}" />
+            </Style>
+
             <Style TargetType="{x:Type ui:FontIcon}">
                 <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" />
             </Style>
