@@ -70,15 +70,15 @@ One-Click Optimise includes turning off **Memory Integrity**, which is usually t
 | Page | Tweaks |
 |---|---|
 | **Gaming Tweaks** | Disable Memory Integrity (HVCI) · Disable Virtual Machine Platform & VBS · Disable Game DVR background recording · Remove the Windows startup delay |
-| **System Debloat** | Disable telemetry · Disable web results in Start search · Disable Cortana & Copilot · Stop app suggestions and silent reinstalls · Stop Store apps running in the background |
+| **System Debloat** | Disable telemetry · Disable web results in Start search · Disable Cortana & Copilot · Stop app suggestions and silent reinstalls · Hide ads in Start, Settings and File Explorer · Turn off Widgets · Stop Edge running in the background · Turn off activity history and tailored experiences · Turn off Windows Error Reporting · Turn off OneDrive · Stop Store apps running in the background |
 | **CPU & Kernel** | Maximise foreground priority, so the game gets the CPU ahead of background work |
 | **Network** | Disable network throttling · Disable the network data usage monitor · Turn off update sharing with other PCs |
 | **Deep Services** | Disable SysMain, Search Indexer, Print Spooler & Fax, Program Compatibility Assistant, Distributed Link Tracking, and other services a handheld does not use |
 | **Interface** | Instant menus · Disable edge swipe gestures · Disable transparency and window animations |
-| **Storage** | Disable last access timestamps · Disable 8.3 short file names |
+| **Storage** | Disable last access timestamps · Disable 8.3 short file names · Turn off reserved storage |
 | **Graphics & Scheduling** | Force Game Mode on · Optimise windowed and borderless games · Enable hardware-accelerated GPU scheduling |
 | **Handheld Usability** | Disable the Sticky Keys and Filter Keys shortcuts · Disable power throttling |
-| **Sleep & Battery** | Hibernate after 15 minutes of sleep · Turn Wi-Fi off during sleep · Only the power button wakes the handheld · Turn off the SD card reader (ROG Ally only) |
+| **Sleep & Battery** | Hibernate after 15 minutes of sleep · Turn Wi-Fi off during sleep · Only the power button wakes the handheld · Turn off the SD card reader (ROG Ally only) · Turn off Fast Startup |
 | **Full Screen Mode** | Choose the home app · Use Handheld Optimiser as the home app · Enter full screen mode at sign-in |
 
 ### Full Screen Mode (Xbox mode home app)

@@ -119,7 +119,8 @@ public partial class LibraryWindow : Window
 
         try
         {
-            var tiles = await Task.Run(() => GameCatalog.Scan().Select(GameTile.Create).ToList());
+            var previous = _allTiles;
+            var tiles = await Task.Run(() => GameTile.ForScan(GameCatalog.Scan(), previous));
             _lastScan = DateTime.UtcNow;
 
             // Rebuilding the tiles resets scrolling, so only do it when something changed.
