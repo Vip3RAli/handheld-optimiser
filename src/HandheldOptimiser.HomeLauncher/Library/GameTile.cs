@@ -164,7 +164,8 @@ internal sealed class GameTile : INotifyPropertyChanged
         [GameStore.Gog] = Gradient("#7A2F80", "#2C1030"),
         [GameStore.Ea] = Gradient("#E0442E", "#4A1410"),
         [GameStore.Ubisoft] = Gradient("#0070D1", "#061C3A"),
-        [GameStore.Other] = Gradient("#4A5060", "#1A1D24")
+        [GameStore.Other] = Gradient("#4A5060", "#1A1D24"),
+        [GameStore.Emulator] = Gradient("#B8336A", "#3A0F22")
     };
 
     // A game with no usable cover or icon takes its store's colours.

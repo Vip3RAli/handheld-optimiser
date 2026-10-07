@@ -50,7 +50,11 @@ internal static partial class SteamLibrary
         }
     }
 
-    private static string? ReadSteamExe()
+    /// <summary>The folder Steam is installed in, or null when Steam is not installed.</summary>
+    public static string? SteamDirectory() => ReadSteamExe() is { } exe ? Path.GetDirectoryName(exe) : null;
+
+    /// <summary>Steam's own exe, or null when Steam is not installed.</summary>
+    public static string? ReadSteamExe()
     {
         using var key = Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam");
         return key?.GetValue("SteamExe") is string exe && File.Exists(exe) ? Path.GetFullPath(exe) : null;

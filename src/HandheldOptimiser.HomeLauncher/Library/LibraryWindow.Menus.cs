@@ -34,7 +34,7 @@ public partial class LibraryWindow
         HideMenuLists();
 
         MenuTitle.Text = tile.Title;
-        MenuStore.Text = tile.StoreName;
+        MenuStore.Text = GameSubtitle(tile);
         RefreshGameItems(tile);
 
         MenuOverlay.Visibility = Visibility.Visible;
@@ -44,11 +44,21 @@ public partial class LibraryWindow
     /// <summary>Every list the overlay can show, collapsed, before one of them is opened.</summary>
     private void HideMenuLists()
     {
-        foreach (var list in new[] { GameItems, ProfileItems, SettingsItems, BackgroundItems, DisplayItems, AddItems, PowerItems, QuickItems })
+        foreach (var list in new[]
+        {
+            GameItems, ProfileItems, SettingsItems, BackgroundItems, DisplayItems, AddItems, PowerItems, QuickItems,
+            WhilePlayingItems, AppsToCloseItems, RunningAppsItems, MaintenanceItems, StartupItems, EmulatorItems
+        })
         {
             list.Visibility = Visibility.Collapsed;
         }
     }
+
+    /// <summary>The store, and how long the game has been played: "Steam   12 h 5 min played, last played today".</summary>
+    private string GameSubtitle(GameTile tile) =>
+        _stats.GetValueOrDefault(tile.Game.Key).Describe(DateTimeOffset.UtcNow) is { } played
+            ? $"{tile.StoreName}   {played}"
+            : $"{tile.StoreName}   Not played from the library yet";
 
     /// <summary>What each quick action will do for this game, on the rows' detail lines.</summary>
     private void RefreshGameItems(GameTile tile)

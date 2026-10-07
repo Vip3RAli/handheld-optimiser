@@ -7,10 +7,13 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 /// The settings a game is played with, switched to when it starts from the library. A null part leaves
 /// that setting as it is.
 /// </summary>
-internal sealed record GameProfile(PowerMode? PowerMode, int? RefreshRate, int? Brightness)
+/// <param name="CloseApps">Whether to close the background programs for this game, whatever the library's
+/// own setting. Null follows that setting.</param>
+internal sealed record GameProfile(PowerMode? PowerMode, int? RefreshRate, int? Brightness, bool? CloseApps = null)
 {
     public static readonly GameProfile None = new(null, null, null);
 
+    /// <summary>Whether it changes any of the device's settings, which are put back after the game.</summary>
     public bool IsEmpty => PowerMode is null && RefreshRate is null && Brightness is null;
 
     /// <summary>A one-line summary for the quick actions menu.</summary>
@@ -30,6 +33,11 @@ internal sealed record GameProfile(PowerMode? PowerMode, int? RefreshRate, int? 
         if (Brightness is { } brightness)
         {
             parts.Add($"{brightness}% brightness");
+        }
+
+        if (CloseApps is { } close)
+        {
+            parts.Add(close ? "closes background programs" : "leaves background programs running");
         }
 
         return parts.Count == 0 ? "Not set. Plays with your current settings" : string.Join(", ", parts);
@@ -62,6 +70,7 @@ internal static class GameProfiles
         PowerMode? mode = null;
         int? hertz = null;
         int? brightness = null;
+        bool? closeApps = null;
 
         foreach (var part in text.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
@@ -77,10 +86,13 @@ internal static class GameProfiles
                 case "brightness" when int.TryParse(value, out var parsed) && parsed is >= 0 and <= 100:
                     brightness = parsed;
                     break;
+                case "closeapps" when value is "on" or "off":
+                    closeApps = value == "on";
+                    break;
             }
         }
 
-        return new GameProfile(mode, hertz, brightness);
+        return new GameProfile(mode, hertz, brightness, closeApps);
     }
 
     /// <returns>False when the profile could not be stored.</returns>
@@ -100,6 +112,11 @@ internal static class GameProfiles
         if (profile.Brightness is { } brightness)
         {
             parts.Add($"brightness={brightness}");
+        }
+
+        if (profile.CloseApps is { } close)
+        {
+            parts.Add($"closeapps={(close ? "on" : "off")}");
         }
 
         try
