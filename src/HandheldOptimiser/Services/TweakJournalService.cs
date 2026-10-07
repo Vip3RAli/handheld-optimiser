@@ -21,7 +21,7 @@ namespace HandheldOptimiser.Services;
 /// user who applied them. A registry value is also replaced in one step, so a crash mid-save leaves the
 /// previous journal intact.
 /// </summary>
-public sealed class TweakJournalService(LogService log)
+public sealed class TweakJournalService(LogService log) : ITweakJournal
 {
     private const string JournalKey = @"SOFTWARE\HandheldOptimiser\UndoJournal";
 
