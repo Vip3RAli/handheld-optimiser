@@ -237,12 +237,12 @@ public sealed class SafetyGuardTests
         var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
 
-        Assert.True(SafetyGuard.IsDeletionAllowed(Path.Combine(local, "D3DSCache", "abc"), out _));
-        Assert.True(SafetyGuard.IsDeletionAllowed(Path.Combine(local, "AMD", "DxCache"), out _));
+        Assert.True(SafetyGuard.IsDeletionAllowed(System.IO.Path.Combine(local, "D3DSCache", "abc"), out _));
+        Assert.True(SafetyGuard.IsDeletionAllowed(System.IO.Path.Combine(local, "AMD", "DxCache"), out _));
 
-        Assert.False(SafetyGuard.IsDeletionAllowed(Path.Combine(local, "AMD"), out _));
-        Assert.False(SafetyGuard.IsDeletionAllowed(Path.Combine(windows, "System32"), out _));
-        Assert.False(SafetyGuard.IsDeletionAllowed(Path.Combine(local, "D3DSCacheExtra"), out _));
-        Assert.False(SafetyGuard.IsDeletionAllowed(Path.Combine(local, "D3DSCache", "..", "..", "Roaming"), out _));
+        Assert.False(SafetyGuard.IsDeletionAllowed(System.IO.Path.Combine(local, "AMD"), out _));
+        Assert.False(SafetyGuard.IsDeletionAllowed(System.IO.Path.Combine(windows, "System32"), out _));
+        Assert.False(SafetyGuard.IsDeletionAllowed(System.IO.Path.Combine(local, "D3DSCacheExtra"), out _));
+        Assert.False(SafetyGuard.IsDeletionAllowed(System.IO.Path.Combine(local, "D3DSCache", "..", "..", "Roaming"), out _));
     }
 }
