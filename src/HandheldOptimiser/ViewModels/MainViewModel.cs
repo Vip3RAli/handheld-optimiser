@@ -18,7 +18,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
     /// <summary>Every page, in the order they are built. The sidebar shows them through <see cref="Groups"/>.</summary>
     public ObservableCollection<PageViewModelBase> Pages { get; } = [];
 
-    /// <summary>The sidebar: four groups, each showing its pages as tabs.</summary>
+    /// <summary>The sidebar: five groups, each showing its pages as tabs.</summary>
     public ObservableCollection<NavGroup> Groups { get; } = [];
 
     [ObservableProperty]
@@ -78,6 +78,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         StartupService startupService,
         TweakJournalService journal,
         RuntimeService runtimeService,
+        UpdateSources updateSources,
         UpdateService updates)
     {
         Log = log;
@@ -179,6 +180,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         Pages.Add(new PowerActionsViewModel(engine, this));
         Pages.Add(new GameRuntimesViewModel(runtimeService, this));
         Pages.Add(new DeviceHealthViewModel(systemState, this));
+        Pages.Add(new UpdatesViewModel(updateSources, restorePoints, log, this));
 
         // Looked up by title so a page that is renamed or removed fails here, at start-up, rather than
         // quietly dropping out of the sidebar.
@@ -213,6 +215,8 @@ public sealed partial class MainViewModel : ObservableObject, IShell
             Page("Device & System Health"),
             Page("Handheld Usability")
         ]));
+
+        Groups.Add(new NavGroup("Updates", Page("Updates").Glyph, [Page("Updates")]));
 
         SelectedGroup = Groups[0];
     }

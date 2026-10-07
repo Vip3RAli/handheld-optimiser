@@ -43,6 +43,9 @@
         <DataTemplate DataType="{x:Type vm:GameRuntimesViewModel}">
             <pages:GameRuntimesPage />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:UpdatesViewModel}">
+            <pages:UpdatesPage />
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:HomeAppPickerViewModel}">
             <pages:HomeAppPicker />
         </DataTemplate>
@@ -112,7 +115,7 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <!-- Four groups, each a row tall enough for a thumb, with a cyan bar beside the open one. -->
+            <!-- Five groups, each a row tall enough for a thumb, with a cyan bar beside the open one. -->
             <Border Grid.Column="0" Style="{StaticResource Panel}" Padding="8">
                 <ListBox ItemsSource="{Binding Groups}"
                          SelectedItem="{Binding SelectedGroup, Mode=TwoWay}"
