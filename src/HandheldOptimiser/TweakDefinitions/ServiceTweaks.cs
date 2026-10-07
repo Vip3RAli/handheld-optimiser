@@ -29,8 +29,8 @@ public static class ServiceTweaks
         id: "services.pcasvc",
         name: "Disable Program Compatibility Assistant",
         description:
-            "Stops the service that watches every program launch for known compatibility problems. It runs " +
-            "constantly and has no role in games, which ship their own compatibility handling.",
+            "Stops the service that checks every program launch for compatibility problems. Games do not " +
+            "need it.",
         risk: RiskLevel.Safe,
         warning: null,
         includeInOneClick: true,
@@ -40,8 +40,8 @@ public static class ServiceTweaks
         id: "services.trkwks",
         name: "Disable Distributed Link Tracking",
         description:
-            "Stops the service that repairs shortcuts when their target moves to another NTFS drive or " +
-            "network share. Nothing on a single-drive handheld relies on it.",
+            "Stops the service that repairs shortcuts when their target moves to another drive or " +
+            "network share. A single-drive handheld does not need it.",
         risk: RiskLevel.Safe,
         warning: null,
         includeInOneClick: true,
@@ -49,22 +49,22 @@ public static class ServiceTweaks
 
     /// <summary>
     /// All of these are Manual and stopped on a stock Ally, so disabling them frees nothing at runtime.
-    /// The value is that nothing can start them later. Kept as one toggle and out of One-Click Optimise so it is
+    /// The value is that nothing can start them later. Kept as one toggle and out of Apply Optimised Tweaks so it is
     /// not mistaken for a performance change.
     /// </summary>
     public static Tweak UnusedHandheldServices => DisableServices(
         id: "services.unused",
         name: "Disable unused handheld services",
         description:
-            "Retail Demo, Wallet, Payments & NFC, Phone Service, Downloaded Maps Manager, Internet Connection " +
-            "Sharing, Mobile Hotspot, Windows Insider, Parental Controls, Media Player Network Sharing and the " +
-            "ActiveX Installer. These normally sit stopped, so this is tidying rather than a performance gain: " +
-            "it just stops anything waking them up.",
+            "Disables Retail Demo, Wallet, Payments & NFC, Phone Service, Downloaded Maps Manager, " +
+            "Internet Connection Sharing, Mobile Hotspot, Windows Insider, Parental Controls, Media " +
+            "Player Network Sharing and the ActiveX Installer. They normally sit stopped, so this is " +
+            "tidying, not a performance gain.",
         risk: RiskLevel.Moderate,
         warning:
-            "Mobile Hotspot and Internet Connection Sharing stop working, calls through Phone Link stop, " +
-            "offline maps no longer update, Microsoft Family parental controls are not enforced on this device, " +
-            "and Windows Insider builds cannot be received.",
+            "Mobile Hotspot, Internet Connection Sharing and Phone Link calls stop working, offline maps " +
+            "stop updating, Microsoft Family parental controls are not enforced, and Windows Insider " +
+            "builds cannot be received.",
         includeInOneClick: false,
         services:
         [
@@ -85,8 +85,8 @@ public static class ServiceTweaks
         id: "services.sysmain",
         name: "Disable SysMain (SuperFetch)",
         description:
-            "Stops Windows preloading frequently used apps into RAM. On an NVMe drive the benefit is small, " +
-            "and on a 16 GB handheld that memory is better left free for the game and the iGPU.",
+            "Stops Windows preloading frequently used apps into RAM, leaving that memory free for the " +
+            "game and the iGPU.",
         risk: RiskLevel.Safe,
         warning: null,
         includeInOneClick: true,
@@ -96,13 +96,13 @@ public static class ServiceTweaks
         id: "services.wsearch",
         name: "Disable Search Indexer",
         description:
-            "Stops the Windows Search service indexing files in the background, which removes a steady " +
-            "source of SSD reads and CPU wake-ups.",
+            "Stops Windows indexing files in the background, removing a steady source of SSD reads and " +
+            "CPU wake-ups.",
         risk: RiskLevel.Moderate,
         warning:
-            "Searching for files and file contents in Start and File Explorer becomes slower, and apps that " +
-            "rely on the index (Outlook search, for example) will return fewer results. Launching apps from " +
-            "Start by name still works.",
+            "File and content searches in Start and File Explorer get slower, and apps that rely on the " +
+            "index (such as Outlook search) return fewer results. Launching apps from Start by name " +
+            "still works.",
         includeInOneClick: false,
         services: ["WSearch"]);
 
@@ -110,8 +110,8 @@ public static class ServiceTweaks
         id: "services.printfax",
         name: "Disable Print Spooler & Fax",
         description:
-            "Stops the print and fax services. As a side benefit, a disabled spooler closes off the whole " +
-            "PrintNightmare family of vulnerabilities.",
+            "Stops the print and fax services. Also closes off the PrintNightmare family of " +
+            "vulnerabilities.",
         risk: RiskLevel.Moderate,
         warning:
             "Nothing can print while this is on, including \"Microsoft Print to PDF\". Revert it before " +

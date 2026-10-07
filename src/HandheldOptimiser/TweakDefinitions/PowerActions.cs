@@ -29,8 +29,8 @@ public static class PowerActions
         Id = "action.compact_os",
         Name = "Compact OS (save several GB)",
         Description =
-            "Compresses the Windows system files to free space for games, typically 2 to 5 GB. Everything " +
-            "keeps working as before; files are decompressed on the fly when read.",
+            "Compresses the Windows system files to free 2 to 5 GB for games. Everything keeps working " +
+            "as before.",
         Glyph = "",
         CreateRestorePoint = true,
         DurationHint = "2 to 5 minutes",
@@ -88,8 +88,7 @@ public static class PowerActions
         Id = "action.uncompact_os",
         Name = "Undo Compact OS",
         Description =
-            "Decompresses the Windows system files again, returning them to how they were before Compact OS. " +
-            "Does nothing if Windows is not compressed.",
+            "Decompresses the Windows system files again. Does nothing if Windows is not compressed.",
         Glyph = "",
         CreateRestorePoint = true,
         DurationHint = "2 to 10 minutes",
@@ -118,8 +117,8 @@ public static class PowerActions
         Id = "action.network_reset",
         Name = "Flush DNS & reset Winsock",
         Description =
-            "Clears cached DNS lookups and resets the Winsock catalogue to defaults. The first thing to try " +
-            "when a game cannot reach its servers or online play suddenly has high ping.",
+            "Clears cached DNS lookups and resets Winsock. Try this first when a game cannot reach its " +
+            "servers or ping is suddenly high.",
         Glyph = "",
         RequiresReboot = true,
         CreateRestorePoint = true,
@@ -146,8 +145,8 @@ public static class PowerActions
         Id = "action.shader_cache",
         Name = "Clear shader caches",
         Description =
-            "Deletes the DirectX and AMD (DX9/DX11/DX12/Vulkan/OpenGL/OpenCL) shader caches. Fixes stutter " +
-            "or graphical corruption that appears after a driver update.",
+            "Deletes the DirectX and AMD shader caches. Fixes stutter or graphical corruption after a " +
+            "driver update.",
         Glyph = "",
         DurationHint = "Under a minute",
         Warning =
@@ -184,8 +183,8 @@ public static class PowerActions
         Id = "action.deep_cleanup",
         Name = "Force deep cleanup",
         Description =
-            "Removes superseded Windows Update components with DISM, then deletes crash dumps and Windows " +
-            "Error Reporting files. Installed updates can still be uninstalled afterwards.",
+            "Removes superseded Windows Update components, crash dumps and error reports. Installed " +
+            "updates can still be uninstalled afterwards.",
         Glyph = "",
         DurationHint = "5 to 15 minutes",
         Execute = async (ctx, progress, ct) =>

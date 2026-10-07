@@ -111,7 +111,11 @@ public partial class LibraryWindow
                     item.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     break;
                 case GamepadAction.Back:
-                    CloseMenu();
+                    if (!BackToSettings())
+                    {
+                        CloseMenu();
+                    }
+
                     break;
             }
 
@@ -182,7 +186,11 @@ public partial class LibraryWindow
         {
             if (e.Key == Key.Escape)
             {
-                CloseMenu();
+                if (!BackToSettings())
+                {
+                    CloseMenu();
+                }
+
                 e.Handled = true;
             }
         }
