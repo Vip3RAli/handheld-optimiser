@@ -33,7 +33,7 @@ public static class HomeAppRegistration
     public const string PackageName = "HandheldOptimiser.HomeApp";
 
     /// <summary>Must match Identity Version in installer\HomeApp\AppxManifest.xml.</summary>
-    public const string PackageVersion = "0.2.1.0";
+    public const string PackageVersion = "0.2.2.0";
 
     /// <summary>
     /// Derived by Windows from the Publisher in installer\HomeApp\AppxManifest.xml ("CN=Handheld
