@@ -83,14 +83,16 @@ internal static class Backdrops
     public static BitmapSource? FromArtwork(string path, int width, int height, ArtworkBlur blur,
         ArtworkPosition position, Color from, Color to, double shade)
     {
-        if (Decode(path) is not { } picture)
+        var (divisor, radius) = Plan(blur);
+
+        // A pixel or two over the width it is laid out at, so the scale to fit is never an enlargement.
+        if (Decode(path, (width + divisor - 1) / divisor + 2) is not { } picture)
         {
             return null;
         }
 
         // As tall as the picture is at the screen's full width, or the whole screen if it is taller.
         var pictureHeight = Math.Min(height, (int)Math.Round((double)width * picture.PixelHeight / picture.PixelWidth));
-        var (divisor, radius) = Plan(blur);
         if (pictureHeight < 1 || Soften(picture, width, pictureHeight, divisor, radius) is not { } art)
         {
             return null;
@@ -137,14 +139,45 @@ internal static class Backdrops
     /// <summary>Eases in and out, so the fade has no visible start or end line.</summary>
     private static double Smooth(double t) => t * t * (3 - 2 * t);
 
-    private static BitmapSource? Decode(string path)
+    /// <summary>
+    /// The picture, decoded no wider than it will be used. Steam's banner art is 3840 pixels wide, twice a
+    /// 1080p screen and four times the half-size layout the softer blurs work at, so decoding it whole
+    /// made several times the pixels needed and left tens of MB behind each time the focus moved.
+    /// </summary>
+    private static BitmapSource? Decode(string path, int maxWidth)
     {
         try
         {
             // From memory, so the file is not held open: Steam replaces its artwork while we run.
-            using var stream = new MemoryStream(File.ReadAllBytes(path));
-            var frame = BitmapDecoder.Create(stream, BitmapCreateOptions.IgnoreColorProfile, BitmapCacheOption.OnLoad).Frames[0];
-            return frame.PixelWidth > 0 && frame.PixelHeight > 0 ? frame : null;
+            var bytes = File.ReadAllBytes(path);
+
+            // Only the header is read here, for the size; nothing is decoded until the image below.
+            int fullWidth;
+            using (var probe = new MemoryStream(bytes))
+            {
+                var frame = BitmapDecoder.Create(probe, BitmapCreateOptions.IgnoreColorProfile, BitmapCacheOption.None).Frames[0];
+                fullWidth = frame.PixelWidth;
+                if (fullWidth <= 0 || frame.PixelHeight <= 0)
+                {
+                    return null;
+                }
+            }
+
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.StreamSource = new MemoryStream(bytes);
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
+
+            // Never wider than the original: asking for more would enlarge it while decoding.
+            if (fullWidth > maxWidth)
+            {
+                image.DecodePixelWidth = maxWidth;
+            }
+
+            image.EndInit();
+            image.Freeze();
+            return image.PixelWidth > 0 && image.PixelHeight > 0 ? image : null;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException
             or FormatException or ArgumentException or InvalidOperationException or COMException)

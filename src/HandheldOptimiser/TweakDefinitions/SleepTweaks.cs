@@ -30,7 +30,8 @@ public static class SleepTweaks
         HibernateAfterStandby,
         DisconnectInStandby,
         NoWakeDevices,
-        DisableCardReader
+        DisableCardReader,
+        FastStartup
     ];
 
     public static Tweak HibernateAfterStandby => PowerSetting(
@@ -240,6 +241,29 @@ public static class SleepTweaks
 
         return outcome.Succeeded;
     }
+
+    /// <summary>
+    /// Fast Startup hibernates the kernel and drivers at shut down instead of closing them. Turning it off
+    /// does not touch hibernate itself, so "Hibernate after 15 minutes of sleep" keeps working.
+    /// </summary>
+    public static Tweak FastStartup => new()
+    {
+        Id = "sleep.faststartup",
+        Name = "Turn off Fast Startup",
+        Description =
+            "Makes Shut down a real shut down. With Fast Startup on, drivers are saved and restored rather " +
+            "than started fresh, which is a common cause of controllers, Wi-Fi or power limits misbehaving " +
+            "until you choose Restart.",
+        Category = TweakCategory.Sleep,
+        Risk = RiskLevel.Safe,
+        IncludeInOneClick = false,
+        Warning = "Starting up from a shut down takes a few seconds longer.",
+        RegistryValues =
+        [
+            new(RegistryRoot.LocalMachine, @"SYSTEM\CurrentControlSet\Control\Session Manager\Power",
+                "HiberbootEnabled", 0, RegistryValueKind.DWord)
+        ]
+    };
 
     private const string HibernateSwitchedOn = "hibernate.switchedon";
 
