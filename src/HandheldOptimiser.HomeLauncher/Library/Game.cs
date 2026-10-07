@@ -11,7 +11,10 @@ public enum GameStore
     Ubisoft,
 
     /// <summary>A program the player added to the library themselves.</summary>
-    Other
+    Other,
+
+    /// <summary>A game file in one of the player's ROM folders, played in an emulator.</summary>
+    Emulator
 }
 
 /// <summary>
@@ -24,6 +27,7 @@ public enum GameStore
 /// <param name="InstallDirectory">Where the game's files are, for the quick actions menu.</param>
 /// <param name="ExecutablePath">The game's own exe, when the store records it (Steam does not).</param>
 /// <param name="HeroPath">Wide artwork for the library's background, when the store keeps one locally.</param>
+/// <param name="Platform">The console an emulator game is for, shown in place of the store's name.</param>
 public sealed record Game(
     string Key,
     string Title,
@@ -35,9 +39,10 @@ public sealed record Game(
     string? WorkingDirectory = null,
     string? InstallDirectory = null,
     string? ExecutablePath = null,
-    string? HeroPath = null)
+    string? HeroPath = null,
+    string? Platform = null)
 {
-    public string StoreName => NameOf(Store);
+    public string StoreName => Platform ?? NameOf(Store);
 
     public static string NameOf(GameStore store) => store switch
     {
@@ -48,6 +53,7 @@ public sealed record Game(
         GameStore.Ea => "EA App",
         GameStore.Ubisoft => "Ubisoft Connect",
         GameStore.Other => "Added by you",
+        GameStore.Emulator => "Emulators",
         _ => "GOG"
     };
 }

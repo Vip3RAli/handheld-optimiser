@@ -19,10 +19,10 @@ public partial class LibraryWindow : Window
 
     private readonly GamepadInput _gamepad;
     private readonly DispatcherTimer _clock;
-
-    // Looks now and then for a profiled game having closed, while the library is in front.
-    private readonly DispatcherTimer _profileCheck;
     private List<GameTile> _allTiles = [];
+
+    // Each game's play time and last play, for sorting and the quick actions menu.
+    private Dictionary<string, PlayStats> _stats = [];
 
     // The tiles on screen: all of them, the favourites, or one store's when a filter is on.
     private List<GameTile> _tiles = [];
@@ -44,11 +44,8 @@ public partial class LibraryWindow : Window
         _clock = new DispatcherTimer(TimeSpan.FromSeconds(15), DispatcherPriority.Background, (_, _) => UpdateTopBar(), Dispatcher);
         UpdateTopBar();
 
-        _profileCheck = new DispatcherTimer(ProfileCheckEvery, DispatcherPriority.Background, (_, _) => OnProfileCheck(), Dispatcher);
-        _profileCheck.Stop();
-
-        // Closing the library also ends what a game's profile changed.
-        Closed += (_, _) => RestoreProfileSettings();
+        // Closing the library also ends what was changed for a game: its profile and closed programs.
+        Closed += (_, _) => EndSession();
 
         // Scan on load, not only on activation: Windows can start the home app without giving it focus.
         Loaded += (_, _) => _ = ScanAsync();
@@ -80,6 +77,7 @@ public partial class LibraryWindow : Window
         _showStatus = LibrarySettings.ShowStatus;
         _quickActions = LibrarySettings.QuickActions;
         _showHidden = LibrarySettings.ShowHidden;
+        _sort = LibrarySettings.Sort;
         OptionsHint.Visibility = _quickActions ? Visibility.Visible : Visibility.Collapsed;
 
         // Switched in the main app or another session: the strip follows on the next look at the tiles.
@@ -101,15 +99,14 @@ public partial class LibraryWindow : Window
             RestoreFocus();
         }
 
-        // Back from a game played with its own profile: put the player's settings back once it has closed.
-        _ = CheckProfileRestoreAsync();
+        // Back from a game the library cannot follow: whatever was changed for it is put back now.
+        CheckUnfollowedSession();
     }
 
     private void OnDeactivated(object? sender, EventArgs e)
     {
         _gamepad.Stop();
         _clock.Stop();
-        _profileCheck.Stop();
         StatusText.Text = string.Empty;
         CloseMenu();
         ClearBackdrop();
@@ -118,7 +115,8 @@ public partial class LibraryWindow : Window
         Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, Native.TrimWorkingSet);
     }
 
-    private async Task ScanAsync()
+    /// <param name="refreshEmulators">Look for emulators again too, which takes a moment.</param>
+    private async Task ScanAsync(bool refreshEmulators = false)
     {
         if (_scanning)
         {
@@ -134,13 +132,19 @@ public partial class LibraryWindow : Window
         try
         {
             var previous = _allTiles;
-            var tiles = await Task.Run(() => GameTile.ForScan(GameCatalog.Scan(), previous));
+            var (tiles, stats) = await Task.Run(() =>
+            {
+                var games = GameCatalog.Scan(refreshEmulators);
+                return (GameTile.ForScan(games, previous), Playtime.Read(GameCatalog.LastLaunched()));
+            });
             _lastScan = DateTime.UtcNow;
 
             // Rebuilding the tiles resets scrolling, so only do it when something changed. New tiles take
             // their stars and hidden marks here; kept ones already have them.
             var marksChanged = MarkTiles(tiles);
-            if (marksChanged || !tiles.Select(t => t.Game).SequenceEqual(_allTiles.Select(t => t.Game)))
+            var statsChanged = !SameStats(stats, _stats);
+            _stats = stats;
+            if (marksChanged || statsChanged || !tiles.Select(t => t.Game).SequenceEqual(_allTiles.Select(t => t.Game)))
             {
                 _allTiles = tiles;
                 ApplyFilter();
@@ -216,8 +220,8 @@ public partial class LibraryWindow : Window
             FilterTabs.Children.Add(FilterTab(option));
         }
 
-        // Favourites first, each group still in the order the scan gave: last played first.
-        _tiles = ShownTiles().Where(_filter.Shows).OrderByDescending(t => t.IsFavourite).ToList();
+        // Favourites first, each group in the chosen order.
+        _tiles = Sorted(ShownTiles().Where(_filter.Shows)).OrderByDescending(t => t.IsFavourite).ToList();
         Tiles.ItemsSource = _tiles;
         CountText.Text = _tiles.Count == 1 ? "1 game" : $"{_tiles.Count} games";
         UpdateEmptyText();
@@ -306,19 +310,27 @@ public partial class LibraryWindow : Window
         _launchBlockedUntil = DateTime.UtcNow + LaunchCooldown;
         _focusedKey = tile.Game.Key;
 
-        // The last profiled game's settings never carry over to the next game.
+        // The last game's profile never carries over to the next game.
         RestoreProfileSettings();
         var profile = GameProfiles.For(tile.Game);
+        var storeWasOpen = StoreClients.IsRunning(tile.Game.Store);
 
         var error = GameCatalog.Launch(tile.Game);
         StatusText.Text = error ?? $"Starting {tile.Title}...";
         if (error is not null)
         {
             _launchBlockedUntil = DateTime.MinValue;
+            return;
         }
-        else if (!profile.IsEmpty)
+
+        // The last game's play time is counted up to now. Programs closed for it stay closed for this one.
+        StopFollowing();
+
+        if (!profile.IsEmpty)
         {
             ApplyProfile(tile.Game, profile);
         }
+
+        StartSession(tile.Game, storeWasOpen, profile.CloseApps ?? LibrarySettings.GameMode);
     }
 }
