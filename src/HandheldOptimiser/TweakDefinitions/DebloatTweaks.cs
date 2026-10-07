@@ -13,6 +13,9 @@ public static class DebloatTweaks
     private const string ContentDelivery = @"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager";
     private const string SearchPolicy = @"SOFTWARE\Policies\Microsoft\Windows\Windows Search";
     private const string CloudContent = @"SOFTWARE\Policies\Microsoft\Windows\CloudContent";
+    private const string ExplorerAdvanced = @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced";
+    private const string EdgePolicy = @"SOFTWARE\Policies\Microsoft\Edge";
+    private const string SystemPolicy = @"SOFTWARE\Policies\Microsoft\Windows\System";
 
     public static IReadOnlyList<Tweak> All =>
     [
@@ -20,6 +23,12 @@ public static class DebloatTweaks
         WebSearch,
         CortanaAndCopilot,
         ConsumerFeatures,
+        ShellAds,
+        Widgets,
+        EdgeBackground,
+        ActivityHistory,
+        ErrorReporting,
+        OneDrive,
         BackgroundApps
     ];
 
@@ -202,6 +211,160 @@ public static class DebloatTweaks
             new(RegistryRoot.LocalMachine, CloudContent, "DisableWindowsConsumerFeatures", 1, RegistryValueKind.DWord),
             new(RegistryRoot.LocalMachine, CloudContent, "DisableCloudOptimizedContent", 1, RegistryValueKind.DWord)
         ]
+    };
+
+    public static Tweak ShellAds => new()
+    {
+        Id = "debloat.shell_ads",
+        Name = "Hide ads in Start, Settings and File Explorer",
+        Description =
+            "Turns off app recommendations and Microsoft account nags in Start, suggested content in Settings, " +
+            "OneDrive prompts in File Explorer, tips on the lock screen, and the \"finish setting up your " +
+            "device\" screen that appears after updates.",
+        Category = TweakCategory.Debloat,
+        Risk = RiskLevel.Safe,
+        RegistryValues =
+        [
+            new(RegistryRoot.CurrentUser, ExplorerAdvanced, "Start_IrisRecommendations", 0, RegistryValueKind.DWord),
+            new(RegistryRoot.CurrentUser, ExplorerAdvanced, "Start_AccountNotifications", 0, RegistryValueKind.DWord),
+            new(RegistryRoot.CurrentUser, ExplorerAdvanced, "ShowSyncProviderNotifications", 0, RegistryValueKind.DWord),
+            new(RegistryRoot.CurrentUser, ContentDelivery, "SubscribedContent-338393Enabled", 0, RegistryValueKind.DWord),
+            new(RegistryRoot.CurrentUser, ContentDelivery, "SubscribedContent-353694Enabled", 0, RegistryValueKind.DWord),
+            new(RegistryRoot.CurrentUser, ContentDelivery, "SubscribedContent-353696Enabled", 0, RegistryValueKind.DWord),
+            new(RegistryRoot.CurrentUser, ContentDelivery, "SubscribedContent-310093Enabled", 0, RegistryValueKind.DWord),
+            new(RegistryRoot.CurrentUser, ContentDelivery, "SubscribedContent-338387Enabled", 0, RegistryValueKind.DWord),
+            new(RegistryRoot.CurrentUser, ContentDelivery, "RotatingLockScreenOverlayEnabled", 0, RegistryValueKind.DWord),
+            new(RegistryRoot.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\UserProfileEngagement",
+                "ScoobeSystemSettingEnabled", 0, RegistryValueKind.DWord)
+        ]
+    };
+
+    /// <summary>
+    /// The policy rather than the taskbar's TaskbarDa value: on current builds a driver blocks other
+    /// programs from writing TaskbarDa, and the policy also stops the board's host process starting.
+    /// </summary>
+    public static Tweak Widgets => new()
+    {
+        Id = "debloat.widgets",
+        Name = "Turn off Widgets",
+        Description =
+            "Removes the Widgets board and its taskbar button. The board keeps a set of Edge WebView " +
+            "processes running in the background, typically 100 to 200 MB of memory the game could use.",
+        Category = TweakCategory.Debloat,
+        Risk = RiskLevel.Safe,
+        RequiresReboot = true,
+        RegistryValues =
+        [
+            new(RegistryRoot.LocalMachine, @"SOFTWARE\Policies\Microsoft\Dsh", "AllowNewsAndInterests", 0, RegistryValueKind.DWord)
+        ]
+    };
+
+    public static Tweak EdgeBackground => new()
+    {
+        Id = "debloat.edge_background",
+        Name = "Stop Edge running in the background",
+        Description =
+            "Turns off Edge's Startup Boost, which preloads it at sign-in, and stops it staying open in the " +
+            "background after you close the last window. Frees the memory those hidden Edge processes hold.",
+        Category = TweakCategory.Debloat,
+        Risk = RiskLevel.Safe,
+        Warning =
+            "Edge takes a moment longer to open, and its settings page says some settings are managed by your " +
+            "organisation. That note is these two policies, nothing else.",
+        RegistryValues =
+        [
+            new(RegistryRoot.LocalMachine, EdgePolicy, "StartupBoostEnabled", 0, RegistryValueKind.DWord),
+            new(RegistryRoot.LocalMachine, EdgePolicy, "BackgroundModeEnabled", 0, RegistryValueKind.DWord)
+        ]
+    };
+
+    public static Tweak ActivityHistory => new()
+    {
+        Id = "debloat.activity_history",
+        Name = "Turn off activity history & tailored experiences",
+        Description =
+            "Stops Windows recording which apps and files you open, and stops it using diagnostic data to " +
+            "personalise tips and offers. Less background logging, and nothing you use goes away.",
+        Category = TweakCategory.Privacy,
+        Risk = RiskLevel.Safe,
+        RegistryValues =
+        [
+            new(RegistryRoot.LocalMachine, SystemPolicy, "EnableActivityFeed", 0, RegistryValueKind.DWord),
+            new(RegistryRoot.LocalMachine, SystemPolicy, "PublishUserActivities", 0, RegistryValueKind.DWord),
+            new(RegistryRoot.LocalMachine, SystemPolicy, "UploadUserActivities", 0, RegistryValueKind.DWord),
+            new(RegistryRoot.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Privacy",
+                "TailoredExperiencesWithDiagnosticDataEnabled", 0, RegistryValueKind.DWord),
+            new(RegistryRoot.CurrentUser, @"Software\Policies\Microsoft\Windows\CloudContent",
+                "DisableTailoredExperiencesWithDiagnosticData", 1, RegistryValueKind.DWord)
+        ]
+    };
+
+    public static Tweak ErrorReporting => new()
+    {
+        Id = "debloat.error_reporting",
+        Name = "Turn off Windows Error Reporting",
+        Description =
+            "Stops Windows collecting crash reports and uploading them to Microsoft after an app or game " +
+            "crashes, which otherwise means a burst of disk and network work right after the crash.",
+        Category = TweakCategory.Privacy,
+        Risk = RiskLevel.Safe,
+        IncludeInOneClick = false,
+        Warning =
+            "Microsoft and game developers stop receiving crash reports from this device, and the " +
+            "\"check for solutions\" prompt after a crash no longer appears.",
+        RegistryValues =
+        [
+            new(RegistryRoot.LocalMachine, @"SOFTWARE\Policies\Microsoft\Windows\Windows Error Reporting",
+                "Disabled", 1, RegistryValueKind.DWord),
+            new(RegistryRoot.LocalMachine, @"SOFTWARE\Microsoft\Windows\Windows Error Reporting",
+                "Disabled", 1, RegistryValueKind.DWord)
+        ]
+    };
+
+    /// <summary>
+    /// Blocked by policy rather than uninstalled: uninstalling cannot be reverted without downloading
+    /// OneDrive again, while the policy comes off cleanly and OneDrive starts at the next sign-in.
+    /// Revert does not start it from here, because this app runs elevated and OneDrive would then
+    /// run as administrator.
+    /// </summary>
+    public static Tweak OneDrive => new()
+    {
+        Id = "debloat.onedrive",
+        Name = "Turn off OneDrive",
+        Description =
+            "Stops OneDrive running and syncing, so it never starts an upload or download in the middle of a " +
+            "game. Game cloud saves go through Steam, Xbox and the other launchers, not OneDrive.",
+        Category = TweakCategory.Debloat,
+        Risk = RiskLevel.Moderate,
+        IncludeInOneClick = false,
+        Warning =
+            "Files that are only in the cloud (the cloud icon in File Explorer) cannot be opened on this " +
+            "device until you revert. If your Desktop or Documents are backed up to OneDrive, make sure " +
+            "they are set to \"Always keep on this device\" first. After reverting, OneDrive starts again " +
+            "at your next sign-in.",
+        RegistryValues =
+        [
+            new(RegistryRoot.LocalMachine, @"SOFTWARE\Policies\Microsoft\Windows\OneDrive",
+                "DisableFileSyncNGSC", 1, RegistryValueKind.DWord)
+        ],
+        ScriptApply = async (ctx, _, ct) =>
+        {
+            var outcome = await ctx.Runner.RunScriptAsync(
+                """
+                $p = Get-Process -Name OneDrive -ErrorAction SilentlyContinue
+                if ($p) {
+                    Write-Output 'Closing OneDrive'
+                    $p | Stop-Process -Force -ErrorAction SilentlyContinue
+                    Write-Output 'STOPPED'
+                }
+                """,
+                "Close OneDrive",
+                ct);
+
+            return outcome.OutputLines.Contains("STOPPED")
+                ? TweakResult.Ok("debloat.onedrive", "OneDrive closed.")
+                : TweakResult.NoChange("debloat.onedrive");
+        }
     };
 
     public static Tweak BackgroundApps => new()
