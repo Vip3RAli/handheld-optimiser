@@ -40,6 +40,7 @@ public partial class LibraryWindow
         _brightness = null;
         _brightnessRead = false;
         RefreshQuickSettings();
+        RefreshCloseAppsNow();
         _ = ReadBrightnessAsync();
 
         MenuOverlay.Visibility = Visibility.Visible;
@@ -222,7 +223,8 @@ public partial class LibraryWindow
 
     private async Task RescanAsync()
     {
-        await ScanAsync();
+        // An explicit refresh also looks for emulators installed meanwhile.
+        await ScanAsync(refreshEmulators: true);
         StatusText.Text = _allTiles.Count == 1 ? "1 game in the library." : $"{_allTiles.Count} games in the library.";
     }
 

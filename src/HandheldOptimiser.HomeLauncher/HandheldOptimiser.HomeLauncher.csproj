@@ -30,6 +30,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The library's pure logic is tested without a window. -->
+    <InternalsVisibleTo Include="HandheldOptimiser.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- The screen brightness control in quick settings, which Windows only offers through WMI. -->
     <PackageReference Include="System.Management" Version="8.0.0" />
   </ItemGroup>

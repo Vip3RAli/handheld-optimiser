@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\HandheldOptimiser\HandheldOptimiser.csproj" />
+    <ProjectReference Include="..\..\src\HandheldOptimiser.HomeLauncher\HandheldOptimiser.HomeLauncher.csproj" />
   </ItemGroup>
 
 </Project>

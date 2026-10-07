@@ -398,9 +398,15 @@
                         <Button x:Name="BackgroundGroup" Style="{StaticResource MenuButton}" Content="Background"
                                 Tag="Artwork, colours and blur" Click="OnOpenBackgroundSettings" />
                         <Button x:Name="DisplayGroup" Style="{StaticResource MenuButton}" Content="Display"
-                                Tag="Battery and Wi-Fi, store filter, quick actions and hidden games" Click="OnOpenDisplaySettings" />
+                                Tag="Sort order, battery and Wi-Fi, store filter, quick actions and hidden games" Click="OnOpenDisplaySettings" />
                         <Button x:Name="AddProgramGroup" Style="{StaticResource MenuButton}" Content="Add a program"
                                 Tag="Emulators and games from other stores" Click="OnOpenAddProgram" />
+                        <Button x:Name="WhilePlayingGroup" Style="{StaticResource MenuButton}" Content="While playing"
+                                Tag="Close background programs and store apps around games" Click="OnOpenWhilePlaying" />
+                        <Button x:Name="EmulatorsGroup" Style="{StaticResource MenuButton}" Content="Emulators"
+                                Tag="ROM folders, and which emulator plays each console" Click="OnOpenEmulators" />
+                        <Button x:Name="MaintenanceGroup" Style="{StaticResource MenuButton}" Content="Maintenance"
+                                Tag="Free up space and choose the startup apps" Click="OnOpenMaintenance" />
                         <Button x:Name="OpenMainAppSetting" Style="{StaticResource MenuButton}" Content="Open Handheld Optimiser"
                                 Tag="Tweaks and tools. Windows asks for administrator permission" Click="OnOpenMainApp" />
                         <Button x:Name="QuitSetting" Style="{StaticResource MenuButton}" Content="Quit"
@@ -455,6 +461,8 @@
                                 Click="OnToggleQuickActions" />
                         <Button x:Name="HiddenSetting" Style="{StaticResource MenuButton}" Content="Show hidden games"
                                 Click="OnToggleShowHidden" />
+                        <Button x:Name="SortSetting" Style="{StaticResource MenuButton}" Content="Sort games"
+                                Click="OnStepSort" />
                         <!-- For touch, which has no B button. -->
                         <Button Style="{StaticResource MenuButton}" Content="Back" Tag="Settings" Click="OnSettingsBack" />
 
@@ -506,6 +514,8 @@
                                 Click="OnStepPowerMode" />
                         <Button x:Name="RefreshRateSetting" Style="{StaticResource MenuButton}" Content="Refresh rate"
                                 Click="OnStepRefreshRate" />
+                        <Button x:Name="CloseAppsNowItem" Style="{StaticResource MenuButton}" Content="Close background programs"
+                                Click="OnCloseAppsNow" />
                         <Button x:Name="RescanItem" Style="{StaticResource MenuButton}" Content="Refresh library"
                                 Tag="Look for games installed since the library opened" Click="OnRescan" />
 
@@ -533,6 +543,8 @@
                                 Click="OnStepProfileRefresh" />
                         <Button x:Name="ProfileBrightnessSetting" Style="{StaticResource MenuButton}" Content="Brightness"
                                 Click="OnStepProfileBrightness" />
+                        <Button x:Name="ProfileAppsSetting" Style="{StaticResource MenuButton}" Content="Background programs"
+                                Click="OnStepProfileApps" />
                         <!-- For touch, which has no B button. -->
                         <Button Style="{StaticResource MenuButton}" Content="Back" Tag="Quick actions" Click="OnSettingsBack" />
 
@@ -565,6 +577,139 @@
                                 <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                             <TextBlock Text="Add" FontSize="15" VerticalAlignment="Center" />
+                            <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                                <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Around games: closing background programs as one starts, and the store's app once it ends. -->
+                    <StackPanel x:Name="WhilePlayingItems" Visibility="Collapsed">
+                        <Button x:Name="GameModeSetting" Style="{StaticResource MenuButton}" Content="Close background programs"
+                                Click="OnToggleGameMode" />
+                        <Button x:Name="AppsToCloseGroup" Style="{StaticResource MenuButton}" Content="Programs to close"
+                                Click="OnOpenAppsToClose" />
+                        <Button x:Name="ReopenSetting" Style="{StaticResource MenuButton}" Content="Open them again afterwards"
+                                Click="OnToggleReopen" />
+                        <Button x:Name="StoreClosingSetting" Style="{StaticResource MenuButton}" Content="Close store apps after playing"
+                                Click="OnStepStoreClosing" />
+                        <Button x:Name="StoreStartupItem" Style="{StaticResource MenuButton}" Content="Store apps at startup"
+                                Tag="Stop Steam, Epic and the rest starting with Windows" Click="OnOpenStoreStartup" />
+                        <!-- For touch, which has no B button. -->
+                        <Button Style="{StaticResource MenuButton}" Content="Back" Tag="Settings" Click="OnSettingsBack" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                            <Border Style="{StaticResource BumperGlyph}" Margin="22,0,8,0">
+                                <TextBlock Text="&#x25C0; &#x25B6;" FontSize="11" FontWeight="Bold" />
+                            </Border>
+                            <TextBlock Text="Adjust" FontSize="15" VerticalAlignment="Center" />
+                            <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                                <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Change" FontSize="15" VerticalAlignment="Center" />
+                            <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                                <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- A row per program, added when the list opens. A switches whether it is closed. -->
+                    <StackPanel x:Name="AppsToCloseItems" Visibility="Collapsed">
+                        <Button x:Name="AddRunningAppItem" Style="{StaticResource MenuButton}" Content="Add a running program"
+                                Tag="Pick one of the programs open now" Click="OnOpenRunningApps" />
+                        <!-- For touch, which has no B button. -->
+                        <Button x:Name="AppsToCloseBackItem" Style="{StaticResource MenuButton}" Content="Back" Tag="While playing"
+                                Click="OnSettingsBack" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                            <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                                <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Change" FontSize="15" VerticalAlignment="Center" />
+                            <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                                <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- The programs running now, added as rows when the list opens. -->
+                    <StackPanel x:Name="RunningAppsItems" Visibility="Collapsed">
+                        <!-- For touch, which has no B button. -->
+                        <Button x:Name="RunningAppsBackItem" Style="{StaticResource MenuButton}" Content="Back" Tag="Programs to close"
+                                Click="OnSettingsBack" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                            <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                                <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Add" FontSize="15" VerticalAlignment="Center" />
+                            <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                                <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Clean-ups a standard user may run, and the startup apps. Clearing takes a second press. -->
+                    <StackPanel x:Name="MaintenanceItems" Visibility="Collapsed">
+                        <Button x:Name="TempItem" Style="{StaticResource MenuButton}" Content="Clear temporary files"
+                                Click="OnClearTemp" LostKeyboardFocus="OnConfirmRowLostFocus" />
+                        <Button x:Name="ShaderItem" Style="{StaticResource MenuButton}" Content="Clear shader caches"
+                                Click="OnClearShaders" LostKeyboardFocus="OnConfirmRowLostFocus" />
+                        <Button x:Name="RecycleItem" Style="{StaticResource MenuButton}" Content="Empty the Recycle Bin"
+                                Click="OnEmptyRecycleBin" LostKeyboardFocus="OnConfirmRowLostFocus" />
+                        <Button x:Name="StartupGroup" Style="{StaticResource MenuButton}" Content="Startup apps"
+                                Click="OnOpenStartup" />
+                        <!-- For touch, which has no B button. -->
+                        <Button Style="{StaticResource MenuButton}" Content="Back" Tag="Settings" Click="OnSettingsBack" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                            <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                                <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Select" FontSize="15" VerticalAlignment="Center" />
+                            <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                                <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- A row per program that starts with Windows, added when the list opens. -->
+                    <StackPanel x:Name="StartupItems" Visibility="Collapsed">
+                        <!-- For touch, which has no B button. -->
+                        <Button x:Name="StartupBackItem" Style="{StaticResource MenuButton}" Content="Back" Click="OnSettingsBack" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                            <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                                <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Change" FontSize="15" VerticalAlignment="Center" />
+                            <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                                <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- A row per console found and per ROM folder, added when the list opens. -->
+                    <StackPanel x:Name="EmulatorItems" Visibility="Collapsed">
+                        <Button x:Name="AddRomFolderItem" Style="{StaticResource MenuButton}" Content="Add a ROM folder"
+                                Tag="A folder of games, or of folders named for each console such as snes or ps2" Click="OnAddRomFolder" />
+                        <Button x:Name="AddEmulatorItem" Style="{StaticResource MenuButton}" Content="Find an emulator"
+                                Tag="Point to an emulator the library did not find" Click="OnAddEmulator" />
+                        <Button x:Name="RescanEmulatorsItem" Style="{StaticResource MenuButton}" Content="Look again"
+                                Tag="For emulators and games added since the library opened" Click="OnRescanEmulators" />
+                        <!-- For touch, which has no B button. -->
+                        <Button x:Name="EmulatorsBackItem" Style="{StaticResource MenuButton}" Content="Back" Tag="Settings"
+                                Click="OnSettingsBack" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                            <Border Style="{StaticResource BumperGlyph}" Margin="22,0,8,0">
+                                <TextBlock Text="&#x25C0; &#x25B6;" FontSize="11" FontWeight="Bold" />
+                            </Border>
+                            <TextBlock Text="Adjust" FontSize="15" VerticalAlignment="Center" />
+                            <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                                <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Select" FontSize="15" VerticalAlignment="Center" />
                             <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
                                 <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>

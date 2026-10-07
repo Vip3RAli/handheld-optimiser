@@ -20,7 +20,8 @@ internal static class GameCatalog
     private const string FavouritesKey = Program.SettingsKey + @"\Favourites";
     private const string HiddenKey = Program.SettingsKey + @"\Hidden";
 
-    public static List<Game> Scan()
+    /// <param name="refreshEmulators">Look for emulators again, rather than use the ones found last time.</param>
+    public static List<Game> Scan(bool refreshEmulators = false)
     {
         var games = new Dictionary<string, Game>(StringComparer.OrdinalIgnoreCase);
 
@@ -77,6 +78,23 @@ internal static class GameCatalog
         catch (Exception ex)
         {
             Program.Log($"Reading the added programs failed: {ex.GetType().Name}: {ex.Message}");
+        }
+
+        // Games in ROM folders, also listed whatever folder they are in. Emulators are only looked for when
+        // there are ROM folders, so the library costs nothing more for a player who has none.
+        try
+        {
+            if (Emulators.RomFolders().Count > 0)
+            {
+                foreach (var game in Emulators.Scan(Emulators.Found(games.Values.ToList(), refreshEmulators)))
+                {
+                    games.TryAdd(game.Key, game);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Program.Log($"Scanning the ROM folders failed: {ex.GetType().Name}: {ex.Message}");
         }
 
         var history = ReadHistory();
@@ -229,6 +247,9 @@ internal static class GameCatalog
             return null;
         }
     }
+
+    /// <summary>When each game was last started from the library, as unix seconds, by game key.</summary>
+    public static Dictionary<string, long> LastLaunched() => ReadHistory();
 
     private static Dictionary<string, long> ReadHistory()
     {

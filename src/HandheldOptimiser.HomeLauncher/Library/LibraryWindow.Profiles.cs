@@ -1,5 +1,3 @@
-using System.Diagnostics;
-using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -7,15 +5,12 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 
 /// <summary>
 /// Per-game profiles: a power mode, refresh rate and brightness a game is switched to when it starts
-/// from the library, with the player's own settings put back once it has closed.
+/// from the library, with the player's own settings put back once it has closed (see
+/// LibraryWindow.Session), and whether background programs are closed for it.
 /// </summary>
 public partial class LibraryWindow
 {
     private const string Unchanged = "Don't change";
-
-    // A game is given this long to start before its missing process means it has closed.
-    private static readonly TimeSpan ProfileStartGrace = TimeSpan.FromSeconds(30);
-    private static readonly TimeSpan ProfileCheckEvery = TimeSpan.FromSeconds(10);
 
     private static readonly int[] ProfileBrightnessLevels = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
@@ -27,7 +22,6 @@ public partial class LibraryWindow
     private IReadOnlyList<int> _profileRates = [];
 
     private SavedSettings? _saved;
-    private bool _checkingProfile;
 
     private void OnOpenProfile(object sender, RoutedEventArgs e)
     {
@@ -60,6 +54,13 @@ public partial class LibraryWindow
             : "This screen has one refresh rate";
 
         ProfileBrightnessSetting.Tag = _profile.Brightness is { } level ? $"{level}%" : Unchanged;
+
+        ProfileAppsSetting.Tag = _profile.CloseApps switch
+        {
+            true => "Closed while it plays",
+            false => "Left running",
+            null => LibrarySettings.GameMode ? "As set under While playing: closed" : "As set under While playing: left running"
+        };
     }
 
     /// <summary>Left and right on a profile row. Each row's choices start with Don't change.</summary>
@@ -85,6 +86,10 @@ public partial class LibraryWindow
         else if (ReferenceEquals(row, ProfileBrightnessSetting))
         {
             profile = _profile with { Brightness = StepChoice(_profile.Brightness, ProfileBrightnessLevels, step) };
+        }
+        else if (ReferenceEquals(row, ProfileAppsSetting))
+        {
+            profile = _profile with { CloseApps = StepChoice(_profile.CloseApps, [true, false], step) };
         }
         else
         {
@@ -117,6 +122,8 @@ public partial class LibraryWindow
     private void OnStepProfileRefresh(object sender, RoutedEventArgs e) => StepProfileSetting(ProfileRefreshSetting, 1);
 
     private void OnStepProfileBrightness(object sender, RoutedEventArgs e) => StepProfileSetting(ProfileBrightnessSetting, 1);
+
+    private void OnStepProfileApps(object sender, RoutedEventArgs e) => StepProfileSetting(ProfileAppsSetting, 1);
 
     /// <summary>Switches to a game's profile as it starts, keeping what it replaces.</summary>
     private void ApplyProfile(Game game, GameProfile profile)
@@ -162,7 +169,6 @@ public partial class LibraryWindow
         }
 
         _saved = null;
-        _profileCheck.Stop();
 
         if (saved.PowerMode is { } mode)
         {
@@ -180,75 +186,5 @@ public partial class LibraryWindow
         }
 
         Program.Log($"Put back the settings {saved.Game.Key}'s profile replaced");
-    }
-
-    /// <summary>
-    /// Puts the player's settings back once the profiled game has closed. While it still runs (the
-    /// player pressed the home button mid-game) it looks again every few seconds the library is in front.
-    /// </summary>
-    private async Task CheckProfileRestoreAsync()
-    {
-        if (_saved is not { } saved || _checkingProfile)
-        {
-            return;
-        }
-
-        _checkingProfile = true;
-        try
-        {
-            var running = await Task.Run(() => IsRunning(saved.Game));
-            if (!ReferenceEquals(_saved, saved))
-            {
-                return;
-            }
-
-            if (running || DateTime.UtcNow - saved.StartedAt < ProfileStartGrace)
-            {
-                if (IsActive)
-                {
-                    _profileCheck.Start();
-                }
-
-                return;
-            }
-
-            RestoreProfileSettings();
-            StatusText.Text = $"Your own settings are back after {saved.Game.Title}.";
-        }
-        finally
-        {
-            _checkingProfile = false;
-        }
-    }
-
-    private void OnProfileCheck()
-    {
-        _profileCheck.Stop();
-        _ = CheckProfileRestoreAsync();
-    }
-
-    /// <summary>
-    /// Whether anything is running from the game's folder. Store games are started through their store,
-    /// so there is no process of ours to watch; the game's own exe sits in its install folder.
-    /// </summary>
-    private static bool IsRunning(Game game)
-    {
-        var folder = game.InstallDirectory ?? Path.GetDirectoryName(game.ExecutablePath);
-        if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder))
-        {
-            return false;
-        }
-
-        var prefix = Path.TrimEndingDirectorySeparator(folder) + Path.DirectorySeparatorChar;
-        var running = false;
-        foreach (var process in Process.GetProcesses())
-        {
-            using (process)
-            {
-                running = running || (Native.ProcessPath(process.Id) is { } path && path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
-            }
-        }
-
-        return running;
     }
 }

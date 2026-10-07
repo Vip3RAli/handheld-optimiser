@@ -35,6 +35,14 @@ internal enum ArtworkBlur
     Strong
 }
 
+/// <summary>The order of the games in the grid. Favourites always come first.</summary>
+internal enum SortOrder
+{
+    RecentlyPlayed,
+    MostPlayed,
+    Name
+}
+
 /// <summary>
 /// The library's own preferences, changed from its settings menu. They live in the per-user key the main
 /// app writes the home app choice to, so the background options on its Full Screen Mode page and the
@@ -52,6 +60,10 @@ internal static class LibrarySettings
     private const string FilterValue = "StoreFilter";
     private const string QuickActionsValue = "QuickActions";
     private const string ShowHiddenValue = "ShowHiddenGames";
+    private const string SortValue = "SortOrder";
+    private const string GameModeValue = "GameMode";
+    private const string ReopenValue = "ReopenClosedApps";
+    private const string StoreClosingValue = "CloseStoreApps";
 
     public static BackgroundKind Background
     {
@@ -122,6 +134,37 @@ internal static class LibrarySettings
     {
         get => ReadSwitch(ShowHiddenValue, on: false);
         set => WriteSwitch(ShowHiddenValue, value);
+    }
+
+    public static SortOrder Sort
+    {
+        get => Enum.TryParse<SortOrder>(Read(SortValue), ignoreCase: true, out var sort) && Enum.IsDefined(sort)
+            ? sort
+            : SortOrder.RecentlyPlayed;
+        set => Write(SortValue, value.ToString().ToLowerInvariant());
+    }
+
+    /// <summary>Close the chosen background programs whenever a game starts. Off until switched on.</summary>
+    public static bool GameMode
+    {
+        get => ReadSwitch(GameModeValue, on: false);
+        set => WriteSwitch(GameModeValue, value);
+    }
+
+    /// <summary>Start the programs closed for a game again once it has closed.</summary>
+    public static bool ReopenApps
+    {
+        get => ReadSwitch(ReopenValue);
+        set => WriteSwitch(ReopenValue, value);
+    }
+
+    /// <summary>Whether a store's app is closed after one of its games.</summary>
+    public static StoreClosing StoreClosing
+    {
+        get => Enum.TryParse<StoreClosing>(Read(StoreClosingValue), ignoreCase: true, out var closing) && Enum.IsDefined(closing)
+            ? closing
+            : StoreClosing.Off;
+        set => Write(StoreClosingValue, value.ToString().ToLowerInvariant());
     }
 
     // Most switches are on until the player switches them off.
