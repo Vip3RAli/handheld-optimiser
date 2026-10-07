@@ -29,4 +29,9 @@
     <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- The screen brightness control in quick settings, which Windows only offers through WMI. -->
+    <PackageReference Include="System.Management" Version="8.0.0" />
+  </ItemGroup>
+
 </Project>

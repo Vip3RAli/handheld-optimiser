@@ -27,6 +27,23 @@ internal sealed class GameTile : INotifyPropertyChanged
 
     public string Title => Game.Title;
     public string StoreName => Game.StoreName;
+
+    /// <summary>Starred by the player, which puts it at the front and shows a star on the tile.</summary>
+    public bool IsFavourite
+    {
+        get => _isFavourite;
+        set => Set(ref _isFavourite, value);
+    }
+
+    /// <summary>Hidden by the player, so only shown, faded, while hidden games are shown.</summary>
+    public bool IsHidden
+    {
+        get => _isHidden;
+        set => Set(ref _isHidden, value);
+    }
+
+    private bool _isFavourite;
+    private bool _isHidden;
     public bool HasCover => Cover is not null;
     public bool ShowsIcon => Cover is null;
 
@@ -94,6 +111,15 @@ internal sealed class GameTile : INotifyPropertyChanged
         CoverChanged();
     }
 
+    private void Set(ref bool field, bool value, [System.Runtime.CompilerServices.CallerMemberName] string name = "")
+    {
+        if (field != value)
+        {
+            field = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        }
+    }
+
     private void CoverChanged()
     {
         foreach (var name in new[] { nameof(Cover), nameof(Icon), nameof(HasCover), nameof(ShowsIcon) })
@@ -137,7 +163,8 @@ internal sealed class GameTile : INotifyPropertyChanged
         [GameStore.BattleNet] = Gradient("#1473B8", "#0A2A4A"),
         [GameStore.Gog] = Gradient("#7A2F80", "#2C1030"),
         [GameStore.Ea] = Gradient("#E0442E", "#4A1410"),
-        [GameStore.Ubisoft] = Gradient("#0070D1", "#061C3A")
+        [GameStore.Ubisoft] = Gradient("#0070D1", "#061C3A"),
+        [GameStore.Other] = Gradient("#4A5060", "#1A1D24")
     };
 
     // A game with no usable cover or icon takes its store's colours.
