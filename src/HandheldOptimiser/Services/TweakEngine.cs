@@ -26,7 +26,7 @@ public sealed class TweakEngine
 {
     private readonly LogService _log;
     private readonly RestorePointService _restorePoints;
-    private readonly TweakJournalService _journal;
+    private readonly ITweakJournal _journal;
     private readonly TweakContext _context;
 
     public IReadOnlyList<Tweak> AllTweaks { get; }
@@ -36,10 +36,10 @@ public sealed class TweakEngine
 
     public TweakEngine(
         LogService log,
-        RegistryHelper registry,
+        IRegistryStore registry,
         PowerShellRunner runner,
         RestorePointService restorePoints,
-        TweakJournalService journal,
+        ITweakJournal journal,
         HandheldDevice device)
     {
         _log = log;
