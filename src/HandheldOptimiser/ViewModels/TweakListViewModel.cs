@@ -20,6 +20,9 @@ public sealed partial class TweakListViewModel : PageViewModelBase
     private readonly TweakEngine _engine;
     private readonly TweakCategory[] _categories;
 
+    // The engine's change count when this page last checked its tweaks, or null before the first check.
+    private int? _checkedAt;
+
     public override string Title { get; }
     public override string Glyph { get; }
     public override string Subtitle { get; }
@@ -55,7 +58,21 @@ public sealed partial class TweakListViewModel : PageViewModelBase
         }
     }
 
-    public override async Task OnNavigatedToAsync() => await RefreshAsync();
+    /// <summary>
+    /// Coming back to the page only checks the tweaks again when something has been applied or reverted
+    /// since the last check. Some checks start PowerShell, so doing them on every visit made switching
+    /// tabs slow. Re-check always checks everything, for changes made outside the app.
+    /// </summary>
+    public override async Task OnNavigatedToAsync()
+    {
+        if (_checkedAt == _engine.ChangeCount)
+        {
+            Header?.Reload();
+            return;
+        }
+
+        await RefreshAsync();
+    }
 
     [RelayCommand]
     private async Task RefreshAsync()
@@ -63,13 +80,25 @@ public sealed partial class TweakListViewModel : PageViewModelBase
         await Shell.RunExclusiveAsync($"Checking {Title.ToLowerInvariant()}…", async (progress, ct) =>
         {
             Header?.Reload();
-
-            foreach (var item in Tweaks)
-            {
-                progress.Report($"Checking {item.Name}");
-                await item.RefreshStateAsync(ct);
-            }
+            await CheckAllAsync(progress, ct);
         });
+    }
+
+    /// <summary>
+    /// Checks every tweak on the page at once rather than one after another. Each check only reads, and
+    /// the ones that start PowerShell or powercfg spend most of their time waiting on it.
+    /// </summary>
+    private async Task CheckAllAsync(IProgress<string>? progress, CancellationToken ct)
+    {
+        var changeCount = _engine.ChangeCount;
+
+        await Task.WhenAll(Tweaks.Select(async item =>
+        {
+            await item.RefreshStateAsync(ct);
+            progress?.Report($"Checked {item.Name}");
+        }));
+
+        _checkedAt = changeCount;
     }
 
     [RelayCommand]
@@ -120,10 +149,7 @@ public sealed partial class TweakListViewModel : PageViewModelBase
                 Shell.NotifyRebootRequired();
             }
 
-            foreach (var item in Tweaks)
-            {
-                await item.RefreshStateAsync(ct);
-            }
+            await CheckAllAsync(null, ct);
         });
     }
 }

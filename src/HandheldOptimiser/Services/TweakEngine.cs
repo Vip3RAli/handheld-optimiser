@@ -68,6 +68,12 @@ public sealed class TweakEngine
 
     public IReadOnlyList<PowerAction> PowerActions { get; }
 
+    /// <summary>
+    /// Goes up whenever tweaks are applied or reverted or a power action runs, anywhere in the app. Pages
+    /// note the value when they check their tweaks, so they only check again once something may have changed.
+    /// </summary>
+    public int ChangeCount { get; private set; }
+
     public TweakContext Context => _context;
 
     public Tweak? FindById(string id) => AllTweaks.FirstOrDefault(t => t.Id == id);
@@ -126,6 +132,8 @@ public sealed class TweakEngine
         {
             _log.Warning("Proceeding WITHOUT a restore point at the user's explicit request.");
         }
+
+        ChangeCount++;
 
         foreach (var tweak in tweaks)
         {
@@ -187,6 +195,7 @@ public sealed class TweakEngine
             return TweakResult.Blocked(tweak.Id, message);
         }
 
+        ChangeCount++;
         var result = await tweak.RevertAsync(_context, entry, ct);
 
         if (!result.IsFailure)
@@ -273,6 +282,8 @@ public sealed class TweakEngine
                 return summary;
             }
         }
+
+        ChangeCount++;
 
         TweakResult result;
         try

@@ -53,6 +53,23 @@ internal sealed class GameTile : INotifyPropertyChanged
     }
 
     /// <summary>
+    /// The tiles for a fresh scan. A game that is exactly as it was last time keeps its tile, so a rescan
+    /// that finds nothing new decodes no pictures at all; only new or changed games get a new tile. The
+    /// library rescans every time it comes back from a game, and decoding every cover each time cost tens
+    /// of MB and up to a second of CPU on a large library.
+    /// </summary>
+    public static List<GameTile> ForScan(IEnumerable<Game> games, IReadOnlyList<GameTile> previous)
+    {
+        var kept = new Dictionary<Game, GameTile>();
+        foreach (var tile in previous)
+        {
+            kept.TryAdd(tile.Game, tile);
+        }
+
+        return games.Select(game => kept.TryGetValue(game, out var tile) ? tile : Create(game)).ToList();
+    }
+
+    /// <summary>
     /// Swaps the icon for a cover that has just been fetched, taking the backdrop colours from it too.
     /// Call it on the UI thread, with the picture and its colours already worked out elsewhere.
     /// </summary>
