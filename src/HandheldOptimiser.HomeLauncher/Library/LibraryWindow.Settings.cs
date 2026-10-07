@@ -1,0 +1,214 @@
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+
+namespace HandheldOptimiser.HomeLauncher.Library;
+
+/// <summary>The library's own settings menu.</summary>
+public partial class LibraryWindow
+{
+    // The player's choices, from the settings menu here or the main app.
+    private BackgroundKind _background = LibrarySettings.Background;
+    private ColourStrength _strength = LibrarySettings.Strength;
+    private ArtworkBlur _blur = LibrarySettings.Blur;
+    private ArtworkPosition _position = LibrarySettings.Position;
+    private bool _showStatus = LibrarySettings.ShowStatus;
+    private bool _showFilter = LibrarySettings.ShowFilter;
+    private bool _quickActions = LibrarySettings.QuickActions;
+
+    /// <summary>The library's own settings, from the gear in the top bar or the controller's Menu button.</summary>
+    private void OpenSettings()
+    {
+        _menuTile = null;
+        _menu = SettingsItems;
+        GameItems.Visibility = Visibility.Collapsed;
+        PowerItems.Visibility = Visibility.Collapsed;
+
+        MenuTitle.Text = "Settings";
+        MenuStore.Text = "Game library";
+        RefreshSettings();
+
+        MenuOverlay.Visibility = Visibility.Visible;
+        ShowMenuItems();
+    }
+
+    private void RefreshSettings()
+    {
+        UpdateSetting.Visibility = _update is null ? Visibility.Collapsed : Visibility.Visible;
+        UpdateSetting.Tag = _update is null ? null : $"Handheld Optimiser {Updates.Display(_update)} is available";
+
+        BackgroundSetting.Tag = _background switch
+        {
+            BackgroundKind.Artwork => "Game artwork",
+            BackgroundKind.Plain => "Plain",
+            _ => "Game colours"
+        };
+
+        // Artwork mode still shows colours for a game with no artwork, so the strength applies there too.
+        StrengthSetting.IsEnabled = _background != BackgroundKind.Plain;
+        StrengthSetting.Tag = _strength.ToString();
+
+        BlurSetting.Visibility = _background == BackgroundKind.Artwork ? Visibility.Visible : Visibility.Collapsed;
+        BlurSetting.Tag = _blur.ToString();
+
+        PositionSetting.Visibility = BlurSetting.Visibility;
+        PositionSetting.Tag = _position.ToString();
+
+        StatusSetting.Tag = OnOff(_showStatus);
+        FilterSetting.Tag = OnOff(_showFilter);
+        QuickActionsSetting.Tag = OnOff(_quickActions);
+
+        // Only the end of the key is shown: enough to tell which one it is.
+        ArtworkKeySetting.Visibility = _background == BackgroundKind.Artwork ? Visibility.Visible : Visibility.Collapsed;
+        ArtworkKeySetting.Tag = LibrarySettings.ArtworkKey is not { } key ? "Not set. Free to create at steamgriddb.com"
+            : key.Length > 4 ? $"Set, ending in {key[^4..]}"
+            : "Set";
+    }
+
+    private static string OnOff(bool on) => on ? "On" : "Off";
+
+    private void OnOpenSettings(object sender, RoutedEventArgs e) => OpenSettings();
+
+    private void OnToggleStatus(object sender, RoutedEventArgs e)
+    {
+        _showStatus = !_showStatus;
+        LibrarySettings.ShowStatus = _showStatus;
+        RefreshSettings();
+        _ = UpdateStatusAsync();
+    }
+
+    private void OnToggleFilter(object sender, RoutedEventArgs e)
+    {
+        _showFilter = !_showFilter;
+        LibrarySettings.ShowFilter = _showFilter;
+        RefreshSettings();
+
+        // Switching it off also drops a store filter that could no longer be changed.
+        ApplyFilter();
+    }
+
+    private void OnToggleQuickActions(object sender, RoutedEventArgs e)
+    {
+        _quickActions = !_quickActions;
+        LibrarySettings.QuickActions = _quickActions;
+        OptionsHint.Visibility = _quickActions ? Visibility.Visible : Visibility.Collapsed;
+        RefreshSettings();
+    }
+
+    private void OnCycleBackground(object sender, RoutedEventArgs e) => StepBackground(1);
+
+    private void OnCycleStrength(object sender, RoutedEventArgs e) => StepStrength(1);
+
+    private void OnCycleBlur(object sender, RoutedEventArgs e) => StepBlur(1);
+
+    private void OnCyclePosition(object sender, RoutedEventArgs e) => StepPosition(1);
+
+    /// <summary>
+    /// Opens the main app over the library, which stays open behind it. If it is already open it is
+    /// brought to the front instead, with no second copy and no administrator prompt.
+    /// </summary>
+    private void OnOpenMainApp(object sender, RoutedEventArgs e)
+    {
+        CloseMenu();
+
+        if (MainApp.ShowIfRunning())
+        {
+            Program.Log("Switched to the main app, which was already open");
+            StatusText.Text = "Handheld Optimiser is already open.";
+            return;
+        }
+
+        if (MainApp.Start() is { } problem)
+        {
+            Program.Log($"Could not open the main app from settings: {problem}");
+            StatusText.Text = $"Handheld Optimiser was not opened: {problem}";
+            return;
+        }
+
+        Program.Log("Opened the main app from settings");
+        StatusText.Text = "Opening Handheld Optimiser...";
+    }
+
+    /// <summary>Closes the library. Windows starts it again on the next home button press.</summary>
+    private void OnQuit(object sender, RoutedEventArgs e)
+    {
+        Program.Log("Game library closed from its settings");
+        Close();
+    }
+
+    private void StepBackground(int step)
+    {
+        _background = Step(_background, step);
+        LibrarySettings.Background = _background;
+        RefreshSettings();
+        ReloadBackdrop();
+    }
+
+    private void StepStrength(int step)
+    {
+        _strength = Step(_strength, step);
+        LibrarySettings.Strength = _strength;
+        RefreshSettings();
+        ReloadBackdrop();
+    }
+
+    private void StepPosition(int step)
+    {
+        _position = Step(_position, step);
+        LibrarySettings.Position = _position;
+        RefreshSettings();
+        ReloadBackdrop();
+    }
+
+    private void StepBlur(int step)
+    {
+        _blur = Step(_blur, step);
+        LibrarySettings.Blur = _blur;
+        RefreshSettings();
+        ReloadBackdrop();
+    }
+
+    /// <summary>The next or previous choice of a setting, going round at either end.</summary>
+    private static T Step<T>(T value, int step) where T : struct, Enum
+    {
+        var choices = Enum.GetValues<T>();
+        return choices[(Array.IndexOf(choices, value) + step + choices.Length) % choices.Length];
+    }
+
+    /// <summary>Left and right on a settings row with several choices step through them, like a slider.</summary>
+    private bool StepFocusedSetting(int step)
+    {
+        if (!ReferenceEquals(_menu, SettingsItems) || Keyboard.FocusedElement is not Button row)
+        {
+            return false;
+        }
+
+        if (ReferenceEquals(row, BackgroundSetting))
+        {
+            StepBackground(step);
+        }
+        else if (ReferenceEquals(row, StrengthSetting))
+        {
+            StepStrength(step);
+        }
+        else if (ReferenceEquals(row, PositionSetting))
+        {
+            StepPosition(step);
+        }
+        else if (ReferenceEquals(row, BlurSetting))
+        {
+            StepBlur(step);
+        }
+        else
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private void OnEditArtworkKey(object sender, RoutedEventArgs e) =>
+        BeginEdit(MenuEditor.ArtworkKey, "SteamGridDB API key",
+            "Free to create at steamgriddb.com, under Preferences then API. It fetches covers and background artwork for games outside Steam, whose titles are sent to SteamGridDB to find them. Leave empty to remove the key.",
+            LibrarySettings.ArtworkKey);
+}
