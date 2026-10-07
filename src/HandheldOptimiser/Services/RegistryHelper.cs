@@ -8,7 +8,7 @@ namespace HandheldOptimiser.Services;
 /// Registry reads and writes, with every write gated by <see cref="SafetyGuard"/> and preceded by a
 /// snapshot of the prior state so the change can be reversed exactly.
 /// </summary>
-public sealed class RegistryHelper(LogService log)
+public sealed class RegistryHelper(LogService log) : IRegistryStore
 {
     private readonly LogService _log = log;
 

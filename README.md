@@ -182,6 +182,8 @@ winget install --id JRSoftware.InnoSetup -e --scope user
 
 This publishes a self-contained build, packs the full screen home app registration, and writes `artifacts\HandheldOptimiser-Setup-<version>.exe`. The version comes from `<Version>` in `src\HandheldOptimiser\HandheldOptimiser.csproj`.
 
+Run the tests with `dotnet test`. They cover undo and the protected lists, and run against an in-memory registry and undo journal, so they never touch the real registry, services or packages. GitHub Actions builds and tests every push to `main` and every pull request.
+
 ### Signing releases for the in-app updater
 
 If the update signing key is present, the build script also writes `HandheldOptimiser-Setup-<version>.exe.sig` and checks it against the public key built into the app. Upload **both files** to the release; without the `.sig`, the updater tells users to install that release by hand.
@@ -201,6 +203,7 @@ It is stored in `%APPDATA%\HandheldOptimiser-Signing`, encrypted to your Windows
 | `src/HandheldOptimiser` | The WPF app. Tweaks are declared in `TweakDefinitions/`; `Services/TweakEngine.cs` applies them with the restore point and undo journal, and `Services/SafetyGuard.cs` holds the protected list |
 | `src/HandheldOptimiser.HomeLauncher` | The small launcher Windows starts as the full screen home app |
 | `installer` | Inno Setup script, build script, and the home app registration package in `HomeApp/` |
+| `tests/HandheldOptimiser.Tests` | xUnit tests for revert (`TweakEngine`) and the protected lists (`SafetyGuard`) |
 | `tools/UpdateSigner` | Creates the update signing key and signs installers; release tooling only, never shipped |
 
 ## Credits

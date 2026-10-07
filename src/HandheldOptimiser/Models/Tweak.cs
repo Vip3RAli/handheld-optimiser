@@ -6,10 +6,10 @@ namespace HandheldOptimiser.Models;
 /// Services a tweak needs in order to do its work. Passed in rather than resolved statically so a tweak
 /// definition stays a plain description of intent.
 /// </summary>
-public sealed class TweakContext(LogService log, RegistryHelper registry, PowerShellRunner runner)
+public sealed class TweakContext(LogService log, IRegistryStore registry, PowerShellRunner runner)
 {
     public LogService Log { get; } = log;
-    public RegistryHelper Registry { get; } = registry;
+    public IRegistryStore Registry { get; } = registry;
     public PowerShellRunner Runner { get; } = runner;
 }
 
