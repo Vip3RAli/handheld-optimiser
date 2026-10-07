@@ -33,6 +33,7 @@ public partial class LibraryWindow
         _focusedKey = game.Key;
         _menu = GameItems;
         SettingsItems.Visibility = Visibility.Collapsed;
+        HideSettingsGroups();
         PowerItems.Visibility = Visibility.Collapsed;
 
         MenuTitle.Text = tile.Title;
@@ -67,7 +68,7 @@ public partial class LibraryWindow
     }
 
     /// <summary>The open list of rows, which is also where cancelling the text box goes back to.</summary>
-    private void ShowMenuItems()
+    private void ShowMenuItems(Button? focus = null)
     {
         if (_menu is null)
         {
@@ -80,7 +81,7 @@ public partial class LibraryWindow
 
         // Wait for the rows to be laid out before one can take focus.
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded,
-            () => _menu?.Children.OfType<Button>().FirstOrDefault(b => b.IsEnabled && b.IsVisible)?.Focus());
+            () => (focus ?? _menu?.Children.OfType<Button>().FirstOrDefault(b => b.IsEnabled && b.IsVisible))?.Focus());
     }
 
     private void CloseMenu()

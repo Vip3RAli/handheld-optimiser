@@ -24,8 +24,7 @@ public static class InterfaceTweaks
         Id = "ux.menushowdelay",
         Name = "Instant menus (zero menu show delay)",
         Description =
-            "Removes the 400 ms pause before cascading and context submenus open. Menus appear the moment " +
-            "your finger or cursor reaches them.",
+            "Removes the 400 ms pause before submenus open.",
         Category = TweakCategory.Interface,
         Risk = RiskLevel.Safe,
         RequiresReboot = true,
@@ -41,15 +40,15 @@ public static class InterfaceTweaks
         Id = "ux.edgeswipe",
         Name = "Disable edge swipe gestures",
         Description =
-            "Stops swipes in from the screen edges opening Widgets, Notifications or Task View, which is " +
-            "easy to trigger by accident while gripping the Ally during touch-heavy games.",
+            "Stops swipes from the screen edges opening Widgets, Notifications or Task View, which is " +
+            "easy to do by accident in touch-heavy games.",
         Category = TweakCategory.Interface,
         Risk = RiskLevel.Moderate,
         RequiresReboot = true,
         IncludeInOneClick = false,
         Warning =
-            "Notifications and Widgets have to be opened from the taskbar or Armoury Crate instead of by " +
-            "swiping. This is a machine-wide policy, so it applies to every user account.",
+            "Open Notifications and Widgets from the taskbar or Armoury Crate instead. Applies to every " +
+            "user account.",
         RegistryValues =
         [
             new(RegistryRoot.LocalMachine, @"SOFTWARE\Policies\Microsoft\Windows\EdgeUI", "AllowEdgeSwipe", 0, RegistryValueKind.DWord)
@@ -66,8 +65,8 @@ public static class InterfaceTweaks
         Id = VisualEffectsId,
         Name = "Disable transparency & window animations",
         Description =
-            "Turns off acrylic transparency and window, taskbar and minimise animations. Less work for the " +
-            "desktop compositor on the iGPU, and the desktop feels snappier. Games are unaffected.",
+            "Turns off transparency and window animations. Less work for the iGPU and a snappier " +
+            "desktop. Games are unaffected.",
         Category = TweakCategory.Interface,
         Risk = RiskLevel.Safe,
         RequiresReboot = true,

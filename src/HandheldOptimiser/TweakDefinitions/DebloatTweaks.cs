@@ -53,9 +53,8 @@ public static class DebloatTweaks
         Id = "debloat.telemetry",
         Name = "Disable telemetry & data collection",
         Description =
-            "Sets telemetry to the minimum the OS allows, disables the Compatibility Appraiser and CEIP " +
-            "scheduled tasks, turns off the advertising ID, and stops the DiagTrack service. Windows Update " +
-            "and Defender are unaffected, as neither depends on any of this.",
+            "Cuts telemetry to the minimum Windows allows and turns off the advertising ID. Windows " +
+            "Update and Defender are unaffected.",
         Category = TweakCategory.Privacy,
         Risk = RiskLevel.Safe,
         RequiresReboot = true,
@@ -156,8 +155,8 @@ public static class DebloatTweaks
         Id = "debloat.websearch",
         Name = "Disable web search in Start menu",
         Description =
-            "Start menu search stops reaching out to Bing and only returns local results. Makes search " +
-            "instant and stops the Start menu hanging when Wi-Fi is flaky.",
+            "Start menu search returns local results only, so it is instant and never hangs on flaky " +
+            "Wi-Fi.",
         Category = TweakCategory.Debloat,
         Risk = RiskLevel.Safe,
         RegistryValues =
@@ -175,8 +174,7 @@ public static class DebloatTweaks
         Id = "debloat.cortana_copilot",
         Name = "Disable Cortana & Copilot",
         Description =
-            "Turns off Cortana and Windows Copilot by policy and removes the Copilot button from the " +
-            "taskbar, so neither runs background tasks or consumes memory.",
+            "Turns off Cortana and Copilot and removes the Copilot taskbar button.",
         Category = TweakCategory.Debloat,
         Risk = RiskLevel.Safe,
         RegistryValues =
@@ -193,9 +191,8 @@ public static class DebloatTweaks
         Id = "debloat.consumer_features",
         Name = "Stop app suggestions & silent reinstalls",
         Description =
-            "Prevents Windows from silently installing promoted apps, showing suggestions in Start, and " +
-            "re-adding the bloatware you remove. Worth applying before the bloatware removal so nothing " +
-            "comes back.",
+            "Stops Windows installing promoted apps, showing suggestions in Start and re-adding " +
+            "bloatware you remove. Apply before removing bloatware.",
         Category = TweakCategory.Debloat,
         Risk = RiskLevel.Safe,
         RegistryValues =
@@ -218,9 +215,8 @@ public static class DebloatTweaks
         Id = "debloat.shell_ads",
         Name = "Hide ads in Start, Settings and File Explorer",
         Description =
-            "Turns off app recommendations and Microsoft account nags in Start, suggested content in Settings, " +
-            "OneDrive prompts in File Explorer, tips on the lock screen, and the \"finish setting up your " +
-            "device\" screen that appears after updates.",
+            "Turns off recommendations, account nags and tips in Start, Settings, File Explorer and the " +
+            "lock screen, plus the \"finish setting up your device\" screen.",
         Category = TweakCategory.Debloat,
         Risk = RiskLevel.Safe,
         RegistryValues =
@@ -248,8 +244,7 @@ public static class DebloatTweaks
         Id = "debloat.widgets",
         Name = "Turn off Widgets",
         Description =
-            "Removes the Widgets board and its taskbar button. The board keeps a set of Edge WebView " +
-            "processes running in the background, typically 100 to 200 MB of memory the game could use.",
+            "Removes the Widgets board and its taskbar button, freeing 100 to 200 MB of memory.",
         Category = TweakCategory.Debloat,
         Risk = RiskLevel.Safe,
         RequiresReboot = true,
@@ -264,13 +259,13 @@ public static class DebloatTweaks
         Id = "debloat.edge_background",
         Name = "Stop Edge running in the background",
         Description =
-            "Turns off Edge's Startup Boost, which preloads it at sign-in, and stops it staying open in the " +
-            "background after you close the last window. Frees the memory those hidden Edge processes hold.",
+            "Stops Edge preloading at sign-in and staying open after you close it, freeing the memory it " +
+            "holds.",
         Category = TweakCategory.Debloat,
         Risk = RiskLevel.Safe,
         Warning =
-            "Edge takes a moment longer to open, and its settings page says some settings are managed by your " +
-            "organisation. That note is these two policies, nothing else.",
+            "Edge opens slightly slower. Its settings page will say it is managed by your organisation, " +
+            "which is just this tweak.",
         RegistryValues =
         [
             new(RegistryRoot.LocalMachine, EdgePolicy, "StartupBoostEnabled", 0, RegistryValueKind.DWord),
@@ -283,8 +278,8 @@ public static class DebloatTweaks
         Id = "debloat.activity_history",
         Name = "Turn off activity history & tailored experiences",
         Description =
-            "Stops Windows recording which apps and files you open, and stops it using diagnostic data to " +
-            "personalise tips and offers. Less background logging, and nothing you use goes away.",
+            "Stops Windows recording which apps and files you open, and using diagnostic data to " +
+            "personalise tips and offers.",
         Category = TweakCategory.Privacy,
         Risk = RiskLevel.Safe,
         RegistryValues =
@@ -304,14 +299,14 @@ public static class DebloatTweaks
         Id = "debloat.error_reporting",
         Name = "Turn off Windows Error Reporting",
         Description =
-            "Stops Windows collecting crash reports and uploading them to Microsoft after an app or game " +
-            "crashes, which otherwise means a burst of disk and network work right after the crash.",
+            "Stops Windows collecting and uploading crash reports, which avoids a burst of disk and " +
+            "network work after a crash.",
         Category = TweakCategory.Privacy,
         Risk = RiskLevel.Safe,
         IncludeInOneClick = false,
         Warning =
-            "Microsoft and game developers stop receiving crash reports from this device, and the " +
-            "\"check for solutions\" prompt after a crash no longer appears.",
+            "Microsoft and game developers get no crash reports from this device, and the \"check for " +
+            "solutions\" prompt no longer appears.",
         RegistryValues =
         [
             new(RegistryRoot.LocalMachine, @"SOFTWARE\Policies\Microsoft\Windows\Windows Error Reporting",
@@ -332,16 +327,15 @@ public static class DebloatTweaks
         Id = "debloat.onedrive",
         Name = "Turn off OneDrive",
         Description =
-            "Stops OneDrive running and syncing, so it never starts an upload or download in the middle of a " +
-            "game. Game cloud saves go through Steam, Xbox and the other launchers, not OneDrive.",
+            "Stops OneDrive running and syncing, so it never interrupts a game. Game cloud saves use " +
+            "Steam, Xbox and the other launchers, not OneDrive.",
         Category = TweakCategory.Debloat,
         Risk = RiskLevel.Moderate,
         IncludeInOneClick = false,
         Warning =
-            "Files that are only in the cloud (the cloud icon in File Explorer) cannot be opened on this " +
-            "device until you revert. If your Desktop or Documents are backed up to OneDrive, make sure " +
-            "they are set to \"Always keep on this device\" first. After reverting, OneDrive starts again " +
-            "at your next sign-in.",
+            "Cloud-only files cannot be opened until you revert. If Desktop or Documents are backed up " +
+            "to OneDrive, set them to \"Always keep on this device\" first. After reverting, OneDrive " +
+            "starts at your next sign-in.",
         RegistryValues =
         [
             new(RegistryRoot.LocalMachine, @"SOFTWARE\Policies\Microsoft\Windows\OneDrive",
@@ -372,14 +366,12 @@ public static class DebloatTweaks
         Id = "debloat.background_apps",
         Name = "Disable Store app background activity",
         Description =
-            "Stops packaged (Store) apps from running tasks in the background. Frees memory and stops " +
-            "background CPU wake-ups while gaming. Desktop programs, Armoury Crate and all services are " +
-            "unaffected.",
+            "Stops Store apps running in the background, freeing memory and CPU. Desktop programs, " +
+            "Armoury Crate and services are unaffected.",
         Category = TweakCategory.Debloat,
         Risk = RiskLevel.Moderate,
         Warning =
-            "Packaged apps will not deliver live tiles or push notifications until reverted. If you rely on " +
-            "notifications from a Store app, leave this off.",
+            "Store apps stop sending notifications until reverted. Leave this off if you rely on them.",
         RegistryValues =
         [
             new(RegistryRoot.CurrentUser,

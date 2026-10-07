@@ -36,9 +36,8 @@ public static class FullScreenTweaks
         Id = HomeAppId,
         Name = "Use Handheld Optimiser as the full screen home app",
         Description =
-            "Full screen mode opens the app you choose above (Steam Big Picture, the Handheld Optimiser library, " +
-            "Armoury Crate SE or your own) instead of the Xbox app, both at sign-in and whenever you press the " +
-            "home button.",
+            "Full screen mode opens the app you choose above instead of the Xbox app, at sign-in and " +
+            "when you press the home button.",
         Category = TweakCategory.FullScreen,
         Risk = RiskLevel.Moderate,
         IncludeInOneClick = false,
@@ -109,8 +108,8 @@ public static class FullScreenTweaks
         Id = "fse.startup",
         Name = "Enter full screen mode at sign-in",
         Description =
-            "Signs straight into full screen mode with your home app open, like a console, instead of the " +
-            "Windows desktop. You can still switch to the desktop from the Game Bar.",
+            "Signs straight into full screen mode with your home app open, like a console. You can still " +
+            "switch to the desktop from the Game Bar.",
         Category = TweakCategory.FullScreen,
         Risk = RiskLevel.Safe,
         IncludeInOneClick = false,

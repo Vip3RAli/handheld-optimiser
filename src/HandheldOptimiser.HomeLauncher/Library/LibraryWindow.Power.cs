@@ -18,6 +18,7 @@ public partial class LibraryWindow
         _menu = PowerItems;
         GameItems.Visibility = Visibility.Collapsed;
         SettingsItems.Visibility = Visibility.Collapsed;
+        HideSettingsGroups();
 
         MenuTitle.Text = "Power";
         MenuStore.Text = "This device";

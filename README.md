@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/dashboard.png" alt="Handheld Optimiser dashboard with the One-Click Optimise button, current state and safety options" width="900">
+  <img src="docs/dashboard.png" alt="Handheld Optimiser dashboard with the Apply Optimised Tweaks button, current state and safety options" width="900">
 </p>
 
 ---
@@ -23,7 +23,7 @@
 
 Windows ships set up for a desktop PC, not a 7-inch handheld. Handheld Optimiser applies the changes handheld owners usually make by hand from forum posts and scripts, from one touch-friendly app:
 
-- **One-Click Optimise** applies the recommended performance and debloat tweaks in a single pass.
+- **Apply Optimised Tweaks** applies the recommended performance and debloat tweaks in a single pass.
 - **Individual toggles** for every tweak, grouped by area, each showing whether it is currently applied.
 - **Xbox mode home app**: make Windows' full screen experience open Steam Big Picture, Armoury Crate SE or any launcher you choose.
 - **Maintenance tools**: clear shader caches, free space with Compact OS, install missing game runtimes, and remove preinstalled apps.
@@ -33,7 +33,7 @@ Windows ships set up for a desktop PC, not a 7-inch handheld. Handheld Optimiser
 Every system change goes through the same safety checks:
 
 - **A System Restore point is created first.** If Windows cannot create one, nothing is changed.
-- **Every tweak records the original setting**, so it can be reverted on its own or all at once with **Revert all tweaks** on the Dashboard, even after restarting or updating the app.
+- **Every tweak records the original setting**, so it can be reverted on its own or all at once with **Undo all changes** on the Dashboard, even after restarting or updating the app.
 - **Protected components are never touched**, whatever a tweak asks for: Windows Update, Microsoft Defender, the firewall, your handheld's own software (Armoury Crate SE and ASUS services, Legion Space and Lenovo services, MSI Center M), AMD and Intel drivers, Realtek audio and Game Pass. The one exception is the optional **Turn off update sharing with other PCs** switch, which changes a single Delivery Optimization setting; updates still download as normal.
 - **Trade-offs are shown up front.** Anything that lowers security or turns off a feature is labelled on its card and listed in the confirmation before it runs.
 
@@ -53,17 +53,17 @@ The sidebar has four sections, sized for a thumb on a handheld's touch screen. E
 
 | Section | Tabs |
 |---|---|
-| **Dashboard** | One-Click Optimise, current state, hardware and safety |
+| **Dashboard** | Apply Optimised Tweaks, current state, hardware and safety |
 | **Performance Tweaks** | Gaming Tweaks · CPU & Kernel · Graphics & Scheduling · Network · Storage · Sleep & Battery · Interface |
 | **Debloat Tool** | System Debloat · Deep Services · Bloatware · Startup Apps |
 | **Settings & Hardware** | Full Screen Mode · Power Actions · Game Runtimes · Device & System Health · Handheld Usability |
 
 ### Dashboard
-A **One-Click Optimise** banner, then three cards: a ring showing how many of the recommended tweaks are applied, the hardware readings, and the restore point and **Revert all tweaks** buttons.
+An **Apply Optimised Tweaks** banner, then three cards: a ring showing how many of the recommended tweaks are applied, the hardware readings, and the restore point and **Undo all changes** buttons.
 
 A **Hardware** card shows the battery's charge and live power draw in watts, its health (what it holds now against what it was built to hold), the memory set aside for graphics (the UMA buffer) and the installed graphics driver. It only reads; nothing on it changes a setting.
 
-One-Click Optimise includes turning off **Memory Integrity**, which is usually the biggest single frame rate gain on the Ally but lowers protection against malicious drivers. The confirmation lists it, and every other trade-off, before anything runs. Virtual Machine Platform is left on because some anti-cheat games need it.
+**Apply Optimised Tweaks** includes turning off **Memory Integrity**, which is usually the biggest single frame rate gain on the Ally but lowers protection against malicious drivers. The confirmation lists it, and every other trade-off, before anything runs. Virtual Machine Platform is left on because some anti-cheat games need it.
 
 ### Tweak pages
 
@@ -104,7 +104,7 @@ A lightweight game library that replaces Big Picture as the home screen. It find
 - **X** on a game (or press and hold on touch) opens its quick actions: set extra launch arguments, open the install folder, view the executable's properties, or correct its background artwork. Launch arguments apply to Steam and GOG games; the other stores start their games themselves and take none.
 - The power button beside the gear (or **View** on the controller) opens the power menu: sleep, hibernate, restart or shut down. Hibernate is listed only when it is switched on in Windows. Restart and shut down ask for a second press, so a stray button cannot end a session.
 - The background is a gradient in the colours of the selected game's cover or icon, worked out on the device with nothing downloaded.
-- The gear in the top bar (or **Menu** on the controller) opens the library's settings: the background (game colours, game artwork or plain), how strong the colours are, how blurred the artwork is (off, light, medium or strong) and whether it sits at the top or the bottom of the screen, the SteamGridDB key, on / off switches for the battery and Wi-Fi display, the store filter and the quick actions, **Open Handheld Optimiser** to bring up the main app (Windows asks for administrator permission; if the app is already open it just comes to the front), and **Quit** to close the library.
+- The gear in the top bar (or **Menu** on the controller) opens the library's settings, a short list with two groups behind their own rows. **Background** has the background (game colours, game artwork or plain), how strong the colours are, how blurred the artwork is (off, light, medium or strong), whether it sits at the top or the bottom of the screen, and the SteamGridDB key. **Display** has on / off switches for the battery and Wi-Fi display, the store filter and the quick actions. **B** steps back from a group, and each group also has a **Back** row for touch. The list itself has **Open Handheld Optimiser** to bring up the main app (Windows asks for administrator permission; if the app is already open it just comes to the front), and **Quit** to close the library.
 - Choose game artwork there, or switch on **Use game artwork as the library background** under **Full Screen Mode**, to show the game's whole banner artwork across the top or bottom of the screen, fading into its colours. Steam games use the artwork Steam already keeps on disk. For the other stores, enter a free [SteamGridDB](https://www.steamgriddb.com) API key and the library fetches each game's artwork once and keeps it in `%LOCALAPPDATA%\HandheldOptimiser\artwork`. Only then does the library contact SteamGridDB, sending the titles of those games to find them. Its only other use of the internet is the check for a newer release. A game with no artwork keeps its gradient. If a game gets the wrong picture or the wrong cover, **Background artwork** in its quick actions lets you give the title to look both up by.
 - **Box art for every store.** Steam games show the cover Steam keeps on disk. With a free [SteamGridDB](https://www.steamgriddb.com) API key entered, games from the other stores (Xbox and Game Pass, Epic, GOG, Battle.net, EA, Ubisoft) get a portrait cover too, in place of their icon. Covers are fetched once, a few at a time when the library opens, and kept in `%LOCALAPPDATA%\HandheldOptimiser\artwork`. This happens whatever background you chose: once a key is set, the titles of games without a cover are sent to SteamGridDB to find them. A game SteamGridDB has no cover for keeps its icon.
 
@@ -158,7 +158,7 @@ Every release is signed with the developer's own key, and the app refuses to ins
 
 ## Uninstalling
 
-Uninstall from **Settings > Apps > Installed apps**. Uninstalling removes the app but **does not undo tweaks**; use **Revert all tweaks** first if you want Windows put back as it was. Your undo history is kept, so reinstalling later can still revert everything. If Handheld Optimiser was your full screen home app, Windows goes back to the Xbox app.
+Uninstall from **Settings > Apps > Installed apps**. Uninstalling removes the app but **does not undo tweaks**; use **Undo all changes** first if you want Windows put back as it was. Your undo history is kept, so reinstalling later can still revert everything. If Handheld Optimiser was your full screen home app, Windows goes back to the Xbox app.
 
 ## FAQ
 
@@ -169,7 +169,7 @@ Almost every change the app makes is machine-wide, so Windows requires it. The f
 The installer is not signed with a paid code-signing certificate yet. The SHA-256 hash of each installer is listed in its release notes if you want to verify your download.
 
 **Something went wrong. What do I do?**
-Use **Revert all tweaks** on the Dashboard, or roll back with the System Restore point the app created. Each session is logged to `%LOCALAPPDATA%\HandheldOptimiser\logs`, which is the most useful thing to attach to an issue.
+Use **Undo all changes** on the Dashboard, or roll back with the System Restore point the app created. Each session is logged to `%LOCALAPPDATA%\HandheldOptimiser\logs`, which is the most useful thing to attach to an issue.
 
 ## Building from source
 

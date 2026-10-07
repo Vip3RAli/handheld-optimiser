@@ -17,7 +17,7 @@ public static class RuntimeCatalog
         .. VisualCpp("2010", "Needed by many games from 2010 to 2013."),
         .. VisualCpp("2012", "Needed by games from 2012 to 2014."),
         .. VisualCpp("2013", "Needed by games from 2013 to 2016."),
-        .. VisualCpp("2015+", "The current runtime, covering Visual C++ 2015 to 2022. Most modern games need it.",
+        .. VisualCpp("2015+", "Covers Visual C++ 2015 to 2022. Most modern games need it.",
             "2015-2022"),
 
         new()
@@ -25,8 +25,7 @@ public static class RuntimeCatalog
             Id = "Microsoft.DirectX",
             Name = "DirectX End-User Runtime (June 2010)",
             Description =
-                "The legacy D3DX, XAudio and XInput libraries that DirectX 9, 10 and 11 games still load. " +
-                "Windows 11 does not include them, and they were never updated after June 2010.",
+                "Legacy libraries that DirectX 9, 10 and 11 games still load. Not included in Windows 11.",
             Detection = RuntimeDetection.Files,
             FixedVersionLabel = "June 2010",
             DetectFiles =
@@ -43,13 +42,13 @@ public static class RuntimeCatalog
             Id = NetFx3Id,
             Name = ".NET Framework 3.5",
             Description =
-                "A Windows feature that is off by default. Older games, mod tools and launchers built on .NET " +
-                "2.0 to 3.5 need it. Installed from Windows Update, which can take a few minutes.",
+                "Needed by older games, mod tools and launchers. Installed from Windows Update, which " +
+                "can take a few minutes.",
             Detection = RuntimeDetection.NetFx3,
             FixedVersionLabel = "3.5"
         },
 
-        .. DotNet("6", "Out of support since November 2024; 6.0.36 is its final release. Still worth updating for apps that need it."),
+        .. DotNet("6", "Out of support since November 2024, but still worth updating for apps that need it."),
         .. DotNet("8", "Current long-term support release."),
         .. DotNet("9", "Current standard-support release."),
 
@@ -72,8 +71,8 @@ public static class RuntimeCatalog
             Id = "Nvidia.PhysXLegacy",
             Name = "NVIDIA PhysX (Legacy)",
             Description =
-                "Physics runtime used by some games from 2008 to 2012, such as Mirror's Edge and Batman: " +
-                "Arkham Asylum. Falls back to the CPU on AMD hardware, so those games launch on the Ally.",
+                "Physics runtime for some games from 2008 to 2012, such as Mirror's Edge and Batman: " +
+                "Arkham Asylum.",
             Group = RuntimeGroup.Legacy
         }
     ];
@@ -87,7 +86,7 @@ public static class RuntimeCatalog
                 Id = $"Microsoft.VCRedist.{version}.{arch}",
                 Name = $"Visual C++ {label ?? version} ({arch})",
                 Description = arch == "x86"
-                    ? $"{description} Required for 32-bit games, which are still common."
+                    ? $"{description} Required for 32-bit games."
                     : description
             };
         }

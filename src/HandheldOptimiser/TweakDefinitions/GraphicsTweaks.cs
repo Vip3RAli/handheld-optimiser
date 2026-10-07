@@ -62,9 +62,8 @@ public static class GraphicsTweaks
         Id = "graphics.windowedgames",
         Name = "Optimise windowed and borderless games",
         Description =
-            "Switches on Windows 11's optimisations for windowed games, so DirectX 10 and 11 games running in a " +
-            "window or borderless get the same low-latency presentation as exclusive full screen, and can use " +
-            "Auto HDR and variable refresh rate. Applies the next time a game starts.",
+            "Gives DirectX 10 and 11 games in a window or borderless the same low latency as exclusive " +
+            "full screen, plus Auto HDR and variable refresh rate. Applies the next time a game starts.",
         Category = TweakCategory.Graphics,
         Risk = RiskLevel.Safe,
         ScriptRegistryValues = [GlobalSettings($"{WindowedSetting}=1;")],
@@ -144,8 +143,8 @@ public static class GraphicsTweaks
         Id = "graphics.gamemode",
         Name = "Force Game Mode on",
         Description =
-            "Makes sure Game Mode is enabled, so Windows prioritises the running game and stops Windows Update " +
-            "installing drivers or showing restart prompts while you play.",
+            "Keeps Game Mode on, so Windows prioritises the game and holds back driver installs and " +
+            "restart prompts while you play.",
         Category = TweakCategory.Graphics,
         Risk = RiskLevel.Safe,
         RegistryValues =
@@ -160,8 +159,8 @@ public static class GraphicsTweaks
         Id = "graphics.hags",
         Name = "Enable hardware-accelerated GPU scheduling",
         Description =
-            "Lets the GPU manage its own memory and work queue instead of the CPU doing it. Lowers input " +
-            "latency slightly, and frame generation in some games needs it switched on.",
+            "Lets the GPU manage its own memory and work queue. Lowers input latency slightly, and some " +
+            "games need it for frame generation.",
         Category = TweakCategory.Graphics,
         Risk = RiskLevel.Moderate,
         RequiresReboot = true,
