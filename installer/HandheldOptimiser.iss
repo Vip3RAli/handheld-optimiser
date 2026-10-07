@@ -91,7 +91,7 @@ begin
   if not UninstallSilent then
     Result := MsgBox(
       'Uninstalling does not undo any tweaks this app applied.' + Gap +
-      'To put Windows back first, cancel now, open Handheld Optimiser and use "Revert all tweaks" ' +
+      'To put Windows back first, cancel now, open Handheld Optimiser and use "Undo all changes" ' +
       'on the Dashboard. Your undo data is kept either way, so reinstalling later can still revert them.' + Gap +
       'Continue uninstalling?',
       mbConfirmation, MB_YESNO) = IDYES;

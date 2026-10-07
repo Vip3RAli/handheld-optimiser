@@ -35,15 +35,14 @@ public static class GamingTweaks
         Id = "gaming.hvci",
         Name = "Disable Memory Integrity (Core Isolation / HVCI)",
         Description =
-            "Stops hypervisor-enforced code integrity checks on driver code. Typically the largest single " +
-            "CPU-bound frame rate gain on the Ally, and reduces frame time spikes in CPU-heavy games.",
+            "Turns off hypervisor-enforced integrity checks on drivers. Usually the largest single frame " +
+            "rate gain in CPU-heavy games.",
         Category = TweakCategory.Gaming,
         Risk = RiskLevel.SecurityTradeoff,
         RequiresReboot = true,
         Warning =
-            "This lowers your machine's defence against malicious or vulnerable kernel drivers. Windows " +
-            "Defender, the firewall and Windows Update all keep working normally, but driver-level exploits " +
-            "become easier. Recommended for a dedicated gaming handheld; not recommended if this device " +
+            "Lowers protection against malicious or vulnerable drivers. Defender, the firewall and " +
+            "Windows Update keep working. Fine for a dedicated gaming handheld; not recommended if it " +
             "handles work email or banking.",
         RegistryValues =
         [
@@ -60,18 +59,17 @@ public static class GamingTweaks
         Id = "gaming.vmp",
         Name = "Disable Virtual Machine Platform & VBS",
         Description =
-            "Turns off Virtual Machine Platform, the Windows Hypervisor Platform and the boot hypervisor, " +
-            "removing virtualisation-based security overhead from every process on the system.",
+            "Turns off Virtual Machine Platform, the Windows Hypervisor Platform and the boot " +
+            "hypervisor, removing virtualisation overhead from every process.",
         Category = TweakCategory.Gaming,
         Risk = RiskLevel.Breaking,
         RequiresReboot = true,
         // Opt-in only: Vanguard and FACEIT games stop launching, which is too easy to miss in a one-click run.
         IncludeInOneClick = false,
         Warning =
-            "WSL / WSL2, Windows Sandbox, the Windows Subsystem for Android, Hyper-V VMs and Credential " +
-            "Guard will all stop working until this is reverted. Some anti-cheat systems (notably Vanguard " +
-            "and Faceit) require virtualisation and will refuse to launch. Revert this tweak if you need any " +
-            "of those.",
+            "WSL, Windows Sandbox, the Windows Subsystem for Android, Hyper-V and Credential Guard stop " +
+            "working until reverted. Some anti-cheat (notably Vanguard and Faceit) needs virtualisation " +
+            "and will refuse to launch.",
         RegistryValues =
         [
             new(RegistryRoot.LocalMachine, DeviceGuardKey, "EnableVirtualizationBasedSecurity", 0, RegistryValueKind.DWord)
@@ -235,8 +233,8 @@ public static class GamingTweaks
         Id = "gaming.gamedvr",
         Name = "Disable Game DVR & background recording",
         Description =
-            "Stops the Game Bar from continuously recording gameplay in the background. The Xbox app, " +
-            "Game Pass, cloud saves and the overlay itself keep working. Only the capture pipeline stops.",
+            "Stops the Game Bar recording gameplay in the background. The Xbox app, Game Pass, cloud " +
+            "saves and the overlay keep working.",
         Category = TweakCategory.Gaming,
         Risk = RiskLevel.Safe,
         RegistryValues =
@@ -253,8 +251,8 @@ public static class GamingTweaks
         Id = "gaming.startupdelay",
         Name = "Remove Windows startup delay",
         Description =
-            "Windows holds startup apps back by about ten seconds after sign-in to keep the desktop " +
-            "responsive. Removing the delay gets Armoury Crate and the desktop usable sooner after boot.",
+            "Removes the delay of about ten seconds Windows puts on startup apps, so Armoury Crate and " +
+            "the desktop are ready sooner after boot.",
         Category = TweakCategory.Gaming,
         Risk = RiskLevel.Safe,
         RequiresReboot = true,

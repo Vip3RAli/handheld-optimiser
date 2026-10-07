@@ -160,7 +160,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         Pages.Add(new TweakListViewModel(
             "Sleep & Battery",
             "",
-            "Handhelds only have Modern Standby, which keeps draining the battery. These keep a short sleep, then hibernate, and stop things waking the device.",
+            "Modern Standby keeps draining the battery. These hibernate after a short sleep and stop things waking the device.",
             [TweakCategory.Sleep],
             engine,
             this));

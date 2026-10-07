@@ -22,8 +22,7 @@ public static class UsabilityTweaks
         Id = "usability.stickykeys",
         Name = "Disable Sticky Keys shortcut",
         Description =
-            "Stops pressing Shift five times from popping up the Sticky Keys prompt and dropping you out of a " +
-            "full-screen game, which is easy to trigger when Shift is mapped to a controller button.",
+            "Stops five presses of Shift opening the Sticky Keys prompt and dropping you out of a game.",
         Category = TweakCategory.Usability,
         Risk = RiskLevel.Safe,
         RequiresReboot = true,
@@ -38,8 +37,8 @@ public static class UsabilityTweaks
         Id = "usability.filterkeys",
         Name = "Disable Filter Keys shortcut",
         Description =
-            "Stops holding right Shift for eight seconds from turning on Filter Keys, which makes the keyboard " +
-            "and mapped buttons ignore quick presses.",
+            "Stops holding right Shift for eight seconds turning on Filter Keys, which makes the " +
+            "keyboard ignore quick presses.",
         Category = TweakCategory.Usability,
         Risk = RiskLevel.Safe,
         RequiresReboot = true,
@@ -54,15 +53,15 @@ public static class UsabilityTweaks
         Id = "usability.powerthrottling",
         Name = "Disable power throttling",
         Description =
-            "Stops Windows slowing down apps it thinks are in the background. Keeps overlays, launchers and " +
-            "second-screen apps at full speed while a game is in focus.",
+            "Stops Windows slowing down background apps, so overlays and launchers stay at full speed " +
+            "while you play.",
         Category = TweakCategory.Usability,
         Risk = RiskLevel.Moderate,
         RequiresReboot = true,
         IncludeInOneClick = false,
         Warning =
-            "Background apps run at full power too, which shortens battery life when unplugged. Best left " +
-            "off if you mostly play on battery.",
+            "Background apps run at full power, which shortens battery life. Best left off if you mostly " +
+            "play on battery.",
         RegistryValues =
         [
             new(RegistryRoot.LocalMachine, @"SYSTEM\CurrentControlSet\Control\Power\PowerThrottling",

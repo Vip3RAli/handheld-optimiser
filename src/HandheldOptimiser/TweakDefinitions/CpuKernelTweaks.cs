@@ -22,9 +22,7 @@ public static class CpuKernelTweaks
         Id = "cpu.priorityseparation",
         Name = "Maximise foreground priority (Win32PrioritySeparation)",
         Description =
-            "Tells the scheduler to give the foreground window short, frequent time slices with the " +
-            "largest priority boost Windows allows. The game you are playing gets the CPU ahead of " +
-            "background work. Takes effect immediately.",
+            "Gives the game in the foreground the CPU ahead of background work. Takes effect immediately.",
         Category = TweakCategory.CpuKernel,
         Risk = RiskLevel.Safe,
         RegistryValues =

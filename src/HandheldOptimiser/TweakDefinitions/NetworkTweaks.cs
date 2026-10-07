@@ -22,18 +22,15 @@ public static class NetworkTweaks
         Id = "network.updatesharing",
         Name = "Turn off update sharing with other PCs",
         Description =
-            "Stops Windows sending and fetching pieces of Windows and Store updates to and from other PCs. " +
-            "Updates still download from Microsoft as normal. Windows only shares on mains power, and by " +
-            "default only with PCs on your own network, so this matters most when the handheld is docked " +
-            "alongside other Windows PCs.",
+            "Stops Windows sharing update downloads with other PCs. Updates still download from " +
+            "Microsoft as normal. Matters most when docked on a network with other Windows PCs.",
         Category = TweakCategory.Network,
         Risk = RiskLevel.Moderate,
         RequiresReboot = true,
         IncludeInOneClick = false,
         Warning =
-            "This is set as a policy, so Settings > Windows Update > Delivery Optimization shows \"Some " +
-            "settings are managed by your organization\" and its sharing switch is greyed out until you " +
-            "switch this back off.",
+            "Settings > Windows Update > Delivery Optimization shows \"Some settings are managed by your " +
+            "organization\" and its sharing switch is greyed out until you switch this back off.",
         RegistryValues =
         [
             new(RegistryRoot.LocalMachine, @"SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization",
@@ -50,8 +47,8 @@ public static class NetworkTweaks
         Id = "network.throttling",
         Name = "Disable network throttling",
         Description =
-            "Removes the Multimedia Class Scheduler's cap on network packet processing while audio is " +
-            "playing, which is always the case in a game. Can smooth out ping spikes in online play.",
+            "Removes the cap Windows puts on network traffic while audio is playing, which is always the " +
+            "case in a game. Can smooth out ping spikes.",
         Category = TweakCategory.Network,
         Risk = RiskLevel.Safe,
         RequiresReboot = true,
@@ -71,14 +68,14 @@ public static class NetworkTweaks
         Id = "network.ndu",
         Name = "Disable Network Data Usage monitor (Ndu)",
         Description =
-            "Stops the driver that counts per-app network usage. It is a known source of non-paged pool " +
-            "memory growth over long sessions.",
+            "Stops the driver that counts per-app network usage, a known cause of memory growth over " +
+            "long sessions.",
         Category = TweakCategory.Network,
         Risk = RiskLevel.Moderate,
         RequiresReboot = true,
         Warning =
-            "Settings > Network > Data usage and Task Manager's per-app network history will stop updating. " +
-            "Metered-connection data limits will no longer be tracked.",
+            "Data usage in Settings and Task Manager's per-app network history stop updating, and " +
+            "metered-connection data limits are no longer tracked.",
         RegistryValues =
         [
             new(RegistryRoot.LocalMachine, @"SYSTEM\CurrentControlSet\Services\Ndu", "Start", 4, RegistryValueKind.DWord)

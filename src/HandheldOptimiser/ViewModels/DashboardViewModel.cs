@@ -6,7 +6,7 @@ using HandheldOptimiser.Services;
 namespace HandheldOptimiser.ViewModels;
 
 /// <summary>
-/// The one-click page. "One-Click Optimise" applies every tweak marked for it, after a restore point and after
+/// The one-click page. "Apply Optimised Tweaks" applies every tweak marked for it, after a restore point and after
 /// an explicit confirmation listing exactly what carries a warning.
 /// </summary>
 public sealed partial class DashboardViewModel(
@@ -255,9 +255,7 @@ public sealed partial class DashboardViewModel(
         var risky = pending.Where(t => t.Risk is RiskLevel.SecurityTradeoff or RiskLevel.Breaking).ToList();
 
         var message =
-            $"This applies {pending.Count} tweaks in one pass, after creating a System Restore point.\n\n" +
-            "Windows Update, Microsoft Defender, the firewall, your handheld's own software (Armoury Crate SE, " +
-            "Legion Space, MSI Center M), AMD and Intel drivers and Realtek audio are never touched.\n\n";
+            $"This applies {pending.Count} tweaks in one pass, after creating a System Restore point.\n\n";
 
         if (risky.Count > 0)
         {
@@ -268,14 +266,14 @@ public sealed partial class DashboardViewModel(
 
         message += "Each tweak can be individually reverted afterwards from its category page.";
 
-        if (!await Shell.ConfirmAsync("One-Click Optimise", message, "Create restore point & optimise"))
+        if (!await Shell.ConfirmAsync("Apply Optimised Tweaks", message, "Create restore point & apply"))
         {
             return;
         }
 
-        await Shell.RunExclusiveAsync("One-Click Optimise", async (progress, ct) =>
+        await Shell.RunExclusiveAsync("Apply Optimised Tweaks", async (progress, ct) =>
         {
-            var summary = await _engine.ApplyAsync(pending, "One-Click Optimise", createRestorePoint: true, progress, ct);
+            var summary = await _engine.ApplyAsync(pending, "Apply Optimised Tweaks", createRestorePoint: true, progress, ct);
 
             if (summary.Aborted)
             {
@@ -305,16 +303,16 @@ public sealed partial class DashboardViewModel(
     private async Task RevertAllAsync()
     {
         if (!await Shell.ConfirmAsync(
-                "Revert everything",
+                "Undo all changes",
                 "Every tweak this app applied will be restored to the value it had beforehand, using the " +
                 "recorded undo data.\n\nRemoved bloatware is not restored. That has to come back from the " +
                 "Microsoft Store.",
-                "Revert all tweaks"))
+                "Undo all changes"))
         {
             return;
         }
 
-        await Shell.RunExclusiveAsync("Reverting all tweaks…", async (progress, ct) =>
+        await Shell.RunExclusiveAsync("Undoing all changes…", async (progress, ct) =>
         {
             var summary = await _engine.RevertAllAsync(progress, ct);
 
@@ -326,7 +324,7 @@ public sealed partial class DashboardViewModel(
             await LoadStateAsync(progress, ct);
 
             await Shell.ConfirmAsync(
-                "Revert finished",
+                "Undo finished",
                 $"{summary.Applied} tweak(s) reverted." +
                 (summary.Failures > 0 ? $"\n{summary.Failures} failed. Check the log." : string.Empty),
                 "OK");

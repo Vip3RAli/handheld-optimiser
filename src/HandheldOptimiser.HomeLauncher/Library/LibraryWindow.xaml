@@ -372,10 +372,33 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <!-- The library's settings. A steps a row to its next value. -->
+                    <!-- The library's settings: a short list, with each group of settings behind its own row. -->
                     <StackPanel x:Name="SettingsItems" Visibility="Collapsed">
                         <Button x:Name="UpdateSetting" Style="{StaticResource MenuButton}" Content="Update now"
                                 Visibility="Collapsed" Click="OnUpdateNow" />
+                        <Button x:Name="BackgroundGroup" Style="{StaticResource MenuButton}" Content="Background"
+                                Tag="Artwork, colours and blur" Click="OnOpenBackgroundSettings" />
+                        <Button x:Name="DisplayGroup" Style="{StaticResource MenuButton}" Content="Display"
+                                Tag="Battery and Wi-Fi, store filter and quick actions" Click="OnOpenDisplaySettings" />
+                        <Button x:Name="OpenMainAppSetting" Style="{StaticResource MenuButton}" Content="Open Handheld Optimiser"
+                                Tag="Tweaks and tools. Windows asks for administrator permission" Click="OnOpenMainApp" />
+                        <Button x:Name="QuitSetting" Style="{StaticResource MenuButton}" Content="Quit"
+                                Tag="Close the game library" Click="OnQuit" />
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                            <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                                <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Select" FontSize="15" VerticalAlignment="Center" />
+                            <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                                <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- The background settings. A steps a row to its next value. -->
+                    <StackPanel x:Name="BackgroundItems" Visibility="Collapsed">
                         <Button x:Name="BackgroundSetting" Style="{StaticResource MenuButton}" Content="Background"
                                 Click="OnCycleBackground" />
                         <Button x:Name="StrengthSetting" Style="{StaticResource MenuButton}" Content="Colour strength"
@@ -386,16 +409,31 @@
                                 Click="OnCyclePosition" />
                         <Button x:Name="ArtworkKeySetting" Style="{StaticResource MenuButton}" Content="SteamGridDB API key"
                                 Click="OnEditArtworkKey" />
+                        <!-- For touch, which has no B button. -->
+                        <Button Style="{StaticResource MenuButton}" Content="Back" Tag="Settings" Click="OnSettingsBack" />
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                            <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                                <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Change" FontSize="15" VerticalAlignment="Center" />
+                            <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                                <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- What the library shows and which buttons it offers. A switches a row on or off. -->
+                    <StackPanel x:Name="DisplayItems" Visibility="Collapsed">
                         <Button x:Name="StatusSetting" Style="{StaticResource MenuButton}" Content="Battery and Wi-Fi"
                                 Click="OnToggleStatus" />
                         <Button x:Name="FilterSetting" Style="{StaticResource MenuButton}" Content="Store filter"
                                 Click="OnToggleFilter" />
                         <Button x:Name="QuickActionsSetting" Style="{StaticResource MenuButton}" Content="Quick actions"
                                 Click="OnToggleQuickActions" />
-                        <Button x:Name="OpenMainAppSetting" Style="{StaticResource MenuButton}" Content="Open Handheld Optimiser"
-                                Tag="Tweaks and tools. Windows asks for administrator permission" Click="OnOpenMainApp" />
-                        <Button x:Name="QuitSetting" Style="{StaticResource MenuButton}" Content="Quit"
-                                Tag="Close the game library" Click="OnQuit" />
+                        <!-- For touch, which has no B button. -->
+                        <Button Style="{StaticResource MenuButton}" Content="Back" Tag="Settings" Click="OnSettingsBack" />
 
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
                             <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">

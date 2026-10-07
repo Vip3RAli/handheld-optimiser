@@ -25,7 +25,7 @@
                 <RadioButton GroupName="HomeApp" IsChecked="{Binding IsLibrary, Mode=TwoWay}" MinHeight="40" Margin="0,6,0,0">
                     <StackPanel>
                         <TextBlock Text="Handheld Optimiser library" FontWeight="SemiBold" />
-                        <TextBlock Text="A lightweight game library for Steam, Xbox, Epic Games, Battle.net, GOG, EA App and Ubisoft Connect games. Uses about 115 MB while open and about 25 MB while you play, against about 1.4 GB for Big Picture." FontSize="11.5" Opacity="0.6" TextWrapping="Wrap" />
+                        <TextBlock Text="A lightweight game library for Steam, Xbox, Epic Games, Battle.net, GOG, EA App and Ubisoft Connect games. Uses about 115 MB while open, against about 1.4 GB for Big Picture." FontSize="11.5" Opacity="0.6" TextWrapping="Wrap" />
                     </StackPanel>
                 </RadioButton>
 
@@ -39,7 +39,7 @@
                         <ui:TextBox PlaceholderText="SteamGridDB API key (optional)"
                                     Text="{Binding ArtworkKey, UpdateSourceTrigger=LostFocus}" />
                         <TextBlock Margin="0,4,0,0" FontSize="11.5" Opacity="0.6" TextWrapping="Wrap"
-                                   Text="Steam games use the artwork Steam already has. With a free key from steamgriddb.com (Preferences, then API), games from the other stores get covers and artwork too; their titles are sent to SteamGridDB to find them. A game with no artwork keeps the gradient." />
+                                   Text="Steam games use Steam's own artwork. A free key from steamgriddb.com (Preferences, then API) adds artwork for games from other stores; their titles are sent to SteamGridDB to find it." />
                     </StackPanel>
                 </StackPanel>
 

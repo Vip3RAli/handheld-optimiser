@@ -23,6 +23,7 @@ public partial class LibraryWindow
         _menu = SettingsItems;
         GameItems.Visibility = Visibility.Collapsed;
         PowerItems.Visibility = Visibility.Collapsed;
+        HideSettingsGroups();
 
         MenuTitle.Text = "Settings";
         MenuStore.Text = "Game library";
@@ -30,6 +31,53 @@ public partial class LibraryWindow
 
         MenuOverlay.Visibility = Visibility.Visible;
         ShowMenuItems();
+    }
+
+    private void HideSettingsGroups()
+    {
+        BackgroundItems.Visibility = Visibility.Collapsed;
+        DisplayItems.Visibility = Visibility.Collapsed;
+    }
+
+    private void OnOpenBackgroundSettings(object sender, RoutedEventArgs e) => OpenSettingsGroup(BackgroundItems, "Background");
+
+    private void OnOpenDisplaySettings(object sender, RoutedEventArgs e) => OpenSettingsGroup(DisplayItems, "Display");
+
+    /// <summary>One group of settings, in place of the settings list.</summary>
+    private void OpenSettingsGroup(StackPanel group, string title)
+    {
+        SettingsItems.Visibility = Visibility.Collapsed;
+        _menu = group;
+
+        MenuTitle.Text = title;
+        MenuStore.Text = "Settings";
+        ShowMenuItems();
+    }
+
+    private void OnSettingsBack(object sender, RoutedEventArgs e) => BackToSettings();
+
+    /// <summary>
+    /// From a group of settings, goes back to the settings list with that group's row focused. False when
+    /// no group is open, so Back closes the menu instead.
+    /// </summary>
+    private bool BackToSettings()
+    {
+        var row = ReferenceEquals(_menu, BackgroundItems) ? BackgroundGroup
+            : ReferenceEquals(_menu, DisplayItems) ? DisplayGroup
+            : null;
+
+        if (row is null)
+        {
+            return false;
+        }
+
+        HideSettingsGroups();
+        _menu = SettingsItems;
+
+        MenuTitle.Text = "Settings";
+        MenuStore.Text = "Game library";
+        ShowMenuItems(row);
+        return true;
     }
 
     private void RefreshSettings()
@@ -178,7 +226,7 @@ public partial class LibraryWindow
     /// <summary>Left and right on a settings row with several choices step through them, like a slider.</summary>
     private bool StepFocusedSetting(int step)
     {
-        if (!ReferenceEquals(_menu, SettingsItems) || Keyboard.FocusedElement is not Button row)
+        if (!ReferenceEquals(_menu, BackgroundItems) || Keyboard.FocusedElement is not Button row)
         {
             return false;
         }
@@ -209,6 +257,6 @@ public partial class LibraryWindow
 
     private void OnEditArtworkKey(object sender, RoutedEventArgs e) =>
         BeginEdit(MenuEditor.ArtworkKey, "SteamGridDB API key",
-            "Free to create at steamgriddb.com, under Preferences then API. It fetches covers and background artwork for games outside Steam, whose titles are sent to SteamGridDB to find them. Leave empty to remove the key.",
+            "Free at steamgriddb.com, under Preferences then API. Fetches artwork for games outside Steam, whose titles are sent to SteamGridDB. Leave empty to remove the key.",
             LibrarySettings.ArtworkKey);
 }

@@ -38,12 +38,11 @@ public static class SleepTweaks
         id: "sleep.hibernateafter",
         name: "Hibernate after 15 minutes of sleep",
         description:
-            "On battery, sleep stays instant to wake for the first 15 minutes, then the handheld hibernates and " +
-            "uses no power at all. Windows usually waits an hour or more, and sleep on a handheld drains a " +
-            "few percent of battery an hour.",
+            "On battery, hibernates after 15 minutes of sleep so it uses no power at all. Sleep alone " +
+            "drains a few percent of battery an hour.",
         warning:
-            "After 15 minutes asleep, waking takes about 10 to 20 seconds instead of being instant. Your game " +
-            "and apps are still exactly where you left them.",
+            "After 15 minutes asleep, waking takes 10 to 20 seconds instead of being instant. Your game " +
+            "and apps stay where you left them.",
         subgroup: SleepSubgroup,
         setting: HibernateAfterSetting,
         ac: null,
@@ -54,10 +53,9 @@ public static class SleepTweaks
         id: "sleep.disconnected",
         name: "Turn Wi-Fi off during sleep",
         description:
-            "Disconnects the network while the handheld is asleep, so Wi-Fi and background downloads stop " +
-            "using the battery. It reconnects as soon as you wake it.",
+            "Disconnects the network during sleep to save battery. It reconnects as soon as you wake it.",
         warning:
-            "Downloads and updates pause while the handheld is asleep instead of carrying on in the background.",
+            "Downloads and updates pause while the handheld is asleep.",
         subgroup: NoSubgroup,
         setting: ConnectivityInStandbySetting,
         ac: 0,
@@ -251,9 +249,8 @@ public static class SleepTweaks
         Id = "sleep.faststartup",
         Name = "Turn off Fast Startup",
         Description =
-            "Makes Shut down a real shut down. With Fast Startup on, drivers are saved and restored rather " +
-            "than started fresh, which is a common cause of controllers, Wi-Fi or power limits misbehaving " +
-            "until you choose Restart.",
+            "Makes Shut down a full shut down. Fast Startup is a common cause of controllers, Wi-Fi or " +
+            "power limits misbehaving until you restart.",
         Category = TweakCategory.Sleep,
         Risk = RiskLevel.Safe,
         IncludeInOneClick = false,
@@ -308,14 +305,14 @@ public static class SleepTweaks
         Id = "sleep.wakedevices",
         Name = "Only the power button wakes the handheld",
         Description =
-            "Stops keyboards, mice, controllers and dongles from waking the handheld, so a bump in a bag or a " +
-            "wireless mouse left on does not wake it and run the battery down.",
+            "Stops keyboards, mice, controllers and dongles waking the handheld, so a bump in a bag does " +
+            "not run the battery down.",
         Category = TweakCategory.Sleep,
         Risk = RiskLevel.Moderate,
         IncludeInOneClick = false,
         Warning =
-            "Pressing a key or a controller button no longer wakes the handheld; use the power button. Devices " +
-            "you plug in later are not covered until you apply this again.",
+            "Use the power button to wake the handheld. Devices you plug in later are not covered until " +
+            "you apply this again.",
 
         ScriptDetect = async (ctx, ct) =>
         {
@@ -387,15 +384,14 @@ public static class SleepTweaks
         Id = "sleep.sdreader",
         Name = "Turn off the SD card reader",
         Description =
-            "Switches the SD card reader off in Windows. On the ROG Ally the reader keeps the system busy during " +
-            "sleep and drains the battery, even with no card in it.",
+            "Switches the SD card reader off. On the ROG Ally it drains the battery during sleep, even " +
+            "with no card in it.",
         Category = TweakCategory.Sleep,
         Risk = RiskLevel.Breaking,
         IncludeInOneClick = false,
         OnlyFor = HandheldDevice.RogAlly,
         Warning =
-            "SD cards stop working until you switch this back off. Do not use it if you keep games or files " +
-            "on an SD card.",
+            "SD cards stop working until you switch this back off.",
 
         ScriptDetect = async (ctx, ct) =>
         {

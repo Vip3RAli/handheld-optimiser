@@ -61,8 +61,8 @@ public static class StorageTweaks
         Id = "storage.lastaccess",
         Name = "Disable last access timestamps",
         Description =
-            "Stops NTFS writing a new timestamp every time a file is read. Game launches and shader loads read " +
-            "thousands of files, so this removes a burst of small writes to the SSD each time.",
+            "Stops NTFS writing a timestamp every time a file is read, removing thousands of small SSD " +
+            "writes on each game launch.",
         Category = TweakCategory.Storage,
         Risk = RiskLevel.Safe,
         RequiresReboot = true,
@@ -78,15 +78,15 @@ public static class StorageTweaks
         Id = "storage.8dot3",
         Name = "Disable 8.3 short file names",
         Description =
-            "Stops NTFS generating a legacy DOS-style short name (PROGRA~1) alongside every new file. Speeds " +
-            "up creating files in large folders such as game installs and shader caches.",
+            "Stops NTFS creating a DOS-style short name (PROGRA~1) for every new file. Speeds up " +
+            "creating files in large folders such as game installs.",
         Category = TweakCategory.Storage,
         Risk = RiskLevel.Moderate,
         RequiresReboot = true,
         IncludeInOneClick = false,
         Warning =
-            "A few very old installers and 16-bit era tools rely on short names and may fail for files " +
-            "created after this. Existing short names are kept.",
+            "A few very old installers and 16-bit tools may fail for files created after this. Existing " +
+            "short names are kept.",
         RegistryValues =
         [
             new(RegistryRoot.LocalMachine, FileSystemKey, "NtfsDisable8dot3NameCreation", 1, RegistryValueKind.DWord)
@@ -102,15 +102,14 @@ public static class StorageTweaks
         Id = "storage.reserved",
         Name = "Turn off reserved storage",
         Description =
-            "Gives back the space Windows keeps aside for updates, usually about 7 GB. Worth it on a 512 GB " +
-            "drive where every game install counts.",
+            "Gives back the space Windows keeps aside for updates, usually about 7 GB.",
         Category = TweakCategory.Storage,
         Risk = RiskLevel.Moderate,
         IncludeInOneClick = false,
         Warning =
-            "If the drive is nearly full when a large Windows update arrives, the update can fail to install " +
-            "until you free some space. Windows will not change this setting while an update is installing; " +
-            "restart and try again if it fails.",
+            "If the drive is nearly full, a large Windows update can fail until you free some space. " +
+            "This setting cannot be changed while an update is installing; restart and try again if it " +
+            "fails.",
 
         ScriptDetect = async (ctx, ct) => await ReadReservedStateAsync(ctx, ct) switch
         {
