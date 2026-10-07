@@ -59,15 +59,45 @@ public partial class LibraryWindow
         {
             HideMenuLists();
             _menu = GameItems;
-            MenuStore.Text = tile.StoreName;
+            MenuStore.Text = GameSubtitle(tile);
             RefreshGameItems(tile);
             ShowMenuItems(ProfileItem);
+            return true;
+        }
+
+        // Lists inside a group go back to that group.
+        if (ReferenceEquals(_menu, AppsToCloseItems))
+        {
+            OpenWhilePlaying(AppsToCloseGroup);
+            return true;
+        }
+
+        if (ReferenceEquals(_menu, RunningAppsItems))
+        {
+            OpenAppsToClose(AddRunningAppItem);
+            return true;
+        }
+
+        if (ReferenceEquals(_menu, StartupItems))
+        {
+            if (ReferenceEquals(_startupFrom, StoreStartupItem))
+            {
+                OpenWhilePlaying(StoreStartupItem);
+            }
+            else
+            {
+                OpenMaintenance(StartupGroup);
+            }
+
             return true;
         }
 
         var row = ReferenceEquals(_menu, BackgroundItems) ? BackgroundGroup
             : ReferenceEquals(_menu, DisplayItems) ? DisplayGroup
             : ReferenceEquals(_menu, AddItems) ? AddProgramGroup
+            : ReferenceEquals(_menu, WhilePlayingItems) ? WhilePlayingGroup
+            : ReferenceEquals(_menu, EmulatorItems) ? EmulatorsGroup
+            : ReferenceEquals(_menu, MaintenanceItems) ? MaintenanceGroup
             : null;
 
         if (row is null)
@@ -77,6 +107,7 @@ public partial class LibraryWindow
 
         HideMenuLists();
         _menu = SettingsItems;
+        _confirming = null;
 
         MenuTitle.Text = "Settings";
         MenuStore.Text = "Game library";
@@ -109,6 +140,7 @@ public partial class LibraryWindow
         StatusSetting.Tag = OnOff(_showStatus);
         FilterSetting.Tag = OnOff(_showFilter);
         QuickActionsSetting.Tag = OnOff(_quickActions);
+        SortSetting.Tag = SortName(_sort) + ". Favourites always come first";
 
         var hidden = _allTiles.Count(t => t.IsHidden);
         HiddenSetting.Tag = (_showHidden ? "On, faded in the grid" : "Off")
@@ -255,6 +287,16 @@ public partial class LibraryWindow
         if (ReferenceEquals(_menu, ProfileItems))
         {
             return StepProfileSetting(row, step);
+        }
+
+        if (ReferenceEquals(_menu, EmulatorItems))
+        {
+            return StepEmulatorSetting(row, step);
+        }
+
+        if (StepToolsSetting(row, step))
+        {
+            return true;
         }
 
         if (!ReferenceEquals(_menu, BackgroundItems))
