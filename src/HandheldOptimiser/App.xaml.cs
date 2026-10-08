@@ -49,6 +49,7 @@ public partial class App : Application
         var engine = new TweakEngine(log, registry, runner, restorePoints, journal, systemState.DetectDevice());
         var runtimes = new RuntimeService(log, runner, restorePoints);
         var updates = new UpdateService(log);
+        var updateSources = UpdateSources.Create(log, runner);
 
         log.Info($"Handheld Optimiser {UpdateService.Display(updates.CurrentVersion)} started (elevated).");
         log.Info($"Session log: {log.LogFilePath}");
@@ -58,7 +59,8 @@ public partial class App : Application
         UpdateService.CleanUpOldDownloads(log);
 
         var viewModel = new MainViewModel(
-            log, engine, systemState, hardware, restorePoints, appxService, startupService, journal, runtimes, updates);
+            log, engine, systemState, hardware, restorePoints, appxService, startupService, journal, runtimes,
+            updateSources, updates);
 
         var window = new MainWindow { DataContext = viewModel };
         MainWindow = window;

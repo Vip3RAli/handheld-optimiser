@@ -138,3 +138,21 @@ public sealed class TweakStateToBrushConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
         throw new NotSupportedException();
 }
+
+public sealed class UpdateRowStateToBrushConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is ViewModels.UpdateRowState state
+            ? new SolidColorBrush(state switch
+            {
+                ViewModels.UpdateRowState.Done => Color.FromRgb(0x6C, 0xC0, 0x7A),
+                ViewModels.UpdateRowState.Available => Color.FromRgb(0xE8, 0xC4, 0x5F),
+                ViewModels.UpdateRowState.Working => Color.FromRgb(0x22, 0xD3, 0xEE),
+                ViewModels.UpdateRowState.Failed => Color.FromRgb(0xE0, 0x6C, 0x6C),
+                _ => Color.FromRgb(0x90, 0x90, 0x90)
+            })
+            : Brushes.Gray;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}

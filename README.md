@@ -26,6 +26,7 @@ Windows ships set up for a desktop PC, not a 7-inch handheld. Handheld Optimiser
 - **Apply Optimised Tweaks** applies the recommended performance and debloat tweaks in a single pass.
 - **Individual toggles** for every tweak, grouped by area, each showing whether it is currently applied.
 - **Xbox mode home app**: make Windows' full screen experience open Steam Big Picture, Armoury Crate SE or any launcher you choose.
+- **One place for updates**: Windows Update, Microsoft Store apps and other apps, checked and updated together.
 - **Maintenance tools**: clear shader caches, free space with Compact OS, install missing game runtimes, and remove preinstalled apps.
 
 ## Built to be undone
@@ -49,7 +50,7 @@ Every system change goes through the same safety checks:
 
 ## Features
 
-The sidebar has four sections, sized for a thumb on a handheld's touch screen. Each section's pages are tabs across the top, and a section reopens on the tab you last used.
+The sidebar has five sections, sized for a thumb on a handheld's touch screen. Each section's pages are tabs across the top, and a section reopens on the tab you last used.
 
 | Section | Tabs |
 |---|---|
@@ -57,6 +58,7 @@ The sidebar has four sections, sized for a thumb on a handheld's touch screen. E
 | **Performance Tweaks** | Gaming Tweaks · CPU & Kernel · Graphics & Scheduling · Network · Storage · Sleep & Battery · Interface |
 | **Debloat Tool** | System Debloat · Deep Services · Bloatware · Startup Apps |
 | **Settings & Hardware** | Full Screen Mode · Power Actions · Game Runtimes · Device & System Health · Handheld Usability |
+| **Updates** | Windows Update, Microsoft Store apps and other apps in one list |
 
 ### Dashboard
 An **Apply Optimised Tweaks** banner, then three cards: a ring showing how many of the recommended tweaks are applied, the hardware readings, and the restore point and **Undo all changes** buttons.
@@ -147,6 +149,16 @@ Scans for the Visual C++, DirectX, .NET, XNA, OpenAL and PhysX runtimes games de
 
 ### Device & System Health
 Checks that your handheld's own services (Armoury Crate on a ROG Ally, Legion Space on a Legion Go, MSI Center M on an MSI Claw) and the AMD, Realtek, Defender, Windows Update and Game Pass services are running, and can re-enable any that were disabled by other tools.
+
+### Updates
+Checks Windows Update, the Microsoft Store and winget at the same time and lists every waiting update in one place, ticked. **Update selected** installs them one after another: apps through winget first, then Store apps, then Windows updates, and says at the end if a restart is needed.
+
+- **Windows Update** uses the same Windows Update service as Settings. Optional preview updates are left out. Driver updates are only listed with **Include driver updates** switched on, because Windows Update sometimes offers a generic driver in place of the one the handheld's maker ships.
+- **Microsoft Store apps** are updated by the Store itself, which the page asks to update each chosen app. If the Store can't be asked from the app, the section says so and **Open the Store** takes you to its updates page.
+- **Other apps** are the desktop apps winget recognises, such as Steam, Discord and browsers. A System Restore point is made before any of them are updated. Apps winget doesn't know about don't appear.
+- **Skip** on a row leaves that update out of every check until you unskip it under **Skipped updates**.
+
+Games are not listed: Steam and the other launchers update their own. Neither are the BIOS or ASUS firmware, which Armoury Crate or MyASUS still handle.
 
 ## Updating
 
