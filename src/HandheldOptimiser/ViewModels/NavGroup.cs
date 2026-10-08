@@ -2,7 +2,7 @@ namespace HandheldOptimiser.ViewModels;
 
 /// <summary>
 /// One entry in the sidebar: a handful of related pages, shown as tabs across the top of the content.
-/// Four of these replace a sidebar that listed every page, which was too many rows to hit reliably with
+/// Five of these replace a sidebar that listed every page, which was too many rows to hit reliably with
 /// a thumb on a seven inch screen.
 /// </summary>
 public sealed class NavGroup(string title, string glyph, IReadOnlyList<PageViewModelBase> pages)

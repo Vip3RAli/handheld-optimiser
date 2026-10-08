@@ -45,7 +45,9 @@ public sealed class PowerShellRunner(LogService log)
         string script,
         string description,
         CancellationToken ct = default,
-        bool echoScript = true)
+        bool echoScript = true,
+        bool logOutput = true,
+        Action<string>? onOutputLine = null)
     {
         _log.Command($"{description}");
 
@@ -67,7 +69,9 @@ public sealed class PowerShellRunner(LogService log)
             description,
             ct,
             echoCommand: false,
-            standardInput: script);
+            logOutput: logOutput,
+            standardInput: script,
+            onOutputLine: onOutputLine);
     }
 
     public async Task<ProcessOutcome> RunProcessAsync(
@@ -77,7 +81,8 @@ public sealed class PowerShellRunner(LogService log)
         CancellationToken ct = default,
         bool echoCommand = true,
         bool logOutput = true,
-        string? standardInput = null)
+        string? standardInput = null,
+        Action<string>? onOutputLine = null)
     {
         if (echoCommand)
         {
@@ -135,6 +140,9 @@ public sealed class PowerShellRunner(LogService log)
             {
                 _log.Trace($"    {shown}");
             }
+
+            // Lets a caller follow a long run line by line, rather than only seeing the output at the end.
+            onOutputLine?.Invoke(shown);
         };
 
         process.ErrorDataReceived += (_, e) =>
