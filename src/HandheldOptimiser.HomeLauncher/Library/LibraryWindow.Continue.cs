@@ -30,7 +30,7 @@ public partial class LibraryWindow
     private void UpdateContinue()
     {
         var played = _continuePlaying && _layout == LibraryLayout.Grid && _filter == TileFilter.All
-            ? RecentGames.Pick(ShownTiles().Where(t => t.IsInstalled && !t.IsHidden),
+            ? RecentGames.Pick(ShownTiles().Where(t => t.IsInstalled && !t.IsHidden && !t.IsApp),
                 t => _stats.GetValueOrDefault(t.Game.Key).LastPlayed, 1 + RecentTileCount())
             : [];
 

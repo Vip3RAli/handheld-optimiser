@@ -24,7 +24,7 @@ public partial class LibraryWindow : Window
     // Each game's play time and last play, for sorting and the quick actions menu.
     private Dictionary<string, PlayStats> _stats = [];
 
-    // The tiles on screen: all of them, the favourites, or one store's when a filter is on.
+    // The tiles on screen: all the games, the favourites, one store's when a filter is on, or the apps.
     private List<GameTile> _tiles = [];
     private TileFilter _filter = TileFilter.All;
 
@@ -190,32 +190,35 @@ public partial class LibraryWindow : Window
     }
 
     /// <summary>
-    /// A tab of the filter strip: every installed game, the favourites, one store's games, or the games
-    /// owned but not installed.
+    /// A tab of the filter strip: every installed game, the favourites, one store's games, the games
+    /// owned but not installed, or the apps. Apps are only ever on their own tab.
     /// </summary>
-    private readonly record struct TileFilter(GameStore? Store, bool Favourites, bool NotInstalled = false)
+    private readonly record struct TileFilter(GameStore? Store, bool Favourites, bool NotInstalled = false, bool Apps = false)
     {
         public static readonly TileFilter All = default;
         public static readonly TileFilter Starred = new(null, true);
         public static readonly TileFilter Uninstalled = new(null, false, true);
+        public static readonly TileFilter AppsTab = new(null, false, Apps: true);
 
-        public string Name => NotInstalled ? "Not installed" : Favourites ? "Favourites" : Store is { } store ? Game.NameOf(store) : "All";
+        public string Name => Apps ? "Apps" : NotInstalled ? "Not installed" : Favourites ? "Favourites"
+            : Store is { } store ? Game.NameOf(store) : "All";
 
-        public bool Shows(GameTile tile) => NotInstalled ? !tile.IsInstalled
-            : tile.IsInstalled && (Favourites ? tile.IsFavourite : Store is not { } store || tile.Game.Store == store);
+        public bool Shows(GameTile tile) => Apps ? tile.IsApp
+            : NotInstalled ? !tile.IsInstalled
+            : tile.IsInstalled && !tile.IsApp && (Favourites ? tile.IsFavourite : Store is not { } store || tile.Game.Store == store);
     }
 
     /// <summary>The games the grid can show: all but the hidden ones, unless those are shown too.</summary>
     private IEnumerable<GameTile> ShownTiles() => _showHidden ? _allTiles : _allTiles.Where(t => !t.IsHidden);
 
     /// <summary>
-    /// The tabs of the filter strip, in order, or none when it would only have All: Favourites once a game
-    /// is starred, and a tab per store when games come from more than one, while the store filter is on;
-    /// and Not installed, whenever there are owned games that are not installed.
+    /// The tabs of the filter strip, in order: All, then Favourites once a game is starred and a tab per
+    /// store when games come from more than one, while the store filter is on; Not installed, whenever
+    /// there are owned games that are not installed; and Apps, always, so there is somewhere to add them.
     /// </summary>
     private List<TileFilter> FilterOptions()
     {
-        var shown = ShownTiles().ToList();
+        var shown = ShownTiles().Where(t => !t.IsApp).ToList();
         var installed = shown.Where(t => t.IsInstalled).ToList();
         var options = new List<TileFilter> { TileFilter.All };
 
@@ -238,7 +241,8 @@ public partial class LibraryWindow : Window
             options.Add(TileFilter.Uninstalled);
         }
 
-        return options.Count > 1 ? options : [];
+        options.Add(TileFilter.AppsTab);
+        return options;
     }
 
     /// <summary>Shows the tiles of the current filter and rebuilds the filter strip to match the library.</summary>
@@ -252,7 +256,6 @@ public partial class LibraryWindow : Window
             _filter = TileFilter.All;
         }
 
-        FilterStrip.Visibility = options.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         FilterTabs.Children.Clear();
         foreach (var option in options)
         {
@@ -263,9 +266,10 @@ public partial class LibraryWindow : Window
         _tiles = Sorted(ShownTiles().Where(_filter.Shows)).OrderByDescending(t => t.IsFavourite).ToList();
         Tiles.ItemsSource = _tiles;
         CountText.Text = _filter.NotInstalled ? $"{_tiles.Count} not installed"
+            : _filter.Apps ? (_tiles.Count == 1 ? "1 app" : $"{_tiles.Count} apps")
             : _tiles.Count == 1 ? "1 game"
             : $"{_tiles.Count} games";
-        AcceptHint.Text = _filter.NotInstalled ? "Install" : "Play";
+        AcceptHint.Text = _filter.NotInstalled ? "Install" : _filter.Apps ? "Open" : "Play";
 
         // The pictures of games that are not installed are only kept while their tab is open.
         if (!_filter.NotInstalled)
@@ -285,7 +289,11 @@ public partial class LibraryWindow : Window
             return;
         }
 
-        EmptyText.Text = _allTiles.All(t => !t.IsInstalled) && !_filter.NotInstalled
+        EmptyText.Text = _filter.Apps
+            ? _tiles.Count == 0
+                ? "No apps yet. Press Menu, choose Add a program while this tab is open, and pick Chrome, Discord or anything else from the Start menu."
+                : string.Empty
+            : _allTiles.All(t => !t.IsInstalled || t.IsApp) && !_filter.NotInstalled
             ? "No installed games were found in Steam, Xbox, Epic Games, Battle.net, GOG, the EA App or Ubisoft Connect.\nInstall a game or add a program under Settings, then press Y and choose Refresh library."
             : _tiles.Count == 0 ? "Every game is hidden. Switch on Show hidden games under Settings, Display to bring them back."
             : string.Empty;
@@ -369,7 +377,10 @@ public partial class LibraryWindow : Window
         }
 
         _focusedKey = tile.Game.Key;
-        if (tile.IsInstalled && _session is { } session)
+
+        // An app opens beside the game, which stays as it is, paused or not. Apps never have a session,
+        // so they are never paused themselves.
+        if (tile.IsInstalled && !tile.IsApp && _session is { } session)
         {
             // The game being played, paused or not: back into it.
             if (session.StartedAt is not null && session.Game.Key == tile.Game.Key)
@@ -402,6 +413,19 @@ public partial class LibraryWindow : Window
             var problem = GameCatalog.Launch(tile.Game);
             StatusText.Text = problem ?? $"Opening {Game.NameOf(tile.Game.Store)} to install {tile.Title}...";
             if (problem is not null)
+            {
+                _launchBlockedUntil = DateTime.MinValue;
+            }
+
+            return;
+        }
+
+        // An app just opens. Whatever is set up for a game that is running stays as it is.
+        if (tile.IsApp)
+        {
+            var failed = GameCatalog.Launch(tile.Game);
+            StatusText.Text = failed ?? $"Opening {tile.Title}...";
+            if (failed is not null)
             {
                 _launchBlockedUntil = DateTime.MinValue;
             }

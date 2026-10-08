@@ -7,7 +7,8 @@ namespace HandheldOptimiser.Tests;
 /// <summary>
 /// The game library's pure logic: reading Steam's config format, naming and listing ROM files, the
 /// play time wording, game profiles, screen sizes, docked mode, Continue playing, the stores' lists
-/// of owned games and which games Quick Resume may pause. Nothing here reads or writes the registry.
+/// of owned games, which games Quick Resume may pause and which added programs are apps. Nothing here
+/// reads or writes the registry.
 /// </summary>
 public sealed class LibraryFeatureTests : IDisposable
 {
@@ -361,6 +362,21 @@ public sealed class LibraryFeatureTests : IDisposable
         Assert.Equal("BattlEye", GamePause.FindAntiCheat(game));
         Assert.Null(GamePause.FindAntiCheat(Path.Combine(_folder, "missing")));
     }
+
+    [Theory]
+    [InlineData(@"C:\Program Files\Google\Chrome\Application\chrome.exe")]
+    [InlineData(@"C:\Program Files (x86)\Microsoft\Edge\Application\MSEDGE.EXE")]
+    [InlineData(@"C:\Users\Zain\AppData\Local\Discord\Update.exe")]
+    [InlineData(@"C:\Users\Zain\AppData\Roaming\Spotify\Spotify.exe")]
+    [InlineData(@"C:\Program Files (x86)\Steam\steam.exe")]
+    public void AddedPrograms_KnowsCommonApps(string exe) => Assert.True(AddedPrograms.LooksLikeApp(exe));
+
+    [Theory]
+    [InlineData(@"D:\Games\Hollow Knight\hollow_knight.exe")]
+    [InlineData(@"C:\Emulators\RetroArch\retroarch.exe")]
+    [InlineData(@"C:\Games\Discordia\Discordia.exe")]
+    [InlineData(null)]
+    public void AddedPrograms_TreatsTheRestAsGames(string? exe) => Assert.False(AddedPrograms.LooksLikeApp(exe));
 
     private void Touch(string name, string text = "")
     {

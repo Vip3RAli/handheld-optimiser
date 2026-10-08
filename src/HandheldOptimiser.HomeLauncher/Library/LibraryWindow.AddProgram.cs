@@ -7,7 +7,8 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 
 /// <summary>
 /// Adding programs the stores do not list: picked from the Start menu with the controller, or with the
-/// file picker by touch or mouse.
+/// file picker by touch or mouse. A program added while the Apps tab is open goes under Apps, as does a
+/// well known app such as Chrome or Discord; anything else goes with the games.
 /// </summary>
 public partial class LibraryWindow
 {
@@ -23,7 +24,7 @@ public partial class LibraryWindow
         }
 
         _programRows.Clear();
-        OpenSettingsGroup(AddItems, "Add a program");
+        OpenSettingsGroup(AddItems, _filter.Apps ? "Add an app" : "Add a program");
         MenuStore.Text = "Looking through the Start menu...";
         _ = ListStartMenuProgramsAsync();
     }
@@ -40,7 +41,9 @@ public partial class LibraryWindow
             return;
         }
 
-        MenuStore.Text = programs.Count == 0 ? "No other programs in the Start menu" : "Or pick one from the Start menu";
+        MenuStore.Text = programs.Count == 0 ? "No other programs in the Start menu"
+            : _filter.Apps ? "Or pick one from the Start menu. It goes under Apps"
+            : "Or pick one from the Start menu";
 
         var index = AddItems.Children.IndexOf(AddBackItem);
         foreach (var (title, shortcut, target) in programs)
@@ -62,7 +65,7 @@ public partial class LibraryWindow
     {
         var picker = new OpenFileDialog
         {
-            Title = "Add a program to the game library",
+            Title = _filter.Apps ? "Add an app to the library" : "Add a program to the game library",
             Filter = AddedPrograms.BrowseFilter,
 
             // A shortcut is kept as it is, so its own name and arguments are used.
@@ -80,15 +83,23 @@ public partial class LibraryWindow
     {
         CloseMenu();
 
-        if (!File.Exists(path) || AddedPrograms.Add(path, title) is not { } game)
+        if (!File.Exists(path) || AddedPrograms.Add(path, title, _filter.Apps ? true : null) is not { } game)
         {
             StatusText.Text = $"{title ?? Path.GetFileNameWithoutExtension(path)} could not be added.";
             return;
         }
 
-        // The new tile takes the focus once the scan has found it.
+        // The new tile takes the focus once the scan has found it, on the tab it is listed on.
         _focusedKey = game.Key;
-        StatusText.Text = $"{game.Title} added to the library.";
+        var tab = game.IsApp ? TileFilter.AppsTab : _filter.Apps ? TileFilter.All : _filter;
+        if (tab != _filter)
+        {
+            _filter = tab;
+            ApplyFilter();
+        }
+
+        StatusText.Text = game.IsApp ? $"{game.Title} added to Apps. Move to games in its quick actions if it is a game."
+            : $"{game.Title} added to the library.";
         _ = ScanAsync();
     }
 }
