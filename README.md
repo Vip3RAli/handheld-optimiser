@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/dashboard.png" alt="Handheld Optimiser dashboard with the Apply Now button, the ring of applied tweaks, hardware readings and safety options" width="900">
+  <img src="docs/app-dashboard.png" alt="Handheld Optimiser dashboard with the Apply Now button, the ring of applied tweaks, hardware readings and safety options" width="900">
 </p>
 
 ---
