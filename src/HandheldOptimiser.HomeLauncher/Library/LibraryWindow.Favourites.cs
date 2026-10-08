@@ -47,6 +47,39 @@ public partial class LibraryWindow
         StatusText.Text = favourite ? $"{tile.Title} added to favourites." : $"{tile.Title} removed from favourites.";
     }
 
+    /// <summary>
+    /// Moves a program the player added between the games and Apps, and goes to the tab it is on now so
+    /// it stays in view.
+    /// </summary>
+    private void OnToggleApp(object sender, RoutedEventArgs e)
+    {
+        if (_menuTile is not { } tile)
+        {
+            return;
+        }
+
+        var app = !tile.IsApp;
+        CloseMenu();
+
+        if (AddedPrograms.SetApp(tile.Game, app) is not { } moved)
+        {
+            StatusText.Text = $"{tile.Title} could not be moved.";
+            return;
+        }
+
+        var replacement = GameTile.Create(moved);
+        replacement.IsFavourite = tile.IsFavourite;
+        replacement.IsHidden = tile.IsHidden;
+        _allTiles = _allTiles.Select(t => t == tile ? replacement : t).ToList();
+
+        _focusedKey = moved.Key;
+        _focusInContinue = false;
+        _filter = app ? TileFilter.AppsTab : TileFilter.All;
+        ApplyFilter();
+        RestoreFocus();
+        StatusText.Text = app ? $"{tile.Title} moved to Apps." : $"{tile.Title} moved to the games.";
+    }
+
     /// <summary>Hides or shows a game, or takes a program the player added off the library altogether.</summary>
     private void OnToggleHidden(object sender, RoutedEventArgs e)
     {

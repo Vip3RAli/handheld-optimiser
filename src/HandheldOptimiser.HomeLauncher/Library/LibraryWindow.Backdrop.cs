@@ -73,7 +73,8 @@ public partial class LibraryWindow
                 return null;
             }
 
-            if (background == BackgroundKind.Artwork && await Artwork.FindAsync(tile.Game) is { } path
+            // Apps take their icon's colours, as there is no artwork to look up for them.
+            if (background == BackgroundKind.Artwork && !tile.IsApp && await Artwork.FindAsync(tile.Game) is { } path
                 && Backdrops.FromArtwork(path, width, height, blur, position, from, to, shade) is { } artwork)
             {
                 // Decoding artwork (up to 4K) leaves tens of MB of buffers behind, some of them outside
