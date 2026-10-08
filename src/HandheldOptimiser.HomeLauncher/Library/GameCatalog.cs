@@ -16,6 +16,10 @@ internal static class GameCatalog
     // The player's extra launch arguments, one value per game key.
     private const string ArgumentsKey = Program.SettingsKey + @"\LaunchArguments";
 
+    // Games the player starred or hid, one value per game key.
+    private const string FavouritesKey = Program.SettingsKey + @"\Favourites";
+    private const string HiddenKey = Program.SettingsKey + @"\Hidden";
+
     public static List<Game> Scan()
     {
         var games = new Dictionary<string, Game>(StringComparer.OrdinalIgnoreCase);
@@ -62,6 +66,19 @@ internal static class GameCatalog
             claimed.UnionWith(folders);
         }
 
+        // Programs the player added are listed whatever folder they are in: they asked for them.
+        try
+        {
+            foreach (var game in AddedPrograms.Scan())
+            {
+                games.TryAdd(game.Key, game);
+            }
+        }
+        catch (Exception ex)
+        {
+            Program.Log($"Reading the added programs failed: {ex.GetType().Name}: {ex.Message}");
+        }
+
         var history = ReadHistory();
         return games.Values
             .OrderByDescending(g => history.GetValueOrDefault(g.Key))
@@ -98,7 +115,60 @@ internal static class GameCatalog
     /// Whether the player's own arguments can reach the game. Steam passes on whatever follows
     /// -applaunch and GOG games are started from their exe; the other stores start the game themselves.
     /// </summary>
-    public static bool SupportsCustomArguments(Game game) => game.Store is GameStore.Steam or GameStore.Gog;
+    public static bool SupportsCustomArguments(Game game) =>
+        game.Store is GameStore.Steam or GameStore.Gog
+        || (game.Store == GameStore.Other && game.LaunchTarget.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>The keys of the games the player starred.</summary>
+    public static HashSet<string> Favourites() => ReadMarks(FavouritesKey);
+
+    /// <summary>The keys of the games the player hid from the grid.</summary>
+    public static HashSet<string> Hidden() => ReadMarks(HiddenKey);
+
+    /// <returns>False when the choice could not be stored.</returns>
+    public static bool SetFavourite(Game game, bool favourite) => WriteMark(FavouritesKey, game, favourite);
+
+    /// <returns>False when the choice could not be stored.</returns>
+    public static bool SetHidden(Game game, bool hidden) => WriteMark(HiddenKey, game, hidden);
+
+    private static HashSet<string> ReadMarks(string keyName)
+    {
+        var marked = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(keyName);
+            marked.UnionWith(key?.GetValueNames() ?? []);
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+        {
+            // Nothing starred or hidden is a fine fallback.
+        }
+
+        return marked;
+    }
+
+    private static bool WriteMark(string keyName, Game game, bool on)
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(keyName);
+            if (on)
+            {
+                key.SetValue(game.Key, 1, RegistryValueKind.DWord);
+            }
+            else
+            {
+                key.DeleteValue(game.Key, throwOnMissingValue: false);
+            }
+
+            return true;
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+        {
+            Program.Log($"Could not save {keyName} for {game.Key}: {ex.Message}");
+            return false;
+        }
+    }
 
     /// <summary>The arguments the player added for this game in the quick actions menu, if any.</summary>
     public static string? CustomArguments(Game game)
