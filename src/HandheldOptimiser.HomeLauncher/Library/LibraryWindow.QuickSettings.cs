@@ -5,7 +5,7 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 
 /// <summary>
 /// Quick settings, the library's take on Armoury Crate's Command Center: volume, screen brightness,
-/// Windows' power mode and the refresh rate, all of which a standard user may change.
+/// Windows' power mode, the resolution and the refresh rate, all of which a standard user may change.
 /// </summary>
 public partial class LibraryWindow
 {
@@ -18,6 +18,7 @@ public partial class LibraryWindow
     private bool _brightnessRead;
     private PowerMode? _powerMode;
     private (int Current, IReadOnlyList<int> Available)? _refreshRates;
+    private (Resolution Current, IReadOnlyList<Resolution> Available)? _resolutions;
 
     // The brightness to set next. WMI is slow, so presses that come faster than it are folded into one.
     private int? _brightnessWanted;
@@ -37,6 +38,7 @@ public partial class LibraryWindow
         _volume = Volume.Read();
         _powerMode = PowerModes.Read();
         _refreshRates = RefreshRates.Read();
+        _resolutions = Resolutions.Read();
         _brightness = null;
         _brightnessRead = false;
         RefreshQuickSettings();
@@ -71,6 +73,11 @@ public partial class LibraryWindow
             : PowerModes.Available ? "Set to a mode Windows does not name"
             : "Only with Windows' Balanced power plan";
 
+        ResolutionSetting.IsEnabled = _resolutions is { Available.Count: > 1 };
+        ResolutionSetting.Tag = _resolutions is not { } sizes ? "Not available on this screen"
+            : sizes.Available.Count > 0 && sizes.Current != sizes.Available[0] ? $"{sizes.Current}. Lower uses less battery"
+            : sizes.Current.ToString();
+
         RefreshRateSetting.IsEnabled = _refreshRates is { Available.Count: > 1 };
         RefreshRateSetting.Tag = _refreshRates is { } rates ? $"{rates.Current} Hz" : "Not available on this screen";
     }
@@ -89,6 +96,10 @@ public partial class LibraryWindow
         else if (ReferenceEquals(row, PowerModeSetting))
         {
             StepPowerMode(step);
+        }
+        else if (ReferenceEquals(row, ResolutionSetting))
+        {
+            StepResolution(step);
         }
         else if (ReferenceEquals(row, RefreshRateSetting))
         {
@@ -213,6 +224,31 @@ public partial class LibraryWindow
     }
 
     private void OnStepRefreshRate(object sender, RoutedEventArgs e) => StepRefreshRate(1);
+
+    /// <param name="step">Positive for a larger size, negative for a smaller one, going round at either end.</param>
+    private void StepResolution(int step)
+    {
+        if (_resolutions is not { Available.Count: > 1 } sizes)
+        {
+            return;
+        }
+
+        // Largest first, so a larger size is further up the list.
+        var index = sizes.Available.ToList().IndexOf(sizes.Current);
+        var next = sizes.Available[(Math.Max(index, 0) - step + sizes.Available.Count) % sizes.Available.Count];
+        if (Resolutions.Set(next) is { } error)
+        {
+            StatusText.Text = error;
+        }
+
+        // The rates on offer can differ at the new size.
+        _resolutions = Resolutions.Read();
+        _refreshRates = RefreshRates.Read();
+        RefreshQuickSettings();
+    }
+
+    // A press steps to the next smaller size, and from the smallest back to the largest.
+    private void OnStepResolution(object sender, RoutedEventArgs e) => StepResolution(-1);
 
     private void OnRescan(object sender, RoutedEventArgs e)
     {

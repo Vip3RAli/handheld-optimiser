@@ -120,17 +120,17 @@ internal static partial class SteamLibrary
     }
 
     // Portrait art names, newest Steam first.
-    private static readonly string[] CoverNames = ["library_600x900.jpg", "library_capsule.jpg"];
+    internal static readonly string[] CoverNames = ["library_600x900.jpg", "library_capsule.jpg"];
 
     // The wide banner Steam shows at the top of a game's library page, or failing that its much smaller
     // store header: the widest picture Steam has of the game.
-    private static readonly string[] HeroNames = ["library_hero.jpg", "library_header.jpg", "header.jpg"];
+    internal static readonly string[] HeroNames = ["library_hero.jpg", "library_header.jpg", "header.jpg"];
 
     /// <summary>
     /// Newer Steam keeps art in a folder per app, sometimes one level deeper under a hash; older Steam
     /// used flat "{appid}_library_600x900.jpg" files.
     /// </summary>
-    private static string? FindArt(string artDir, string appId, string[] names)
+    internal static string? FindArt(string artDir, string appId, string[] names)
     {
         try
         {

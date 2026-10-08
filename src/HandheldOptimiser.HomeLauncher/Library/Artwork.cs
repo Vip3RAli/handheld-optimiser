@@ -184,6 +184,12 @@ internal static class Artwork
             return (cached, false);
         }
 
+        // A game that is not installed may come with its store's own cover, which needs no key.
+        if (await StoreCoverAsync(game) is { } fromStore)
+        {
+            return (fromStore, false);
+        }
+
         if (LibrarySettings.ArtworkKey is not { } apiKey || RecentlyNotFound(NoCoverPath(game)))
         {
             return (null, false);
@@ -224,6 +230,40 @@ internal static class Artwork
         }
     }
 
+    // The stores' own image servers, the only places a cover named by a store's game list is fetched from.
+    private static readonly string[] StoreImageHosts = ["steamstatic.com", "epicgames.com", "unrealengine.com", "gog.com", "gog-statics.com"];
+
+    /// <summary>Downloads the cover a store's game list names, for a game that is not installed.</summary>
+    private static async Task<string?> StoreCoverAsync(Game game)
+    {
+        if (game.CoverUrl is not { } link || !Uri.TryCreate(link, UriKind.Absolute, out var url) || url.Scheme != Uri.UriSchemeHttps
+            || !StoreImageHosts.Any(host => url.Host.Equals(host, StringComparison.OrdinalIgnoreCase)
+                || url.Host.EndsWith("." + host, StringComparison.OrdinalIgnoreCase))
+            || RecentlyNotFound(NoStoreCoverPath(game)))
+        {
+            return null;
+        }
+
+        try
+        {
+            var bytes = await DownloadAsync(url);
+            if (bytes is not null && IsImage(bytes))
+            {
+                var path = CoverCachePath(game);
+                await SaveAsync(bytes, path);
+                return path;
+            }
+
+            MarkNotFound(NoStoreCoverPath(game));
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException or UnauthorizedAccessException)
+        {
+            Program.Log($"The store's cover for {game.Key} could not be fetched: {ex.Message}");
+        }
+
+        return null;
+    }
+
     /// <summary>
     /// Where SteamGridDB lists one kind of art ("heroes" or "grids") for the game, or null when it does
     /// not know the game.
@@ -253,14 +293,19 @@ internal static class Artwork
                 continue;
             }
 
-            Directory.CreateDirectory(CacheDir);
-            var temp = path + ".tmp";
-            await File.WriteAllBytesAsync(temp, bytes);
-            File.Move(temp, path, overwrite: true);
+            await SaveAsync(bytes, path);
             return true;
         }
 
         return false;
+    }
+
+    private static async Task SaveAsync(byte[] bytes, string path)
+    {
+        Directory.CreateDirectory(CacheDir);
+        var temp = path + ".tmp";
+        await File.WriteAllBytesAsync(temp, bytes);
+        File.Move(temp, path, overwrite: true);
     }
 
     /// <returns>The response, or null when SteamGridDB does not know the game.</returns>
@@ -370,6 +415,8 @@ internal static class Artwork
     private static string CoverCachePath(Game game) => Path.Combine(CacheDir, FileName(game) + ".cover");
 
     private static string NoCoverPath(Game game) => Path.Combine(CacheDir, FileName(game) + ".nocover");
+
+    private static string NoStoreCoverPath(Game game) => Path.Combine(CacheDir, FileName(game) + ".nostorecover");
 
     // Game keys look like "steam:620", and a colon cannot be in a file name.
     private static string FileName(Game game) =>

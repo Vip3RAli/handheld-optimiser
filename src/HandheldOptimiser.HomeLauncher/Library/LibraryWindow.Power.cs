@@ -33,6 +33,9 @@ public partial class LibraryWindow
     private void RefreshPower()
     {
         const string confirm = "Press again to confirm";
+        SleepItem.Tag = _session is { StartedAt: not null } session && LibrarySettings.ResumeAfterSleep
+            ? $"Pause here and wake back in {session.Game.Title}"
+            : "Pause here and wake where you left off";
         RestartItem.Tag = ReferenceEquals(_confirming, RestartItem) ? confirm : "Close everything and start Windows again";
         ShutDownItem.Tag = ReferenceEquals(_confirming, ShutDownItem) ? confirm : "Close everything and power off";
     }

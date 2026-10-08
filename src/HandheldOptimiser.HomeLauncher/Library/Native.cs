@@ -341,6 +341,8 @@ internal static partial class Native
         public uint PanningHeight;
     }
 
+    public const uint DmPelsWidth = 0x00080000;
+    public const uint DmPelsHeight = 0x00100000;
     public const uint DmDisplayFrequency = 0x00400000;
     public const uint DmInterlaced = 0x00000002;
     public const int DispChangeSuccessful = 0;
@@ -372,6 +374,200 @@ internal static partial class Native
     {
         mode.Size = (ushort)sizeof(DevMode);
         return ChangeDisplaySettingsEx(null, ref mode, 0, CdsUpdateRegistry, 0);
+    }
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool IsIconic(nint window);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool ShowWindow(nint window, int command);
+
+    private const int SwRestore = 9;
+
+    /// <summary>
+    /// Puts another program's window in front, restored if it was minimised. Windows only allows this
+    /// while the library is the program in front.
+    /// </summary>
+    public static bool SwitchTo(nint window)
+    {
+        if (IsIconic(window))
+        {
+            ShowWindow(window, SwRestore);
+        }
+
+        return SetForegroundWindow(window);
+    }
+
+    // The display turning off and on, which is how a Modern Standby device's sleep and wake show up.
+    public static readonly Guid ConsoleDisplayState = new("6FE69556-704A-47A0-8F24-C28D936FDA47");
+    public const int WmPowerBroadcast = 0x0218;
+    public const int PbtApmSuspend = 0x0004;
+    public const int PbtApmResumeSuspend = 0x0007;
+    public const int PbtApmResumeAutomatic = 0x0012;
+    public const int PbtPowerSettingChange = 0x8013;
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    public static partial nint RegisterPowerSettingNotification(nint recipient, in Guid setting, uint flags);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool UnregisterPowerSettingNotification(nint notification);
+
+    /// <summary>POWERBROADCAST_SETTING, for a setting whose data is one DWORD.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct PowerBroadcastSetting
+    {
+        public Guid PowerSetting;
+        public uint DataLength;
+        public uint Data;
+    }
+
+    private const uint MonitorDefaultToNearest = 2;
+    private const uint QdcOnlyActivePaths = 2;
+    private const int DisplayConfigGetSourceName = 1;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Luid
+    {
+        public uint LowPart;
+        public int HighPart;
+    }
+
+    /// <summary>DISPLAYCONFIG_PATH_INFO: a screen Windows draws (the source) and where it shows (the target).</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    private struct DisplayPath
+    {
+        public Luid SourceAdapter;
+        public uint SourceId;
+        public uint SourceModeIndex;
+        public uint SourceStatus;
+        public Luid TargetAdapter;
+        public uint TargetId;
+        public uint TargetModeIndex;
+        public uint OutputTechnology;
+        public uint Rotation;
+        public uint Scaling;
+        public uint RefreshNumerator;
+        public uint RefreshDenominator;
+        public uint ScanLineOrdering;
+        public int TargetAvailable;
+        public uint TargetStatus;
+        public uint Flags;
+    }
+
+    /// <summary>DISPLAYCONFIG_MODE_INFO, which is only passed through.</summary>
+    [StructLayout(LayoutKind.Sequential, Size = 64)]
+    private struct DisplayModeInfo
+    {
+        public uint InfoType;
+    }
+
+    /// <summary>DISPLAYCONFIG_SOURCE_DEVICE_NAME: the \\.\DISPLAYn name of a source.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    private unsafe struct SourceDeviceName
+    {
+        public int Type;
+        public uint Size;
+        public Luid Adapter;
+        public uint Id;
+        public fixed char GdiDeviceName[32];
+    }
+
+    /// <summary>MONITORINFOEXW.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    private unsafe struct MonitorInfo
+    {
+        public uint Size;
+        public int MonitorLeft, MonitorTop, MonitorRight, MonitorBottom;
+        public int WorkLeft, WorkTop, WorkRight, WorkBottom;
+        public uint Flags;
+        public fixed char Device[32];
+    }
+
+    [LibraryImport("user32.dll")]
+    private static partial nint MonitorFromWindow(nint window, uint flags);
+
+    [LibraryImport("user32.dll", EntryPoint = "GetMonitorInfoW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool GetMonitorInfo(nint monitor, ref MonitorInfo info);
+
+    [LibraryImport("user32.dll")]
+    private static partial int GetDisplayConfigBufferSizes(uint flags, out uint pathCount, out uint modeCount);
+
+    [LibraryImport("user32.dll")]
+    private static unsafe partial int QueryDisplayConfig(uint flags, ref uint pathCount, DisplayPath* paths,
+        ref uint modeCount, DisplayModeInfo* modes, nint topologyId);
+
+    [LibraryImport("user32.dll")]
+    private static unsafe partial int DisplayConfigGetDeviceInfo(SourceDeviceName* request);
+
+    /// <summary>The \\.\DISPLAYn name of the screen a window is on, or null when it cannot be read.</summary>
+    public static unsafe string? ScreenOf(nint window)
+    {
+        var monitor = MonitorFromWindow(window, MonitorDefaultToNearest);
+        var info = new MonitorInfo { Size = (uint)sizeof(MonitorInfo) };
+        return monitor != 0 && GetMonitorInfo(monitor, ref info) ? new string(info.Device) : null;
+    }
+
+    /// <summary>
+    /// Every screen Windows draws, by its \\.\DISPLAYn name, with the kind of connection each place it
+    /// shows on uses (DISPLAYCONFIG_VIDEO_OUTPUT_TECHNOLOGY). A screen duplicated on two displays is listed
+    /// twice. Empty when Windows will not say.
+    /// </summary>
+    public static unsafe List<(string Screen, uint Technology)> ScreenConnections()
+    {
+        var found = new List<(string, uint)>();
+
+        // Displays can come and go between the two calls, which then asks for a bigger buffer.
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            if (GetDisplayConfigBufferSizes(QdcOnlyActivePaths, out var pathCount, out var modeCount) != 0)
+            {
+                return found;
+            }
+
+            var paths = new DisplayPath[pathCount];
+            var modes = new DisplayModeInfo[modeCount];
+            int result;
+            fixed (DisplayPath* pathBuffer = paths)
+            fixed (DisplayModeInfo* modeBuffer = modes)
+            {
+                result = QueryDisplayConfig(QdcOnlyActivePaths, ref pathCount, pathBuffer, ref modeCount, modeBuffer, 0);
+            }
+
+            // ERROR_INSUFFICIENT_BUFFER: try again with the new sizes.
+            if (result == 122)
+            {
+                continue;
+            }
+
+            if (result != 0)
+            {
+                return found;
+            }
+
+            for (var i = 0; i < pathCount; i++)
+            {
+                var request = new SourceDeviceName
+                {
+                    Type = DisplayConfigGetSourceName,
+                    Size = (uint)sizeof(SourceDeviceName),
+                    Adapter = paths[i].SourceAdapter,
+                    Id = paths[i].SourceId
+                };
+
+                if (DisplayConfigGetDeviceInfo(&request) == 0)
+                {
+                    found.Add((new string(request.GdiDeviceName), paths[i].OutputTechnology));
+                }
+            }
+
+            return found;
+        }
+
+        return found;
     }
 
     /// <summary>
