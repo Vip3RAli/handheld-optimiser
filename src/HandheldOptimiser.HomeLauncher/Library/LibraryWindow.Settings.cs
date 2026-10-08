@@ -96,6 +96,7 @@ public partial class LibraryWindow
             : ReferenceEquals(_menu, DisplayItems) ? DisplayGroup
             : ReferenceEquals(_menu, TvItems) ? TvGroup
             : ReferenceEquals(_menu, OwnedItems) ? OwnedGroup
+            : ReferenceEquals(_menu, DealsItems) ? DealsGroup
             : ReferenceEquals(_menu, AddItems) ? AddProgramGroup
             : ReferenceEquals(_menu, WhilePlayingItems) ? WhilePlayingGroup
             : ReferenceEquals(_menu, EmulatorItems) ? EmulatorsGroup
