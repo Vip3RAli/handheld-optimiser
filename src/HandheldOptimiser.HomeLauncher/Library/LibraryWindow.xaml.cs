@@ -48,6 +48,7 @@ public partial class LibraryWindow : Window
         Closed += (_, _) => EndSession();
         Closed += (_, _) => StopWatchingScreens();
         Closed += (_, _) => StopWatchingWake();
+        Closed += (_, _) => StopWatchingForeground();
 
         // Scan on load, not only on activation: Windows can start the home app without giving it focus.
         Loaded += (_, _) => _ = ScanAsync();
@@ -76,8 +77,12 @@ public partial class LibraryWindow : Window
 
     private void OnActivated(object? sender, EventArgs e)
     {
-        // Just woken with a game running: straight back to it.
+        // Just woken with a game running: straight back to it. Otherwise the game is paused, with Quick Resume.
         _ = ResumeGameAsync();
+        if (!_resuming && !JustWoke)
+        {
+            PauseOnReturn();
+        }
 
         _gamepad.Start();
         _background = LibrarySettings.Background;
@@ -363,8 +368,33 @@ public partial class LibraryWindow : Window
             return;
         }
 
+        _focusedKey = tile.Game.Key;
+        if (tile.IsInstalled && _session is { } session)
+        {
+            // The game being played, paused or not: back into it.
+            if (session.StartedAt is not null && session.Game.Key == tile.Game.Key)
+            {
+                _launchBlockedUntil = DateTime.UtcNow + LaunchCooldown;
+                _ = BackToGameAsync(session, tile);
+                return;
+            }
+
+            // Only one game is kept paused.
+            if (session.IsPaused)
+            {
+                ConfirmClosePaused(session, tile);
+                return;
+            }
+        }
+
+        StartGame(tile);
+    }
+
+    private void StartGame(GameTile tile)
+    {
         _launchBlockedUntil = DateTime.UtcNow + LaunchCooldown;
         _focusedKey = tile.Game.Key;
+        _closeArmed = null;
 
         // A game that is not installed opens its store's install page, with nothing else to set up.
         if (!tile.IsInstalled)

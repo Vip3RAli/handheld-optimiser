@@ -22,6 +22,9 @@ internal static class LibraryApp
             return 0;
         }
 
+        // A game the last library paused and never resumed, if it ended without doing so.
+        GamePause.ResumeLeftOver();
+
         // A static tile grid does not need the GPU. Measured on the Ally, software rendering halves the
         // library's private memory (about 100 MB to 50 MB) and keeps the graphics driver out of the process.
         System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
@@ -41,6 +44,9 @@ internal static class LibraryApp
         finally
         {
             registration.Unregister(null);
+
+            // The window resumes a paused game as it closes; this covers the library failing instead.
+            GamePause.ResumeLeftOver();
         }
     }
 }
