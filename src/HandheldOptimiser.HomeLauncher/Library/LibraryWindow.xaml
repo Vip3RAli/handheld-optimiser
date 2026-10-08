@@ -351,8 +351,8 @@
                 </Grid>
             </Border>
 
-            <!-- Store filter, hidden until games from more than one store are installed. -->
-            <StackPanel x:Name="FilterStrip" Orientation="Horizontal" Margin="48,0,48,10" Visibility="Collapsed">
+            <!-- The tabs: All, the favourites and a tab per store when there are some, Not installed, and Apps. -->
+            <StackPanel x:Name="FilterStrip" Orientation="Horizontal" Margin="48,0,48,10">
                 <Border Style="{StaticResource BumperGlyph}" Margin="0,0,12,0">
                     <TextBlock Text="LB" FontSize="12" FontWeight="Bold" />
                 </Border>
@@ -495,6 +495,8 @@
                         <Button x:Name="FavouriteItem" Style="{StaticResource MenuButton}" Click="OnToggleFavourite" />
                         <Button x:Name="ProfileItem" Style="{StaticResource MenuButton}" Content="Game profile"
                                 Click="OnOpenProfile" />
+                        <!-- Only for a program the player added: moves it between the games and Apps. -->
+                        <Button x:Name="MoveItem" Style="{StaticResource MenuButton}" Click="OnToggleApp" />
                         <Button x:Name="ArgumentsItem" Style="{StaticResource MenuButton}" Content="Launch arguments"
                                 Click="OnEditArguments" />
                         <Button x:Name="FolderItem" Style="{StaticResource MenuButton}" Content="Open install folder"
@@ -532,7 +534,7 @@
                         <Button x:Name="OwnedGroup" Style="{StaticResource MenuButton}" Content="Games not installed"
                                 Tag="The games you own on Steam, Epic and GOG, ready to install" Click="OnOpenOwnedSettings" />
                         <Button x:Name="AddProgramGroup" Style="{StaticResource MenuButton}" Content="Add a program"
-                                Tag="Emulators and games from other stores" Click="OnOpenAddProgram" />
+                                Tag="Emulators, games from other stores, and apps like Chrome or Discord" Click="OnOpenAddProgram" />
                         <Button x:Name="WhilePlayingGroup" Style="{StaticResource MenuButton}" Content="While playing"
                                 Tag="Background programs, store apps, Quick Resume and your game after sleep" Click="OnOpenWhilePlaying" />
                         <Button x:Name="EmulatorsGroup" Style="{StaticResource MenuButton}" Content="Emulators"
