@@ -24,6 +24,12 @@ public partial class LibraryWindow
             return;
         }
 
+        if (Keyboard.FocusedElement is Button { DataContext: DealTile } deal)
+        {
+            NavigateDeals(deal, direction);
+            return;
+        }
+
         if (Keyboard.FocusedElement is not Button { DataContext: GameTile tile } button)
         {
             RestoreFocus();
@@ -42,6 +48,12 @@ public partial class LibraryWindow
 
         // Up from the grid's first row goes to the Continue playing row above it.
         if (direction == FocusNavigationDirection.Up && index >= 0 && index < columns && FocusContinueAbove(button))
+        {
+            return;
+        }
+
+        // Down from the grid's last row goes to the Deals row below it.
+        if (direction == FocusNavigationDirection.Down && index >= 0 && index / columns == last / columns && FocusDealBelow(button))
         {
             return;
         }
@@ -149,6 +161,9 @@ public partial class LibraryWindow
         {
             case GamepadAction.Accept when Keyboard.FocusedElement is Button { DataContext: GameTile tile }:
                 Launch(tile);
+                break;
+            case GamepadAction.Accept when Keyboard.FocusedElement is Button { DataContext: DealTile deal }:
+                OpenDeal(deal);
                 break;
             case GamepadAction.Options when _quickActions && Keyboard.FocusedElement is Button { DataContext: GameTile tile }:
                 OpenMenu(tile);
@@ -272,6 +287,13 @@ public partial class LibraryWindow
         {
             _focusedKey = tile.Game.Key;
             _focusInContinue = InContinueRow(button);
+            AcceptHint.Text = AcceptText();
+            if (_focusInDeals)
+            {
+                // The deal's price and shop were on the status line.
+                _focusInDeals = false;
+                StatusText.Text = string.Empty;
+            }
             QueueBackdrop(tile);
             ShowRowDetails(tile);
 

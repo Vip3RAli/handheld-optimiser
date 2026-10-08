@@ -105,6 +105,10 @@ public partial class LibraryWindow : Window
 
         ShowContinueArt();
 
+        // The deals kept on disk at once, and new ones if they are old and no game is running.
+        UpdateDeals();
+        _ = RefreshDealsAsync(force: false);
+
         // Switched in the main app or another session: the strip follows on the next look at the tiles.
         if (_showFilter != LibrarySettings.ShowFilter)
         {
@@ -137,6 +141,7 @@ public partial class LibraryWindow : Window
         ClearBackdrop();
         ClearContinueArt();
         UnloadNotInstalled();
+        UnloadDeals();
 
         // Once the rendering of the focus change has gone out, nothing here is needed until we are back.
         Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, Native.TrimWorkingSet);
@@ -269,7 +274,7 @@ public partial class LibraryWindow : Window
             : _filter.Apps ? (_tiles.Count == 1 ? "1 app" : $"{_tiles.Count} apps")
             : _tiles.Count == 1 ? "1 game"
             : $"{_tiles.Count} games";
-        AcceptHint.Text = _filter.NotInstalled ? "Install" : _filter.Apps ? "Open" : "Play";
+        AcceptHint.Text = AcceptText();
 
         // The pictures of games that are not installed are only kept while their tab is open.
         if (!_filter.NotInstalled)
@@ -278,6 +283,7 @@ public partial class LibraryWindow : Window
         }
 
         UpdateContinue();
+        UpdateDeals();
         UpdateEmptyText();
     }
 
@@ -347,6 +353,12 @@ public partial class LibraryWindow : Window
         // Wait for the item containers to exist after ItemsSource changes.
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
         {
+            // Back on the deal it was on, when that deal is still listed.
+            if (RestoreDealFocus())
+            {
+                return;
+            }
+
             // Back on the Continue playing card or tile it was on, when that game is still there.
             if (_focusInContinue && ContinueButtons().Find(b => b.DataContext is GameTile t && t.Game.Key == _focusedKey) is { } button)
             {

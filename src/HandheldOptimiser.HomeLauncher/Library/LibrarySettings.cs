@@ -89,6 +89,9 @@ internal static class LibrarySettings
     private const string DockedSizeValue = "DockedSize";
     private const string NotInstalledValue = "ShowNotInstalled";
     private const string SteamKeyValue = "SteamWebApiKey";
+    private const string DealsValue = "ShowDeals";
+    private const string DealsKeyValue = "IsThereAnyDealKey";
+    private const string WishlistDealsValue = "WishlistDealsFirst";
 
     /// <summary>The sizes a TV or monitor can show the library at, as percentages. 0 fits it to the screen.</summary>
     public static readonly int[] DockedSizes = [0, 100, 125, 150, 175, 200];
@@ -265,6 +268,27 @@ internal static class LibrarySettings
     {
         get => Read(SteamKeyValue)?.Trim() is { Length: > 0 } key ? key : null;
         set => Write(SteamKeyValue, value);
+    }
+
+    /// <summary>The Deals row below the library. Off until switched on.</summary>
+    public static bool ShowDeals
+    {
+        get => ReadSwitch(DealsValue, on: false);
+        set => WriteSwitch(DealsValue, value);
+    }
+
+    /// <summary>The player's IsThereAnyDeal API key, which the Deals row needs. Null when none is set.</summary>
+    public static string? DealsKey
+    {
+        get => Read(DealsKeyValue)?.Trim() is { Length: > 0 } key ? key : null;
+        set => Write(DealsKeyValue, value);
+    }
+
+    /// <summary>Deals on the games on the player's Steam wishlist first, which needs the Steam key too.</summary>
+    public static bool WishlistDeals
+    {
+        get => ReadSwitch(WishlistDealsValue);
+        set => WriteSwitch(WishlistDealsValue, value);
     }
 
     // Most switches are on until the player switches them off.

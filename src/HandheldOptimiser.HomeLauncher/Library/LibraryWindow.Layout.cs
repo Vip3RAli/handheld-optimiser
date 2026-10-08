@@ -153,6 +153,7 @@ public partial class LibraryWindow
         RowDetails.Visibility = row ? Visibility.Visible : Visibility.Collapsed;
 
         UpdateContinue();
+        UpdateDeals();
         RestoreFocus();
     }
 
