@@ -35,6 +35,9 @@ internal sealed class GameTile : INotifyPropertyChanged
     /// <summary>False for a game the player owns but has not installed, shown faded with a download mark.</summary>
     public bool IsInstalled => Game.Installed;
 
+    /// <summary>A program listed under Apps rather than with the games.</summary>
+    public bool IsApp => Game.IsApp;
+
     /// <summary>Whether its pictures have been decoded. Always true for an installed game.</summary>
     public bool IsLoaded { get; private set; }
 

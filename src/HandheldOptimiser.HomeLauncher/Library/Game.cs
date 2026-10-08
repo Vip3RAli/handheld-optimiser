@@ -31,6 +31,9 @@ public enum GameStore
 /// <param name="Installed">False for a game the player owns but has not installed. Its launch target
 /// then opens the store's install page for it.</param>
 /// <param name="CoverUrl">Where the store keeps a cover for a game that is not installed.</param>
+/// <param name="IsApp">An added program that is not a game, such as a browser or Discord. It is listed
+/// under Apps rather than with the games, and opening it leaves out everything done for games: no
+/// profile, no closing of other programs, no play time and no place in Continue playing.</param>
 public sealed record Game(
     string Key,
     string Title,
@@ -45,9 +48,10 @@ public sealed record Game(
     string? HeroPath = null,
     string? Platform = null,
     bool Installed = true,
-    string? CoverUrl = null)
+    string? CoverUrl = null,
+    bool IsApp = false)
 {
-    public string StoreName => Platform ?? NameOf(Store);
+    public string StoreName => IsApp ? "App" : Platform ?? NameOf(Store);
 
     public static string NameOf(GameStore store) => store switch
     {

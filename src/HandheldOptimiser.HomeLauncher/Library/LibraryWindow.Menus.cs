@@ -59,6 +59,9 @@ public partial class LibraryWindow
     /// <summary>The store, and how long the game has been played: "Steam   12 h 5 min played, last played today".</summary>
     private string GameSubtitle(GameTile tile) =>
         IsPausedGame(tile) ? $"{tile.StoreName}   Paused where you left off"
+        : tile.IsApp ? _stats.GetValueOrDefault(tile.Game.Key).LastPlayed is { } opened
+                ? $"App   Last opened from the library {PlayStats.Ago(DateTimeOffset.UtcNow - opened)}"
+                : "App"
         : _stats.GetValueOrDefault(tile.Game.Key).Describe(DateTimeOffset.UtcNow) is { } played
             ? $"{tile.StoreName}   {played}"
             : tile.IsInstalled ? $"{tile.StoreName}   Not played from the library yet"
@@ -79,12 +82,21 @@ public partial class LibraryWindow
         }
 
         FavouriteItem.Content = tile.IsFavourite ? "Remove from favourites" : "Add to favourites";
-        FavouriteItem.Tag = tile.IsFavourite ? "Back among the other games" : "Kept at the front of the library, with a star";
+        FavouriteItem.Tag = tile.IsFavourite ? $"Back among the other {(tile.IsApp ? "apps" : "games")}"
+            : tile.IsApp ? "Kept at the front of Apps, with a star"
+            : "Kept at the front of the library, with a star";
 
+        // Profiles only change things for games.
+        ProfileItem.Visibility = installed && !tile.IsApp ? Visibility.Visible : Visibility.Collapsed;
         ProfileItem.Tag = GameProfiles.For(game).Describe();
         RefreshCloseGameItem(tile);
 
         var added = AddedPrograms.IsAdded(game);
+        MoveItem.Visibility = added ? Visibility.Visible : Visibility.Collapsed;
+        MoveItem.Content = tile.IsApp ? "Move to games" : "Move to Apps";
+        MoveItem.Tag = tile.IsApp ? "Listed with the games, with play time and game profiles"
+            : "For programs that are not games, like a browser or Discord";
+
         HideItem.Content = added ? "Remove from library" : tile.IsHidden ? "Show in library" : "Hide from library";
         HideItem.Tag = added ? "Takes it off the list. Nothing is deleted"
             : tile.IsHidden ? "Back in the grid with the other games"
@@ -92,7 +104,7 @@ public partial class LibraryWindow
 
         var takesArguments = GameCatalog.SupportsCustomArguments(game);
         ArgumentsItem.IsEnabled = takesArguments;
-        ArgumentsItem.Tag = !takesArguments ? $"Not available for {game.StoreName} games"
+        ArgumentsItem.Tag = !takesArguments ? game.IsApp ? "Not available for this app" : $"Not available for {game.StoreName} games"
             : GameCatalog.CustomArguments(game) is { Length: > 0 } arguments ? arguments
             : "None";
 
@@ -107,7 +119,7 @@ public partial class LibraryWindow
         PropertiesItem.Tag = exe ?? folder ?? "Executable not found";
 
         var canLookUp = Artwork.HasApiKey;
-        ArtworkItem.Visibility = _background == BackgroundKind.Artwork ? Visibility.Visible : Visibility.Collapsed;
+        ArtworkItem.Visibility = _background == BackgroundKind.Artwork && !tile.IsApp ? Visibility.Visible : Visibility.Collapsed;
         ArtworkItem.IsEnabled = canLookUp;
         ArtworkItem.Tag = !canLookUp ? "Add a free SteamGridDB key in Settings to change this"
             : Artwork.SearchTitle(game) is { } corrected ? $"Looked up as \"{corrected}\""
