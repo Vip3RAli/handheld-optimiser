@@ -441,6 +441,65 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+
+                <!--
+                    Deals: games on sale from IsThereAnyDeal, below the grid in a row that scrolls across.
+                    Only when switched on, in the grid layout, on the All tab.
+                -->
+                <StackPanel x:Name="DealsPanel" Margin="0,18,0,0" Visibility="Collapsed">
+                    <StackPanel Orientation="Horizontal" Margin="10,0,0,2">
+                        <TextBlock Text="Deals" FontSize="18" FontWeight="SemiBold" Opacity="0.85" />
+                        <TextBlock Text="Prices from IsThereAnyDeal" Margin="12,0,0,2" FontSize="13" Opacity="0.5"
+                                   VerticalAlignment="Bottom" />
+                    </StackPanel>
+                    <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                                  PanningMode="HorizontalOnly" Focusable="False">
+                        <ItemsControl x:Name="DealTiles" Focusable="False">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Style="{StaticResource CardButton}" Click="OnDealClick" GotKeyboardFocus="OnDealFocused">
+                                        <StackPanel Width="300">
+                                            <Grid Height="140">
+                                                <Border CornerRadius="8" ClipToBounds="True" Background="#262B36">
+                                                    <Grid>
+                                                        <Image Source="{Binding Banner}" Stretch="UniformToFill"
+                                                               RenderOptions.BitmapScalingMode="HighQuality" />
+                                                        <TextBlock Text="{Binding Title}" Margin="16,0" FontSize="18" FontWeight="SemiBold"
+                                                                   TextAlignment="Center" TextWrapping="Wrap" VerticalAlignment="Center"
+                                                                   Visibility="{Binding ShowsTitle, Converter={StaticResource BoolToVis}}" />
+                                                    </Grid>
+                                                </Border>
+                                                <Border Margin="8" Padding="8,3" CornerRadius="6" Background="#3FA34D"
+                                                        HorizontalAlignment="Left" VerticalAlignment="Bottom">
+                                                    <TextBlock Text="{Binding Cut}" FontSize="15" FontWeight="Bold" />
+                                                </Border>
+                                                <Border Margin="8" Padding="8,3" CornerRadius="6" Background="#D0101216"
+                                                        HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                        Visibility="{Binding HasBadge, Converter={StaticResource BoolToVis}}">
+                                                    <TextBlock Text="{Binding Badge}" FontSize="12" FontWeight="SemiBold" Foreground="#F5C542" />
+                                                </Border>
+                                            </Grid>
+                                            <TextBlock Text="{Binding Title}" Margin="2,8,2,0" FontSize="14" FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <StackPanel Orientation="Horizontal" Margin="2,1,2,0">
+                                                <TextBlock Text="{Binding Price}" FontSize="13" FontWeight="SemiBold" />
+                                                <TextBlock Text="{Binding Regular}" Margin="8,0,0,0" FontSize="12" Opacity="0.5"
+                                                           TextDecorations="Strikethrough" VerticalAlignment="Center" />
+                                                <TextBlock Text="{Binding Shop}" Margin="8,0,0,0" FontSize="12" Opacity="0.55"
+                                                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </StackPanel>
             </StackPanel>
         </ScrollViewer>
 
@@ -533,6 +592,8 @@
                                 Tag="A bigger layout when the library is on a TV or monitor" Click="OnOpenTvSettings" />
                         <Button x:Name="OwnedGroup" Style="{StaticResource MenuButton}" Content="Games not installed"
                                 Tag="The games you own on Steam, Epic and GOG, ready to install" Click="OnOpenOwnedSettings" />
+                        <Button x:Name="DealsGroup" Style="{StaticResource MenuButton}" Content="Game deals"
+                                Tag="Games on sale below the library, from IsThereAnyDeal" Click="OnOpenDealsSettings" />
                         <Button x:Name="AddProgramGroup" Style="{StaticResource MenuButton}" Content="Add a program"
                                 Tag="Emulators, games from other stores, and apps like Chrome or Discord" Click="OnOpenAddProgram" />
                         <Button x:Name="WhilePlayingGroup" Style="{StaticResource MenuButton}" Content="While playing"
@@ -897,6 +958,30 @@
                                 Click="OnEditSteamKey" />
                         <Button x:Name="OwnedRefreshItem" Style="{StaticResource MenuButton}" Content="Look again"
                                 Tag="Ask Steam for your games now, and read Epic and GOG Galaxy again" Click="OnRefreshOwned" />
+                        <!-- For touch, which has no B button. -->
+                        <Button Style="{StaticResource MenuButton}" Content="Back" Tag="Settings" Click="OnSettingsBack" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                            <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                                <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Select" FontSize="15" VerticalAlignment="Center" />
+                            <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                                <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- The Deals row below the library. A switches a row on or off. -->
+                    <StackPanel x:Name="DealsItems" Visibility="Collapsed">
+                        <Button x:Name="DealsSetting" Style="{StaticResource MenuButton}" Content="Show game deals"
+                                Click="OnToggleDeals" />
+                        <Button x:Name="DealsKeySetting" Style="{StaticResource MenuButton}" Content="IsThereAnyDeal API key"
+                                Click="OnEditDealsKey" />
+                        <Button x:Name="WishlistDealsSetting" Style="{StaticResource MenuButton}" Content="Wishlist deals first"
+                                Click="OnToggleWishlistDeals" />
+                        <Button x:Name="DealsRefreshItem" Style="{StaticResource MenuButton}" Content="Look again"
+                                Click="OnRefreshDeals" />
                         <!-- For touch, which has no B button. -->
                         <Button Style="{StaticResource MenuButton}" Content="Back" Tag="Settings" Click="OnSettingsBack" />
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">

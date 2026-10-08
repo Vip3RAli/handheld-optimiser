@@ -16,7 +16,8 @@ public partial class LibraryWindow
         Arguments,
         ArtworkTitle,
         ArtworkKey,
-        SteamKey
+        SteamKey,
+        DealsKey
     }
 
     // The list showing in the overlay: a game's quick actions, the library's settings or the power menu.
@@ -49,7 +50,7 @@ public partial class LibraryWindow
         {
             GameItems, ProfileItems, SettingsItems, BackgroundItems, DisplayItems, AddItems, PowerItems, QuickItems,
             WhilePlayingItems, AppsToCloseItems, RunningAppsItems, MaintenanceItems, StartupItems, EmulatorItems,
-            TvItems, OwnedItems
+            TvItems, OwnedItems, DealsItems
         })
         {
             list.Visibility = Visibility.Collapsed;
@@ -255,6 +256,12 @@ public partial class LibraryWindow
                 _ = RefreshOwnedAsync(force: true);
             }
 
+            return;
+        }
+
+        if (editor == MenuEditor.DealsKey)
+        {
+            SaveDealsKey(text);
             return;
         }
 
