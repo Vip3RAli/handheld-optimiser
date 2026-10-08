@@ -4,7 +4,7 @@ using System.Windows.Controls;
 namespace HandheldOptimiser.HomeLauncher.Library;
 
 /// <summary>
-/// Per-game profiles: a power mode, refresh rate and brightness a game is switched to when it starts
+/// Per-game profiles: a power mode, resolution, refresh rate and brightness a game is switched to when it starts
 /// from the library, with the player's own settings put back once it has closed (see
 /// LibraryWindow.Session), and whether background programs are closed for it.
 /// </summary>
@@ -15,11 +15,13 @@ public partial class LibraryWindow
     private static readonly int[] ProfileBrightnessLevels = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
     /// <summary>The settings from before a profiled game started. Only what its profile changed is set.</summary>
-    private sealed record SavedSettings(Game Game, DateTime StartedAt, PowerMode? PowerMode, int? RefreshRate, int? Brightness);
+    private sealed record SavedSettings(Game Game, DateTime StartedAt, PowerMode? PowerMode, int? RefreshRate, int? Brightness,
+        Resolution? Resolution = null);
 
-    // The profile open in the menu, and the refresh rates its screen offers.
+    // The profile open in the menu, and the resolutions and refresh rates its screen offers.
     private GameProfile _profile = GameProfile.None;
     private IReadOnlyList<int> _profileRates = [];
+    private IReadOnlyList<Resolution> _profileSizes = [];
 
     private SavedSettings? _saved;
 
@@ -32,6 +34,7 @@ public partial class LibraryWindow
 
         _profile = GameProfiles.For(tile.Game);
         _profileRates = RefreshRates.Read()?.Available ?? [];
+        _profileSizes = Resolutions.Read()?.Available ?? [];
 
         HideMenuLists();
         _menu = ProfileItems;
@@ -47,6 +50,11 @@ public partial class LibraryWindow
         ProfilePowerSetting.Tag = _profile.PowerMode is { } mode ? PowerModes.Name(mode)
             : powerModes ? Unchanged
             : "Only with Windows' Balanced power plan";
+
+        ProfileResolutionSetting.IsEnabled = _profileSizes.Count > 1 || _profile.Resolution is not null;
+        ProfileResolutionSetting.Tag = _profile.Resolution is { } size ? size.ToString()
+            : _profileSizes.Count > 1 ? Unchanged
+            : "This screen has one resolution";
 
         ProfileRefreshSetting.IsEnabled = _profileRates.Count > 1 || _profile.RefreshRate is not null;
         ProfileRefreshSetting.Tag = _profile.RefreshRate is { } hertz ? $"{hertz} Hz"
@@ -70,6 +78,17 @@ public partial class LibraryWindow
         if (ReferenceEquals(row, ProfilePowerSetting))
         {
             profile = _profile with { PowerMode = StepChoice(_profile.PowerMode, Enum.GetValues<PowerMode>(), step) };
+        }
+        else if (ReferenceEquals(row, ProfileResolutionSetting))
+        {
+            // As with refresh rates, a size saved on another screen stays one of the choices.
+            var sizes = _profileSizes.ToList();
+            if (_profile.Resolution is { } chosen && !sizes.Contains(chosen))
+            {
+                sizes.Add(chosen);
+            }
+
+            profile = _profile with { Resolution = StepChoice(_profile.Resolution, sizes, step) };
         }
         else if (ReferenceEquals(row, ProfileRefreshSetting))
         {
@@ -119,6 +138,8 @@ public partial class LibraryWindow
 
     private void OnStepProfilePower(object sender, RoutedEventArgs e) => StepProfileSetting(ProfilePowerSetting, 1);
 
+    private void OnStepProfileResolution(object sender, RoutedEventArgs e) => StepProfileSetting(ProfileResolutionSetting, 1);
+
     private void OnStepProfileRefresh(object sender, RoutedEventArgs e) => StepProfileSetting(ProfileRefreshSetting, 1);
 
     private void OnStepProfileBrightness(object sender, RoutedEventArgs e) => StepProfileSetting(ProfileBrightnessSetting, 1);
@@ -129,12 +150,22 @@ public partial class LibraryWindow
     private void ApplyProfile(Game game, GameProfile profile)
     {
         var powerMode = profile.PowerMode is not null ? PowerModes.Read() : null;
-        var refreshRate = profile.RefreshRate is not null ? RefreshRates.Read()?.Current : null;
-        _saved = new SavedSettings(game, DateTime.UtcNow, powerMode, refreshRate, null);
+        var resolution = profile.Resolution is not null ? Resolutions.Read()?.Current : null;
+
+        // A new size can come with a different refresh rate, so the rate is kept to put back as well.
+        var refreshRate = profile.RefreshRate is not null || resolution is not null ? RefreshRates.Read()?.Current : null;
+        _saved = new SavedSettings(game, DateTime.UtcNow, powerMode, refreshRate, null, resolution);
 
         if (profile.PowerMode is { } mode && powerMode is not null && powerMode != mode && !PowerModes.Set(mode))
         {
             Program.Log($"Could not switch to the power mode in {game.Key}'s profile");
+        }
+
+        // The size first: the refresh rate is then set for the new size.
+        if (profile.Resolution is { } size && resolution is not null && resolution != size
+            && Resolutions.Set(size) is { } sizeError)
+        {
+            Program.Log($"Could not switch to the resolution in {game.Key}'s profile: {sizeError}");
         }
 
         if (profile.RefreshRate is { } hertz && refreshRate is not null && refreshRate != hertz && RefreshRates.Set(hertz) is { } error)
@@ -173,6 +204,11 @@ public partial class LibraryWindow
         if (saved.PowerMode is { } mode)
         {
             PowerModes.Set(mode);
+        }
+
+        if (saved.Resolution is { } size && Resolutions.Set(size, saved.RefreshRate) is { } sizeError)
+        {
+            Program.Log($"Could not put the resolution back: {sizeError}");
         }
 
         if (saved.RefreshRate is { } hertz && RefreshRates.Set(hertz) is { } error)
