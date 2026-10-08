@@ -63,6 +63,7 @@ public partial class LibraryWindow
 
     private void RefreshWhilePlaying()
     {
+        RefreshQuickResumeSetting();
         RefreshResumeSetting();
 
         var chosen = BackgroundApps.Choices().Where(c => c.Close).Select(c => c.App.Name).ToList();

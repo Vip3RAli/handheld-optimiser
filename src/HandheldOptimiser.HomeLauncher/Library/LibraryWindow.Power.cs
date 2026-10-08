@@ -76,6 +76,13 @@ public partial class LibraryWindow
 
         CloseMenu();
         Program.Log($"{name} chosen in the power menu");
+
+        // A paused game could not close as Windows asks it to, and would hold up the restart.
+        if (_session is { } session)
+        {
+            ResumeGame(session);
+        }
+
         ReportPower(action());
     }
 
