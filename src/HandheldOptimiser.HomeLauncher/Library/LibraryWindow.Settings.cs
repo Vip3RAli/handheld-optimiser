@@ -94,6 +94,8 @@ public partial class LibraryWindow
 
         var row = ReferenceEquals(_menu, BackgroundItems) ? BackgroundGroup
             : ReferenceEquals(_menu, DisplayItems) ? DisplayGroup
+            : ReferenceEquals(_menu, TvItems) ? TvGroup
+            : ReferenceEquals(_menu, OwnedItems) ? OwnedGroup
             : ReferenceEquals(_menu, AddItems) ? AddProgramGroup
             : ReferenceEquals(_menu, WhilePlayingItems) ? WhilePlayingGroup
             : ReferenceEquals(_menu, EmulatorItems) ? EmulatorsGroup
@@ -136,6 +138,9 @@ public partial class LibraryWindow
 
         PositionSetting.Visibility = BlurSetting.Visibility;
         PositionSetting.Tag = _position.ToString();
+
+        RefreshLayoutSettings();
+        RefreshOwnedSettings();
 
         StatusSetting.Tag = OnOff(_showStatus);
         FilterSetting.Tag = OnOff(_showFilter);
@@ -294,7 +299,7 @@ public partial class LibraryWindow
             return StepEmulatorSetting(row, step);
         }
 
-        if (StepToolsSetting(row, step))
+        if (StepToolsSetting(row, step) || StepLayoutSetting(row, step))
         {
             return true;
         }

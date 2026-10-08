@@ -1,6 +1,9 @@
 namespace HandheldOptimiser.HomeLauncher.Library;
 
-/// <summary>Portrait covers from SteamGridDB for games whose store keeps none on disk.</summary>
+/// <summary>
+/// Portrait covers for games whose store keeps none on disk: from SteamGridDB, or for a game that is not
+/// installed, from its store's own image server.
+/// </summary>
 public partial class LibraryWindow
 {
     // Few enough at once to be polite to SteamGridDB, enough that a new library fills in a minute.
@@ -17,14 +20,21 @@ public partial class LibraryWindow
     // The API key SteamGridDB turned away, so nothing more is asked for until the player changes it.
     private string? _rejectedKey;
 
+    // Covers for games that are not installed, fetched alongside the others as their pictures load.
+    private readonly SemaphoreSlim _storeCoverSlots = new(CoverFetchesAtOnce);
+
     /// <summary>
-    /// Gives a cover to every game whose store keeps none, from disk if it was fetched before and from
-    /// SteamGridDB otherwise. Each tile changes as its own cover arrives; the grid is never rebuilt, so
-    /// the focus and the scroll position stay where they are.
+    /// Gives a cover to every installed game whose store keeps none, from disk if it was fetched before and
+    /// from SteamGridDB otherwise. Each tile changes as its own cover arrives; the grid is never rebuilt,
+    /// so the focus and the scroll position stay where they are.
     /// </summary>
-    private async Task FetchCoversAsync()
+    /// <param name="notInstalled">
+    /// Games that are not installed whose pictures have just loaded, to fetch covers for instead. Their
+    /// stores' own covers need no SteamGridDB key.
+    /// </param>
+    private async Task FetchCoversAsync(IReadOnlyList<GameTile>? notInstalled = null)
     {
-        if (_fetchingCovers)
+        if (_fetchingCovers && notInstalled is null)
         {
             // Something changed while covers were on their way; go round again once they are in.
             _fetchCoversAgain = true;
@@ -43,8 +53,9 @@ public partial class LibraryWindow
 
         // A cover already on disk needs no key and no request. This also catches one that finished
         // downloading for a tile a rescan has since replaced.
-        var wanted = _allTiles
-            .Where(t => t.NeedsCover && (Artwork.CachedCover(t.Game) is not null || (mayAsk && _coversAsked.Add(t.Game.Key))))
+        var wanted = (notInstalled ?? _allTiles.Where(t => t.IsInstalled))
+            .Where(t => t.NeedsCover && (Artwork.CachedCover(t.Game) is not null
+                || ((mayAsk || t.Game.CoverUrl is not null) && _coversAsked.Add(t.Game.Key))))
             .ToList();
 
         if (wanted.Count == 0)
@@ -52,52 +63,17 @@ public partial class LibraryWindow
             return;
         }
 
+        if (notInstalled is not null)
+        {
+            await FetchCoversAsync(wanted, _storeCoverSlots, apiKey);
+            return;
+        }
+
         _fetchingCovers = true;
         try
         {
             using var slots = new SemaphoreSlim(CoverFetchesAtOnce);
-
-            await Task.WhenAll(wanted.Select(async tile =>
-            {
-                await slots.WaitAsync();
-                try
-                {
-                    if (_rejectedKey is not null && _rejectedKey == apiKey && Artwork.CachedCover(tile.Game) is null)
-                    {
-                        return;
-                    }
-
-                    // Downloaded, decoded and its colours taken off the UI thread; only the swap happens here.
-                    var (cover, colours, keyRejected) = await Task.Run(async () =>
-                    {
-                        var (path, rejected) = await Artwork.FindCoverAsync(tile.Game);
-                        var image = path is null ? null : GameTile.LoadCover(path);
-                        return (image, Palette.Colours(image), rejected);
-                    });
-
-                    if (keyRejected)
-                    {
-                        _rejectedKey = apiKey;
-                    }
-
-                    if (cover is null)
-                    {
-                        return;
-                    }
-
-                    tile.ShowCover(cover, colours);
-
-                    // The colours behind the grid came from the icon, so take them from the cover now.
-                    if (tile.Game.Key == _focusedKey)
-                    {
-                        ReloadBackdrop();
-                    }
-                }
-                finally
-                {
-                    slots.Release();
-                }
-            }));
+            await FetchCoversAsync(wanted, slots, apiKey);
         }
         finally
         {
@@ -109,5 +85,58 @@ public partial class LibraryWindow
             _fetchCoversAgain = false;
             _ = FetchCoversAsync();
         }
+    }
+
+    private async Task FetchCoversAsync(List<GameTile> wanted, SemaphoreSlim slots, string? apiKey)
+    {
+        await Task.WhenAll(wanted.Select(async tile =>
+        {
+            await slots.WaitAsync();
+            try
+            {
+                if (_rejectedKey is not null && _rejectedKey == apiKey && Artwork.CachedCover(tile.Game) is null
+                    && tile.Game.CoverUrl is null)
+                {
+                    return;
+                }
+
+                // A game that is not installed whose pictures were let go while it waited.
+                if (!tile.IsLoaded)
+                {
+                    _coversAsked.Remove(tile.Game.Key);
+                    return;
+                }
+
+                // Downloaded, decoded and its colours taken off the UI thread; only the swap happens here.
+                var (cover, colours, keyRejected) = await Task.Run(async () =>
+                {
+                    var (path, rejected) = await Artwork.FindCoverAsync(tile.Game);
+                    var image = path is null ? null : GameTile.LoadCover(path);
+                    return (image, Palette.Colours(image), rejected);
+                });
+
+                if (keyRejected)
+                {
+                    _rejectedKey = apiKey;
+                }
+
+                if (cover is null || !tile.IsLoaded)
+                {
+                    return;
+                }
+
+                tile.ShowCover(cover, colours);
+
+                // The colours behind the grid came from the icon, so take them from the cover now.
+                if (tile.Game.Key == _focusedKey)
+                {
+                    ReloadBackdrop();
+                }
+            }
+            finally
+            {
+                slots.Release();
+            }
+        }));
     }
 }
