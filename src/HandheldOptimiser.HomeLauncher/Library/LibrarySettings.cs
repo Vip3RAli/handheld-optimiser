@@ -82,6 +82,8 @@ internal static class LibrarySettings
     private const string LayoutValue = "Layout";
     private const string ContinueValue = "ContinuePlaying";
     private const string ResumeValue = "ResumeAfterSleep";
+    private const string QuickResumeValue = "QuickResume";
+    private const string PausedValue = "PausedProcesses";
     private const string DockedValue = "DockedMode";
     private const string DockedLayoutValue = "DockedLayout";
     private const string DockedSizeValue = "DockedSize";
@@ -213,6 +215,20 @@ internal static class LibrarySettings
     {
         get => ReadSwitch(ResumeValue);
         set => WriteSwitch(ResumeValue, value);
+    }
+
+    /// <summary>Pause the game being played while the library is in front, until it is picked again.</summary>
+    public static bool QuickResume
+    {
+        get => ReadSwitch(QuickResumeValue);
+        set => WriteSwitch(QuickResumeValue, value);
+    }
+
+    /// <summary>The processes paused right now, for the next library to resume if this one ends without doing so.</summary>
+    public static string? PausedProcesses
+    {
+        get => Read(PausedValue);
+        set => Write(PausedValue, value);
     }
 
     /// <summary>A layout and size of its own while the library is on a TV or monitor.</summary>

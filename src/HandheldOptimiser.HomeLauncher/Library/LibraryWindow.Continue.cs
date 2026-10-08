@@ -44,7 +44,8 @@ public partial class LibraryWindow
         var card = played[0];
         ContinuePanel.Visibility = Visibility.Visible;
         ContinueCard.DataContext = card;
-        ContinueDetail.Text = _stats.GetValueOrDefault(card.Game.Key).Describe(DateTimeOffset.UtcNow);
+        ContinueDetail.Text = IsPausedGame(card) ? "Paused. Press A to carry on where you left off"
+            : _stats.GetValueOrDefault(card.Game.Key).Describe(DateTimeOffset.UtcNow);
 
         // Rebuilding the tiles would lose the focus on one of them, so only when they changed.
         var recent = played.Skip(1).ToList();

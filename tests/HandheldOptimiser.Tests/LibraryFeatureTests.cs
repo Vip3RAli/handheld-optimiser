@@ -6,8 +6,8 @@ namespace HandheldOptimiser.Tests;
 
 /// <summary>
 /// The game library's pure logic: reading Steam's config format, naming and listing ROM files, the
-/// play time wording, game profiles, screen sizes, docked mode, Continue playing and the stores' lists
-/// of owned games. Nothing here reads or writes the registry.
+/// play time wording, game profiles, screen sizes, docked mode, Continue playing, the stores' lists
+/// of owned games and which games Quick Resume may pause. Nothing here reads or writes the registry.
 /// </summary>
 public sealed class LibraryFeatureTests : IDisposable
 {
@@ -296,6 +296,70 @@ public sealed class LibraryFeatureTests : IDisposable
         Assert.Equal("https://images.gog.com/abc_glx_vertical_cover.jpg", games[0].CoverUrl);
         Assert.Equal("goggalaxy://openGameView/1207658924", games[0].LaunchTarget);
         Assert.Equal("Original Only", games[1].Title);
+    }
+
+    [Fact]
+    public void GamePause_NoteOfPausedProcessesRoundTrips()
+    {
+        var processes = new List<(int Id, long Started)> { (1234, 133700000000000000), (5678, 133700000000000001) };
+
+        var text = GamePause.Format(processes);
+
+        Assert.Equal("1234@133700000000000000;5678@133700000000000001", text);
+        Assert.Equal(processes, GamePause.Parse(text));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("garbage")]
+    [InlineData("12@")]
+    [InlineData("@5")]
+    [InlineData("-1@5;0@5;7@-3")]
+    public void GamePause_BrokenNoteResumesNothing(string? text) => Assert.Empty(GamePause.Parse(text));
+
+    [Fact]
+    public void GamePause_BrokenEntriesAreSkipped() =>
+        Assert.Equal([(42, 99L)], GamePause.Parse("x@1; 42@99 ;3@y"));
+
+    [Fact]
+    public void GamePause_OnlyAGamesOwnFolderIsPaused()
+    {
+        var programFiles = Path.Combine(_folder, "Program Files");
+        var windows = Path.Combine(_folder, "Windows");
+        string[] system = [programFiles];
+
+        Assert.False(GamePause.TooBroad(Path.Combine(programFiles, "Steam", "steamapps", "common", "Hades"), system, windows));
+        Assert.True(GamePause.TooBroad(programFiles, system, windows));
+        Assert.True(GamePause.TooBroad(programFiles + Path.DirectorySeparatorChar, system, windows));
+        Assert.True(GamePause.TooBroad(_folder, system, windows));
+        Assert.True(GamePause.TooBroad(Path.Combine(windows, "System32"), system, windows));
+        Assert.True(GamePause.TooBroad(Path.GetPathRoot(_folder)!, system, windows));
+        Assert.True(GamePause.TooBroad("", system, windows));
+    }
+
+    [Fact]
+    public void GamePause_FindsAntiCheatInTheGamesFolder()
+    {
+        var game = Directory.CreateDirectory(Path.Combine(_folder, "Fortnite")).FullName;
+        Assert.Null(GamePause.FindAntiCheat(game));
+
+        var win64 = Directory.CreateDirectory(Path.Combine(game, "FortniteGame", "Binaries", "Win64")).FullName;
+        File.WriteAllText(Path.Combine(win64, "FortniteClient-Win64-Shipping.exe"), "");
+        Assert.Null(GamePause.FindAntiCheat(game));
+
+        Directory.CreateDirectory(Path.Combine(win64, "EasyAntiCheat"));
+        Assert.Equal("Easy Anti-Cheat", GamePause.FindAntiCheat(game));
+    }
+
+    [Fact]
+    public void GamePause_FindsAntiCheatByItsFiles()
+    {
+        var game = Directory.CreateDirectory(Path.Combine(_folder, "DayZ")).FullName;
+        File.WriteAllText(Path.Combine(game, "BEService_x64.exe"), "");
+
+        Assert.Equal("BattlEye", GamePause.FindAntiCheat(game));
+        Assert.Null(GamePause.FindAntiCheat(Path.Combine(_folder, "missing")));
     }
 
     private void Touch(string name, string text = "")

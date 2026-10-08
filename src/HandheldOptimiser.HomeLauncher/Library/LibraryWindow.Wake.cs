@@ -28,6 +28,9 @@ public partial class LibraryWindow
     private DateTime? _wokeAt;
     private bool _resuming;
 
+    /// <summary>Whether the device woke a moment ago and the game is still to be put back in front.</summary>
+    private bool JustWoke => _wokeAt is { } woke && DateTime.UtcNow - woke <= ResumeWithin;
+
     private void WatchWake()
     {
         var handle = new WindowInteropHelper(this).Handle;
@@ -115,14 +118,8 @@ public partial class LibraryWindow
         _resuming = true;
         try
         {
-            // Looking through the running programs takes a moment, so it stays off the UI thread.
-            var window = await Task.Run(session.MainWindow);
-            if (window == 0 || !ReferenceEquals(_session, session) || !IsActive)
-            {
-                return;
-            }
-
-            if (Native.SwitchTo(window))
+            // Resumed first, if Quick Resume paused it.
+            if (await ReturnToGameAsync(session))
             {
                 Program.Log($"Back to {session.Game.Key} after waking up");
             }
