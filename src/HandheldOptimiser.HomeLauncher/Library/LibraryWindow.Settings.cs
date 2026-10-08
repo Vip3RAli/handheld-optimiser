@@ -15,15 +15,14 @@ public partial class LibraryWindow
     private bool _showStatus = LibrarySettings.ShowStatus;
     private bool _showFilter = LibrarySettings.ShowFilter;
     private bool _quickActions = LibrarySettings.QuickActions;
+    private bool _showHidden = LibrarySettings.ShowHidden;
 
     /// <summary>The library's own settings, from the gear in the top bar or the controller's Menu button.</summary>
     private void OpenSettings()
     {
         _menuTile = null;
         _menu = SettingsItems;
-        GameItems.Visibility = Visibility.Collapsed;
-        PowerItems.Visibility = Visibility.Collapsed;
-        HideSettingsGroups();
+        HideMenuLists();
 
         MenuTitle.Text = "Settings";
         MenuStore.Text = "Game library";
@@ -31,12 +30,6 @@ public partial class LibraryWindow
 
         MenuOverlay.Visibility = Visibility.Visible;
         ShowMenuItems();
-    }
-
-    private void HideSettingsGroups()
-    {
-        BackgroundItems.Visibility = Visibility.Collapsed;
-        DisplayItems.Visibility = Visibility.Collapsed;
     }
 
     private void OnOpenBackgroundSettings(object sender, RoutedEventArgs e) => OpenSettingsGroup(BackgroundItems, "Background");
@@ -57,13 +50,24 @@ public partial class LibraryWindow
     private void OnSettingsBack(object sender, RoutedEventArgs e) => BackToSettings();
 
     /// <summary>
-    /// From a group of settings, goes back to the settings list with that group's row focused. False when
-    /// no group is open, so Back closes the menu instead.
+    /// From a group of settings, goes back to the settings list with that group's row focused, and from a
+    /// game's profile back to its quick actions. False when no group is open, so Back closes the menu instead.
     /// </summary>
     private bool BackToSettings()
     {
+        if (ReferenceEquals(_menu, ProfileItems) && _menuTile is { } tile)
+        {
+            HideMenuLists();
+            _menu = GameItems;
+            MenuStore.Text = tile.StoreName;
+            RefreshGameItems(tile);
+            ShowMenuItems(ProfileItem);
+            return true;
+        }
+
         var row = ReferenceEquals(_menu, BackgroundItems) ? BackgroundGroup
             : ReferenceEquals(_menu, DisplayItems) ? DisplayGroup
+            : ReferenceEquals(_menu, AddItems) ? AddProgramGroup
             : null;
 
         if (row is null)
@@ -71,7 +75,7 @@ public partial class LibraryWindow
             return false;
         }
 
-        HideSettingsGroups();
+        HideMenuLists();
         _menu = SettingsItems;
 
         MenuTitle.Text = "Settings";
@@ -105,6 +109,10 @@ public partial class LibraryWindow
         StatusSetting.Tag = OnOff(_showStatus);
         FilterSetting.Tag = OnOff(_showFilter);
         QuickActionsSetting.Tag = OnOff(_quickActions);
+
+        var hidden = _allTiles.Count(t => t.IsHidden);
+        HiddenSetting.Tag = (_showHidden ? "On, faded in the grid" : "Off")
+            + (hidden == 0 ? ". No games are hidden" : hidden == 1 ? ". 1 game is hidden" : $". {hidden} games are hidden");
 
         // Only the end of the key is shown: enough to tell which one it is.
         ArtworkKeySetting.Visibility = _background == BackgroundKind.Artwork ? Visibility.Visible : Visibility.Collapsed;
@@ -141,6 +149,14 @@ public partial class LibraryWindow
         LibrarySettings.QuickActions = _quickActions;
         OptionsHint.Visibility = _quickActions ? Visibility.Visible : Visibility.Collapsed;
         RefreshSettings();
+    }
+
+    private void OnToggleShowHidden(object sender, RoutedEventArgs e)
+    {
+        _showHidden = !_showHidden;
+        LibrarySettings.ShowHidden = _showHidden;
+        RefreshSettings();
+        ApplyFilter();
     }
 
     private void OnCycleBackground(object sender, RoutedEventArgs e) => StepBackground(1);
@@ -226,7 +242,22 @@ public partial class LibraryWindow
     /// <summary>Left and right on a settings row with several choices step through them, like a slider.</summary>
     private bool StepFocusedSetting(int step)
     {
-        if (!ReferenceEquals(_menu, BackgroundItems) || Keyboard.FocusedElement is not Button row)
+        if (Keyboard.FocusedElement is not Button row)
+        {
+            return false;
+        }
+
+        if (ReferenceEquals(_menu, QuickItems))
+        {
+            return StepQuickSetting(row, step);
+        }
+
+        if (ReferenceEquals(_menu, ProfileItems))
+        {
+            return StepProfileSetting(row, step);
+        }
+
+        if (!ReferenceEquals(_menu, BackgroundItems))
         {
             return false;
         }

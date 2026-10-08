@@ -117,6 +117,11 @@ public partial class LibraryWindow
                     }
 
                     break;
+
+                // Y opens quick settings and closes them again, like Armoury Crate's Command Center button.
+                case GamepadAction.QuickSettings when ReferenceEquals(_menu, QuickItems):
+                    CloseMenu();
+                    break;
             }
 
             return;
@@ -130,8 +135,8 @@ public partial class LibraryWindow
             case GamepadAction.Options when _quickActions && Keyboard.FocusedElement is Button { DataContext: GameTile tile }:
                 OpenMenu(tile);
                 break;
-            case GamepadAction.Refresh:
-                _ = ScanAsync();
+            case GamepadAction.QuickSettings:
+                OpenQuickSettings();
                 break;
             case GamepadAction.Menu:
                 OpenSettings();
@@ -207,6 +212,11 @@ public partial class LibraryWindow
         else if (e.Key == Key.F2)
         {
             OpenPower();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.F3)
+        {
+            OpenQuickSettings();
             e.Handled = true;
         }
         else if (e.Key is Key.PageUp or Key.PageDown)

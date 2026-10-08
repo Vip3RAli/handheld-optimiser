@@ -19,11 +19,14 @@ public partial class LibraryWindow : Window
 
     private readonly GamepadInput _gamepad;
     private readonly DispatcherTimer _clock;
+
+    // Looks now and then for a profiled game having closed, while the library is in front.
+    private readonly DispatcherTimer _profileCheck;
     private List<GameTile> _allTiles = [];
 
-    // The tiles on screen: all of them, or one store's when a filter is on.
+    // The tiles on screen: all of them, the favourites, or one store's when a filter is on.
     private List<GameTile> _tiles = [];
-    private GameStore? _filter;
+    private TileFilter _filter = TileFilter.All;
 
     private string? _focusedKey;
     private DateTime _lastScan = DateTime.MinValue;
@@ -40,6 +43,12 @@ public partial class LibraryWindow : Window
 
         _clock = new DispatcherTimer(TimeSpan.FromSeconds(15), DispatcherPriority.Background, (_, _) => UpdateTopBar(), Dispatcher);
         UpdateTopBar();
+
+        _profileCheck = new DispatcherTimer(ProfileCheckEvery, DispatcherPriority.Background, (_, _) => OnProfileCheck(), Dispatcher);
+        _profileCheck.Stop();
+
+        // Closing the library also ends what a game's profile changed.
+        Closed += (_, _) => RestoreProfileSettings();
 
         // Scan on load, not only on activation: Windows can start the home app without giving it focus.
         Loaded += (_, _) => _ = ScanAsync();
@@ -70,6 +79,7 @@ public partial class LibraryWindow : Window
         _position = LibrarySettings.Position;
         _showStatus = LibrarySettings.ShowStatus;
         _quickActions = LibrarySettings.QuickActions;
+        _showHidden = LibrarySettings.ShowHidden;
         OptionsHint.Visibility = _quickActions ? Visibility.Visible : Visibility.Collapsed;
 
         // Switched in the main app or another session: the strip follows on the next look at the tiles.
@@ -90,12 +100,16 @@ public partial class LibraryWindow : Window
         {
             RestoreFocus();
         }
+
+        // Back from a game played with its own profile: put the player's settings back once it has closed.
+        _ = CheckProfileRestoreAsync();
     }
 
     private void OnDeactivated(object? sender, EventArgs e)
     {
         _gamepad.Stop();
         _clock.Stop();
+        _profileCheck.Stop();
         StatusText.Text = string.Empty;
         CloseMenu();
         ClearBackdrop();
@@ -123,16 +137,16 @@ public partial class LibraryWindow : Window
             var tiles = await Task.Run(() => GameTile.ForScan(GameCatalog.Scan(), previous));
             _lastScan = DateTime.UtcNow;
 
-            // Rebuilding the tiles resets scrolling, so only do it when something changed.
-            if (!tiles.Select(t => t.Game).SequenceEqual(_allTiles.Select(t => t.Game)))
+            // Rebuilding the tiles resets scrolling, so only do it when something changed. New tiles take
+            // their stars and hidden marks here; kept ones already have them.
+            var marksChanged = MarkTiles(tiles);
+            if (marksChanged || !tiles.Select(t => t.Game).SequenceEqual(_allTiles.Select(t => t.Game)))
             {
                 _allTiles = tiles;
                 ApplyFilter();
             }
 
-            EmptyText.Text = _allTiles.Count == 0
-                ? "No installed games were found in Steam, Xbox, Epic Games, Battle.net, GOG, the EA App or Ubisoft Connect.\nInstall a game, then press Y to refresh."
-                : string.Empty;
+            UpdateEmptyText();
         }
         finally
         {
@@ -143,60 +157,108 @@ public partial class LibraryWindow : Window
         _ = FetchCoversAsync();
     }
 
-    /// <summary>Stores with at least one installed game, in the order their tabs are shown.</summary>
-    private List<GameStore> InstalledStores() => _allTiles.Select(t => t.Game.Store).Distinct().Order().ToList();
+    /// <summary>A tab of the filter strip: every game, the favourites, or one store's games.</summary>
+    private readonly record struct TileFilter(GameStore? Store, bool Favourites)
+    {
+        public static readonly TileFilter All = default;
+        public static readonly TileFilter Starred = new(null, true);
+
+        public string Name => Favourites ? "Favourites" : Store is { } store ? Game.NameOf(store) : "All";
+
+        public bool Shows(GameTile tile) => Favourites ? tile.IsFavourite : Store is not { } store || tile.Game.Store == store;
+    }
+
+    /// <summary>The games the grid can show: all but the hidden ones, unless those are shown too.</summary>
+    private IEnumerable<GameTile> ShownTiles() => _showHidden ? _allTiles : _allTiles.Where(t => !t.IsHidden);
+
+    /// <summary>
+    /// The tabs of the filter strip, in order, or none when the strip is off or would only have All:
+    /// Favourites once a game is starred, and a tab per store when games come from more than one.
+    /// </summary>
+    private List<TileFilter> FilterOptions()
+    {
+        if (!_showFilter)
+        {
+            return [];
+        }
+
+        var shown = ShownTiles().ToList();
+        var options = new List<TileFilter> { TileFilter.All };
+        if (shown.Any(t => t.IsFavourite))
+        {
+            options.Add(TileFilter.Starred);
+        }
+
+        var stores = shown.Select(t => t.Game.Store).Distinct().Order().ToList();
+        if (stores.Count > 1)
+        {
+            options.AddRange(stores.Select(store => new TileFilter(store, false)));
+        }
+
+        return options.Count > 1 ? options : [];
+    }
 
     /// <summary>Shows the tiles of the current filter and rebuilds the filter strip to match the library.</summary>
     private void ApplyFilter()
     {
-        var stores = InstalledStores();
-        var filterable = _showFilter && stores.Count > 1;
+        var options = FilterOptions();
 
-        // The filtered store's last game may just have been uninstalled.
-        if (!filterable || (_filter is { } current && !stores.Contains(current)))
+        // The filtered store's last game may just have been uninstalled, or the last favourite unstarred.
+        if (!options.Contains(_filter))
         {
-            _filter = null;
+            _filter = TileFilter.All;
         }
 
-        FilterStrip.Visibility = filterable ? Visibility.Visible : Visibility.Collapsed;
+        FilterStrip.Visibility = options.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         FilterTabs.Children.Clear();
-        if (filterable)
+        foreach (var option in options)
         {
-            FilterTabs.Children.Add(FilterTab("All", null));
-            foreach (var store in stores)
-            {
-                FilterTabs.Children.Add(FilterTab(Game.NameOf(store), store));
-            }
+            FilterTabs.Children.Add(FilterTab(option));
         }
 
-        _tiles = _filter is { } shown ? _allTiles.Where(t => t.Game.Store == shown).ToList() : _allTiles;
+        // Favourites first, each group still in the order the scan gave: last played first.
+        _tiles = ShownTiles().Where(_filter.Shows).OrderByDescending(t => t.IsFavourite).ToList();
         Tiles.ItemsSource = _tiles;
         CountText.Text = _tiles.Count == 1 ? "1 game" : $"{_tiles.Count} games";
+        UpdateEmptyText();
     }
 
-    private RadioButton FilterTab(string name, GameStore? store)
+    private void UpdateEmptyText()
+    {
+        // Until the first scan is in, the text says the games are being looked for.
+        if (_lastScan == DateTime.MinValue)
+        {
+            return;
+        }
+
+        EmptyText.Text = _allTiles.Count == 0
+            ? "No installed games were found in Steam, Xbox, Epic Games, Battle.net, GOG, the EA App or Ubisoft Connect.\nInstall a game or add a program under Settings, then press Y and choose Refresh library."
+            : _tiles.Count == 0 ? "Every game is hidden. Switch on Show hidden games under Settings, Display to bring them back."
+            : string.Empty;
+    }
+
+    private RadioButton FilterTab(TileFilter filter)
     {
         var tab = new RadioButton
         {
             Style = (Style)FindResource("FilterTab"),
             GroupName = "StoreFilter",
-            Content = name,
-            Tag = store,
-            IsChecked = store == _filter
+            Content = filter.Name,
+            IsChecked = filter == _filter
         };
 
-        tab.Click += (_, _) => SetFilter(store);
+        tab.Click += (_, _) => SetFilter(filter);
         return tab;
     }
 
-    private void SetFilter(GameStore? store)
+    private void SetFilter(TileFilter filter)
     {
-        if (store == _filter)
+        if (filter == _filter)
         {
             return;
         }
 
-        _filter = store;
+        _filter = filter;
         ApplyFilter();
         RestoreFocus();
     }
@@ -204,14 +266,12 @@ public partial class LibraryWindow : Window
     /// <summary>LB and RB: one tab left or right, wrapping around.</summary>
     private void CycleFilter(int step)
     {
-        var stores = InstalledStores();
-        if (!_showFilter || stores.Count < 2)
+        var options = FilterOptions();
+        if (options.Count < 2)
         {
             return;
         }
 
-        var options = new List<GameStore?> { null };
-        options.AddRange(stores.Cast<GameStore?>());
         SetFilter(options[(options.IndexOf(_filter) + step + options.Count) % options.Count]);
     }
 
@@ -246,11 +306,19 @@ public partial class LibraryWindow : Window
         _launchBlockedUntil = DateTime.UtcNow + LaunchCooldown;
         _focusedKey = tile.Game.Key;
 
+        // The last profiled game's settings never carry over to the next game.
+        RestoreProfileSettings();
+        var profile = GameProfiles.For(tile.Game);
+
         var error = GameCatalog.Launch(tile.Game);
         StatusText.Text = error ?? $"Starting {tile.Title}...";
         if (error is not null)
         {
             _launchBlockedUntil = DateTime.MinValue;
+        }
+        else if (!profile.IsEmpty)
+        {
+            ApplyProfile(tile.Game, profile);
         }
     }
 }

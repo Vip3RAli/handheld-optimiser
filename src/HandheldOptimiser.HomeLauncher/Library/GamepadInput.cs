@@ -8,7 +8,7 @@ internal enum GamepadAction
     Accept,
     Back,
     Options,
-    Refresh,
+    QuickSettings,
     PreviousFilter,
     NextFilter,
     Menu,
@@ -17,9 +17,9 @@ internal enum GamepadAction
 
 /// <summary>
 /// Polls XInput controllers while the library is in front, so the d-pad or left stick moves between
-/// tiles, A launches, X opens a game's options and the bumpers change the store filter. Polling stops
-/// whenever the library loses focus: the game owns the controller then, and the library must not react
-/// to in-game presses.
+/// tiles, A launches, X opens a game's options, Y opens quick settings and the bumpers change the store
+/// filter. Polling stops whenever the library loses focus: the game owns the controller then, and the
+/// library must not react to in-game presses.
 /// </summary>
 internal sealed class GamepadInput
 {
@@ -33,7 +33,7 @@ internal sealed class GamepadInput
         (0x1000, GamepadAction.Accept),
         (0x2000, GamepadAction.Back),
         (0x4000, GamepadAction.Options),
-        (0x8000, GamepadAction.Refresh),
+        (0x8000, GamepadAction.QuickSettings),
         (0x0100, GamepadAction.PreviousFilter),
         (0x0200, GamepadAction.NextFilter),
         (0x0010, GamepadAction.Menu),

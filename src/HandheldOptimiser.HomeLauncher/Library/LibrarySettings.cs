@@ -51,6 +51,7 @@ internal static class LibrarySettings
     private const string StatusValue = "StatusBar";
     private const string FilterValue = "StoreFilter";
     private const string QuickActionsValue = "QuickActions";
+    private const string ShowHiddenValue = "ShowHiddenGames";
 
     public static BackgroundKind Background
     {
@@ -116,8 +117,20 @@ internal static class LibrarySettings
         set => WriteSwitch(QuickActionsValue, value);
     }
 
-    // Everything is on until the player switches it off.
-    private static bool ReadSwitch(string name) => !string.Equals(Read(name), "off", StringComparison.OrdinalIgnoreCase);
+    /// <summary>Games the player hid, shown faded so they can be brought back. Off until switched on.</summary>
+    public static bool ShowHidden
+    {
+        get => ReadSwitch(ShowHiddenValue, on: false);
+        set => WriteSwitch(ShowHiddenValue, value);
+    }
+
+    // Most switches are on until the player switches them off.
+    private static bool ReadSwitch(string name, bool on = true) => Read(name)?.ToLowerInvariant() switch
+    {
+        "on" => true,
+        "off" => false,
+        _ => on
+    };
 
     private static void WriteSwitch(string name, bool on) => Write(name, on ? "on" : "off");
 

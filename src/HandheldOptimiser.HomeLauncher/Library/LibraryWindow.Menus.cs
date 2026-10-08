@@ -28,16 +28,43 @@ public partial class LibraryWindow
 
     private void OpenMenu(GameTile tile)
     {
-        var game = tile.Game;
         _menuTile = tile;
-        _focusedKey = game.Key;
+        _focusedKey = tile.Game.Key;
         _menu = GameItems;
-        SettingsItems.Visibility = Visibility.Collapsed;
-        HideSettingsGroups();
-        PowerItems.Visibility = Visibility.Collapsed;
+        HideMenuLists();
 
         MenuTitle.Text = tile.Title;
         MenuStore.Text = tile.StoreName;
+        RefreshGameItems(tile);
+
+        MenuOverlay.Visibility = Visibility.Visible;
+        ShowMenuItems();
+    }
+
+    /// <summary>Every list the overlay can show, collapsed, before one of them is opened.</summary>
+    private void HideMenuLists()
+    {
+        foreach (var list in new[] { GameItems, ProfileItems, SettingsItems, BackgroundItems, DisplayItems, AddItems, PowerItems, QuickItems })
+        {
+            list.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    /// <summary>What each quick action will do for this game, on the rows' detail lines.</summary>
+    private void RefreshGameItems(GameTile tile)
+    {
+        var game = tile.Game;
+
+        FavouriteItem.Content = tile.IsFavourite ? "Remove from favourites" : "Add to favourites";
+        FavouriteItem.Tag = tile.IsFavourite ? "Back among the other games" : "Kept at the front of the library, with a star";
+
+        ProfileItem.Tag = GameProfiles.For(game).Describe();
+
+        var added = AddedPrograms.IsAdded(game);
+        HideItem.Content = added ? "Remove from library" : tile.IsHidden ? "Show in library" : "Hide from library";
+        HideItem.Tag = added ? "Takes it off the list. Nothing is deleted"
+            : tile.IsHidden ? "Back in the grid with the other games"
+            : "Off the grid. Show hidden games in Settings brings it back";
 
         var takesArguments = GameCatalog.SupportsCustomArguments(game);
         ArgumentsItem.IsEnabled = takesArguments;
@@ -62,9 +89,6 @@ public partial class LibraryWindow
             : Artwork.SearchTitle(game) is { } corrected ? $"Looked up as \"{corrected}\""
             : game.HeroPath is not null ? "Steam's own artwork. Enter a title to look it up instead"
             : "Looked up by the game's own title";
-
-        MenuOverlay.Visibility = Visibility.Visible;
-        ShowMenuItems();
     }
 
     /// <summary>The open list of rows, which is also where cancelling the text box goes back to.</summary>

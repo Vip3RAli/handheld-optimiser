@@ -8,7 +8,10 @@ public enum GameStore
     BattleNet,
     Gog,
     Ea,
-    Ubisoft
+    Ubisoft,
+
+    /// <summary>A program the player added to the library themselves.</summary>
+    Other
 }
 
 /// <summary>
@@ -44,6 +47,7 @@ public sealed record Game(
         GameStore.BattleNet => "Battle.net",
         GameStore.Ea => "EA App",
         GameStore.Ubisoft => "Ubisoft Connect",
+        GameStore.Other => "Added by you",
         _ => "GOG"
     };
 }

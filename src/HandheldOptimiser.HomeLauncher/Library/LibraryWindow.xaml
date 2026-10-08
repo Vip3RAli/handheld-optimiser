@@ -46,6 +46,13 @@
                                         </StackPanel>
                                     </Grid>
                                 </Border>
+                                <!-- Favourites wear a star in the corner. -->
+                                <Border Width="34" Height="34" CornerRadius="17" Margin="8" Background="#B0101216"
+                                        HorizontalAlignment="Right" VerticalAlignment="Top"
+                                        Visibility="{Binding IsFavourite, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="&#xE735;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16"
+                                               Foreground="#F5C542" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
                                 <Border x:Name="Ring" CornerRadius="10" Margin="-4" BorderThickness="3"
                                         BorderBrush="#F2F3F5" Opacity="0" />
                             </Grid>
@@ -54,6 +61,10 @@
                             <TextBlock Text="{Binding StoreName}" Margin="2,1,2,0" FontSize="12" Opacity="0.55" />
                         </StackPanel>
                         <ControlTemplate.Triggers>
+                            <!-- Hidden games only show while Show hidden games is on, faded so they stand out. -->
+                            <DataTrigger Binding="{Binding IsHidden}" Value="True">
+                                <Setter TargetName="Art" Property="Opacity" Value="0.4" />
+                            </DataTrigger>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Ring" Property="Opacity" Value="0.45" />
                             </Trigger>
@@ -224,6 +235,10 @@
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                <!-- Volume, brightness, power mode and refresh rate, also on the controller's Y button. -->
+                <Button Style="{StaticResource IconButton}" Margin="0,-10,4,-10" VerticalAlignment="Center"
+                        Content="&#xE9E9;" ToolTip="Quick settings" Click="OnOpenQuickSettings" />
+
                 <!-- The library's settings, also on the controller's Menu button. Sized for a finger. -->
                 <Button Style="{StaticResource IconButton}" Margin="0,-10,4,-10" VerticalAlignment="Center"
                         Content="&#xE713;" ToolTip="Settings" Click="OnOpenSettings" />
@@ -326,7 +341,7 @@
                     <TextBlock Text="Y" FontWeight="Bold" FontSize="13" Foreground="#101010"
                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
-                <TextBlock Text="Refresh" FontSize="15" VerticalAlignment="Center" />
+                <TextBlock Text="Quick settings" FontSize="15" VerticalAlignment="Center" />
                 <Border Style="{StaticResource BumperGlyph}" Margin="22,0,8,0">
                     <TextBlock Text="VIEW" FontSize="11" FontWeight="Bold" />
                 </Border>
@@ -351,6 +366,9 @@
                     <TextBlock x:Name="MenuStore" Margin="0,2,0,18" FontSize="13" Opacity="0.55" />
 
                     <StackPanel x:Name="GameItems">
+                        <Button x:Name="FavouriteItem" Style="{StaticResource MenuButton}" Click="OnToggleFavourite" />
+                        <Button x:Name="ProfileItem" Style="{StaticResource MenuButton}" Content="Game profile"
+                                Click="OnOpenProfile" />
                         <Button x:Name="ArgumentsItem" Style="{StaticResource MenuButton}" Content="Launch arguments"
                                 Click="OnEditArguments" />
                         <Button x:Name="FolderItem" Style="{StaticResource MenuButton}" Content="Open install folder"
@@ -359,6 +377,7 @@
                                 Click="OnShowProperties" />
                         <Button x:Name="ArtworkItem" Style="{StaticResource MenuButton}" Content="Background artwork"
                                 Click="OnEditArtworkTitle" />
+                        <Button x:Name="HideItem" Style="{StaticResource MenuButton}" Click="OnToggleHidden" />
 
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
                             <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
@@ -379,7 +398,9 @@
                         <Button x:Name="BackgroundGroup" Style="{StaticResource MenuButton}" Content="Background"
                                 Tag="Artwork, colours and blur" Click="OnOpenBackgroundSettings" />
                         <Button x:Name="DisplayGroup" Style="{StaticResource MenuButton}" Content="Display"
-                                Tag="Battery and Wi-Fi, store filter and quick actions" Click="OnOpenDisplaySettings" />
+                                Tag="Battery and Wi-Fi, store filter, quick actions and hidden games" Click="OnOpenDisplaySettings" />
+                        <Button x:Name="AddProgramGroup" Style="{StaticResource MenuButton}" Content="Add a program"
+                                Tag="Emulators and games from other stores" Click="OnOpenAddProgram" />
                         <Button x:Name="OpenMainAppSetting" Style="{StaticResource MenuButton}" Content="Open Handheld Optimiser"
                                 Tag="Tweaks and tools. Windows asks for administrator permission" Click="OnOpenMainApp" />
                         <Button x:Name="QuitSetting" Style="{StaticResource MenuButton}" Content="Quit"
@@ -432,6 +453,8 @@
                                 Click="OnToggleFilter" />
                         <Button x:Name="QuickActionsSetting" Style="{StaticResource MenuButton}" Content="Quick actions"
                                 Click="OnToggleQuickActions" />
+                        <Button x:Name="HiddenSetting" Style="{StaticResource MenuButton}" Content="Show hidden games"
+                                Click="OnToggleShowHidden" />
                         <!-- For touch, which has no B button. -->
                         <Button Style="{StaticResource MenuButton}" Content="Back" Tag="Settings" Click="OnSettingsBack" />
 
@@ -463,6 +486,85 @@
                                 <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                             <TextBlock Text="Select" FontSize="15" VerticalAlignment="Center" />
+                            <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                                <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!--
+                        Quick settings, like Armoury Crate's Command Center. Left and right adjust a row; A
+                        mutes the volume and steps the other rows on, for touch.
+                    -->
+                    <StackPanel x:Name="QuickItems" Visibility="Collapsed">
+                        <Button x:Name="VolumeSetting" Style="{StaticResource MenuButton}" Content="Volume"
+                                Click="OnToggleMute" />
+                        <Button x:Name="BrightnessSetting" Style="{StaticResource MenuButton}" Content="Brightness"
+                                Click="OnStepBrightness" />
+                        <Button x:Name="PowerModeSetting" Style="{StaticResource MenuButton}" Content="Power mode"
+                                Click="OnStepPowerMode" />
+                        <Button x:Name="RefreshRateSetting" Style="{StaticResource MenuButton}" Content="Refresh rate"
+                                Click="OnStepRefreshRate" />
+                        <Button x:Name="RescanItem" Style="{StaticResource MenuButton}" Content="Refresh library"
+                                Tag="Look for games installed since the library opened" Click="OnRescan" />
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                            <Border Style="{StaticResource BumperGlyph}" Margin="22,0,8,0">
+                                <TextBlock Text="&#x25C0; &#x25B6;" FontSize="11" FontWeight="Bold" />
+                            </Border>
+                            <TextBlock Text="Adjust" FontSize="15" VerticalAlignment="Center" />
+                            <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                                <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Select" FontSize="15" VerticalAlignment="Center" />
+                            <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                                <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Close" FontSize="15" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- One game's profile, switched to when it starts from the library. -->
+                    <StackPanel x:Name="ProfileItems" Visibility="Collapsed">
+                        <Button x:Name="ProfilePowerSetting" Style="{StaticResource MenuButton}" Content="Power mode"
+                                Click="OnStepProfilePower" />
+                        <Button x:Name="ProfileRefreshSetting" Style="{StaticResource MenuButton}" Content="Refresh rate"
+                                Click="OnStepProfileRefresh" />
+                        <Button x:Name="ProfileBrightnessSetting" Style="{StaticResource MenuButton}" Content="Brightness"
+                                Click="OnStepProfileBrightness" />
+                        <!-- For touch, which has no B button. -->
+                        <Button Style="{StaticResource MenuButton}" Content="Back" Tag="Quick actions" Click="OnSettingsBack" />
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                            <Border Style="{StaticResource BumperGlyph}" Margin="22,0,8,0">
+                                <TextBlock Text="&#x25C0; &#x25B6;" FontSize="11" FontWeight="Bold" />
+                            </Border>
+                            <TextBlock Text="Adjust" FontSize="15" VerticalAlignment="Center" />
+                            <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                                <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Change" FontSize="15" VerticalAlignment="Center" />
+                            <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                                <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Programs from the Start menu are added as rows above the hints once they are found. -->
+                    <StackPanel x:Name="AddItems" Visibility="Collapsed">
+                        <Button x:Name="BrowseItem" Style="{StaticResource MenuButton}" Content="Browse for a program"
+                                Tag="Pick an exe or shortcut with the file picker" Click="OnBrowseProgram" />
+                        <!-- For touch, which has no B button. -->
+                        <Button x:Name="AddBackItem" Style="{StaticResource MenuButton}" Content="Back" Tag="Settings"
+                                Click="OnSettingsBack" />
+
+                        <StackPanel x:Name="AddHints" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                            <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                                <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Add" FontSize="15" VerticalAlignment="Center" />
                             <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
                                 <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>

@@ -273,6 +273,107 @@ internal static partial class Native
         }
     }
 
+    [LibraryImport("powrprof.dll")]
+    private static partial uint PowerGetActiveScheme(nint rootPowerKey, out nint activePolicy);
+
+    [LibraryImport("kernel32.dll")]
+    private static partial nint LocalFree(nint memory);
+
+    /// <summary>The active power plan's id, or null when it cannot be read.</summary>
+    public static Guid? ActivePowerPlan()
+    {
+        if (PowerGetActiveScheme(0, out var policy) != ErrorSuccess || policy == 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            return Marshal.PtrToStructure<Guid>(policy);
+        }
+        finally
+        {
+            LocalFree(policy);
+        }
+    }
+
+    // Not in the Windows SDK headers, but exported by powrprof.dll since Windows 10 1709. The Settings
+    // app's power mode control calls these.
+    [LibraryImport("powrprof.dll")]
+    public static partial uint PowerGetEffectiveOverlayScheme(out Guid overlay);
+
+    [LibraryImport("powrprof.dll")]
+    public static partial uint PowerSetActiveOverlayScheme(Guid overlay);
+
+    /// <summary>DEVMODEW, laid out for a display rather than a printer.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public unsafe struct DevMode
+    {
+        public fixed char DeviceName[32];
+        public ushort SpecVersion;
+        public ushort DriverVersion;
+        public ushort Size;
+        public ushort DriverExtra;
+        public uint Fields;
+        public int PositionX;
+        public int PositionY;
+        public uint DisplayOrientation;
+        public uint DisplayFixedOutput;
+        public short Color;
+        public short Duplex;
+        public short YResolution;
+        public short TTOption;
+        public short Collate;
+        public fixed char FormName[32];
+        public ushort LogPixels;
+        public uint BitsPerPel;
+        public uint PelsWidth;
+        public uint PelsHeight;
+        public uint DisplayFlags;
+        public uint DisplayFrequency;
+        public uint IcmMethod;
+        public uint IcmIntent;
+        public uint MediaType;
+        public uint DitherType;
+        public uint Reserved1;
+        public uint Reserved2;
+        public uint PanningWidth;
+        public uint PanningHeight;
+    }
+
+    public const uint DmDisplayFrequency = 0x00400000;
+    public const uint DmInterlaced = 0x00000002;
+    public const int DispChangeSuccessful = 0;
+    public const int DispChangeRestart = 1;
+
+    private const int EnumCurrentSettings = -1;
+    private const uint CdsUpdateRegistry = 0x00000001;
+
+    [LibraryImport("user32.dll", EntryPoint = "EnumDisplaySettingsW", StringMarshalling = StringMarshalling.Utf16)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool EnumDisplaySettings(string? deviceName, int modeNumber, ref DevMode mode);
+
+    [LibraryImport("user32.dll", EntryPoint = "ChangeDisplaySettingsExW", StringMarshalling = StringMarshalling.Utf16)]
+    private static partial int ChangeDisplaySettingsEx(string? deviceName, ref DevMode mode, nint window, uint flags, nint parameters);
+
+    /// <summary>The main screen's current resolution and refresh rate.</summary>
+    public static bool CurrentDisplayMode(out DevMode mode) => DisplayMode(EnumCurrentSettings, out mode);
+
+    /// <summary>One of the modes the main screen offers, numbered from 0; false past the last one.</summary>
+    public static unsafe bool DisplayMode(int index, out DevMode mode)
+    {
+        mode = new DevMode { Size = (ushort)sizeof(DevMode) };
+        return EnumDisplaySettings(null, index, ref mode);
+    }
+
+    /// <summary>Switches the main screen to a mode, for this user, kept after a restart.</summary>
+    /// <returns>A DISP_CHANGE code; 0 is success.</returns>
+    public static unsafe int ChangeDisplayMode(ref DevMode mode)
+    {
+        mode.Size = (ushort)sizeof(DevMode);
+        return ChangeDisplaySettingsEx(null, ref mode, 0, CdsUpdateRegistry, 0);
+    }
+
     /// <summary>
     /// Hands the process's pages back to Windows. The library sits behind the game for hours, so its
     /// working set should be what the game can use, not what the library last touched.
