@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Threading;
 
 namespace HandheldOptimiser.HomeLauncher.Library;
@@ -206,7 +207,7 @@ public partial class LibraryWindow : Window
         public static readonly TileFilter AppsTab = new(null, false, Apps: true);
 
         public string Name => Apps ? "Apps" : NotInstalled ? "Not installed" : Favourites ? "Favourites"
-            : Store is { } store ? Game.NameOf(store) : "All";
+            : Store is { } store ? Game.NameOf(store) : "Games";
 
         public bool Shows(GameTile tile) => Apps ? tile.IsApp
             : NotInstalled ? !tile.IsInstalled
@@ -217,9 +218,9 @@ public partial class LibraryWindow : Window
     private IEnumerable<GameTile> ShownTiles() => _showHidden ? _allTiles : _allTiles.Where(t => !t.IsHidden);
 
     /// <summary>
-    /// The tabs of the filter strip, in order: All, then Favourites once a game is starred and a tab per
-    /// store when games come from more than one, while the store filter is on; Not installed, whenever
-    /// there are owned games that are not installed; and Apps, always, so there is somewhere to add them.
+    /// The tabs of the filter strip, in order: Games, then Favourites once a game is starred and a tab per
+    /// store when games come from more than one, while the store filter is on; Apps, always, so there is
+    /// somewhere to add them; and last Not installed, whenever there are owned games that are not installed.
     /// </summary>
     private List<TileFilter> FilterOptions()
     {
@@ -241,12 +242,13 @@ public partial class LibraryWindow : Window
             }
         }
 
+        options.Add(TileFilter.AppsTab);
+
         if (installed.Count < shown.Count)
         {
             options.Add(TileFilter.Uninstalled);
         }
 
-        options.Add(TileFilter.AppsTab);
         return options;
     }
 
@@ -301,7 +303,7 @@ public partial class LibraryWindow : Window
                 : string.Empty
             : _allTiles.All(t => !t.IsInstalled || t.IsApp) && !_filter.NotInstalled
             ? "No installed games were found in Steam, Xbox, Epic Games, Battle.net, GOG, the EA App or Ubisoft Connect.\nInstall a game or add a program under Settings, then press Y and choose Refresh library."
-            : _tiles.Count == 0 ? "Every game is hidden. Switch on Show hidden games under Settings, Display to bring them back."
+            : _tiles.Count == 0 ? "Every game is hidden. Switch on Show hidden games under Settings, Library View Options to bring them back."
             : string.Empty;
     }
 
@@ -343,9 +345,13 @@ public partial class LibraryWindow : Window
         SetFilter(options[(options.IndexOf(_filter) + step + options.Count) % options.Count]);
     }
 
-    private void RestoreFocus()
+    /// <summary>
+    /// Puts the focus back on the game it was on. A rescan or a new cover must not pull the d-pad off the
+    /// top bar, so the focus stays there unless it is the top bar asking to leave.
+    /// </summary>
+    private void RestoreFocus(bool leavingTopBar = false)
     {
-        if (!IsActive || _tiles.Count == 0 || _menu is not null)
+        if (!IsActive || _tiles.Count == 0 || _menu is not null || (!leavingTopBar && IsTopBarButton(Keyboard.FocusedElement)))
         {
             return;
         }

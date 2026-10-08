@@ -39,12 +39,20 @@ public sealed partial class DashboardViewModel(
     private string _optimisationStatus = "Not checked yet";
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(AppliedAngle))]
+    [NotifyPropertyChangedFor(nameof(AppliedAngle), nameof(AppliedLevel))]
     private int _appliedCount;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(AppliedAngle))]
+    [NotifyPropertyChangedFor(nameof(AppliedAngle), nameof(AppliedLevel))]
     private int _totalCount;
+
+    /// <summary>
+    /// Which colour the ring on the Dashboard is drawn in: red under a third applied, yellow from a
+    /// third, green from two thirds.
+    /// </summary>
+    public OptimisationLevel AppliedLevel => AppliedCount * 3 < TotalCount ? OptimisationLevel.Low
+        : AppliedCount * 3 < TotalCount * 2 ? OptimisationLevel.Medium
+        : OptimisationLevel.High;
 
     /// <summary>
     /// How far round the ring on the Dashboard is filled, in degrees. Stops just short of a full turn:
@@ -346,4 +354,12 @@ public sealed partial class DashboardViewModel(
             ProtectionEnabled = await _restorePoints.IsProtectionEnabledAsync(ct);
         });
     }
+}
+
+/// <summary>How much of the optimised set is applied, for the colour of the Dashboard ring.</summary>
+public enum OptimisationLevel
+{
+    Low,
+    Medium,
+    High
 }

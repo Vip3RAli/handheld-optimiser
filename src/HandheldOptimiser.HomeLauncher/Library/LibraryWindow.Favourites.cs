@@ -125,6 +125,6 @@ public partial class LibraryWindow
         RestoreFocus();
         StatusText.Text = !hidden ? $"{tile.Title} is back in the library."
             : _showHidden ? $"{tile.Title} is hidden. It shows faded while Show hidden games is on."
-            : $"{tile.Title} is hidden. Show hidden games in Settings, Display brings it back.";
+            : $"{tile.Title} is hidden. Show hidden games in Settings, Library View Options brings it back.";
     }
 }
