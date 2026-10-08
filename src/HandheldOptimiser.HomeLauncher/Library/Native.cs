@@ -400,6 +400,92 @@ internal static partial class Native
         return SetForegroundWindow(window);
     }
 
+    // ----- Quick Resume -----
+
+    private const uint ProcessSuspendResume = 0x0800;
+
+    [LibraryImport("ntdll.dll")]
+    private static partial int NtSuspendProcess(nint process);
+
+    [LibraryImport("ntdll.dll")]
+    private static partial int NtResumeProcess(nint process);
+
+    [LibraryImport("kernel32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool GetProcessTimes(nint process, out long creation, out long exit, out long kernel, out long user);
+
+    /// <summary>
+    /// A handle that can pause and resume the process, or 0 when Windows refuses one: for a process
+    /// running as administrator, or one an anti-cheat driver protects. Close it with <see cref="CloseProcess"/>.
+    /// </summary>
+    public static nint OpenForPause(int processId) =>
+        OpenProcess(ProcessSuspendResume | ProcessQueryLimitedInformation, false, processId);
+
+    public static void CloseProcess(nint process) => CloseHandle(process);
+
+    /// <summary>Stops every thread of the process. Each call needs one <see cref="ResumeProcess"/>.</summary>
+    public static bool SuspendProcess(nint process) => NtSuspendProcess(process) >= 0;
+
+    public static bool ResumeProcess(nint process) => NtResumeProcess(process) >= 0;
+
+    /// <summary>When the process started, as a FILETIME, which tells it apart from a later one given the same id.</summary>
+    public static long ProcessStarted(nint process) => GetProcessTimes(process, out var creation, out _, out _, out _) ? creation : 0;
+
+    private const uint EventSystemForeground = 0x0003;
+    private const uint WinEventOutOfContext = 0x0000;
+
+    [LibraryImport("user32.dll")]
+    private static unsafe partial nint SetWinEventHook(uint eventMin, uint eventMax, nint module,
+        delegate* unmanaged<nint, uint, nint, int, int, uint, uint, void> callback, uint processId, uint threadId, uint flags);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool UnhookWinEvent(nint hook);
+
+    [LibraryImport("user32.dll")]
+    private static partial uint GetWindowThreadProcessId(nint window, out int processId);
+
+    [LibraryImport("user32.dll", EntryPoint = "GetClassNameW")]
+    private static unsafe partial int GetClassName(nint window, char* name, int capacity);
+
+    /// <summary>Raised on the thread that called <see cref="WatchForeground"/> whenever another window comes to the front.</summary>
+    public static event Action<nint>? ForegroundChanged;
+
+    /// <summary>Starts raising <see cref="ForegroundChanged"/>. Needs a message loop on this thread, as the UI thread has.</summary>
+    public static unsafe nint WatchForeground() =>
+        SetWinEventHook(EventSystemForeground, EventSystemForeground, 0, &OnWinEvent, 0, 0, WinEventOutOfContext);
+
+    public static void StopWatchingForeground(nint hook) => UnhookWinEvent(hook);
+
+    [UnmanagedCallersOnly]
+    private static void OnWinEvent(nint hook, uint winEvent, nint window, int objectId, int childId, uint thread, uint time)
+    {
+        // An exception cannot cross back into Windows, so it ends here.
+        try
+        {
+            ForegroundChanged?.Invoke(window);
+        }
+        catch (Exception ex)
+        {
+            Program.Log($"Foreground change failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>The id of the process the window belongs to, or 0.</summary>
+    public static int WindowProcess(nint window) => GetWindowThreadProcessId(window, out var processId) != 0 ? processId : 0;
+
+    /// <summary>
+    /// Whether the window is the stand-in Windows puts up for a program that has stopped responding,
+    /// which is what a paused game's window turns into if it is brought to the front.
+    /// </summary>
+    public static unsafe bool IsGhostWindow(nint window)
+    {
+        const int Capacity = 16;
+        var name = stackalloc char[Capacity];
+        var length = GetClassName(window, name, Capacity);
+        return length > 0 && new string(name, 0, length) == "Ghost";
+    }
+
     // The display turning off and on, which is how a Modern Standby device's sleep and wake show up.
     public static readonly Guid ConsoleDisplayState = new("6FE69556-704A-47A0-8F24-C28D936FDA47");
     public const int WmPowerBroadcast = 0x0218;

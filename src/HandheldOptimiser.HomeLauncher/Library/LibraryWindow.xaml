@@ -503,6 +503,8 @@
                                 Click="OnShowProperties" />
                         <Button x:Name="ArtworkItem" Style="{StaticResource MenuButton}" Content="Background artwork"
                                 Click="OnEditArtworkTitle" />
+                        <Button x:Name="CloseGameItem" Style="{StaticResource MenuButton}" Content="Close game"
+                                Visibility="Collapsed" Click="OnCloseGame" LostKeyboardFocus="OnCloseGameLostFocus" />
                         <Button x:Name="HideItem" Style="{StaticResource MenuButton}" Click="OnToggleHidden" />
 
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
@@ -532,7 +534,7 @@
                         <Button x:Name="AddProgramGroup" Style="{StaticResource MenuButton}" Content="Add a program"
                                 Tag="Emulators and games from other stores" Click="OnOpenAddProgram" />
                         <Button x:Name="WhilePlayingGroup" Style="{StaticResource MenuButton}" Content="While playing"
-                                Tag="Background programs, store apps, and your game after sleep" Click="OnOpenWhilePlaying" />
+                                Tag="Background programs, store apps, Quick Resume and your game after sleep" Click="OnOpenWhilePlaying" />
                         <Button x:Name="EmulatorsGroup" Style="{StaticResource MenuButton}" Content="Emulators"
                                 Tag="ROM folders, and which emulator plays each console" Click="OnOpenEmulators" />
                         <Button x:Name="MaintenanceGroup" Style="{StaticResource MenuButton}" Content="Maintenance"
@@ -734,6 +736,8 @@
                                 Click="OnStepStoreClosing" />
                         <Button x:Name="StoreStartupItem" Style="{StaticResource MenuButton}" Content="Store apps at startup"
                                 Tag="Stop Steam, Epic and the rest starting with Windows" Click="OnOpenStoreStartup" />
+                        <Button x:Name="QuickResumeSetting" Style="{StaticResource MenuButton}" Content="Quick Resume"
+                                Click="OnToggleQuickResume" />
                         <Button x:Name="ResumeSetting" Style="{StaticResource MenuButton}" Content="Back to your game after sleep"
                                 Click="OnToggleResume" />
                         <!-- For touch, which has no B button. -->

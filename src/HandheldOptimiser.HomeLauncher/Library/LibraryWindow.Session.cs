@@ -75,6 +75,7 @@ public partial class LibraryWindow
         }
 
         _session = null;
+        ResumeGame(session);
         session.Stop();
         RecordPlaytime(session);
     }
@@ -92,6 +93,9 @@ public partial class LibraryWindow
     private void OnSessionEnded(GameSession session)
     {
         _session = null;
+
+        // Ended while paused, from Task Manager say: lets go of its processes.
+        ResumeGame(session);
         RecordPlaytime(session);
         RestoreProfileSettings();
         ReopenClosedApps();
