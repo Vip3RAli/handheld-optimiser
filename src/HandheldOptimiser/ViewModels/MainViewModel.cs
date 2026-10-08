@@ -18,7 +18,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
     /// <summary>Every page, in the order they are built. The sidebar shows them through <see cref="Groups"/>.</summary>
     public ObservableCollection<PageViewModelBase> Pages { get; } = [];
 
-    /// <summary>The sidebar: five groups, each showing its pages as tabs.</summary>
+    /// <summary>The sidebar: five groups, each dropping its pages down as a list while it is open.</summary>
     public ObservableCollection<NavGroup> Groups { get; } = [];
 
     [ObservableProperty]
@@ -41,6 +41,13 @@ public sealed partial class MainViewModel : ObservableObject, IShell
 
     [ObservableProperty]
     private bool _isLogExpanded;
+
+    /// <summary>
+    /// Whether the open group's list of pages is showing. Pressing the open group again closes it,
+    /// and choosing another group opens that one's.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isGroupOpen = true;
 
     private readonly UpdateService _updates;
 
@@ -211,27 +218,31 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         [
             Page("Full Screen Mode"),
             Page("Power Actions"),
-            Page("Game Runtimes"),
             Page("Device & System Health"),
             Page("Handheld Usability")
         ]));
 
-        Groups.Add(new NavGroup("Updates", Page("Updates").Glyph, [Page("Updates")]));
+        Groups.Add(new NavGroup("Updates", Page("Updates").Glyph,
+        [
+            Page("Updates"),
+            Page("Game Runtimes")
+        ]));
 
         SelectedGroup = Groups[0];
     }
 
-    /// <summary>Choosing a group in the sidebar opens the tab that was last open in it.</summary>
+    /// <summary>Choosing a group in the sidebar opens the page that was last open in it.</summary>
     partial void OnSelectedGroupChanged(NavGroup? value)
     {
         // A list's selection can be cleared (Ctrl+click); the page on screen stays where it is then.
         if (value is not null)
         {
+            IsGroupOpen = true;
             SelectedPage = value.SelectedPage;
         }
     }
 
-    /// <summary>A tab was pressed.</summary>
+    /// <summary>A page in the open group's list was pressed.</summary>
     [RelayCommand]
     private void OpenPage(PageViewModelBase page)
     {

@@ -1,9 +1,11 @@
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 
 namespace HandheldOptimiser.HomeLauncher.Library;
 
-/// <summary>The top bar: the clock, battery and Wi-Fi readings, and the update banner.</summary>
+/// <summary>The top bar: its buttons on the d-pad, the clock, battery and Wi-Fi readings, and the update banner.</summary>
 public partial class LibraryWindow
 {
     // Inside width of the battery outline, which the fill is a share of.
@@ -49,6 +51,45 @@ public partial class LibraryWindow
     {
         _dismissedUpdate = _update;
         UpdateBanner.Visibility = Visibility.Collapsed;
+    }
+
+    // ----- Quick settings, Settings and Power on the d-pad -----
+
+    // The top bar button the d-pad was last on, which Up goes back to.
+    private Button? _topBarButton;
+
+    private Button[] TopBarButtons() => [QuickButton, SettingsButton, PowerButton];
+
+    private bool IsTopBarButton(object? element) => element is Button button && Array.IndexOf(TopBarButtons(), button) >= 0;
+
+    /// <summary>Up from the top row of games, or from an empty library: the top bar's buttons.</summary>
+    private void FocusTopBar() => (_topBarButton ?? QuickButton).Focus();
+
+    private void NavigateTopBar(Button from, FocusNavigationDirection direction)
+    {
+        var buttons = TopBarButtons();
+        var index = Array.IndexOf(buttons, from);
+        switch (direction)
+        {
+            case FocusNavigationDirection.Left when index > 0:
+                buttons[index - 1].Focus();
+                break;
+            case FocusNavigationDirection.Right when index + 1 < buttons.Length:
+                buttons[index + 1].Focus();
+                break;
+            case FocusNavigationDirection.Down:
+                RestoreFocus(leavingTopBar: true);
+                break;
+        }
+    }
+
+    private void OnTopBarFocused(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (sender is Button button)
+        {
+            _topBarButton = button;
+            AcceptHint.Text = "Open";
+        }
     }
 
     private void UpdateTopBar()

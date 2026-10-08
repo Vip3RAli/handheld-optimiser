@@ -44,7 +44,7 @@ public partial class LibraryWindow
         var apiKey = LibrarySettings.ArtworkKey;
         var mayAsk = apiKey is not null && apiKey != _rejectedKey;
 
-        // A different key, set here or in the main app, may get what the last one could not.
+        // A different key may get what the last one could not.
         if (apiKey != _coversAskedWith)
         {
             _coversAsked.Clear();
