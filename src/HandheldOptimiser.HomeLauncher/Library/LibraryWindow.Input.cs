@@ -24,6 +24,12 @@ public partial class LibraryWindow
             return;
         }
 
+        if (Keyboard.FocusedElement is Button topBar && IsTopBarButton(topBar))
+        {
+            NavigateTopBar(topBar, direction);
+            return;
+        }
+
         if (Keyboard.FocusedElement is Button { DataContext: DealTile } deal)
         {
             NavigateDeals(deal, direction);
@@ -32,7 +38,16 @@ public partial class LibraryWindow
 
         if (Keyboard.FocusedElement is not Button { DataContext: GameTile tile } button)
         {
-            RestoreFocus();
+            // With nothing to show, such as an empty Apps tab, the top bar is all there is to reach.
+            if (_tiles.Count == 0 && direction == FocusNavigationDirection.Up)
+            {
+                FocusTopBar();
+            }
+            else
+            {
+                RestoreFocus();
+            }
+
             return;
         }
 
@@ -46,9 +61,14 @@ public partial class LibraryWindow
         var columns = ColumnCount();
         var last = _tiles.Count - 1;
 
-        // Up from the grid's first row goes to the Continue playing row above it.
-        if (direction == FocusNavigationDirection.Up && index >= 0 && index < columns && FocusContinueAbove(button))
+        // Up from the grid's first row goes to the Continue playing row above it, or to the top bar.
+        if (direction == FocusNavigationDirection.Up && index >= 0 && index < columns)
         {
+            if (!FocusContinueAbove(button))
+            {
+                FocusTopBar();
+            }
+
             return;
         }
 
@@ -164,6 +184,9 @@ public partial class LibraryWindow
                 break;
             case GamepadAction.Accept when Keyboard.FocusedElement is Button { DataContext: DealTile deal }:
                 OpenDeal(deal);
+                break;
+            case GamepadAction.Accept when Keyboard.FocusedElement is Button topBar && IsTopBarButton(topBar):
+                topBar.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 break;
             case GamepadAction.Options when _quickActions && Keyboard.FocusedElement is Button { DataContext: GameTile tile }:
                 OpenMenu(tile);

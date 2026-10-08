@@ -116,7 +116,7 @@
                             IsEnabled="{Binding DataContext.IsBusy, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource InverseBool}}">
                         <StackPanel Orientation="Horizontal">
                             <ui:FontIcon Glyph="&#xE945;" FontSize="20" Margin="0,0,10,0" VerticalAlignment="Center" />
-                            <TextBlock Text="Apply Optimised Tweaks" VerticalAlignment="Center" />
+                            <TextBlock Text="Apply Now" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
                 </Grid>
@@ -141,11 +141,37 @@
                         <Grid Width="150" Height="150" Margin="0,14,0,0" VerticalAlignment="Center">
                             <ui:Arc Width="150" Height="150" StartAngle="0" EndAngle="359.99"
                                     Stroke="#24FFFFFF" StrokeThickness="12" />
+                            <!-- Red under a third applied, yellow from a third, green from two thirds. -->
                             <ui:Arc Width="150" Height="150" StartAngle="0" EndAngle="{Binding AppliedAngle}"
-                                    Stroke="{StaticResource BrandAccent}" StrokeThickness="12">
-                                <ui:Arc.Effect>
-                                    <DropShadowEffect Color="#22D3EE" BlurRadius="22" ShadowDepth="0" Opacity="0.9" />
-                                </ui:Arc.Effect>
+                                    StrokeThickness="12">
+                                <ui:Arc.Style>
+                                    <Style TargetType="ui:Arc">
+                                        <Setter Property="Stroke" Value="#E06C6C" />
+                                        <Setter Property="Effect">
+                                            <Setter.Value>
+                                                <DropShadowEffect Color="#E06C6C" BlurRadius="22" ShadowDepth="0" Opacity="0.9" />
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding AppliedLevel}" Value="Medium">
+                                                <Setter Property="Stroke" Value="#E8C45F" />
+                                                <Setter Property="Effect">
+                                                    <Setter.Value>
+                                                        <DropShadowEffect Color="#E8C45F" BlurRadius="22" ShadowDepth="0" Opacity="0.9" />
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding AppliedLevel}" Value="High">
+                                                <Setter Property="Stroke" Value="#6CC07A" />
+                                                <Setter Property="Effect">
+                                                    <Setter.Value>
+                                                        <DropShadowEffect Color="#6CC07A" BlurRadius="22" ShadowDepth="0" Opacity="0.9" />
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ui:Arc.Style>
                             </ui:Arc>
 
                             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">

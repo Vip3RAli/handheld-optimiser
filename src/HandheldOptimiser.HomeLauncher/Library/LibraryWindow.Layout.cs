@@ -114,14 +114,8 @@ public partial class LibraryWindow
             return (_layoutSetting, 1);
         }
 
-        var layout = _dockedLayout switch
-        {
-            DockedLayout.Grid => LibraryLayout.Grid,
-            DockedLayout.Row => LibraryLayout.Row,
-            _ => _layoutSetting
-        };
-
-        return (layout, Displays.Scale(_dockedSize, ActualWidth));
+        var layout = _dockedLayout == DockedLayout.Grid ? LibraryLayout.Grid : LibraryLayout.Row;
+        return (layout,Displays.Scale(_dockedSize, ActualWidth));
     }
 
     /// <summary>Whether the settings or the screen ask for a different layout or size than the one on screen.</summary>
@@ -193,11 +187,11 @@ public partial class LibraryWindow
         UpdateContinue();
     }
 
-    // ----- Settings: TV and monitor -----
+    // ----- Settings: Docked mode -----
 
     private void OnOpenTvSettings(object sender, RoutedEventArgs e)
     {
-        OpenSettingsGroup(TvItems, "TV and monitor");
+        OpenSettingsGroup(TvItems, "Docked mode");
         MenuStore.Text = _docked ? "The library is on a TV or monitor now" : "The library is on the built-in screen now";
     }
 
@@ -234,7 +228,7 @@ public partial class LibraryWindow
         }
     }
 
-    /// <summary>Left and right on the layout rows of Display and TV and monitor.</summary>
+    /// <summary>Left and right on the layout rows of Display and Docked mode.</summary>
     private bool StepLayoutSetting(Button row, int step)
     {
         if (ReferenceEquals(row, LayoutSetting))
@@ -268,16 +262,11 @@ public partial class LibraryWindow
 
         var dockedMode = LibrarySettings.DockedMode;
         DockedSetting.Tag = dockedMode
-            ? "On: a layout and size of its own on a TV or monitor"
+            ? "On: a layout and zoom of its own on a TV or monitor"
             : "Off: the same as on the built-in screen";
 
         DockedLayoutSetting.IsEnabled = dockedMode;
-        DockedLayoutSetting.Tag = LibrarySettings.DockedLayout switch
-        {
-            DockedLayout.Grid => "Grid",
-            DockedLayout.Row => "Row",
-            _ => "The same as on the built-in screen"
-        };
+        DockedLayoutSetting.Tag = LibrarySettings.DockedLayout == DockedLayout.Grid ? "Grid" : "Row";
 
         DockedSizeSetting.IsEnabled = dockedMode;
         DockedSizeSetting.Tag = LibrarySettings.DockedSize is var size and > 0

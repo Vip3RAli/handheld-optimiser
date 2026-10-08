@@ -50,22 +50,19 @@ internal enum LibraryLayout
     Row
 }
 
-/// <summary>The layout on a TV or monitor: the handheld's own, or one of the two.</summary>
+/// <summary>The layout on a TV or monitor.</summary>
 internal enum DockedLayout
 {
-    Same,
     Grid,
     Row
 }
 
 /// <summary>
 /// The library's own preferences, changed from its settings menu. They live in the per-user key the main
-/// app writes the home app choice to, so the background options on its Full Screen Mode page and the
-/// ones here are the same settings.
+/// app writes the home app choice to.
 /// </summary>
 internal static class LibrarySettings
 {
-    // Keep the names in step with HomeAppRegistration in the main app.
     private const string BackgroundValue = "Background";
     private const string StrengthValue = "ColourStrength";
     private const string ArtworkKeyValue = "SteamGridDbKey";

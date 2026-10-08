@@ -67,7 +67,7 @@ public partial class LibraryWindow
         {
             true => "Closed while it plays",
             false => "Left running",
-            null => LibrarySettings.GameMode ? "As set under While playing: closed" : "As set under While playing: left running"
+            null => LibrarySettings.GameMode ? "As set under Play and Sleep: closed" : "As set under Play and Sleep: left running"
         };
     }
 

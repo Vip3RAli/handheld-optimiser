@@ -55,7 +55,7 @@ public partial class LibraryWindow
     {
         HideMenuLists();
         _menu = WhilePlayingItems;
-        MenuTitle.Text = "While playing";
+        MenuTitle.Text = "Play and Sleep";
         MenuStore.Text = "Settings";
         RefreshWhilePlaying();
         ShowMenuItems(focus);
@@ -183,8 +183,8 @@ public partial class LibraryWindow
     {
         var count = BackgroundApps.Choices().Count(c => c.Close);
         CloseAppsNowItem.IsEnabled = count > 0;
-        CloseAppsNowItem.Tag = count == 0 ? "Choose them under Settings, While playing"
-            : "The ones chosen under Settings, While playing. They stay closed";
+        CloseAppsNowItem.Tag = count == 0 ? "Choose them under Settings, Play and Sleep"
+            : "The ones chosen under Settings, Play and Sleep. They stay closed";
     }
 
     private async void OnCloseAppsNow(object sender, RoutedEventArgs e)
@@ -224,7 +224,7 @@ public partial class LibraryWindow
         HideMenuLists();
         _menu = MaintenanceItems;
         _confirming = null;
-        MenuTitle.Text = "Maintenance";
+        MenuTitle.Text = "Quick Tweaks";
         MenuStore.Text = StorageSummary();
 
         TempItem.Tag = ShaderItem.Tag = RecycleItem.Tag = "Measuring...";
@@ -347,7 +347,7 @@ public partial class LibraryWindow
         _menu = StartupItems;
         MenuTitle.Text = "Startup apps";
         MenuStore.Text = "Takes effect the next time you sign in";
-        StartupBackItem.Tag = ReferenceEquals(from, StoreStartupItem) ? "While playing" : "Maintenance";
+        StartupBackItem.Tag = ReferenceEquals(from, StoreStartupItem) ? "Play and Sleep" : "Quick Tweaks";
 
         ClearRows(StartupItems);
         var apps = StartupApps.Read();

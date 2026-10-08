@@ -9,7 +9,7 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 
 /// <summary>
 /// The Deals row below the grid: games on sale from IsThereAnyDeal, wishlist games first. Off until
-/// switched on, and only in the grid layout on the All tab. The deals are asked for when the library comes
+/// switched on, and only in the grid layout on the Games tab. The deals are asked for when the library comes
 /// to the front with no game running, at most every few hours (see GameDeals), and their banners are only
 /// kept while the library is in front.
 /// </summary>
@@ -298,7 +298,7 @@ public partial class LibraryWindow
             : key is null ? "On. Needs an IsThereAnyDeal API key, below"
             : _layout != LibraryLayout.Grid ? "On. Shows below the games in the grid layout"
             : count == 0 ? "On. No deals yet"
-            : $"On, below the games on the All tab. {count} deals";
+            : $"On, below the games on the Games tab. {count} deals";
 
         DealsKeySetting.IsEnabled = on;
         DealsKeySetting.Tag = key is null ? "Not set. Free at isthereanydeal.com/apps/my"

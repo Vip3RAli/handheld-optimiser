@@ -47,7 +47,7 @@
             </Style>
 
             <!--
-                A pill: the tabs across the top of a section, and the one-click button. A plain Button with
+                A pill: the one-click button. A plain Button with
                 its own template, because the rounded-rectangle look of the themed button is the thing
                 being replaced.
             -->

@@ -134,6 +134,9 @@ public partial class LibraryWindow
             case FocusNavigationDirection.Right when index >= 0 && index + 1 < buttons.Count:
                 buttons[index + 1].Focus();
                 break;
+            case FocusNavigationDirection.Up:
+                FocusTopBar();
+                break;
             case FocusNavigationDirection.Down when _tiles.Count > 0:
                 var firstRow = Enumerable.Range(0, Math.Min(ColumnCount(), _tiles.Count))
                     .Select(i => TileContainer(i) is { } c ? VisualChild<Button>(c) : null)

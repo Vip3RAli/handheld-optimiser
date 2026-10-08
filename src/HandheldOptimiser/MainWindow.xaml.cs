@@ -82,6 +82,18 @@ public partial class MainWindow : FluentWindow
         WindowState = WindowState.Maximized;
     }
 
+    /// <summary>
+    /// Pressing the group that is already open closes its list of pages, and pressing it again opens it.
+    /// A press on another group selects it instead, which opens its list.
+    /// </summary>
+    private void OnGroupHeaderPressed(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement { TemplatedParent: ListBoxItem { IsSelected: true } } && DataContext is MainViewModel vm)
+        {
+            vm.IsGroupOpen = !vm.IsGroupOpen;
+        }
+    }
+
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
         if (e.NewValue is MainViewModel vm)

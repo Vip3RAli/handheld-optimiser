@@ -20,7 +20,7 @@ public sealed partial class HomeAppPickerViewModel : ObservableObject, IPageSect
     }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsSteam), nameof(IsLibrary), nameof(IsArmouryCrate), nameof(IsCustom))]
+    [NotifyPropertyChangedFor(nameof(IsLibrary), nameof(IsOther), nameof(IsSteam), nameof(IsArmouryCrate), nameof(IsCustom))]
     private HomeAppTarget _target;
 
     [ObservableProperty]
@@ -28,12 +28,6 @@ public sealed partial class HomeAppPickerViewModel : ObservableObject, IPageSect
 
     [ObservableProperty]
     private string _customArgs = string.Empty;
-
-    [ObservableProperty]
-    private bool _useArtwork;
-
-    [ObservableProperty]
-    private string _artworkKey = string.Empty;
 
     [ObservableProperty]
     private string _availabilityText = string.Empty;
@@ -47,17 +41,26 @@ public sealed partial class HomeAppPickerViewModel : ObservableObject, IPageSect
     public string SteamNote => SteamInstalled ? "Opens straight into Big Picture mode." : "Steam is not installed.";
     public string ArmouryCrateNote => ArmouryCrateInstalled ? "Opens the Armoury Crate SE home screen." : "Armoury Crate SE is not installed.";
 
-    // Radio buttons bind to these; each setter only acts on being checked.
-    public bool IsSteam
-    {
-        get => Target == HomeAppTarget.Steam;
-        set { if (value) Target = HomeAppTarget.Steam; }
-    }
+    // The launcher Another launcher goes back to, so trying the library and coming back keeps it.
+    private HomeAppTarget _otherTarget = HomeAppTarget.Steam;
 
+    // Radio buttons bind to these; each setter only acts on being checked.
     public bool IsLibrary
     {
         get => Target == HomeAppTarget.Library;
         set { if (value) Target = HomeAppTarget.Library; }
+    }
+
+    public bool IsOther
+    {
+        get => Target != HomeAppTarget.Library;
+        set { if (value && Target == HomeAppTarget.Library) Target = _otherTarget; }
+    }
+
+    public bool IsSteam
+    {
+        get => Target == HomeAppTarget.Steam;
+        set { if (value) Target = HomeAppTarget.Steam; }
     }
 
     public bool IsArmouryCrate
@@ -81,8 +84,6 @@ public sealed partial class HomeAppPickerViewModel : ObservableObject, IPageSect
             Target = target;
             CustomPath = path;
             CustomArgs = args;
-            UseArtwork = HomeAppRegistration.LoadUseArtwork();
-            ArtworkKey = HomeAppRegistration.LoadArtworkKey();
         }
         finally
         {
@@ -106,31 +107,18 @@ public sealed partial class HomeAppPickerViewModel : ObservableObject, IPageSect
                     : "Choose an app below, then switch on \"Use Handheld Optimiser as the full screen home app\".";
     }
 
-    partial void OnTargetChanged(HomeAppTarget value) => Save();
+    partial void OnTargetChanged(HomeAppTarget value)
+    {
+        if (value != HomeAppTarget.Library)
+        {
+            _otherTarget = value;
+        }
+
+        Save();
+    }
+
     partial void OnCustomPathChanged(string value) => Save();
     partial void OnCustomArgsChanged(string value) => Save();
-
-    // Each writes only its own value: the library's settings menu has a third background choice (plain)
-    // that saving the switch along with the key would overwrite.
-    partial void OnUseArtworkChanged(bool value) => SaveBackground(() => HomeAppRegistration.SaveUseArtwork(value));
-    partial void OnArtworkKeyChanged(string value) => SaveBackground(() => HomeAppRegistration.SaveArtworkKey(value.Trim()));
-
-    private void SaveBackground(Action save)
-    {
-        if (_loading)
-        {
-            return;
-        }
-
-        try
-        {
-            save();
-        }
-        catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException or System.IO.IOException)
-        {
-            _log.Error($"Could not save the library background choice: {ex.Message}");
-        }
-    }
 
     private void Save()
     {

@@ -219,9 +219,10 @@
             </Setter>
         </Style>
 
-        <!-- A round glyph button in the top bar. Not focusable, so keyboard focus stays on the tiles. -->
+        <!-- A round glyph button in the top bar. Only the ones the d-pad can reach are focusable. -->
         <Style x:Key="IconButton" TargetType="Button">
             <Setter Property="Focusable" Value="False" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Foreground" Value="#F2F3F5" />
             <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" />
             <Setter Property="FontSize" Value="18" />
@@ -229,12 +230,18 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Disc" Width="44" Height="44" CornerRadius="22" Background="Transparent" Opacity="0.8">
+                        <Border x:Name="Disc" Width="44" Height="44" CornerRadius="22" Background="Transparent" Opacity="0.8"
+                                BorderBrush="Transparent" BorderThickness="2">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Disc" Property="Background" Value="#22FFFFFF" />
+                                <Setter TargetName="Disc" Property="Opacity" Value="1" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Disc" Property="Background" Value="#22FFFFFF" />
+                                <Setter TargetName="Disc" Property="BorderBrush" Value="#F2F3F5" />
                                 <Setter TargetName="Disc" Property="Opacity" Value="1" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -295,16 +302,22 @@
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
-                <!-- Volume, brightness, power mode and refresh rate, also on the controller's Y button. -->
-                <Button Style="{StaticResource IconButton}" Margin="0,-10,4,-10" VerticalAlignment="Center"
+                <!--
+                    Volume, brightness, power mode and refresh rate, also on the controller's Y button. Up from
+                    the top row of games reaches these three buttons, and A presses the one in focus.
+                -->
+                <Button x:Name="QuickButton" Style="{StaticResource IconButton}" Margin="0,-10,4,-10" VerticalAlignment="Center"
+                        Focusable="True" GotKeyboardFocus="OnTopBarFocused"
                         Content="&#xE9E9;" ToolTip="Quick settings" Click="OnOpenQuickSettings" />
 
                 <!-- The library's settings, also on the controller's Menu button. Sized for a finger. -->
-                <Button Style="{StaticResource IconButton}" Margin="0,-10,4,-10" VerticalAlignment="Center"
+                <Button x:Name="SettingsButton" Style="{StaticResource IconButton}" Margin="0,-10,4,-10" VerticalAlignment="Center"
+                        Focusable="True" GotKeyboardFocus="OnTopBarFocused"
                         Content="&#xE713;" ToolTip="Settings" Click="OnOpenSettings" />
 
                 <!-- Sleep, hibernate, restart and shut down, also on the controller's View button. -->
-                <Button Style="{StaticResource IconButton}" Margin="0,-10,14,-10" VerticalAlignment="Center"
+                <Button x:Name="PowerButton" Style="{StaticResource IconButton}" Margin="0,-10,14,-10" VerticalAlignment="Center"
+                        Focusable="True" GotKeyboardFocus="OnTopBarFocused"
                         Content="&#xE7E8;" ToolTip="Power" Click="OnOpenPower" />
 
                 <!-- Wi-Fi signal: four bars, lit up to the current strength. -->
@@ -351,7 +364,7 @@
                 </Grid>
             </Border>
 
-            <!-- The tabs: All, the favourites and a tab per store when there are some, Not installed, and Apps. -->
+            <!-- The tabs: Games, the favourites and a tab per store when there are some, Apps, and Not installed. -->
             <StackPanel x:Name="FilterStrip" Orientation="Horizontal" Margin="48,0,48,10">
                 <Border Style="{StaticResource BumperGlyph}" Margin="0,0,12,0">
                     <TextBlock Text="LB" FontSize="12" FontWeight="Bold" />
@@ -374,7 +387,7 @@
             <StackPanel>
                 <!--
                     Continue playing: the last game played as a wide card, and the few before it, above the
-                    grid. Only in the grid layout, on the All tab.
+                    grid. Only in the grid layout, on the Games tab.
                 -->
                 <StackPanel x:Name="ContinuePanel" Visibility="Collapsed">
                     <TextBlock Text="Continue playing" Margin="10,0,0,2" FontSize="18" FontWeight="SemiBold" Opacity="0.85" />
@@ -444,7 +457,7 @@
 
                 <!--
                     Deals: games on sale from IsThereAnyDeal, below the grid in a row that scrolls across.
-                    Only when switched on, in the grid layout, on the All tab.
+                    Only when switched on, in the grid layout, on the Games tab.
                 -->
                 <StackPanel x:Name="DealsPanel" Margin="0,18,0,0" Visibility="Collapsed">
                     <StackPanel Orientation="Horizontal" Margin="10,0,0,2">
@@ -584,26 +597,26 @@
                     <StackPanel x:Name="SettingsItems" Visibility="Collapsed">
                         <Button x:Name="UpdateSetting" Style="{StaticResource MenuButton}" Content="Update now"
                                 Visibility="Collapsed" Click="OnUpdateNow" />
-                        <Button x:Name="BackgroundGroup" Style="{StaticResource MenuButton}" Content="Background"
-                                Tag="Artwork, colours and blur" Click="OnOpenBackgroundSettings" />
-                        <Button x:Name="DisplayGroup" Style="{StaticResource MenuButton}" Content="Display"
-                                Tag="Layout, Continue playing, sort order, store filter, quick actions and hidden games" Click="OnOpenDisplaySettings" />
-                        <Button x:Name="TvGroup" Style="{StaticResource MenuButton}" Content="TV and monitor"
-                                Tag="A bigger layout when the library is on a TV or monitor" Click="OnOpenTvSettings" />
+                        <Button x:Name="BackgroundGroup" Style="{StaticResource MenuButton}" Content="Art and Background"
+                                Tag="Change the background and artwork" Click="OnOpenBackgroundSettings" />
+                        <Button x:Name="DisplayGroup" Style="{StaticResource MenuButton}" Content="Library View Options"
+                                Tag="Customise how the library looks" Click="OnOpenDisplaySettings" />
+                        <Button x:Name="TvGroup" Style="{StaticResource MenuButton}" Content="Docked mode"
+                                Tag="Monitor and TV layout options" Click="OnOpenTvSettings" />
                         <Button x:Name="OwnedGroup" Style="{StaticResource MenuButton}" Content="Games not installed"
                                 Tag="The games you own on Steam, Epic and GOG, ready to install" Click="OnOpenOwnedSettings" />
                         <Button x:Name="DealsGroup" Style="{StaticResource MenuButton}" Content="Game deals"
-                                Tag="Games on sale below the library, from IsThereAnyDeal" Click="OnOpenDealsSettings" />
+                                Tag="Show deals below library. Powered by IsThereAnyDeal.com (Requires free API key)" Click="OnOpenDealsSettings" />
                         <Button x:Name="AddProgramGroup" Style="{StaticResource MenuButton}" Content="Add a program"
-                                Tag="Emulators, games from other stores, and apps like Chrome or Discord" Click="OnOpenAddProgram" />
-                        <Button x:Name="WhilePlayingGroup" Style="{StaticResource MenuButton}" Content="While playing"
-                                Tag="Background programs, store apps, Quick Resume and your game after sleep" Click="OnOpenWhilePlaying" />
+                                Tag="Add apps or Emulators to launcher" Click="OnOpenAddProgram" />
+                        <Button x:Name="WhilePlayingGroup" Style="{StaticResource MenuButton}" Content="Play and Sleep"
+                                Tag="Choose what happens during play and device sleep" Click="OnOpenWhilePlaying" />
                         <Button x:Name="EmulatorsGroup" Style="{StaticResource MenuButton}" Content="Emulators"
-                                Tag="ROM folders, and which emulator plays each console" Click="OnOpenEmulators" />
-                        <Button x:Name="MaintenanceGroup" Style="{StaticResource MenuButton}" Content="Maintenance"
+                                Tag="ROM Folders and settings" Click="OnOpenEmulators" />
+                        <Button x:Name="MaintenanceGroup" Style="{StaticResource MenuButton}" Content="Quick Tweaks"
                                 Tag="Free up space and choose the startup apps" Click="OnOpenMaintenance" />
-                        <Button x:Name="OpenMainAppSetting" Style="{StaticResource MenuButton}" Content="Open Handheld Optimiser"
-                                Tag="Tweaks and tools. Windows asks for administrator permission" Click="OnOpenMainApp" />
+                        <Button x:Name="OpenMainAppSetting" Style="{StaticResource MenuButton}" Content="Launch Handheld Optimiser"
+                                Tag="Tweak Windows 11. (UAC Prompt)" Click="OnOpenMainApp" />
                         <Button x:Name="QuitSetting" Style="{StaticResource MenuButton}" Content="Quit"
                                 Tag="Close the game library" Click="OnQuit" />
 
@@ -826,7 +839,7 @@
                         <Button x:Name="AddRunningAppItem" Style="{StaticResource MenuButton}" Content="Add a running program"
                                 Tag="Pick one of the programs open now" Click="OnOpenRunningApps" />
                         <!-- For touch, which has no B button. -->
-                        <Button x:Name="AppsToCloseBackItem" Style="{StaticResource MenuButton}" Content="Back" Tag="While playing"
+                        <Button x:Name="AppsToCloseBackItem" Style="{StaticResource MenuButton}" Content="Back" Tag="Play and Sleep"
                                 Click="OnSettingsBack" />
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
                             <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
@@ -928,9 +941,9 @@
                     <StackPanel x:Name="TvItems" Visibility="Collapsed">
                         <Button x:Name="DockedSetting" Style="{StaticResource MenuButton}" Content="Docked mode"
                                 Click="OnToggleDocked" />
-                        <Button x:Name="DockedLayoutSetting" Style="{StaticResource MenuButton}" Content="Layout on a TV"
+                        <Button x:Name="DockedLayoutSetting" Style="{StaticResource MenuButton}" Content="Layout"
                                 Click="OnStepDockedLayout" />
-                        <Button x:Name="DockedSizeSetting" Style="{StaticResource MenuButton}" Content="Size on a TV"
+                        <Button x:Name="DockedSizeSetting" Style="{StaticResource MenuButton}" Content="Zoom"
                                 Click="OnStepDockedSize" />
                         <!-- For touch, which has no B button. -->
                         <Button Style="{StaticResource MenuButton}" Content="Back" Tag="Settings" Click="OnSettingsBack" />

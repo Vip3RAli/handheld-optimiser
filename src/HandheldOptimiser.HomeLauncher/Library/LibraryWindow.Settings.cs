@@ -7,7 +7,7 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 /// <summary>The library's own settings menu.</summary>
 public partial class LibraryWindow
 {
-    // The player's choices, from the settings menu here or the main app.
+    // The player's choices, from the settings menu.
     private BackgroundKind _background = LibrarySettings.Background;
     private ColourStrength _strength = LibrarySettings.Strength;
     private ArtworkBlur _blur = LibrarySettings.Blur;
@@ -32,9 +32,9 @@ public partial class LibraryWindow
         ShowMenuItems();
     }
 
-    private void OnOpenBackgroundSettings(object sender, RoutedEventArgs e) => OpenSettingsGroup(BackgroundItems, "Background");
+    private void OnOpenBackgroundSettings(object sender, RoutedEventArgs e) => OpenSettingsGroup(BackgroundItems, "Art and Background");
 
-    private void OnOpenDisplaySettings(object sender, RoutedEventArgs e) => OpenSettingsGroup(DisplayItems, "Display");
+    private void OnOpenDisplaySettings(object sender, RoutedEventArgs e) => OpenSettingsGroup(DisplayItems, "Library View Options");
 
     /// <summary>One group of settings, in place of the settings list.</summary>
     private void OpenSettingsGroup(StackPanel group, string title)
