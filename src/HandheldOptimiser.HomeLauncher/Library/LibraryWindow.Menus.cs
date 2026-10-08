@@ -15,7 +15,8 @@ public partial class LibraryWindow
     {
         Arguments,
         ArtworkTitle,
-        ArtworkKey
+        ArtworkKey,
+        SteamKey
     }
 
     // The list showing in the overlay: a game's quick actions, the library's settings or the power menu.
@@ -47,7 +48,8 @@ public partial class LibraryWindow
         foreach (var list in new[]
         {
             GameItems, ProfileItems, SettingsItems, BackgroundItems, DisplayItems, AddItems, PowerItems, QuickItems,
-            WhilePlayingItems, AppsToCloseItems, RunningAppsItems, MaintenanceItems, StartupItems, EmulatorItems
+            WhilePlayingItems, AppsToCloseItems, RunningAppsItems, MaintenanceItems, StartupItems, EmulatorItems,
+            TvItems, OwnedItems
         })
         {
             list.Visibility = Visibility.Collapsed;
@@ -58,12 +60,22 @@ public partial class LibraryWindow
     private string GameSubtitle(GameTile tile) =>
         _stats.GetValueOrDefault(tile.Game.Key).Describe(DateTimeOffset.UtcNow) is { } played
             ? $"{tile.StoreName}   {played}"
-            : $"{tile.StoreName}   Not played from the library yet";
+            : tile.IsInstalled ? $"{tile.StoreName}   Not played from the library yet"
+            : $"{tile.StoreName}   Not installed";
 
     /// <summary>What each quick action will do for this game, on the rows' detail lines.</summary>
     private void RefreshGameItems(GameTile tile)
     {
         var game = tile.Game;
+
+        // A game that is not installed can only be installed or hidden.
+        var installed = tile.IsInstalled;
+        InstallItem.Visibility = installed ? Visibility.Collapsed : Visibility.Visible;
+        InstallItem.Tag = $"Opens {Game.NameOf(game.Store)} to install it";
+        foreach (var row in new[] { FavouriteItem, ProfileItem, ArgumentsItem, FolderItem, PropertiesItem })
+        {
+            row.Visibility = installed ? Visibility.Visible : Visibility.Collapsed;
+        }
 
         FavouriteItem.Content = tile.IsFavourite ? "Remove from favourites" : "Add to favourites";
         FavouriteItem.Tag = tile.IsFavourite ? "Back among the other games" : "Kept at the front of the library, with a star";
@@ -216,6 +228,22 @@ public partial class LibraryWindow
         }
 
         var text = EditorBox.Text.Trim();
+        if (editor == MenuEditor.SteamKey)
+        {
+            // Back to the list, then Steam is asked for the games with the new key.
+            LibrarySettings.SteamKey = text;
+            _ownedError = null;
+            RefreshSettings();
+            ShowMenuItems();
+            if (text.Length > 0)
+            {
+                SteamKeySetting.Tag = "Asking Steam for your games...";
+                _ = RefreshOwnedAsync(force: true);
+            }
+
+            return;
+        }
+
         if (editor == MenuEditor.ArtworkKey)
         {
             // Back to the settings list, with the focused game's artwork looked up under the new key,

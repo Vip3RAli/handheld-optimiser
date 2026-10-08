@@ -24,15 +24,27 @@ public partial class LibraryWindow
             return;
         }
 
-        if (Keyboard.FocusedElement is not Button { DataContext: GameTile tile })
+        if (Keyboard.FocusedElement is not Button { DataContext: GameTile tile } button)
         {
             RestoreFocus();
+            return;
+        }
+
+        if (InContinueRow(button))
+        {
+            NavigateContinue(button, direction);
             return;
         }
 
         var index = _tiles.IndexOf(tile);
         var columns = ColumnCount();
         var last = _tiles.Count - 1;
+
+        // Up from the grid's first row goes to the Continue playing row above it.
+        if (direction == FocusNavigationDirection.Up && index >= 0 && index < columns && FocusContinueAbove(button))
+        {
+            return;
+        }
 
         var target = direction switch
         {
@@ -52,10 +64,16 @@ public partial class LibraryWindow
 
     /// <summary>
     /// Tiles in the first row, which is the column count since every tile is the same width. Measured on
-    /// the item containers: the focused button is scaled up, which shifts its own position.
+    /// the item containers: the focused button is scaled up, which shifts its own position. The row
+    /// layout is one row of every tile.
     /// </summary>
     private int ColumnCount()
     {
+        if (_layout == LibraryLayout.Row)
+        {
+            return Math.Max(1, _tiles.Count);
+        }
+
         double? firstTop = null;
         var columns = 0;
 
@@ -253,7 +271,14 @@ public partial class LibraryWindow
         if (sender is Button { DataContext: GameTile tile } button)
         {
             _focusedKey = tile.Game.Key;
+            _focusInContinue = InContinueRow(button);
             QueueBackdrop(tile);
+            ShowRowDetails(tile);
+
+            if (!tile.IsInstalled)
+            {
+                LoadNotInstalledNear(_tiles.IndexOf(tile));
+            }
 
             // Leave room for the focus ring and the title underneath when scrolling a row into view.
             button.BringIntoView(new Rect(-20, -40, button.ActualWidth + 40, button.ActualHeight + 80));

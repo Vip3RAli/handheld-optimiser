@@ -5,8 +5,9 @@ using Xunit;
 namespace HandheldOptimiser.Tests;
 
 /// <summary>
-/// The game library's pure logic: reading Steam's config format, naming and listing ROM files, and the
-/// play time wording. Nothing here reads or writes the registry.
+/// The game library's pure logic: reading Steam's config format, naming and listing ROM files, the
+/// play time wording, game profiles, screen sizes, docked mode, Continue playing and the stores' lists
+/// of owned games. Nothing here reads or writes the registry.
 /// </summary>
 public sealed class LibraryFeatureTests : IDisposable
 {
@@ -131,6 +132,170 @@ public sealed class LibraryFeatureTests : IDisposable
         Assert.Equal("1 h 30 min played, last played 3 days ago", stats.Describe(now));
         Assert.Null(default(PlayStats).Describe(now));
         Assert.Equal("Last played yesterday", new PlayStats(TimeSpan.Zero, now - TimeSpan.FromHours(30)).Describe(now));
+    }
+
+    [Fact]
+    public void GameProfiles_KeepTheResolution()
+    {
+        var profile = new GameProfile(PowerMode.Performance, 120, 50, CloseApps: true, Resolution: new Resolution(1280, 720));
+        var text = GameProfiles.Format(profile);
+
+        Assert.Equal("power=performance;res=1280x720;hz=120;brightness=50;closeapps=on", text);
+        Assert.Equal(profile, GameProfiles.Parse(text));
+        Assert.Contains("1280 x 720, 120 Hz, 50% brightness", profile.Describe());
+    }
+
+    [Theory]
+    [InlineData("res=1280x720", 1280, 720)]
+    [InlineData("res=1920X1080;hz=60", 1920, 1080)]
+    [InlineData("res=wide", null, null)]
+    [InlineData("res=0x720", null, null)]
+    public void GameProfiles_ReadTheResolution(string text, int? width, int? height) =>
+        Assert.Equal(width is null ? null : new Resolution(width.Value, height!.Value), GameProfiles.Parse(text).Resolution);
+
+    [Fact]
+    public void GameProfiles_ResolutionAloneIsNotEmpty() =>
+        Assert.False(new GameProfile(null, null, null, Resolution: new Resolution(1280, 720)).IsEmpty);
+
+    [Fact]
+    public void Resolutions_OfferSizesTheShapeOfTheScreen()
+    {
+        Resolution[] offered =
+        [
+            new(1920, 1080), new(1680, 1050), new(1600, 900), new(1366, 768), new(1280, 800),
+            new(1280, 720), new(1024, 768), new(800, 600), new(640, 480), new(1920, 1080)
+        ];
+
+        var choices = Resolutions.Choices(offered, new Resolution(1920, 1080));
+
+        Assert.Equal([new(1920, 1080), new(1600, 900), new(1366, 768), new(1280, 720)], choices);
+    }
+
+    [Fact]
+    public void Resolutions_KeepTheCurrentSizeAmongTheChoices()
+    {
+        var choices = Resolutions.Choices([new(1920, 1080), new(1280, 720)], new Resolution(1280, 800));
+
+        Assert.Contains(new Resolution(1280, 800), choices);
+        Assert.Equal(new Resolution(1920, 1080), choices[0]);
+    }
+
+    [Fact]
+    public void Displays_DockedOnlyWhenTheScreenShowsOnSomethingPluggedIn()
+    {
+        const uint hdmi = 5;
+        const uint displayPortEmbedded = 11;
+        (string, uint)[] handheld = [(@"\\.\DISPLAY1", displayPortEmbedded)];
+        (string, uint)[] duplicated = [(@"\\.\DISPLAY1", displayPortEmbedded), (@"\\.\DISPLAY1", hdmi)];
+        (string, uint)[] extended = [(@"\\.\DISPLAY1", displayPortEmbedded), (@"\\.\DISPLAY2", hdmi)];
+
+        Assert.False(Displays.IsDocked(handheld, @"\\.\DISPLAY1"));
+        Assert.True(Displays.IsDocked(duplicated, @"\\.\DISPLAY1"));
+        Assert.False(Displays.IsDocked(extended, @"\\.\DISPLAY1"));
+        Assert.True(Displays.IsDocked(extended, @"\\.\display2"));
+    }
+
+    [Theory]
+    [InlineData(0, 1280, 1)]
+    [InlineData(0, 1920, 1.5)]
+    [InlineData(0, 2560, 2)]
+    [InlineData(0, 800, 1)]
+    [InlineData(125, 1920, 1.25)]
+    public void Displays_ScaleFitsTheHandheldsLayout(int size, double width, double scale) =>
+        Assert.Equal(scale, Displays.Scale(size, width), 3);
+
+    [Fact]
+    public void RecentGames_PicksThePlayedOnesNewestFirst()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var played = new Dictionary<string, DateTimeOffset?>
+        {
+            ["a"] = now - TimeSpan.FromDays(3),
+            ["b"] = null,
+            ["c"] = now,
+            ["d"] = now - TimeSpan.FromDays(1)
+        };
+
+        Assert.Equal(["c", "d"], RecentGames.Pick(played.Keys, k => played[k], 2));
+        Assert.Equal(["c", "d", "a"], RecentGames.Pick(played.Keys, k => played[k], 10));
+        Assert.Empty(RecentGames.Pick(played.Keys, k => played[k], 0));
+    }
+
+    [Fact]
+    public void OwnedGames_ReadsEpicsCatalogueCache()
+    {
+        const string json = """
+            [
+              { "id": "item1", "namespace": "ns1", "title": "Hades",
+                "categories": [ { "path": "games" }, { "path": "applications" } ],
+                "releaseInfo": [ { "appId": "Min", "platform": [ "Windows", "Mac" ] } ],
+                "keyImages": [ { "type": "Thumbnail", "url": "https://cdn1.epicgames.com/t.jpg" },
+                               { "type": "DieselGameBoxTall", "url": "https://cdn1.epicgames.com/tall.jpg" } ] },
+              { "id": "item2", "namespace": "ns1", "title": "Hades Soundtrack",
+                "categories": [ { "path": "addons" }, { "path": "games" } ],
+                "mainGameItem": { "id": "item1" },
+                "releaseInfo": [ { "appId": "MinOst", "platform": [ "Windows" ] } ] },
+              { "id": "item3", "namespace": "ns2", "title": "Mac Only",
+                "categories": [ { "path": "games" } ],
+                "releaseInfo": [ { "appId": "Mac1", "platform": [ "Mac" ] } ] },
+              { "id": "item4", "namespace": "ns3", "title": "Unreal Engine",
+                "categories": [ { "path": "engines" } ],
+                "releaseInfo": [ { "appId": "UE", "platform": [ "Windows" ] } ] }
+            ]
+            """;
+
+        var games = OwnedGames.ParseEpicCatalog(Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(json)));
+
+        var hades = Assert.Single(games);
+        Assert.Equal("epic:Min", hades.Key);
+        Assert.Equal("Hades", hades.Title);
+        Assert.False(hades.Installed);
+        Assert.Equal("https://cdn1.epicgames.com/tall.jpg", hades.CoverUrl);
+        Assert.Equal("com.epicgames.launcher://apps/ns1%3Aitem1%3AMin?action=install", hades.LaunchTarget);
+    }
+
+    [Theory]
+    [InlineData("not base64!")]
+    [InlineData("e30=")]
+    public void OwnedGames_BrokenEpicCacheListsNothing(string text) => Assert.Empty(OwnedGames.ParseEpicCatalog(text));
+
+    [Fact]
+    public void OwnedGames_ReadsSteamsAnswer()
+    {
+        const string json = """
+            { "response": { "game_count": 3, "games": [
+                { "appid": 620, "name": "Portal 2", "playtime_forever": 600 },
+                { "appid": 228980, "name": "Steamworks Common Redistributables" },
+                { "appid": 400 }
+            ] } }
+            """;
+
+        var portal = Assert.Single(OwnedGames.ParseSteamOwned(json, artDir: null));
+        Assert.Equal("steam:620", portal.Key);
+        Assert.Equal("steam://install/620", portal.LaunchTarget);
+        Assert.Equal("https://cdn.cloudflare.steamstatic.com/steam/apps/620/library_600x900.jpg", portal.CoverUrl);
+        Assert.Empty(OwnedGames.ParseSteamOwned("""{ "response": {} }""", null));
+    }
+
+    [Fact]
+    public void OwnedGames_ReadsGogGalaxyRows()
+    {
+        string?[][] rows =
+        [
+            ["gog_1207658924", "title", """{"title":"The Witcher 3: Wild Hunt"}"""],
+            ["gog_1207658924", "originalImages", """{"verticalCover":"https://images.gog.com/abc_glx_vertical_cover.webp"}"""],
+            ["gog_42", "originalTitle", """{"title":"Original Only"}"""],
+            ["steam_620", "title", """{"title":"Portal 2"}"""],
+            ["gog_7", "title", "not json"]
+        ];
+
+        var games = OwnedGames.ParseGalaxyRows(rows).OrderBy(g => g.Key).ToList();
+
+        Assert.Equal(["gog:1207658924", "gog:42"], games.Select(g => g.Key));
+        Assert.Equal("The Witcher 3: Wild Hunt", games[0].Title);
+        Assert.Equal("https://images.gog.com/abc_glx_vertical_cover.jpg", games[0].CoverUrl);
+        Assert.Equal("goggalaxy://openGameView/1207658924", games[0].LaunchTarget);
+        Assert.Equal("Original Only", games[1].Title);
     }
 
     private void Touch(string name, string text = "")

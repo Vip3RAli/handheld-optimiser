@@ -11,6 +11,10 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 ///
 /// Only the cover ever changes afterwards: a game whose store keeps none starts on its icon and takes
 /// the cover fetched for it when that arrives, without the grid being rebuilt around it.
+///
+/// A game that is not installed starts with no pictures at all. A Steam account can own a thousand
+/// games, whose covers would take hundreds of MB, so only the ones near the focus are loaded (see
+/// <see cref="Load"/>) and they are let go again as the focus moves away.
 /// </summary>
 internal sealed class GameTile : INotifyPropertyChanged
 {
@@ -27,6 +31,12 @@ internal sealed class GameTile : INotifyPropertyChanged
 
     public string Title => Game.Title;
     public string StoreName => Game.StoreName;
+
+    /// <summary>False for a game the player owns but has not installed, shown faded with a download mark.</summary>
+    public bool IsInstalled => Game.Installed;
+
+    /// <summary>Whether its pictures have been decoded. Always true for an installed game.</summary>
+    public bool IsLoaded { get; private set; }
 
     /// <summary>Starred by the player, which puts it at the front and shows a star on the tile.</summary>
     public bool IsFavourite
@@ -55,18 +65,54 @@ internal sealed class GameTile : INotifyPropertyChanged
 
     public static GameTile Create(Game game)
     {
-        // A cover fetched on an earlier run is on disk already, so the tile opens with it.
-        var cover = (game.CoverPath ?? Artwork.CachedCover(game)) is { } path ? LoadCover(path) : null;
-        var icon = cover is null && game.IconPath is not null ? LoadIcon(game.IconPath) : null;
+        if (!game.Installed)
+        {
+            return new() { Game = game, Background = StoreBrushes[game.Store], BackdropColours = StoreColours(game.Store) };
+        }
 
+        var (cover, icon, colours) = Pictures(game);
         return new()
         {
             Game = game,
             Cover = cover,
             Icon = icon,
             Background = StoreBrushes[game.Store],
-            BackdropColours = Palette.Colours(cover ?? icon) ?? StoreColours(game.Store)
+            BackdropColours = colours,
+            IsLoaded = true
         };
+    }
+
+    /// <summary>The tile's cover or icon, decoded, and the colours taken from it. Safe off the UI thread.</summary>
+    public static (ImageSource? Cover, ImageSource? Icon, (Color From, Color To) Colours) Pictures(Game game)
+    {
+        // A cover fetched on an earlier run is on disk already, so the tile opens with it.
+        var cover = (game.CoverPath ?? Artwork.CachedCover(game)) is { } path ? LoadCover(path) : null;
+        var icon = cover is null && game.IconPath is not null ? LoadIcon(game.IconPath) : null;
+        return (cover, icon, Palette.Colours(cover ?? icon) ?? StoreColours(game.Store));
+    }
+
+    /// <summary>Shows pictures from <see cref="Pictures"/> on a tile that was made without them. UI thread only.</summary>
+    public void Load((ImageSource? Cover, ImageSource? Icon, (Color From, Color To) Colours) pictures)
+    {
+        Cover = pictures.Cover;
+        Icon = pictures.Icon;
+        BackdropColours = pictures.Colours;
+        IsLoaded = true;
+        CoverChanged();
+    }
+
+    /// <summary>Lets go of the pictures of a game that is not installed. Installed games keep theirs.</summary>
+    public void Unload()
+    {
+        if (IsInstalled || !IsLoaded)
+        {
+            return;
+        }
+
+        Cover = null;
+        Icon = null;
+        IsLoaded = false;
+        CoverChanged();
     }
 
     /// <summary>
@@ -93,6 +139,7 @@ internal sealed class GameTile : INotifyPropertyChanged
     public void ShowCover(ImageSource cover, (Color From, Color To)? colours)
     {
         Cover = cover;
+        IsLoaded = true;
         BackdropColours = colours ?? BackdropColours;
         CoverChanged();
     }

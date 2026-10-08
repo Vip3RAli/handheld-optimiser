@@ -46,10 +46,14 @@ public partial class LibraryWindow : Window
 
         // Closing the library also ends what was changed for a game: its profile and closed programs.
         Closed += (_, _) => EndSession();
+        Closed += (_, _) => StopWatchingScreens();
+        Closed += (_, _) => StopWatchingWake();
 
         // Scan on load, not only on activation: Windows can start the home app without giving it focus.
         Loaded += (_, _) => _ = ScanAsync();
         Loaded += (_, _) => _ = CheckForUpdateAsync();
+        Loaded += (_, _) => WatchScreens();
+        SourceInitialized += (_, _) => WatchWake();
         Activated += OnActivated;
         Deactivated += OnDeactivated;
         PreviewKeyDown += OnKeyDown;
@@ -58,6 +62,9 @@ public partial class LibraryWindow : Window
     /// <summary>Brings the library to the front; called when the home button starts a second instance.</summary>
     public void ShowLibrary()
     {
+        // The player asked for the library, so waking up does not send them back to their game.
+        _wokeAt = null;
+
         if (WindowState == WindowState.Minimized)
         {
             WindowState = WindowState.Maximized;
@@ -69,6 +76,9 @@ public partial class LibraryWindow : Window
 
     private void OnActivated(object? sender, EventArgs e)
     {
+        // Just woken with a game running: straight back to it.
+        _ = ResumeGameAsync();
+
         _gamepad.Start();
         _background = LibrarySettings.Background;
         _strength = LibrarySettings.Strength;
@@ -79,6 +89,16 @@ public partial class LibraryWindow : Window
         _showHidden = LibrarySettings.ShowHidden;
         _sort = LibrarySettings.Sort;
         OptionsHint.Visibility = _quickActions ? Visibility.Visible : Visibility.Collapsed;
+
+        // Changed in another session, or a screen plugged in while a game was in front.
+        var layoutChanged = LayoutChanged();
+        if (_continuePlaying != LibrarySettings.ContinuePlaying || layoutChanged)
+        {
+            _continuePlaying = LibrarySettings.ContinuePlaying;
+            ApplyLayout();
+        }
+
+        ShowContinueArt();
 
         // Switched in the main app or another session: the strip follows on the next look at the tiles.
         if (_showFilter != LibrarySettings.ShowFilter)
@@ -110,6 +130,8 @@ public partial class LibraryWindow : Window
         StatusText.Text = string.Empty;
         CloseMenu();
         ClearBackdrop();
+        ClearContinueArt();
+        UnloadNotInstalled();
 
         // Once the rendering of the focus change has gone out, nothing here is needed until we are back.
         Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, Native.TrimWorkingSet);
@@ -159,44 +181,56 @@ public partial class LibraryWindow : Window
 
         RestoreFocus();
         _ = FetchCoversAsync();
+        _ = RefreshOwnedAsync(force: false);
     }
 
-    /// <summary>A tab of the filter strip: every game, the favourites, or one store's games.</summary>
-    private readonly record struct TileFilter(GameStore? Store, bool Favourites)
+    /// <summary>
+    /// A tab of the filter strip: every installed game, the favourites, one store's games, or the games
+    /// owned but not installed.
+    /// </summary>
+    private readonly record struct TileFilter(GameStore? Store, bool Favourites, bool NotInstalled = false)
     {
         public static readonly TileFilter All = default;
         public static readonly TileFilter Starred = new(null, true);
+        public static readonly TileFilter Uninstalled = new(null, false, true);
 
-        public string Name => Favourites ? "Favourites" : Store is { } store ? Game.NameOf(store) : "All";
+        public string Name => NotInstalled ? "Not installed" : Favourites ? "Favourites" : Store is { } store ? Game.NameOf(store) : "All";
 
-        public bool Shows(GameTile tile) => Favourites ? tile.IsFavourite : Store is not { } store || tile.Game.Store == store;
+        public bool Shows(GameTile tile) => NotInstalled ? !tile.IsInstalled
+            : tile.IsInstalled && (Favourites ? tile.IsFavourite : Store is not { } store || tile.Game.Store == store);
     }
 
     /// <summary>The games the grid can show: all but the hidden ones, unless those are shown too.</summary>
     private IEnumerable<GameTile> ShownTiles() => _showHidden ? _allTiles : _allTiles.Where(t => !t.IsHidden);
 
     /// <summary>
-    /// The tabs of the filter strip, in order, or none when the strip is off or would only have All:
-    /// Favourites once a game is starred, and a tab per store when games come from more than one.
+    /// The tabs of the filter strip, in order, or none when it would only have All: Favourites once a game
+    /// is starred, and a tab per store when games come from more than one, while the store filter is on;
+    /// and Not installed, whenever there are owned games that are not installed.
     /// </summary>
     private List<TileFilter> FilterOptions()
     {
-        if (!_showFilter)
-        {
-            return [];
-        }
-
         var shown = ShownTiles().ToList();
+        var installed = shown.Where(t => t.IsInstalled).ToList();
         var options = new List<TileFilter> { TileFilter.All };
-        if (shown.Any(t => t.IsFavourite))
+
+        if (_showFilter)
         {
-            options.Add(TileFilter.Starred);
+            if (installed.Any(t => t.IsFavourite))
+            {
+                options.Add(TileFilter.Starred);
+            }
+
+            var stores = installed.Select(t => t.Game.Store).Distinct().Order().ToList();
+            if (stores.Count > 1)
+            {
+                options.AddRange(stores.Select(store => new TileFilter(store, false)));
+            }
         }
 
-        var stores = shown.Select(t => t.Game.Store).Distinct().Order().ToList();
-        if (stores.Count > 1)
+        if (installed.Count < shown.Count)
         {
-            options.AddRange(stores.Select(store => new TileFilter(store, false)));
+            options.Add(TileFilter.Uninstalled);
         }
 
         return options.Count > 1 ? options : [];
@@ -223,7 +257,18 @@ public partial class LibraryWindow : Window
         // Favourites first, each group in the chosen order.
         _tiles = Sorted(ShownTiles().Where(_filter.Shows)).OrderByDescending(t => t.IsFavourite).ToList();
         Tiles.ItemsSource = _tiles;
-        CountText.Text = _tiles.Count == 1 ? "1 game" : $"{_tiles.Count} games";
+        CountText.Text = _filter.NotInstalled ? $"{_tiles.Count} not installed"
+            : _tiles.Count == 1 ? "1 game"
+            : $"{_tiles.Count} games";
+        AcceptHint.Text = _filter.NotInstalled ? "Install" : "Play";
+
+        // The pictures of games that are not installed are only kept while their tab is open.
+        if (!_filter.NotInstalled)
+        {
+            UnloadNotInstalled();
+        }
+
+        UpdateContinue();
         UpdateEmptyText();
     }
 
@@ -235,7 +280,7 @@ public partial class LibraryWindow : Window
             return;
         }
 
-        EmptyText.Text = _allTiles.Count == 0
+        EmptyText.Text = _allTiles.All(t => !t.IsInstalled) && !_filter.NotInstalled
             ? "No installed games were found in Steam, Xbox, Epic Games, Battle.net, GOG, the EA App or Ubisoft Connect.\nInstall a game or add a program under Settings, then press Y and choose Refresh library."
             : _tiles.Count == 0 ? "Every game is hidden. Switch on Show hidden games under Settings, Display to bring them back."
             : string.Empty;
@@ -289,13 +334,24 @@ public partial class LibraryWindow : Window
         // Wait for the item containers to exist after ItemsSource changes.
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
         {
+            // Back on the Continue playing card or tile it was on, when that game is still there.
+            if (_focusInContinue && ContinueButtons().Find(b => b.DataContext is GameTile t && t.Game.Key == _focusedKey) is { } button)
+            {
+                button.Focus();
+                QueueBackdrop((GameTile)button.DataContext);
+                return;
+            }
+
             var index = Math.Max(0, _tiles.FindIndex(t => t.Game.Key == _focusedKey));
             FocusTile(index);
 
-            // A tile that kept the focus raises no focus event, and its background may have been released.
+            // A tile that kept the focus raises no focus event, and its background (or its pictures, for a
+            // game that is not installed) may have been released.
             if (index < _tiles.Count)
             {
                 QueueBackdrop(_tiles[index]);
+                ShowRowDetails(_tiles[index]);
+                LoadNotInstalledNear(index);
             }
         });
     }
@@ -309,6 +365,19 @@ public partial class LibraryWindow : Window
 
         _launchBlockedUntil = DateTime.UtcNow + LaunchCooldown;
         _focusedKey = tile.Game.Key;
+
+        // A game that is not installed opens its store's install page, with nothing else to set up.
+        if (!tile.IsInstalled)
+        {
+            var problem = GameCatalog.Launch(tile.Game);
+            StatusText.Text = problem ?? $"Opening {Game.NameOf(tile.Game.Store)} to install {tile.Title}...";
+            if (problem is not null)
+            {
+                _launchBlockedUntil = DateTime.MinValue;
+            }
+
+            return;
+        }
 
         // The last game's profile never carries over to the next game.
         RestoreProfileSettings();

@@ -97,6 +97,17 @@ internal static class GameCatalog
             Program.Log($"Scanning the ROM folders failed: {ex.GetType().Name}: {ex.Message}");
         }
 
+        // Games the player owns but has not installed, for their own tab. Only the stores' own lists are
+        // read here; asking Steam for its list happens separately, as it goes over the network.
+        if (LibrarySettings.ShowNotInstalled)
+        {
+            var installed = new HashSet<string>(games.Keys, StringComparer.OrdinalIgnoreCase);
+            foreach (var game in OwnedGames.NotInstalled(installed))
+            {
+                games.TryAdd(game.Key, game);
+            }
+        }
+
         var history = ReadHistory();
         return games.Values
             .OrderByDescending(g => history.GetValueOrDefault(g.Key))
@@ -104,12 +115,15 @@ internal static class GameCatalog
             .ToList();
     }
 
+    /// <summary>Starts an installed game, or opens the store's install page for one that is not installed.</summary>
     /// <returns>An error message, or null when the game was started.</returns>
     public static string? Launch(Game game)
     {
         try
         {
-            var arguments = new[] { game.LaunchArguments, CustomArguments(game) }.Where(a => !string.IsNullOrWhiteSpace(a));
+            var arguments = game.Installed
+                ? new[] { game.LaunchArguments, CustomArguments(game) }.Where(a => !string.IsNullOrWhiteSpace(a))
+                : [];
 
             Process.Start(new ProcessStartInfo(game.LaunchTarget)
             {
@@ -121,7 +135,15 @@ internal static class GameCatalog
         catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or FileNotFoundException)
         {
             Program.Log($"Failed to launch {game.Key} ({game.LaunchTarget}): {ex.Message}");
-            return $"{game.Title} could not be started: {ex.Message}";
+            return game.Installed
+                ? $"{game.Title} could not be started: {ex.Message}"
+                : $"{game.StoreName} could not be opened to install {game.Title}: {ex.Message}";
+        }
+
+        if (!game.Installed)
+        {
+            Program.Log($"Opened the install page for {game.Key}");
+            return null;
         }
 
         Program.Log($"Launched {game.Key}");

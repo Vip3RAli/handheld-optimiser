@@ -87,6 +87,46 @@ internal sealed class GameSession
         }
     }
 
+    /// <summary>
+    /// The game's main window, to put back in front after the device wakes, or 0 when none of its
+    /// processes has one. Call it off the UI thread.
+    /// </summary>
+    public nint MainWindow()
+    {
+        if (_folder is null)
+        {
+            return 0;
+        }
+
+        var running = Find(_folder);
+        try
+        {
+            foreach (var process in running)
+            {
+                try
+                {
+                    if (process.MainWindowHandle != 0)
+                    {
+                        return process.MainWindowHandle;
+                    }
+                }
+                catch (InvalidOperationException)
+                {
+                    // Closed since it was found.
+                }
+            }
+
+            return 0;
+        }
+        finally
+        {
+            foreach (var process in running)
+            {
+                process.Dispose();
+            }
+        }
+    }
+
     /// <summary>Stops following the game, for when another game starts or the library closes.</summary>
     public void Stop() => _stop.Cancel();
 

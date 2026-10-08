@@ -46,6 +46,12 @@
                                         </StackPanel>
                                     </Grid>
                                 </Border>
+                                <!-- Games that are not installed wear a download mark. -->
+                                <Border x:Name="InstallMark" Width="34" Height="34" CornerRadius="17" Margin="8" Background="#D0101216"
+                                        HorizontalAlignment="Left" VerticalAlignment="Bottom" Visibility="Collapsed">
+                                    <TextBlock Text="&#xE896;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
                                 <!-- Favourites wear a star in the corner. -->
                                 <Border Width="34" Height="34" CornerRadius="17" Margin="8" Background="#B0101216"
                                         HorizontalAlignment="Right" VerticalAlignment="Top"
@@ -65,6 +71,10 @@
                             <DataTrigger Binding="{Binding IsHidden}" Value="True">
                                 <Setter TargetName="Art" Property="Opacity" Value="0.4" />
                             </DataTrigger>
+                            <DataTrigger Binding="{Binding IsInstalled}" Value="False">
+                                <Setter TargetName="Art" Property="Opacity" Value="0.6" />
+                                <Setter TargetName="InstallMark" Property="Visibility" Value="Visible" />
+                            </DataTrigger>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Ring" Property="Opacity" Value="0.45" />
                             </Trigger>
@@ -82,6 +92,53 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- The Continue playing card: a wide tile with the same focus ring and lift as the others. -->
+        <Style x:Key="CardButton" TargetType="Button">
+            <Setter Property="Margin" Value="10" />
+            <Setter Property="Foreground" Value="#F2F3F5" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+            <Setter Property="RenderTransform">
+                <Setter.Value>
+                    <ScaleTransform />
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <ContentPresenter />
+                            <Border x:Name="Ring" CornerRadius="10" Margin="-4" BorderThickness="3"
+                                    BorderBrush="#F2F3F5" Opacity="0" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Ring" Property="Opacity" Value="0.45" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Ring" Property="Opacity" Value="1" />
+                                <Setter Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleX="1.03" ScaleY="1.03" />
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter Property="Panel.ZIndex" Value="1" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- The two layouts: a grid that scrolls down, and one row that scrolls across. -->
+        <ItemsPanelTemplate x:Key="GridPanel">
+            <WrapPanel />
+        </ItemsPanelTemplate>
+        <ItemsPanelTemplate x:Key="RowPanel">
+            <StackPanel Orientation="Horizontal" />
+        </ItemsPanelTemplate>
 
         <!-- Controller button hint: a round glyph and its label. -->
         <Style x:Key="HintGlyph" TargetType="Border">
@@ -211,22 +268,25 @@
     </Window.Resources>
 
     <Grid>
+        <!--
+            The focused game's background, as a finished picture the size of the screen (see Backdrops):
+            its colours or its artwork, with the shade that keeps tiles and text readable already in it.
+            Two layers, so a new one can fade in over the old. Drawn pixel for pixel, never scaled, so they
+            sit outside the part that docked mode makes bigger.
+        -->
+        <Rectangle x:Name="BackdropBack" Opacity="0" IsHitTestVisible="False"
+                   RenderOptions.BitmapScalingMode="NearestNeighbor" />
+        <Rectangle x:Name="BackdropFront" Opacity="0" IsHitTestVisible="False"
+                   RenderOptions.BitmapScalingMode="NearestNeighbor" />
+
+        <!-- Everything else, drawn bigger on a TV or monitor by docked mode. -->
+        <Grid x:Name="ScaledContent">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-
-        <!--
-            The focused game's background, as a finished picture the size of the screen (see Backdrops):
-            its colours or its artwork, with the shade that keeps tiles and text readable already in it.
-            Two layers, so a new one can fade in over the old. Drawn pixel for pixel, never scaled.
-        -->
-        <Rectangle x:Name="BackdropBack" Grid.RowSpan="4" Opacity="0" IsHitTestVisible="False"
-                   RenderOptions.BitmapScalingMode="NearestNeighbor" />
-        <Rectangle x:Name="BackdropFront" Grid.RowSpan="4" Opacity="0" IsHitTestVisible="False"
-                   RenderOptions.BitmapScalingMode="NearestNeighbor" />
 
         <Grid Grid.Row="0" Margin="48,32,48,12">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
@@ -303,22 +363,85 @@
             </StackPanel>
         </StackPanel>
 
+        <!-- The row layout's details of the focused game, in the space the single row leaves above it. -->
+        <StackPanel x:Name="RowDetails" Grid.Row="2" Margin="48,24,48,0" VerticalAlignment="Top" Visibility="Collapsed">
+            <TextBlock x:Name="RowTitle" FontSize="40" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+            <TextBlock x:Name="RowDetail" Margin="0,6,0,0" FontSize="17" Opacity="0.75" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+
         <ScrollViewer x:Name="Scroller" Grid.Row="2" VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly"
                       Padding="38,4,38,24" Focusable="False">
-            <ItemsControl x:Name="Tiles" Focusable="False" KeyboardNavigation.DirectionalNavigation="Contained">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <!-- Press and hold arrives as a right click, so touch reaches the quick actions too. -->
-                        <Button Style="{StaticResource TileButton}" Click="OnTileClick" GotKeyboardFocus="OnTileFocused"
-                                MouseRightButtonUp="OnTileRightClick" />
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+            <StackPanel>
+                <!--
+                    Continue playing: the last game played as a wide card, and the few before it, above the
+                    grid. Only in the grid layout, on the All tab.
+                -->
+                <StackPanel x:Name="ContinuePanel" Visibility="Collapsed">
+                    <TextBlock Text="Continue playing" Margin="10,0,0,2" FontSize="18" FontWeight="SemiBold" Opacity="0.85" />
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="ContinueCard" Style="{StaticResource CardButton}" Click="OnTileClick"
+                                GotKeyboardFocus="OnTileFocused" MouseRightButtonUp="OnTileRightClick">
+                            <Grid Width="560" Height="270">
+                                <Border x:Name="ContinueBack" CornerRadius="8" ClipToBounds="True">
+                                    <Image x:Name="ContinueArt" Stretch="UniformToFill" Opacity="0.6"
+                                           RenderOptions.BitmapScalingMode="HighQuality" />
+                                </Border>
+                                <Border CornerRadius="8">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                            <GradientStop Color="#C0000000" Offset="0" />
+                                            <GradientStop Color="#00000000" Offset="1" />
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                                <StackPanel Orientation="Horizontal" Margin="16">
+                                    <Border Width="159" Height="238" CornerRadius="6" ClipToBounds="True" Background="{Binding Background}">
+                                        <Grid>
+                                            <Image Source="{Binding Cover}" Stretch="UniformToFill"
+                                                   RenderOptions.BitmapScalingMode="HighQuality" />
+                                            <Image Source="{Binding Icon}" Width="72" Height="72"
+                                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                                   Visibility="{Binding ShowsIcon, Converter={StaticResource BoolToVis}}" />
+                                        </Grid>
+                                    </Border>
+                                    <StackPanel Width="340" Margin="20,0,0,4" VerticalAlignment="Bottom">
+                                        <TextBlock Text="{Binding Title}" FontSize="26" FontWeight="SemiBold"
+                                                   TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="72" />
+                                        <TextBlock Text="{Binding StoreName}" Margin="0,4,0,0" FontSize="14" Opacity="0.7" />
+                                        <TextBlock x:Name="ContinueDetail" Margin="0,2,0,0" FontSize="14" Opacity="0.7"
+                                                   TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+                        <ItemsControl x:Name="RecentTiles" Focusable="False">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Style="{StaticResource TileButton}" Click="OnTileClick" GotKeyboardFocus="OnTileFocused"
+                                            MouseRightButtonUp="OnTileRightClick" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                    <TextBlock Text="All games" Margin="10,14,0,2" FontSize="18" FontWeight="SemiBold" Opacity="0.85" />
+                </StackPanel>
+
+                <ItemsControl x:Name="Tiles" Focusable="False" KeyboardNavigation.DirectionalNavigation="Contained"
+                              ItemsPanel="{StaticResource GridPanel}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <!-- Press and hold arrives as a right click, so touch reaches the quick actions too. -->
+                            <Button Style="{StaticResource TileButton}" Click="OnTileClick" GotKeyboardFocus="OnTileFocused"
+                                    MouseRightButtonUp="OnTileRightClick" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
         </ScrollViewer>
 
         <TextBlock x:Name="EmptyText" Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -330,7 +453,7 @@
                 <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
                     <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
-                <TextBlock Text="Play" FontSize="15" VerticalAlignment="Center" />
+                <TextBlock x:Name="AcceptHint" Text="Play" FontSize="15" VerticalAlignment="Center" />
                 <StackPanel x:Name="OptionsHint" Orientation="Horizontal">
                     <Border Style="{StaticResource HintGlyph}" Background="#2F6FD0">
                         <TextBlock Text="X" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
@@ -366,6 +489,9 @@
                     <TextBlock x:Name="MenuStore" Margin="0,2,0,18" FontSize="13" Opacity="0.55" />
 
                     <StackPanel x:Name="GameItems">
+                        <!-- Only for a game that is not installed, which has none of the other rows but Hide. -->
+                        <Button x:Name="InstallItem" Style="{StaticResource MenuButton}" Content="Install"
+                                Visibility="Collapsed" Click="OnInstall" />
                         <Button x:Name="FavouriteItem" Style="{StaticResource MenuButton}" Click="OnToggleFavourite" />
                         <Button x:Name="ProfileItem" Style="{StaticResource MenuButton}" Content="Game profile"
                                 Click="OnOpenProfile" />
@@ -398,11 +524,15 @@
                         <Button x:Name="BackgroundGroup" Style="{StaticResource MenuButton}" Content="Background"
                                 Tag="Artwork, colours and blur" Click="OnOpenBackgroundSettings" />
                         <Button x:Name="DisplayGroup" Style="{StaticResource MenuButton}" Content="Display"
-                                Tag="Sort order, battery and Wi-Fi, store filter, quick actions and hidden games" Click="OnOpenDisplaySettings" />
+                                Tag="Layout, Continue playing, sort order, store filter, quick actions and hidden games" Click="OnOpenDisplaySettings" />
+                        <Button x:Name="TvGroup" Style="{StaticResource MenuButton}" Content="TV and monitor"
+                                Tag="A bigger layout when the library is on a TV or monitor" Click="OnOpenTvSettings" />
+                        <Button x:Name="OwnedGroup" Style="{StaticResource MenuButton}" Content="Games not installed"
+                                Tag="The games you own on Steam, Epic and GOG, ready to install" Click="OnOpenOwnedSettings" />
                         <Button x:Name="AddProgramGroup" Style="{StaticResource MenuButton}" Content="Add a program"
                                 Tag="Emulators and games from other stores" Click="OnOpenAddProgram" />
                         <Button x:Name="WhilePlayingGroup" Style="{StaticResource MenuButton}" Content="While playing"
-                                Tag="Close background programs and store apps around games" Click="OnOpenWhilePlaying" />
+                                Tag="Background programs, store apps, and your game after sleep" Click="OnOpenWhilePlaying" />
                         <Button x:Name="EmulatorsGroup" Style="{StaticResource MenuButton}" Content="Emulators"
                                 Tag="ROM folders, and which emulator plays each console" Click="OnOpenEmulators" />
                         <Button x:Name="MaintenanceGroup" Style="{StaticResource MenuButton}" Content="Maintenance"
@@ -453,6 +583,10 @@
 
                     <!-- What the library shows and which buttons it offers. A switches a row on or off. -->
                     <StackPanel x:Name="DisplayItems" Visibility="Collapsed">
+                        <Button x:Name="LayoutSetting" Style="{StaticResource MenuButton}" Content="Layout"
+                                Click="OnStepLayout" />
+                        <Button x:Name="ContinueSetting" Style="{StaticResource MenuButton}" Content="Continue playing"
+                                Click="OnToggleContinue" />
                         <Button x:Name="StatusSetting" Style="{StaticResource MenuButton}" Content="Battery and Wi-Fi"
                                 Click="OnToggleStatus" />
                         <Button x:Name="FilterSetting" Style="{StaticResource MenuButton}" Content="Store filter"
@@ -512,6 +646,8 @@
                                 Click="OnStepBrightness" />
                         <Button x:Name="PowerModeSetting" Style="{StaticResource MenuButton}" Content="Power mode"
                                 Click="OnStepPowerMode" />
+                        <Button x:Name="ResolutionSetting" Style="{StaticResource MenuButton}" Content="Resolution"
+                                Click="OnStepResolution" />
                         <Button x:Name="RefreshRateSetting" Style="{StaticResource MenuButton}" Content="Refresh rate"
                                 Click="OnStepRefreshRate" />
                         <Button x:Name="CloseAppsNowItem" Style="{StaticResource MenuButton}" Content="Close background programs"
@@ -539,6 +675,8 @@
                     <StackPanel x:Name="ProfileItems" Visibility="Collapsed">
                         <Button x:Name="ProfilePowerSetting" Style="{StaticResource MenuButton}" Content="Power mode"
                                 Click="OnStepProfilePower" />
+                        <Button x:Name="ProfileResolutionSetting" Style="{StaticResource MenuButton}" Content="Resolution"
+                                Click="OnStepProfileResolution" />
                         <Button x:Name="ProfileRefreshSetting" Style="{StaticResource MenuButton}" Content="Refresh rate"
                                 Click="OnStepProfileRefresh" />
                         <Button x:Name="ProfileBrightnessSetting" Style="{StaticResource MenuButton}" Content="Brightness"
@@ -596,6 +734,8 @@
                                 Click="OnStepStoreClosing" />
                         <Button x:Name="StoreStartupItem" Style="{StaticResource MenuButton}" Content="Store apps at startup"
                                 Tag="Stop Steam, Epic and the rest starting with Windows" Click="OnOpenStoreStartup" />
+                        <Button x:Name="ResumeSetting" Style="{StaticResource MenuButton}" Content="Back to your game after sleep"
+                                Click="OnToggleResume" />
                         <!-- For touch, which has no B button. -->
                         <Button Style="{StaticResource MenuButton}" Content="Back" Tag="Settings" Click="OnSettingsBack" />
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
@@ -717,6 +857,54 @@
                         </StackPanel>
                     </StackPanel>
 
+                    <!-- Docked mode: a layout and size of its own on a TV or monitor. -->
+                    <StackPanel x:Name="TvItems" Visibility="Collapsed">
+                        <Button x:Name="DockedSetting" Style="{StaticResource MenuButton}" Content="Docked mode"
+                                Click="OnToggleDocked" />
+                        <Button x:Name="DockedLayoutSetting" Style="{StaticResource MenuButton}" Content="Layout on a TV"
+                                Click="OnStepDockedLayout" />
+                        <Button x:Name="DockedSizeSetting" Style="{StaticResource MenuButton}" Content="Size on a TV"
+                                Click="OnStepDockedSize" />
+                        <!-- For touch, which has no B button. -->
+                        <Button Style="{StaticResource MenuButton}" Content="Back" Tag="Settings" Click="OnSettingsBack" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                            <Border Style="{StaticResource BumperGlyph}" Margin="22,0,8,0">
+                                <TextBlock Text="&#x25C0; &#x25B6;" FontSize="11" FontWeight="Bold" />
+                            </Border>
+                            <TextBlock Text="Adjust" FontSize="15" VerticalAlignment="Center" />
+                            <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                                <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Change" FontSize="15" VerticalAlignment="Center" />
+                            <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                                <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Owned games that are not installed, in a tab of their own. -->
+                    <StackPanel x:Name="OwnedItems" Visibility="Collapsed">
+                        <Button x:Name="NotInstalledSetting" Style="{StaticResource MenuButton}" Content="Show games not installed"
+                                Click="OnToggleNotInstalled" />
+                        <Button x:Name="SteamKeySetting" Style="{StaticResource MenuButton}" Content="Steam Web API key"
+                                Click="OnEditSteamKey" />
+                        <Button x:Name="OwnedRefreshItem" Style="{StaticResource MenuButton}" Content="Look again"
+                                Tag="Ask Steam for your games now, and read Epic and GOG Galaxy again" Click="OnRefreshOwned" />
+                        <!-- For touch, which has no B button. -->
+                        <Button Style="{StaticResource MenuButton}" Content="Back" Tag="Settings" Click="OnSettingsBack" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                            <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                                <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Select" FontSize="15" VerticalAlignment="Center" />
+                            <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                                <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </StackPanel>
+
                     <StackPanel x:Name="TextEditor" Visibility="Collapsed">
                         <TextBlock x:Name="EditorTitle" FontSize="16" FontWeight="SemiBold" />
                         <TextBlock x:Name="EditorHint" Margin="0,2,0,12" FontSize="12.5" Opacity="0.6" TextWrapping="Wrap" />
@@ -733,6 +921,7 @@
                 </StackPanel>
                 </ScrollViewer>
             </Border>
+        </Grid>
         </Grid>
     </Grid>
 </Window>

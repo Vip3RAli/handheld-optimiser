@@ -9,12 +9,14 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 /// </summary>
 /// <param name="CloseApps">Whether to close the background programs for this game, whatever the library's
 /// own setting. Null follows that setting.</param>
-internal sealed record GameProfile(PowerMode? PowerMode, int? RefreshRate, int? Brightness, bool? CloseApps = null)
+/// <param name="Resolution">The screen size to play at, such as 1280 x 720 to stretch the battery.</param>
+internal sealed record GameProfile(PowerMode? PowerMode, int? RefreshRate, int? Brightness, bool? CloseApps = null,
+    Resolution? Resolution = null)
 {
     public static readonly GameProfile None = new(null, null, null);
 
     /// <summary>Whether it changes any of the device's settings, which are put back after the game.</summary>
-    public bool IsEmpty => PowerMode is null && RefreshRate is null && Brightness is null;
+    public bool IsEmpty => PowerMode is null && RefreshRate is null && Brightness is null && Resolution is null;
 
     /// <summary>A one-line summary for the quick actions menu.</summary>
     public string Describe()
@@ -23,6 +25,11 @@ internal sealed record GameProfile(PowerMode? PowerMode, int? RefreshRate, int? 
         if (PowerMode is { } mode)
         {
             parts.Add(PowerModes.Name(mode));
+        }
+
+        if (Resolution is { } size)
+        {
+            parts.Add(size.ToString());
         }
 
         if (RefreshRate is { } hertz)
@@ -44,7 +51,7 @@ internal sealed record GameProfile(PowerMode? PowerMode, int? RefreshRate, int? 
     }
 }
 
-/// <summary>Each game's profile, one value per game key, as "power=performance;hz=60;brightness=50".</summary>
+/// <summary>Each game's profile, one value per game key, as "power=performance;res=1280x720;hz=60;brightness=50".</summary>
 internal static class GameProfiles
 {
     private const string ProfilesKey = Program.SettingsKey + @"\Profiles";
@@ -62,12 +69,14 @@ internal static class GameProfiles
             return GameProfile.None;
         }
 
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return GameProfile.None;
-        }
+        return string.IsNullOrWhiteSpace(text) ? GameProfile.None : Parse(text);
+    }
 
+    /// <summary>A profile from its stored text. Parts that cannot be read are left as Don't change.</summary>
+    public static GameProfile Parse(string text)
+    {
         PowerMode? mode = null;
+        Resolution? resolution = null;
         int? hertz = null;
         int? brightness = null;
         bool? closeApps = null;
@@ -79,6 +88,9 @@ internal static class GameProfiles
             {
                 case "power" when Enum.TryParse<PowerMode>(value, ignoreCase: true, out var parsed) && Enum.IsDefined(parsed):
                     mode = parsed;
+                    break;
+                case "res" when Resolution.Parse(value) is { } parsed:
+                    resolution = parsed;
                     break;
                 case "hz" when int.TryParse(value, out var parsed) && parsed > 1:
                     hertz = parsed;
@@ -92,16 +104,21 @@ internal static class GameProfiles
             }
         }
 
-        return new GameProfile(mode, hertz, brightness, closeApps);
+        return new GameProfile(mode, hertz, brightness, closeApps, resolution);
     }
 
-    /// <returns>False when the profile could not be stored.</returns>
-    public static bool Save(Game game, GameProfile profile)
+    /// <summary>A profile as stored text, empty when it changes nothing.</summary>
+    public static string Format(GameProfile profile)
     {
         var parts = new List<string>();
         if (profile.PowerMode is { } mode)
         {
             parts.Add($"power={mode.ToString().ToLowerInvariant()}");
+        }
+
+        if (profile.Resolution is { } size)
+        {
+            parts.Add($"res={size.Key}");
         }
 
         if (profile.RefreshRate is { } hertz)
@@ -119,16 +136,23 @@ internal static class GameProfiles
             parts.Add($"closeapps={(close ? "on" : "off")}");
         }
 
+        return string.Join(';', parts);
+    }
+
+    /// <returns>False when the profile could not be stored.</returns>
+    public static bool Save(Game game, GameProfile profile)
+    {
+        var text = Format(profile);
         try
         {
             using var key = Registry.CurrentUser.CreateSubKey(ProfilesKey);
-            if (parts.Count == 0)
+            if (text.Length == 0)
             {
                 key.DeleteValue(game.Key, throwOnMissingValue: false);
             }
             else
             {
-                key.SetValue(game.Key, string.Join(';', parts), RegistryValueKind.String);
+                key.SetValue(game.Key, text, RegistryValueKind.String);
             }
 
             return true;

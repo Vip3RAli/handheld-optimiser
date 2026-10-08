@@ -28,6 +28,9 @@ public enum GameStore
 /// <param name="ExecutablePath">The game's own exe, when the store records it (Steam does not).</param>
 /// <param name="HeroPath">Wide artwork for the library's background, when the store keeps one locally.</param>
 /// <param name="Platform">The console an emulator game is for, shown in place of the store's name.</param>
+/// <param name="Installed">False for a game the player owns but has not installed. Its launch target
+/// then opens the store's install page for it.</param>
+/// <param name="CoverUrl">Where the store keeps a cover for a game that is not installed.</param>
 public sealed record Game(
     string Key,
     string Title,
@@ -40,7 +43,9 @@ public sealed record Game(
     string? InstallDirectory = null,
     string? ExecutablePath = null,
     string? HeroPath = null,
-    string? Platform = null)
+    string? Platform = null,
+    bool Installed = true,
+    string? CoverUrl = null)
 {
     public string StoreName => Platform ?? NameOf(Store);
 
