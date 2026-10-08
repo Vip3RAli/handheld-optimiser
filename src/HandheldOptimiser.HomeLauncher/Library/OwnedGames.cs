@@ -333,7 +333,7 @@ internal static class OwnedGames
     }
 
     /// <summary>The Steam id of the account signed in now, or else of the one that signed in last.</summary>
-    private static ulong? SteamAccount()
+    public static ulong? SteamAccount()
     {
         try
         {
