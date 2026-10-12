@@ -79,18 +79,18 @@ public partial class LibraryWindow
         {
             case PauseOutcome.Paused:
                 WatchForeground();
-                StatusText.Text = $"{title} is paused. Press A on it to carry on.";
+                Notice = $"{title} is paused. Press A on it to carry on.";
                 RefreshPausedGame();
                 break;
 
             case PauseOutcome.AntiCheat when !ReferenceEquals(_toldNotPaused, session):
                 _toldNotPaused = session;
-                StatusText.Text = $"{title} keeps running behind the library: it uses {session.AntiCheat}, which pausing could trip.";
+                Notice = $"{title} keeps running behind the library: it uses {session.AntiCheat}, which pausing could trip.";
                 break;
 
             case PauseOutcome.Refused when !ReferenceEquals(_toldNotPaused, session):
                 _toldNotPaused = session;
-                StatusText.Text = $"{title} keeps running behind the library: Windows would not let it be paused.";
+                Notice = $"{title} keeps running behind the library: Windows would not let it be paused.";
                 break;
         }
     }
@@ -151,7 +151,9 @@ public partial class LibraryWindow
         if (_closeArmed is not { } armed || armed.Key != tile.Game.Key || DateTime.UtcNow > armed.Until)
         {
             _closeArmed = (tile.Game.Key, DateTime.UtcNow + CloseArmedFor);
-            StatusText.Text = $"{paused.Game.Title} is paused. Press A again to close it and start {tile.Title}. Anything not saved in it is lost.";
+            // On the card for as long as the second press counts.
+            ShowNotice($"{paused.Game.Title} is paused. Press A again to close it and start {tile.Title}. Anything not saved in it is lost.",
+                tile, CloseArmedFor);
             return;
         }
 
@@ -182,22 +184,15 @@ public partial class LibraryWindow
 
     private async Task CloseGameAsync(GameSession session)
     {
-        StatusText.Text = $"Closing {session.Game.Title}...";
+        Notice = $"Closing {session.Game.Title}...";
         StopWatchingForeground();
         await Task.Run(() => session.Close(CloseWait));
-        StatusText.Text = $"{session.Game.Title} closed.";
+        Notice = $"{session.Game.Title} closed.";
         RefreshPausedGame();
     }
 
-    /// <summary>The game's paused mark, on the Continue playing card and the row layout's details, after it changes.</summary>
-    private void RefreshPausedGame()
-    {
-        UpdateContinue();
-        if (Keyboard.FocusedElement is Button { DataContext: GameTile tile } && _menu is null)
-        {
-            ShowRowDetails(tile);
-        }
-    }
+    /// <summary>The game's paused mark on the Last played card, after it changes.</summary>
+    private void RefreshPausedGame() => UpdateContinue();
 
     /// <summary>Whether this is the game paused right now.</summary>
     private bool IsPausedGame(GameTile tile) => _session is { IsPaused: true } session && session.Game.Key == tile.Game.Key;
@@ -257,9 +252,7 @@ public partial class LibraryWindow
     {
         var running = _session is { StartedAt: not null } session && session.Game.Key == tile.Game.Key;
         CloseGameItem.Visibility = running ? Visibility.Visible : Visibility.Collapsed;
-        CloseGameItem.Tag = ReferenceEquals(_confirming, CloseGameItem) ? "Press again to close it"
-            : IsPausedGame(tile) ? "It's paused. Anything not saved in it is lost"
-            : "Anything not saved in it is lost";
+        CloseGameItem.Tag = ReferenceEquals(_confirming, CloseGameItem) ? "Press again to close it" : null;
     }
 
     private void OnCloseGame(object sender, RoutedEventArgs e)
@@ -273,6 +266,9 @@ public partial class LibraryWindow
         {
             _confirming = CloseGameItem;
             RefreshCloseGameItem(tile);
+
+            // The warning was under the row's name, and is given now, before the press that counts.
+            Notice = "Anything not saved in the game is lost.";
             return;
         }
 
@@ -308,7 +304,5 @@ public partial class LibraryWindow
     }
 
     private void RefreshQuickResumeSetting() =>
-        QuickResumeSetting.Tag = LibrarySettings.QuickResume
-            ? "On: your game pauses while the library is in front, until you pick it again"
-            : "Off: your game keeps running behind the library";
+        QuickResumeSetting.Tag = OnOff(LibrarySettings.QuickResume);
 }

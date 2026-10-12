@@ -139,7 +139,5 @@ public partial class LibraryWindow
     }
 
     private void RefreshResumeSetting() =>
-        ResumeSetting.Tag = LibrarySettings.ResumeAfterSleep
-            ? "On: waking up goes back to the game you were playing"
-            : "Off: waking up stays where you left off";
+        ResumeSetting.Tag = OnOff(LibrarySettings.ResumeAfterSleep);
 }

@@ -16,7 +16,8 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 /// shown behind the grid for the focused game, for players who chose artwork over the default gradient
 /// of the game's colours, and the portrait cover on its tile. Steam keeps both for most of its games;
 /// anything else is fetched when the player has entered an API key, and is kept on disk so each game is
-/// only ever fetched once.
+/// only ever fetched once. The programs listed under Apps are looked up as well, by name, among the
+/// programs SteamGridDB keeps beside its games (see <see cref="ArtworkMatch"/>).
 /// </summary>
 internal static class Artwork
 {
@@ -26,6 +27,14 @@ internal static class Artwork
     // Tiles are two wide by three tall. 600x900 is that shape and what most games have; the others are
     // the portrait sizes SteamGridDB also takes, asked for only when a game has nothing at 600x900.
     private static readonly string[] CoverSizes = ["600x900", "660x930,342x482"];
+
+    // The row layout's tiles are square: the sizes SteamGridDB keeps its square icons at.
+    private const string SquareSizes = "512x512,1024x1024";
+
+    // An app's Old School card takes a landscape picture: the sizes SteamGridDB keeps those at. They
+    // have the program's logo and name on them, where its banner artwork for a program is a plain
+    // backdrop meant to go behind a logo, and says nothing on a card.
+    private const string CapsuleSizes = "920x430,460x215";
 
     // The player's corrections for games SteamGridDB matched wrongly, one value per game key.
     private const string TitlesKey = Program.SettingsKey + @"\ArtworkTitles";
@@ -87,6 +96,13 @@ internal static class Artwork
             // The cover was found under the same title, so it is as wrong as the background was.
             File.Delete(CoverCachePath(game));
             File.Delete(NoCoverPath(game));
+            File.Delete(SquareCachePath(game));
+            File.Delete(NoSquarePath(game));
+            File.Delete(CapsuleCachePath(game));
+            File.Delete(NoCapsulePath(game));
+
+            // The store's details are looked up by the same title.
+            StoreDetails.Forget(game);
             return true;
         }
         catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
@@ -230,6 +246,114 @@ internal static class Artwork
         }
     }
 
+    /// <summary>The square icon already on disk for a game, if it has been fetched.</summary>
+    public static string? CachedSquare(Game game)
+    {
+        var path = SquareCachePath(game);
+        return File.Exists(path) ? path : null;
+    }
+
+    /// <summary>
+    /// The file holding a square icon for the game's tile in the row layout, downloading it first if need
+    /// be. Only SteamGridDB has these, so there is none without a key. Call it off the UI thread.
+    /// </summary>
+    /// <returns>As <see cref="FindCoverAsync"/>.</returns>
+    public static async Task<(string? Path, bool KeyRejected)> FindSquareAsync(Game game)
+    {
+        if (CachedSquare(game) is { } cached)
+        {
+            return (cached, false);
+        }
+
+        if (LibrarySettings.ArtworkKey is not { } apiKey || RecentlyNotFound(NoSquarePath(game)))
+        {
+            return (null, false);
+        }
+
+        try
+        {
+            if (await ArtListAsync(game, "grids", SearchTitle(game), apiKey) is { } grids)
+            {
+                using var list = await GetAsync($"{grids}{ArtFilter}&dimensions={SquareSizes}", apiKey);
+                var path = SquareCachePath(game);
+                if (await SaveFirstAsync(list, path))
+                {
+                    return (path, false);
+                }
+            }
+
+            MarkNotFound(NoSquarePath(game));
+            return (null, false);
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+        {
+            Program.Log($"SteamGridDB did not accept the API key ({(int)ex.StatusCode.Value}), so no icons were fetched.");
+            return (null, true);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException
+            or IOException or UnauthorizedAccessException)
+        {
+            Program.Log($"The icon for {game.Key} could not be fetched: {ex.Message}");
+            return (null, false);
+        }
+    }
+
+    /// <summary>
+    /// The file holding the landscape picture for an app's Old School card, downloading it first if need
+    /// be. Only SteamGridDB has these, so there is none without a key. Call it off the UI thread.
+    /// </summary>
+    /// <returns>The file, or null when there is no such picture or SteamGridDB could not be reached.</returns>
+    public static async Task<string?> FindCapsuleAsync(Game game)
+    {
+        var cached = CapsuleCachePath(game);
+        if (File.Exists(cached))
+        {
+            return cached;
+        }
+
+        if (LibrarySettings.ArtworkKey is not { } apiKey || RecentlyNotFound(NoCapsulePath(game)))
+        {
+            return null;
+        }
+
+        // Moving along the cards asks again while the first answer is on its way, which joins it.
+        var fetch = Fetches.GetOrAdd(game.Key + ":capsule", _ => FetchCapsuleAsync(game, apiKey));
+        try
+        {
+            return await fetch;
+        }
+        finally
+        {
+            Fetches.TryRemove(game.Key + ":capsule", out _);
+        }
+    }
+
+    private static async Task<string?> FetchCapsuleAsync(Game game, string apiKey)
+    {
+        try
+        {
+            if (await ArtListAsync(game, "grids", SearchTitle(game), apiKey) is { } grids)
+            {
+                using var list = await GetAsync($"{grids}{ArtFilter}&dimensions={CapsuleSizes}", apiKey);
+                var path = CapsuleCachePath(game);
+                if (await SaveFirstAsync(list, path))
+                {
+                    return path;
+                }
+            }
+
+            MarkNotFound(NoCapsulePath(game));
+            return null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException
+            or IOException or UnauthorizedAccessException)
+        {
+            // Offline, a rejected key or a full disk: the card keeps its cover, and the next look tries again.
+            Program.Log($"The card picture for {game.Key} could not be fetched: {ex.Message}");
+            return null;
+        }
+    }
+
     // The stores' own image servers, the only places a cover named by a store's game list is fetched from.
     private static readonly string[] StoreImageHosts = ["steamstatic.com", "epicgames.com", "unrealengine.com", "gog.com", "gog-statics.com"];
 
@@ -276,9 +400,9 @@ internal static class Artwork
             return $"{kind}/steam/{game.Key[(game.Key.IndexOf(':') + 1)..]}";
         }
 
-        var term = Uri.EscapeDataString(Clean(corrected ?? game.Title));
-        using var search = await GetAsync($"search/autocomplete/{term}", apiKey);
-        return FirstMatchId(search) is { } id ? $"{kind}/game/{id}" : null;
+        var title = Clean(corrected ?? game.Title);
+        using var search = await GetAsync($"search/autocomplete/{Uri.EscapeDataString(title)}", apiKey);
+        return ArtworkMatch.Pick(Results(search), title, game.IsApp, corrected is not null) is { } id ? $"{kind}/game/{id}" : null;
     }
 
     /// <summary>Saves the best listed picture that downloads and really is a picture.</summary>
@@ -324,9 +448,21 @@ internal static class Artwork
         return JsonDocument.Parse(await response.Content.ReadAsByteArrayAsync());
     }
 
-    private static long? FirstMatchId(JsonDocument? search) =>
-        Data(search).Select(game => game.TryGetProperty("id", out var id) && id.TryGetInt64(out var value) ? value : (long?)null)
-            .FirstOrDefault(id => id is not null);
+    /// <summary>The search's answers, in SteamGridDB's order, less any with no id or name.</summary>
+    private static List<(long Id, string Name)> Results(JsonDocument? search)
+    {
+        var results = new List<(long Id, string Name)>();
+        foreach (var entry in Data(search))
+        {
+            if (entry.TryGetProperty("id", out var id) && id.TryGetInt64(out var value)
+                && entry.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String)
+            {
+                results.Add((value, name.GetString()!));
+            }
+        }
+
+        return results;
+    }
 
     /// <summary>
     /// Best rated first, as SteamGridDB lists them: each one at full size, then its small preview in case
@@ -413,6 +549,14 @@ internal static class Artwork
     private static string NotFoundPath(Game game) => Path.Combine(CacheDir, FileName(game) + ".none");
 
     private static string CoverCachePath(Game game) => Path.Combine(CacheDir, FileName(game) + ".cover");
+
+    private static string SquareCachePath(Game game) => Path.Combine(CacheDir, FileName(game) + ".square");
+
+    private static string NoSquarePath(Game game) => Path.Combine(CacheDir, FileName(game) + ".nosquare");
+
+    private static string CapsuleCachePath(Game game) => Path.Combine(CacheDir, FileName(game) + ".capsule");
+
+    private static string NoCapsulePath(Game game) => Path.Combine(CacheDir, FileName(game) + ".nocapsule");
 
     private static string NoCoverPath(Game game) => Path.Combine(CacheDir, FileName(game) + ".nocover");
 

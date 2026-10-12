@@ -34,7 +34,7 @@ Write-Host "Building Handheld Optimiser $version" -ForegroundColor Cyan
 # Start clean so files deleted from the project do not linger in the installer.
 if (Test-Path $publishDir) { Remove-Item $publishDir -Recurse -Force }
 
-# Self-contained: a fresh handheld may not have the .NET 8 Desktop Runtime.
+# Self-contained: a fresh handheld may not have the .NET 10 Desktop Runtime.
 # ReadyToRun: precompiled code starts noticeably faster on a handheld CPU.
 dotnet publish $project `
     -c Release `

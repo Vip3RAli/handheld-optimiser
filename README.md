@@ -82,21 +82,22 @@ The library finds installed games from **Steam**, **Xbox / PC Game Pass**, **Epi
 
 | Feature | What it does |
 |---|---|
-| **Tabs** | Games, Favourites, one per store, Apps and Not installed. **LB / RB** switch between them. |
-| **Quick settings** (**Y**) | Volume, brightness, power mode, resolution and refresh rate. |
+| **Layouts** | A grid, a row like a console's home screen, or **Old School**: big staggered cards under a list of categories, like the Xbox 360 dashboard. Choose one under **Settings > Library Display**. |
+| **Tabs** | Games, Favourites, one per store, Apps and Not installed. **LB / RB** move along them and on to the settings and power buttons. |
+| **Artwork** | Wide artwork, covers and icons from SteamGridDB with your own free key, for games outside Steam and for apps such as Chrome. |
 | **Quick actions** (**X**) | Favourite or hide a game, set its game profile, launch arguments or artwork. |
 | **Game profiles** | A power mode, resolution, refresh rate and brightness per game, put back when it closes. |
-| **Continue playing** | Your last game as a wide card above the grid, with play time tracked for every game. |
+| **Last played** | Your last game as a wide card above the grid, with its play time, size and profile beside it, and its description from Steam's store or Wikipedia if you switch that on. |
 | **Quick Resume** | The home button pauses the game behind the library, and **A** carries on where you left off. Games with anti-cheat are never paused. |
 | **Play and Sleep** | Close background programs and store apps around a game, and go back to your game after sleep. |
 | **Docked mode** | A layout and zoom of its own on a TV or monitor. |
-| **Not installed** | Games you own on Steam, Epic and GOG, ready to install. Steam needs your own free Web API key. |
-| **Game deals** | An optional row of games on sale, from IsThereAnyDeal with your own free API key. |
+| **Not installed** | Games you own on Steam, Epic and GOG, ready to install, read from each store's app on your device. Your own free Steam Web API key gives Steam's exact list. |
+| **Game deals** | An optional row with the Epic Games Store's free games of the week, which needs no key, and games on sale from IsThereAnyDeal with your own free API key. |
 | **Emulators** | Games from your ROM folders, including EmuDeck's and RetroBat's, in the emulator found for each console. |
 | **Quick Tweaks** | Clear temporary files, shader caches and the Recycle Bin, and switch startup apps. |
 | **Power** (**View**) | Sleep, hibernate, restart or shut down. |
 
-Everything works with the controller or by touch. **Menu** opens the settings, and **Up** from the top row reaches the quick settings, settings and power buttons.
+Everything works with the controller or by touch. **Menu** opens the settings, and **Up** from the top row reaches the settings and power buttons.
 
 | | RAM |
 |---|---|
@@ -104,7 +105,7 @@ Everything works with the controller or by touch. **Menu** opens the settings, a
 | Library, open | about 115 MB |
 | Library, while a game runs | about 25 MB |
 
-**Privacy.** The library only uses the internet to check for a newer release, and for the features you switch on with your own keys: artwork from [SteamGridDB](https://www.steamgriddb.com), your Steam game list and wishlist, store covers for games you have not installed, and deals from [IsThereAnyDeal](https://isthereanydeal.com). Keys stay on your device.
+**Privacy.** The library only uses the internet to check for a newer release, and for the features you switch on: artwork from [SteamGridDB](https://www.steamgriddb.com), which is sent the names of your apps and of games outside Steam, your Steam game list and wishlist, store covers for games you have not installed, deals from [IsThereAnyDeal](https://isthereanydeal.com), the Epic Games Store's free games, and your last game's details from Steam's store or [Wikipedia](https://www.wikipedia.org). Most of these use your own keys, which stay on your device.
 
 **Controller tips.** Keep the controller in **Gamepad** mode. If the home button opens Steam, turn off Steam's guide button setting under **Steam > Settings > Controller**.
 
@@ -132,7 +133,7 @@ This affected 0.4.0 and earlier. Open **Full Screen Mode** and switch on **Use H
 
 ## Building from source
 
-Requires Windows, the .NET 8 SDK and Inno Setup 6.
+Requires Windows, the .NET 10 SDK and Inno Setup 6.
 
 ```powershell
 winget install --id JRSoftware.InnoSetup -e --scope user

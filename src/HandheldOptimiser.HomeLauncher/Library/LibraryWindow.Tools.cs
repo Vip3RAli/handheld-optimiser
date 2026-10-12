@@ -31,14 +31,14 @@ public partial class LibraryWindow
         _addedRows[list] = [];
     }
 
-    /// <summary>Adds a row to a list, above the given row.</summary>
-    private Button AddRow(StackPanel list, UIElement before, string content, string? detail, Action click)
+    /// <summary>Adds a row to a list, above the given row, with what it is set to when it is a setting.</summary>
+    private Button AddRow(StackPanel list, UIElement before, string content, string? value, Action click)
     {
         var row = new Button
         {
             Style = (Style)FindResource("MenuButton"),
             Content = content,
-            Tag = detail
+            Tag = value
         };
 
         row.Click += (_, _) => click();
@@ -56,7 +56,7 @@ public partial class LibraryWindow
         HideMenuLists();
         _menu = WhilePlayingItems;
         MenuTitle.Text = "Play and Sleep";
-        MenuStore.Text = "Settings";
+        MenuStore.Text = SleepTweaks;
         RefreshWhilePlaying();
         ShowMenuItems(focus);
     }
@@ -66,26 +66,15 @@ public partial class LibraryWindow
         RefreshQuickResumeSetting();
         RefreshResumeSetting();
 
-        var chosen = BackgroundApps.Choices().Where(c => c.Close).Select(c => c.App.Name).ToList();
-        var gameMode = LibrarySettings.GameMode;
+        GameModeSetting.Tag = OnOff(LibrarySettings.GameMode);
+        AppsToCloseGroup.Tag = BackgroundApps.Choices().Count(c => c.Close) is var chosen and > 0 ? chosen.ToString() : "None";
 
-        GameModeSetting.Tag = gameMode
-            ? $"On. Closed as a game starts. A game's profile can change this"
-            : "Off. A game's profile can switch it on for that game";
-
-        AppsToCloseGroup.Tag = chosen.Count switch
-        {
-            0 => "None chosen",
-            <= 3 => string.Join(", ", chosen),
-            _ => $"{string.Join(", ", chosen.Take(2))} and {chosen.Count - 2} more"
-        };
-
-        ReopenSetting.Tag = LibrarySettings.ReopenApps ? "On, once the game has closed" : "Off. They stay closed";
+        ReopenSetting.Tag = OnOff(LibrarySettings.ReopenApps);
 
         StoreClosingSetting.Tag = LibrarySettings.StoreClosing switch
         {
-            StoreClosing.OpenedByGame => "When the game opened it. Steam, Epic, EA and the rest",
-            StoreClosing.Always => "Always, even if it was open before the game",
+            StoreClosing.OpenedByGame => "If the game opened it",
+            StoreClosing.Always => "Always",
             _ => "Off"
         };
     }
@@ -140,9 +129,7 @@ public partial class LibraryWindow
     }
 
     private static string AppDetail(BackgroundApp app, bool close) =>
-        !close ? "Left running"
-        : app.ReopenArguments is null ? "Closed while playing. Windows starts it again when needed"
-        : "Closed while playing";
+        close ? "Closed" : "Left running";
 
     private void OnOpenRunningApps(object sender, RoutedEventArgs e)
     {
@@ -167,9 +154,9 @@ public partial class LibraryWindow
         MenuStore.Text = running.Count == 0 ? "No other programs are running" : "Closed whenever a game starts, from the next game on";
         foreach (var (title, exe) in running)
         {
-            AddRow(RunningAppsItems, RunningAppsBackItem, title, exe, () =>
+            AddRow(RunningAppsItems, RunningAppsBackItem, title, null, () =>
             {
-                StatusText.Text = BackgroundApps.AddCustom(exe, title) ? $"{title} will be closed while you play." : $"{title} could not be added.";
+                Notice = BackgroundApps.AddCustom(exe, title) ? $"{title} will be closed while you play." : $"{title} could not be added.";
                 OpenAppsToClose();
             });
         }
@@ -183,16 +170,15 @@ public partial class LibraryWindow
     {
         var count = BackgroundApps.Choices().Count(c => c.Close);
         CloseAppsNowItem.IsEnabled = count > 0;
-        CloseAppsNowItem.Tag = count == 0 ? "Choose them under Settings, Play and Sleep"
-            : "The ones chosen under Settings, Play and Sleep. They stay closed";
+        CloseAppsNowItem.Tag = count == 0 ? "None chosen" : count.ToString();
     }
 
     private async void OnCloseAppsNow(object sender, RoutedEventArgs e)
     {
         CloseMenu();
-        StatusText.Text = "Closing background programs...";
+        Notice = "Closing background programs...";
         var closed = await Task.Run(() => BackgroundApps.CloseChosen([]));
-        StatusText.Text = closed.Count == 0 ? "None of the chosen programs were running."
+        Notice = closed.Count == 0 ? "None of the chosen programs were running."
             : $"Closed {string.Join(", ", closed.Select(c => c.Name))}.";
     }
 
@@ -228,7 +214,7 @@ public partial class LibraryWindow
         MenuStore.Text = StorageSummary();
 
         TempItem.Tag = ShaderItem.Tag = RecycleItem.Tag = "Measuring...";
-        StartupGroup.Tag = "Programs that start with Windows";
+        StartupGroup.Tag = null;
         ShowMenuItems(focus);
         _ = MeasureAsync();
     }
@@ -247,7 +233,7 @@ public partial class LibraryWindow
 
         _measured = measured;
         var on = startup.Count(a => a.Enabled);
-        StartupGroup.Tag = on == 1 ? "1 program starts with Windows" : $"{on} programs start with Windows";
+        StartupGroup.Tag = $"{on} on";
         RefreshMaintenance();
     }
 
@@ -260,11 +246,11 @@ public partial class LibraryWindow
         }
 
         TempItem.Tag = ReferenceEquals(_confirming, TempItem) ? confirm
-            : $"{CleanResult.Size(measured.Temp)} left behind by programs and installers";
+            : CleanResult.Size(measured.Temp);
         ShaderItem.Tag = ReferenceEquals(_confirming, ShaderItem) ? confirm
-            : $"{CleanResult.Size(measured.Shaders)}. Fixes stutter after a driver update. Games rebuild them as they play";
+            : CleanResult.Size(measured.Shaders);
         RecycleItem.Tag = ReferenceEquals(_confirming, RecycleItem) ? confirm
-            : measured.Recycle is { } bin ? CleanResult.Size(bin) : "Size unknown";
+            : measured.Recycle is { } bin ? CleanResult.Size(bin) : "Unknown";
     }
 
     /// <summary>Free space on each drive: "C: 120 GB free of 476 GB".</summary>
@@ -308,7 +294,7 @@ public partial class LibraryWindow
         row.Tag = "Clearing...";
         var result = await Task.Run(clean);
         Program.Log($"{name}: {result.Describe()}");
-        StatusText.Text = $"{name}: {result.Describe()}.";
+        Notice = $"{name}: {result.Describe()}.";
 
         if (ReferenceEquals(_menu, MaintenanceItems))
         {
@@ -347,7 +333,6 @@ public partial class LibraryWindow
         _menu = StartupItems;
         MenuTitle.Text = "Startup apps";
         MenuStore.Text = "Takes effect the next time you sign in";
-        StartupBackItem.Tag = ReferenceEquals(from, StoreStartupItem) ? "Play and Sleep" : "Quick Tweaks";
 
         ClearRows(StartupItems);
         var apps = StartupApps.Read();
@@ -378,8 +363,7 @@ public partial class LibraryWindow
     }
 
     private static string StartupDetail(StartupApp app) =>
-        (app.Enabled ? "Starts with Windows" : "Off")
-        + (app.ForAllUsers ? ". Set for all users: change it in Handheld Optimiser" : string.Empty);
+        OnOff(app.Enabled);
 
     /// <summary>Left and right on the rows of these settings.</summary>
     private bool StepToolsSetting(Button row, int step)

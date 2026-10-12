@@ -18,13 +18,19 @@ public partial class LibraryWindow
     private bool _refreshingOwned;
     private string? _ownedError;
 
-    /// <summary>Loads the pictures of the games that are not installed around the focus, and lets go of the rest.</summary>
+    // The game the pictures were last loaded around: the focused one, or the first on screen after the
+    // grid was scrolled by touch, the mouse wheel or a search, none of which move the focus.
+    private string? _picturesNearKey;
+
+    /// <summary>Loads the pictures of the games that are not installed around one of them, and lets go of the rest.</summary>
     private void LoadNotInstalledNear(int index)
     {
-        if (!_filter.NotInstalled || index < 0)
+        if (!_filter.NotInstalled || index < 0 || index >= _tiles.Count)
         {
             return;
         }
+
+        _picturesNearKey = _tiles[index].Game.Key;
 
         var from = Math.Max(0, index - LoadedBefore);
         var to = Math.Min(_tiles.Count, index + LoadedAfter);
@@ -80,8 +86,35 @@ public partial class LibraryWindow
         }
 
         var index = _tiles.IndexOf(tile);
-        var focus = _tiles.FindIndex(t => t.Game.Key == _focusedKey);
-        return index >= 0 && focus >= 0 && index >= focus - LoadedBefore && index < focus + LoadedAfter;
+        var near = _tiles.FindIndex(t => t.Game.Key == _picturesNearKey);
+        return index >= 0 && near >= 0 && index >= near - LoadedBefore && index < near + LoadedAfter;
+    }
+
+    /// <summary>
+    /// After the grid scrolled: loads the pictures of the games now on screen. Moving the focus scrolls
+    /// too, but so do touch and the mouse wheel, which leave the focus where it was.
+    /// </summary>
+    private void OnGridScrolled(object sender, System.Windows.Controls.ScrollChangedEventArgs e)
+    {
+        if (!_filter.NotInstalled || IsRow || e.VerticalChange == 0 || _tiles.Count == 0
+            || TileContainer(0) is not { ActualHeight: > 0 } first)
+        {
+            return;
+        }
+
+        // How many rows have gone off the top, and so the first game still on screen.
+        var above = -Tiles.TranslatePoint(default, Scroller).Y;
+        var row = Math.Max(0, (int)(above / first.ActualHeight));
+        var columns = ColumnCount();
+        var index = Math.Min(row * columns, _tiles.Count - 1);
+
+        // Left alone while the game they were loaded around is still among the first rows on screen, as
+        // the focused game is when it was the d-pad that scrolled.
+        var near = _tiles.FindIndex(t => t.Game.Key == _picturesNearKey);
+        if (near < index || near >= index + 3 * columns)
+        {
+            LoadNotInstalledNear(index);
+        }
     }
 
     /// <summary>Lets go of every picture of a game that is not installed.</summary>
@@ -109,6 +142,11 @@ public partial class LibraryWindow
         {
             var (changed, error) = await OwnedGames.RefreshSteamAsync(force);
             _ownedError = error;
+            if (error is not null && ReferenceEquals(_menu, OwnedItems))
+            {
+                Notice = error;
+            }
+
             if (changed)
             {
                 await ScanAsync();
@@ -138,8 +176,9 @@ public partial class LibraryWindow
 
     private void OnOpenOwnedSettings(object sender, RoutedEventArgs e)
     {
-        OpenSettingsGroup(OwnedItems, "Games not installed");
+        OpenSettingsGroup(OwnedItems, "Games not installed", GamesApps);
         RefreshOwnedSettings();
+        Notice = _ownedError ?? string.Empty;
     }
 
     private void OnToggleNotInstalled(object sender, RoutedEventArgs e)
@@ -157,7 +196,7 @@ public partial class LibraryWindow
 
     private void OnRefreshOwned(object sender, RoutedEventArgs e)
     {
-        StatusText.Text = "Looking for your games...";
+        Notice = "Looking for your games...";
         _ = RefreshOwnedNowAsync();
     }
 
@@ -166,23 +205,16 @@ public partial class LibraryWindow
         await RefreshOwnedAsync(force: true);
         await ScanAsync();
         var count = _allTiles.Count(t => !t.IsInstalled);
-        StatusText.Text = _ownedError ?? (count == 1 ? "1 game is not installed." : $"{count} games are not installed.");
+        Notice = _ownedError ?? (count == 1 ? "1 game is not installed." : $"{count} games are not installed.");
     }
 
     private void RefreshOwnedSettings()
     {
         var on = LibrarySettings.ShowNotInstalled;
-        var count = _allTiles.Count(t => !t.IsInstalled);
-        NotInstalledSetting.Tag = !on ? "Off"
-            : count == 0 ? "On. None found yet: Epic and GOG Galaxy are read from this device, Steam needs a key"
-            : $"On, in the Not installed tab. {count} found";
+        NotInstalledSetting.Tag = OnOff(on);
 
-        var steamCount = OwnedGames.SteamCount();
         SteamKeySetting.IsEnabled = on;
-        SteamKeySetting.Tag = LibrarySettings.SteamKey is not { } key ? "Not set. Free at steamcommunity.com/dev/apikey"
-            : _ownedError is { } error ? error
-            : steamCount is { } games ? $"Set, ending in {key[^Math.Min(4, key.Length)..]}. Steam listed {games} games"
-            : $"Set, ending in {key[^Math.Min(4, key.Length)..]}";
+        SteamKeySetting.Tag = LibrarySettings.SteamKey is null ? "Not set" : _ownedError is null ? "Set" : "Not working";
 
         OwnedRefreshItem.IsEnabled = on;
     }

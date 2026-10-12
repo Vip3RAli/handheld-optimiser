@@ -26,18 +26,16 @@ public partial class LibraryWindow
         _confirming = null;
         RefreshPower();
 
-        MenuOverlay.Visibility = Visibility.Visible;
+        ShowMenuOverlay();
         ShowMenuItems();
     }
 
     private void RefreshPower()
     {
+        // The row that has been pressed once says so in place of its name.
         const string confirm = "Press again to confirm";
-        SleepItem.Tag = _session is { StartedAt: not null } session && LibrarySettings.ResumeAfterSleep
-            ? $"Pause here and wake back in {session.Game.Title}"
-            : "Pause here and wake where you left off";
-        RestartItem.Tag = ReferenceEquals(_confirming, RestartItem) ? confirm : "Close everything and start Windows again";
-        ShutDownItem.Tag = ReferenceEquals(_confirming, ShutDownItem) ? confirm : "Close everything and power off";
+        RestartItem.Content = ReferenceEquals(_confirming, RestartItem) ? confirm : "Restart";
+        ShutDownItem.Content = ReferenceEquals(_confirming, ShutDownItem) ? confirm : "Shut down";
     }
 
     private void OnOpenPower(object sender, RoutedEventArgs e) => OpenPower();
@@ -101,7 +99,7 @@ public partial class LibraryWindow
         if (error is not null)
         {
             Program.Log(error);
-            StatusText.Text = error;
+            Notice = error;
         }
     }
 }

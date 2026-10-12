@@ -13,6 +13,7 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 /// <param name="Url">IsThereAnyDeal's link to the store page, which must be opened as given.</param>
 /// <param name="Image">A wide banner for the card, or null when there is none.</param>
 /// <param name="HistoricalLow">The lowest price the game has ever been at any store.</param>
+/// <param name="Note">What a giveaway's card says in its corner, such as "Free this week". Null for a sale.</param>
 internal sealed record Deal(
     string Id,
     string Title,
@@ -24,7 +25,8 @@ internal sealed record Deal(
     bool OnWishlist,
     string Url,
     string? Image,
-    DateTimeOffset? Expiry);
+    DateTimeOffset? Expiry,
+    string? Note = null);
 
 /// <summary>
 /// The Deals row below the library: games on sale, from IsThereAnyDeal with the player's own key. The

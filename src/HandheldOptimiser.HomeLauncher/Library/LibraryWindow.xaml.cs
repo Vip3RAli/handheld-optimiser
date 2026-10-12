@@ -59,6 +59,7 @@ public partial class LibraryWindow : Window
         Activated += OnActivated;
         Deactivated += OnDeactivated;
         PreviewKeyDown += OnKeyDown;
+        WatchCardSwipes();
     }
 
     /// <summary>Brings the library to the front; called when the home button starts a second instance.</summary>
@@ -98,13 +99,24 @@ public partial class LibraryWindow : Window
 
         // Changed in another session, or a screen plugged in while a game was in front.
         var layoutChanged = LayoutChanged();
-        if (_continuePlaying != LibrarySettings.ContinuePlaying || layoutChanged)
+        var infoChanged = _continueInfo != LibrarySettings.ContinueInfo || _storeDetails != LibrarySettings.StoreDetails;
+        if (_continuePlaying != LibrarySettings.ContinuePlaying || infoChanged || layoutChanged)
         {
             _continuePlaying = LibrarySettings.ContinuePlaying;
+            _continueInfo = LibrarySettings.ContinueInfo;
+            _storeDetails = LibrarySettings.StoreDetails;
+            if (infoChanged)
+            {
+                _infoKey = null;
+            }
+
             ApplyLayout();
         }
 
         ShowContinueArt();
+        LoadSquares();
+        UpdateRenderMode();
+        LoadCardArt();
 
         // The deals kept on disk at once, and new ones if they are old and no game is running.
         UpdateDeals();
@@ -137,12 +149,28 @@ public partial class LibraryWindow : Window
     {
         _gamepad.Stop();
         _clock.Stop();
-        StatusText.Text = string.Empty;
+        Notice = string.Empty;
         CloseMenu();
+
+        // The open Not installed card holds a tile for every game the player owns and has not installed,
+        // hundreds of them, which is about 90 MB that nothing needs behind a game. It goes back to the
+        // card it grew from, and A opens it again on the game it was left on.
+        if (IsBrowsing)
+        {
+            // The tile with the keyboard focus is about to be taken out of the window. Left holding
+            // it, WPF would hand the focus to the window itself as the tile went, which makes the
+            // library the active window again, in front of the game or store that just opened.
+            Keyboard.ClearFocus();
+            LeaveNotInstalled();
+        }
+
         ClearBackdrop();
         ClearContinueArt();
+        UnloadSquares();
+        UnloadCardArt();
         UnloadNotInstalled();
         UnloadDeals();
+        UpdateRenderMode();
 
         // Once the rendering of the focus change has gone out, nothing here is needed until we are back.
         Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, Native.TrimWorkingSet);
@@ -218,15 +246,15 @@ public partial class LibraryWindow : Window
     private IEnumerable<GameTile> ShownTiles() => _showHidden ? _allTiles : _allTiles.Where(t => !t.IsHidden);
 
     /// <summary>
-    /// The tabs of the filter strip, in order: Games, then Favourites once a game is starred and a tab per
-    /// store when games come from more than one, while the store filter is on; Apps, always, so there is
-    /// somewhere to add them; and last Not installed, whenever there are owned games that are not installed.
+    /// The tabs of the filter strip, in order: Games; Apps, always, so there is somewhere to add them; then
+    /// Favourites once a game is starred and a tab per store when games come from more than one, while the
+    /// store filter is on; and last Not installed, whenever there are owned games that are not installed.
     /// </summary>
     private List<TileFilter> FilterOptions()
     {
         var shown = ShownTiles().Where(t => !t.IsApp).ToList();
         var installed = shown.Where(t => t.IsInstalled).ToList();
-        var options = new List<TileFilter> { TileFilter.All };
+        var options = new List<TileFilter> { TileFilter.All, TileFilter.AppsTab };
 
         if (_showFilter)
         {
@@ -241,8 +269,6 @@ public partial class LibraryWindow : Window
                 options.AddRange(stores.Select(store => new TileFilter(store, false)));
             }
         }
-
-        options.Add(TileFilter.AppsTab);
 
         if (installed.Count < shown.Count)
         {
@@ -269,14 +295,23 @@ public partial class LibraryWindow : Window
             FilterTabs.Children.Add(FilterTab(option));
         }
 
+        // Search is only on the Not installed tab, and is forgotten when that is left.
+        SearchButton.Visibility = _filter.NotInstalled ? Visibility.Visible : Visibility.Collapsed;
+        if (!_filter.NotInstalled)
+        {
+            ResetSearch();
+        }
+
+        // The Not installed tab is a grid whatever the layout, so a change of tab may change how they are laid out.
+        ApplyTilePanel();
+        RefreshCategories();
+
         // Favourites first, each group in the chosen order.
-        _tiles = Sorted(ShownTiles().Where(_filter.Shows)).OrderByDescending(t => t.IsFavourite).ToList();
+        _tiles = Sorted(ShownTiles().Where(_filter.Shows).Where(Found))
+            .OrderByDescending(t => t.IsFavourite).ToList();
         Tiles.ItemsSource = _tiles;
-        CountText.Text = _filter.NotInstalled ? $"{_tiles.Count} not installed"
-            : _filter.Apps ? (_tiles.Count == 1 ? "1 app" : $"{_tiles.Count} apps")
-            : _tiles.Count == 1 ? "1 game"
-            : $"{_tiles.Count} games";
         AcceptHint.Text = AcceptText();
+        UpdateOpenCardCount();
 
         // The pictures of games that are not installed are only kept while their tab is open.
         if (!_filter.NotInstalled)
@@ -287,6 +322,8 @@ public partial class LibraryWindow : Window
         UpdateContinue();
         UpdateDeals();
         UpdateEmptyText();
+        LoadSquares();
+        QueueCardReset();
     }
 
     private void UpdateEmptyText()
@@ -297,13 +334,24 @@ public partial class LibraryWindow : Window
             return;
         }
 
-        EmptyText.Text = _filter.Apps
+        // An Old School category with cards of its own is never empty.
+        if (OpenKind is { } kind && kind != CategoryKind.Games)
+        {
+            EmptyText.Text = string.Empty;
+            return;
+        }
+
+        EmptyText.Text = _search.Length > 0
             ? _tiles.Count == 0
-                ? "No apps yet. Press Menu, choose Add a program while this tab is open, and pick Chrome, Discord or anything else from the Start menu."
+                ? $"No games that are not installed match \"{_search}\"{(_searchStore is { } store ? $" on {Game.NameOf(store)}" : string.Empty)}."
+                : string.Empty
+            : _filter.Apps
+            ? _tiles.Count == 0
+                ? "No apps yet. Press Menu, choose Games and Apps then Add a program while this tab is open, and pick Chrome, Discord or anything else from the Start menu."
                 : string.Empty
             : _allTiles.All(t => !t.IsInstalled || t.IsApp) && !_filter.NotInstalled
-            ? "No installed games were found in Steam, Xbox, Epic Games, Battle.net, GOG, the EA App or Ubisoft Connect.\nInstall a game or add a program under Settings, then press Y and choose Refresh library."
-            : _tiles.Count == 0 ? "Every game is hidden. Switch on Show hidden games under Settings, Library View Options to bring them back."
+            ? "No installed games were found in Steam, Xbox, Epic Games, Battle.net, GOG, the EA App or Ubisoft Connect.\nInstall a game or add a program under Settings, then press Menu and choose Refresh library."
+            : _tiles.Count == 0 ? "Every game is hidden. Switch on Show hidden games under Settings, Library Display to bring them back."
             : string.Empty;
     }
 
@@ -313,12 +361,43 @@ public partial class LibraryWindow : Window
         {
             Style = (Style)FindResource("FilterTab"),
             GroupName = "StoreFilter",
-            Content = filter.Name,
+            Content = TabIcon(filter),
+            ToolTip = filter.Name,
             IsChecked = filter == _filter
         };
 
         tab.Click += (_, _) => SetFilter(filter);
         return tab;
+    }
+
+    /// <summary>
+    /// What a tab's round button shows: a store's logo for its tab, and a symbol from Windows' icon font
+    /// for the others.
+    /// </summary>
+    private static object TabIcon(TileFilter filter)
+    {
+        var logo = filter is { Store: { } store, Apps: false, NotInstalled: false }
+            ? store == GameStore.Emulator ? StoreLogos.ForConsole("Arcade") : StoreLogos.For(store)
+            : null;
+
+        if (logo is null)
+        {
+            // Apps, a download, a star, an added program, and a controller for the games.
+            return filter.Apps ? ""
+                : filter.NotInstalled ? ""
+                : filter.Favourites ? ""
+                : filter.Store is not null ? ""
+                : "";
+        }
+
+        // Filled in the colour of the button's own symbol, which is dark on the tab that is open.
+        var shape = new System.Windows.Shapes.Path { Data = logo, Stretch = System.Windows.Media.Stretch.Uniform, Width = 20, Height = 20 };
+        shape.SetBinding(System.Windows.Shapes.Shape.FillProperty, new System.Windows.Data.Binding
+        {
+            Path = new PropertyPath(System.Windows.Documents.TextElement.ForegroundProperty),
+            RelativeSource = System.Windows.Data.RelativeSource.Self
+        });
+        return shape;
     }
 
     private void SetFilter(TileFilter filter)
@@ -329,29 +408,81 @@ public partial class LibraryWindow : Window
         }
 
         _filter = filter;
+
+        // Another tab's Old School cards slide in, as they do when the layout is first shown.
+        GameCards.Fresh = true;
         ApplyFilter();
+
+        // From the Not installed grid's own tabs to a tab of games: that tab's category is the open one.
+        OpenCategoryOfFilter();
+        ShowCategoryCards();
+        UpdateDeals();
         RestoreFocus();
     }
 
-    /// <summary>LB and RB: one tab left or right, wrapping around.</summary>
+    /// <summary>
+    /// LB and RB: one place left or right along the whole top bar, wrapping around. A tab is opened as it
+    /// is reached, with the focus back among its games. The buttons after the tabs (search on the Not
+    /// installed tab, settings and power) are picked out for A to press.
+    /// </summary>
     private void CycleFilter(int step)
     {
-        var options = FilterOptions();
-        if (options.Count < 2)
+        // The Old School layout has its categories in place of the top bar, and the bumpers move along
+        // those. From the open Not installed card that closes it first.
+        if (_layout == LibraryLayout.OldSchool)
         {
+            LeaveNotInstalled();
+            StepCategory(step > 0 ? 1 : -1);
             return;
         }
 
-        SetFilter(options[(options.IndexOf(_filter) + step + options.Count) % options.Count]);
+        var tabs = FilterOptions();
+        var buttons = new List<Button>();
+        if (SearchButton.Visibility == Visibility.Visible)
+        {
+            buttons.Add(SearchButton);
+        }
+
+        buttons.Add(SettingsButton);
+        buttons.Add(PowerButton);
+
+        // From a button, or from the open tab. The search bar and its store button count as the search button.
+        var focused = Keyboard.FocusedElement as Button;
+        var button = ReferenceEquals(focused, SearchBar) || ReferenceEquals(focused, StoreButton) ? SearchButton : focused;
+        var at = button is not null && buttons.IndexOf(button) is >= 0 and var index ? tabs.Count + index : tabs.IndexOf(_filter);
+
+        var count = tabs.Count + buttons.Count;
+        var next = (((at + step) % count) + count) % count;
+        if (next >= tabs.Count)
+        {
+            buttons[next - tabs.Count].Focus();
+            return;
+        }
+
+        SetFilter(tabs[next]);
+        RestoreFocus(leavingTopBar: true);
     }
 
     /// <summary>
     /// Puts the focus back on the game it was on. A rescan or a new cover must not pull the d-pad off the
-    /// top bar, so the focus stays there unless it is the top bar asking to leave.
+    /// top bar or out of the search box, so the focus stays there unless it is the top bar asking to leave.
     /// </summary>
     private void RestoreFocus(bool leavingTopBar = false)
     {
-        if (!IsActive || _tiles.Count == 0 || _menu is not null || (!leavingTopBar && IsTopBarButton(Keyboard.FocusedElement)))
+        if (!IsActive || _menu is not null
+            || (!leavingTopBar && (IsTopBarButton(Keyboard.FocusedElement) || IsSearching)))
+        {
+            return;
+        }
+
+        // An Old School category with cards of its own, not games: the card at the front of those.
+        if (OpenKind is { } kind && kind != CategoryKind.Games)
+        {
+            FocusFrontCard();
+            return;
+        }
+
+        if (_tiles.Count == 0)
         {
             return;
         }
@@ -365,11 +496,12 @@ public partial class LibraryWindow : Window
                 return;
             }
 
-            // Back on the Continue playing card or tile it was on, when that game is still there.
-            if (_focusInContinue && ContinueButtons().Find(b => b.DataContext is GameTile t && t.Game.Key == _focusedKey) is { } button)
+            // Back on the Last played card it was on, when that game is still there.
+            if (_focusInContinue && ContinuePanel.Visibility == Visibility.Visible
+                && ContinueCard.DataContext is GameTile card && card.Game.Key == _focusedKey)
             {
-                button.Focus();
-                QueueBackdrop((GameTile)button.DataContext);
+                ContinueCard.Focus();
+                QueueBackdrop(card);
                 return;
             }
 
@@ -381,7 +513,6 @@ public partial class LibraryWindow : Window
             if (index < _tiles.Count)
             {
                 QueueBackdrop(_tiles[index]);
-                ShowRowDetails(_tiles[index]);
                 LoadNotInstalledNear(index);
             }
         });
@@ -429,7 +560,7 @@ public partial class LibraryWindow : Window
         if (!tile.IsInstalled)
         {
             var problem = GameCatalog.Launch(tile.Game);
-            StatusText.Text = problem ?? $"Opening {Game.NameOf(tile.Game.Store)} to install {tile.Title}...";
+            ShowNotice(problem ?? $"Opening {Game.NameOf(tile.Game.Store)} to install {tile.Title}", tile);
             if (problem is not null)
             {
                 _launchBlockedUntil = DateTime.MinValue;
@@ -442,7 +573,7 @@ public partial class LibraryWindow : Window
         if (tile.IsApp)
         {
             var failed = GameCatalog.Launch(tile.Game);
-            StatusText.Text = failed ?? $"Opening {tile.Title}...";
+            ShowNotice(failed ?? $"Opening {tile.Title}", tile);
             if (failed is not null)
             {
                 _launchBlockedUntil = DateTime.MinValue;
@@ -457,7 +588,7 @@ public partial class LibraryWindow : Window
         var storeWasOpen = StoreClients.IsRunning(tile.Game.Store);
 
         var error = GameCatalog.Launch(tile.Game);
-        StatusText.Text = error ?? $"Starting {tile.Title}...";
+        ShowNotice(error ?? $"Launching {tile.Title}", tile, error is null ? LaunchNoticeShownFor : null);
         if (error is not null)
         {
             _launchBlockedUntil = DateTime.MinValue;
