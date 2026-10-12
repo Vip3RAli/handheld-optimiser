@@ -102,7 +102,6 @@ Everything works with the controller or by touch. **Menu** opens the settings, a
 | | RAM |
 |---|---|
 | Steam Big Picture, open | about 1.4 GB |
-| Library, open | about 115 MB |
 | Library, while a game runs | about 25 MB |
 
 **Privacy.** The library only uses the internet to check for a newer release, and for the features you switch on: artwork from [SteamGridDB](https://www.steamgriddb.com), which is sent the names of your apps and of games outside Steam, your Steam game list and wishlist, store covers for games you have not installed, deals from [IsThereAnyDeal](https://isthereanydeal.com), the Epic Games Store's free games, and your last game's details from Steam's store or [Wikipedia](https://www.wikipedia.org). Most of these use your own keys, which stay on your device.
