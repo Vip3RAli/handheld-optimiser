@@ -33,7 +33,7 @@ public enum GameStore
 /// <param name="CoverUrl">Where the store keeps a cover for a game that is not installed.</param>
 /// <param name="IsApp">An added program that is not a game, such as a browser or Discord. It is listed
 /// under Apps rather than with the games, and opening it leaves out everything done for games: no
-/// profile, no closing of other programs, no play time and no place in Continue playing.</param>
+/// profile, no closing of other programs, no play time and no place in Last played.</param>
 public sealed record Game(
     string Key,
     string Title,

@@ -13,7 +13,13 @@ public partial class LibraryWindow
     /// </summary>
     private void OnNavigate(FocusNavigationDirection direction)
     {
-        if (_editing is not null)
+        if (_editing is not null || _cardGrowing)
+        {
+            return;
+        }
+
+        // The d-pad moves around Windows' keyboard while the search box is being typed in.
+        if (IsSearching)
         {
             return;
         }
@@ -21,6 +27,20 @@ public partial class LibraryWindow
         if (_menu is not null)
         {
             MoveMenuFocus(direction);
+            return;
+        }
+
+        // In the Old School layout up and down are between the categories, whatever has the focus, and
+        // left and right along the cards of the one that is open.
+        if (IsOldSchool && direction is FocusNavigationDirection.Up or FocusNavigationDirection.Down)
+        {
+            StepCategory(direction == FocusNavigationDirection.Up ? 1 : -1);
+            return;
+        }
+
+        if (Keyboard.FocusedElement is Button { DataContext: ActionCard })
+        {
+            NavigateCards(ActionStack, direction);
             return;
         }
 
@@ -33,6 +53,12 @@ public partial class LibraryWindow
         if (Keyboard.FocusedElement is Button { DataContext: DealTile } deal)
         {
             NavigateDeals(deal, direction);
+            return;
+        }
+
+        if (Keyboard.FocusedElement is Button { DataContext: DealSourceTile } source)
+        {
+            NavigateDealSources(source, direction);
             return;
         }
 
@@ -53,7 +79,7 @@ public partial class LibraryWindow
 
         if (InContinueRow(button))
         {
-            NavigateContinue(button, direction);
+            NavigateContinue(direction);
             return;
         }
 
@@ -61,10 +87,10 @@ public partial class LibraryWindow
         var columns = ColumnCount();
         var last = _tiles.Count - 1;
 
-        // Up from the grid's first row goes to the Continue playing row above it, or to the top bar.
+        // Up from the grid's first row goes to the Last played card above it, or to the top bar.
         if (direction == FocusNavigationDirection.Up && index >= 0 && index < columns)
         {
-            if (!FocusContinueAbove(button))
+            if (!FocusContinueAbove())
             {
                 FocusTopBar();
             }
@@ -97,11 +123,11 @@ public partial class LibraryWindow
     /// <summary>
     /// Tiles in the first row, which is the column count since every tile is the same width. Measured on
     /// the item containers: the focused button is scaled up, which shifts its own position. The row
-    /// layout is one row of every tile.
+    /// and the Old School cards are one line of every tile.
     /// </summary>
     private int ColumnCount()
     {
-        if (_layout == LibraryLayout.Row)
+        if (IsOneLine)
         {
             return Math.Max(1, _tiles.Count);
         }
@@ -137,6 +163,12 @@ public partial class LibraryWindow
 
     private void OnGamepadPressed(GamepadAction action)
     {
+        // The Not installed card is on its way open, and what the press was meant for is on its way out.
+        if (_cardGrowing)
+        {
+            return;
+        }
+
         if (_editing is not null)
         {
             // The Windows touch keyboard takes A, B, X and Y for typing, so those must not act here too.
@@ -147,6 +179,28 @@ public partial class LibraryWindow
                     break;
                 case GamepadAction.View:
                     ShowMenuItems();
+                    break;
+            }
+
+            return;
+        }
+
+        if (IsSearching)
+        {
+            // As in the text editor, the letters are typed with A, X and Y on Windows' keyboard.
+            switch (action)
+            {
+                case GamepadAction.Menu:
+                    FinishSearch();
+                    break;
+                case GamepadAction.View:
+                    ClearTyping();
+                    break;
+
+                // B puts Windows' keyboard away, and with it the cursor: the bar is picked out again with
+                // what was typed kept, and B once more closes the search.
+                case GamepadAction.Back:
+                    EndTyping();
                     break;
             }
 
@@ -185,20 +239,42 @@ public partial class LibraryWindow
             case GamepadAction.Accept when Keyboard.FocusedElement is Button { DataContext: DealTile deal }:
                 OpenDeal(deal);
                 break;
+            case GamepadAction.Accept when Keyboard.FocusedElement is Button { DataContext: DealSourceTile } source:
+                source.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                break;
+            case GamepadAction.Accept when Keyboard.FocusedElement is Button { DataContext: ActionCard card }:
+                card.Act();
+                break;
+
+            // B in the Old School layout's open Not installed card closes it.
+            case GamepadAction.Back when !IsSearchOpen && LeaveNotInstalled():
+                break;
             case GamepadAction.Accept when Keyboard.FocusedElement is Button topBar && IsTopBarButton(topBar):
-                topBar.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                // The search button opens differently for the controller than for a tap.
+                _gamepadPress = true;
+                try
+                {
+                    topBar.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                }
+                finally
+                {
+                    _gamepadPress = false;
+                }
+
                 break;
             case GamepadAction.Options when _quickActions && Keyboard.FocusedElement is Button { DataContext: GameTile tile }:
                 OpenMenu(tile);
                 break;
-            case GamepadAction.QuickSettings:
-                OpenQuickSettings();
+
+            // B among the games a search found closes it and shows them all again.
+            case GamepadAction.Back when IsSearchOpen:
+                ClearSearch();
                 break;
             case GamepadAction.Menu:
-                OpenSettings();
+                OpenSettingsOrItsCards();
                 break;
             case GamepadAction.View:
-                OpenPower();
+                OpenPowerOrItsCards();
                 break;
             case GamepadAction.PreviousFilter:
                 CycleFilter(-1);
@@ -211,6 +287,12 @@ public partial class LibraryWindow
 
     private void OnKeyDown(object sender, KeyEventArgs e)
     {
+        if (_cardGrowing)
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (_editing is not null)
         {
             // Every other key belongs to the text box.
@@ -222,6 +304,23 @@ public partial class LibraryWindow
             else if (e.Key == Key.Escape)
             {
                 ShowMenuItems();
+                e.Handled = true;
+            }
+
+            return;
+        }
+
+        if (IsSearching)
+        {
+            // Every other key belongs to the search box.
+            if (e.Key is Key.Enter or Key.Down)
+            {
+                FinishSearch();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                EndTyping();
                 e.Handled = true;
             }
 
@@ -255,6 +354,15 @@ public partial class LibraryWindow
                 e.Handled = true;
             }
         }
+        else if (e.Key == Key.Escape && IsSearchOpen)
+        {
+            ClearSearch();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape && LeaveNotInstalled())
+        {
+            e.Handled = true;
+        }
         else if (e.Key == Key.F5)
         {
             _ = ScanAsync();
@@ -262,17 +370,12 @@ public partial class LibraryWindow
         }
         else if (e.Key == Key.F1)
         {
-            OpenSettings();
+            OpenSettingsOrItsCards();
             e.Handled = true;
         }
         else if (e.Key == Key.F2)
         {
-            OpenPower();
-            e.Handled = true;
-        }
-        else if (e.Key == Key.F3)
-        {
-            OpenQuickSettings();
+            OpenPowerOrItsCards();
             e.Handled = true;
         }
         else if (e.Key is Key.PageUp or Key.PageDown)
@@ -291,16 +394,64 @@ public partial class LibraryWindow
     {
         if (sender is Button { DataContext: GameTile tile })
         {
+            // A tap on an Old School card behind the front one only brings it forward, which taking the
+            // focus has just done. The next tap, on what is now the front card, starts its game.
+            if (CardClickSwallowed(GameCards, tile))
+            {
+                return;
+            }
+
             Launch(tile);
         }
     }
 
     private void OnTileRightClick(object sender, MouseButtonEventArgs e)
     {
-        if (_quickActions && sender is Button { DataContext: GameTile tile })
+        if (_quickActions && sender is Button { DataContext: GameTile tile } button)
         {
-            OpenMenu(tile);
+            // An Old School card turns over to show its quick actions, which it does at the front. One
+            // behind the front comes forward first, and the next press and hold turns it.
+            if (IsOldSchool && _tiles.IndexOf(tile) != GameCards.Front)
+            {
+                button.Focus();
+            }
+            else
+            {
+                OpenMenu(tile);
+            }
+
             e.Handled = true;
+        }
+    }
+
+    /// <summary>
+    /// The Menu button: the settings, which in the Old School layout are the cards of their own category.
+    /// From the open Not installed card that closes it first.
+    /// </summary>
+    private void OpenSettingsOrItsCards()
+    {
+        if (_layout == LibraryLayout.OldSchool)
+        {
+            LeaveNotInstalled();
+            OpenCategoryOf(CategoryKind.Settings);
+        }
+        else
+        {
+            OpenSettings();
+        }
+    }
+
+    /// <summary>The View button: the power menu, which in the Old School layout is the cards of its own category.</summary>
+    private void OpenPowerOrItsCards()
+    {
+        if (_layout == LibraryLayout.OldSchool)
+        {
+            LeaveNotInstalled();
+            OpenCategoryOf(CategoryKind.Power);
+        }
+        else
+        {
+            OpenPower();
         }
     }
 
@@ -311,22 +462,27 @@ public partial class LibraryWindow
             _focusedKey = tile.Game.Key;
             _focusInContinue = InContinueRow(button);
             AcceptHint.Text = AcceptText();
-            if (_focusInDeals)
-            {
-                // The deal's price and shop were on the status line.
-                _focusInDeals = false;
-                StatusText.Text = string.Empty;
-            }
+            _focusInDeals = false;
             QueueBackdrop(tile);
-            ShowRowDetails(tile);
 
             if (!tile.IsInstalled)
             {
                 LoadNotInstalledNear(_tiles.IndexOf(tile));
             }
 
+            // The Old School cards all sit in one place and come to the focus, so only the page moves.
+            if (IsOldSchool && !_focusInContinue)
+            {
+                CardFocused(GameCards, tile, _tiles.IndexOf(tile));
+                LoadCardArt();
+                TilesScroller.BringIntoView(new Rect(0, -20, TilesScroller.ActualWidth, TilesScroller.ActualHeight + 60));
+                return;
+            }
+
             // Leave room for the focus ring and the title underneath when scrolling a row into view.
-            button.BringIntoView(new Rect(-20, -40, button.ActualWidth + 40, button.ActualHeight + 80));
+            // In the row the focused tile is drawn well beyond where it is laid out.
+            var (across, above) = IsRow ? (95d, 170d) : (20d, 40d);
+            button.BringIntoView(new Rect(-across, -above, button.ActualWidth + (2 * across), button.ActualHeight + above + 40));
         }
     }
 

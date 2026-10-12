@@ -129,6 +129,88 @@ internal static class Backdrops
         return Frozen(pixels, width, height);
     }
 
+    // Banner artwork is about three times as wide as it is tall, and a little over that is decoded.
+    private const double WidestArtwork = 3.2;
+
+    /// <summary>
+    /// The artwork cut to fill an Old School card: scaled to cover it and cropped about its middle, at
+    /// the card's own size in pixels so drawing it is never a stretch. Null when the file cannot be read
+    /// as a picture.
+    /// </summary>
+    public static BitmapSource? Card(string path, int width, int height)
+    {
+        // Wide enough that its height covers the card's, since Decode limits the width alone.
+        if (width < 1 || height < 1 || Decode(path, Math.Max(width, (int)(height * WidestArtwork)) + 2) is not { } picture)
+        {
+            return null;
+        }
+
+        return Cover(picture, width, height) is { } pixels ? Frozen(pixels, width, height) : null;
+    }
+
+    // The panel under an app's picture on its card, top and bottom: the dark of the deals' cards.
+    private static readonly Color PanelTop = Color.FromRgb(0x2B, 0x30, 0x3C);
+    private static readonly Color PanelBottom = Color.FromRgb(0x14, 0x17, 0x1D);
+
+    // The share of an app's picture, at its foot, over which it fades into the panel.
+    private const double PanelFadeShare = 0.22;
+
+    /// <summary>
+    /// An app's Old School card: its landscape picture, whole, across the top, fading into a dark panel
+    /// that its name is read on. The picture has the program's logo on it and is about twice as wide as
+    /// tall, so cutting it to the card's shape as a game's artwork is cut would lose the ends of the
+    /// logo. At the card's own size in pixels. Null when the file cannot be read as a picture.
+    /// </summary>
+    public static BitmapSource? AppCard(string path, int width, int height)
+    {
+        if (width < 1 || height < 1 || Decode(path, width + 2) is not { } picture)
+        {
+            return null;
+        }
+
+        // As tall as the picture is at the card's full width, or the whole card if it is taller.
+        var pictureHeight = Math.Min(height, (int)Math.Round((double)width * picture.PixelHeight / picture.PixelWidth));
+        if (pictureHeight < 1 || Cover(picture, width, pictureHeight) is not { } art)
+        {
+            return null;
+        }
+
+        var pixels = new byte[width * height * BytesPerPixel];
+        var fade = pictureHeight < height ? pictureHeight * PanelFadeShare : 0;
+
+        Parallel.For(0, height, y =>
+        {
+            var down = height > 1 ? (double)y / (height - 1) : 0;
+            var blue = PanelTop.B + (PanelBottom.B - PanelTop.B) * down;
+            var green = PanelTop.G + (PanelBottom.G - PanelTop.G) * down;
+            var red = PanelTop.R + (PanelBottom.R - PanelTop.R) * down;
+
+            // How much of the picture shows on this row: all of it, less and less towards its foot, then none.
+            var fromFoot = pictureHeight - 1 - y;
+            var show = fromFoot < 0 ? 0 : fromFoot >= fade ? 1 : Smooth(fromFoot / fade);
+            var row = y * width * BytesPerPixel;
+
+            for (var x = 0; x < width * BytesPerPixel; x += BytesPerPixel)
+            {
+                var i = row + x;
+                if (show > 0)
+                {
+                    pixels[i] = Round(art[i] * show + blue * (1 - show));
+                    pixels[i + 1] = Round(art[i + 1] * show + green * (1 - show));
+                    pixels[i + 2] = Round(art[i + 2] * show + red * (1 - show));
+                }
+                else
+                {
+                    pixels[i] = Round(blue);
+                    pixels[i + 1] = Round(green);
+                    pixels[i + 2] = Round(red);
+                }
+            }
+        });
+
+        return Frozen(pixels, width, height);
+    }
+
     // A picture is the point of this background, so it gets less of the shade than a plain gradient
     // needs to stay out of the way of the text.
     private const double PictureShade = 0.72;

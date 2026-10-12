@@ -21,6 +21,14 @@ public partial class LibraryWindow
     /// </summary>
     private void QueueBackdrop(GameTile tile)
     {
+        // The Old School layout's open Not installed card keeps its green around it, whichever game is
+        // picked, and so does every game when the player chose the green for the background.
+        if (IsBrowsing || _background == BackgroundKind.Green)
+        {
+            ShowCategoryBackdrop();
+            return;
+        }
+
         if (tile.Game.Key == _backdropKey || !IsActive)
         {
             return;
@@ -73,8 +81,7 @@ public partial class LibraryWindow
                 return null;
             }
 
-            // Apps take their icon's colours, as there is no artwork to look up for them.
-            if (background == BackgroundKind.Artwork && !tile.IsApp && await Artwork.FindAsync(tile.Game) is { } path
+            if (background == BackgroundKind.Artwork && await Artwork.FindAsync(tile.Game) is { } path
                 && Backdrops.FromArtwork(path, width, height, blur, position, from, to, shade) is { } artwork)
             {
                 // Decoding artwork (up to 4K) leaves tens of MB of buffers behind, some of them outside

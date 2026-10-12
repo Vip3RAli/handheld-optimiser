@@ -43,7 +43,7 @@ public partial class LibraryWindow
     private void OnUpdateNow(object sender, RoutedEventArgs e)
     {
         CloseMenu();
-        StatusText.Text = Updates.StartUpdate() ?? "Opening Handheld Optimiser to install the update...";
+        Notice = Updates.StartUpdate() ?? "Opening Handheld Optimiser to install the update...";
     }
 
     /// <summary>Hides the banner for this release. The update stays in Settings.</summary>
@@ -53,17 +53,29 @@ public partial class LibraryWindow
         UpdateBanner.Visibility = Visibility.Collapsed;
     }
 
-    // ----- Quick settings, Settings and Power on the d-pad -----
+    // ----- Search, Settings and Power on the d-pad -----
 
     // The top bar button the d-pad was last on, which Up goes back to.
     private Button? _topBarButton;
 
-    private Button[] TopBarButtons() => [QuickButton, SettingsButton, PowerButton];
+    // The search button is only there on the Not installed tab, and the store button and the search bar
+    // while the search is open. The Old School layout's open card has the search and nothing else.
+    private Button[] TopBarButtons() => SearchButton.Visibility != Visibility.Visible ? [SettingsButton, PowerButton]
+        : IsBrowsing ? IsSearchOpen ? [StoreButton, SearchBar, SearchButton] : [SearchButton]
+        : IsSearchOpen ? [StoreButton, SearchBar, SearchButton, SettingsButton, PowerButton]
+        : [SearchButton, SettingsButton, PowerButton];
 
     private bool IsTopBarButton(object? element) => element is Button button && Array.IndexOf(TopBarButtons(), button) >= 0;
 
-    /// <summary>Up from the top row of games, or from an empty library: the top bar's buttons.</summary>
-    private void FocusTopBar() => (_topBarButton ?? QuickButton).Focus();
+    /// <summary>
+    /// Up from the top row of games, or from an empty library: the top bar's buttons. On the Not installed
+    /// tab that is the search button, or the search bar while the search is open, which is what the top bar
+    /// is most wanted for there.
+    /// </summary>
+    private void FocusTopBar() =>
+        (SearchButton.Visibility != Visibility.Visible ? _topBarButton is { IsVisible: true } last ? last : SettingsButton
+            : IsSearchOpen ? SearchBar
+            : SearchButton).Focus();
 
     private void NavigateTopBar(Button from, FocusNavigationDirection direction)
     {
@@ -88,7 +100,9 @@ public partial class LibraryWindow
         if (sender is Button button)
         {
             _topBarButton = button;
-            AcceptHint.Text = "Open";
+            AcceptHint.Text = ReferenceEquals(button, StoreButton) ? "Next store"
+                : ReferenceEquals(button, SearchBar) ? "Type"
+                : "Open";
         }
     }
 

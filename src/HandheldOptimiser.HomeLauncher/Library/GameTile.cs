@@ -16,7 +16,7 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 /// games, whose covers would take hundreds of MB, so only the ones near the focus are loaded (see
 /// <see cref="Load"/>) and they are let go again as the focus moves away.
 /// </summary>
-internal sealed class GameTile : INotifyPropertyChanged
+internal sealed class GameTile : INotifyPropertyChanged, INoticeHost
 {
     // Tiles are 180 x 270 DIPs; 360 px wide covers up to 200% scaling.
     private const int CoverDecodeWidth = 360;
@@ -29,8 +29,33 @@ internal sealed class GameTile : INotifyPropertyChanged
     public ImageSource? Icon { get; private set; }
     public required Brush Background { get; init; }
 
+    /// <summary>
+    /// The square icon for the row layout, from SteamGridDB. Null until it has been loaded, and for a game
+    /// that has none, whose tile then shows its cover cut to fit.
+    /// </summary>
+    public ImageSource? Square { get; private set; }
+
+    /// <summary>
+    /// The wide artwork for the Old School layout's card, cut to the card's shape. Null until it has been
+    /// loaded, and for a game that has none, whose card then shows its cover on <see cref="CardBrush"/>.
+    /// </summary>
+    public ImageSource? Wide { get; private set; }
+
+    /// <summary>The game's own colours, behind the cover on an Old School card with no wide artwork.</summary>
+    public Brush CardBrush => _cardBrush ??= Gradient(BackdropColours.From, BackdropColours.To, 45);
+
+    private Brush? _cardBrush;
+
     public string Title => Game.Title;
     public string StoreName => Game.StoreName;
+
+    /// <summary>
+    /// The store's logo for the corner of the artwork, or the console's for an emulator's game. Null for
+    /// an app or a program the player added.
+    /// </summary>
+    public Geometry? StoreLogo => Game.IsApp ? null
+        : Game.Store == GameStore.Emulator ? StoreLogos.ForConsole(Game.Platform)
+        : StoreLogos.For(Game.Store);
 
     /// <summary>False for a game the player owns but has not installed, shown faded with a download mark.</summary>
     public bool IsInstalled => Game.Installed;
@@ -55,8 +80,26 @@ internal sealed class GameTile : INotifyPropertyChanged
         set => Set(ref _isHidden, value);
     }
 
+    /// <summary>
+    /// What the library has to say about the game, such as that it is starting, shown on its tile or card
+    /// in place of its name. Null when it has nothing to say.
+    /// </summary>
+    public string? Notice
+    {
+        get => _notice;
+        set
+        {
+            if (_notice != value)
+            {
+                _notice = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Notice)));
+            }
+        }
+    }
+
     private bool _isFavourite;
     private bool _isHidden;
+    private string? _notice;
     public bool HasCover => Cover is not null;
     public bool ShowsIcon => Cover is null;
 
@@ -147,6 +190,26 @@ internal sealed class GameTile : INotifyPropertyChanged
         CoverChanged();
     }
 
+    /// <summary>Shows the square icon, or with null lets go of it. UI thread only.</summary>
+    public void ShowSquare(ImageSource? square)
+    {
+        if (!ReferenceEquals(Square, square))
+        {
+            Square = square;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Square)));
+        }
+    }
+
+    /// <summary>Shows the wide artwork, or with null lets go of it. UI thread only.</summary>
+    public void ShowWide(ImageSource? wide)
+    {
+        if (!ReferenceEquals(Wide, wide))
+        {
+            Wide = wide;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Wide)));
+        }
+    }
+
     /// <summary>Goes back to the icon, for a fetched cover that turned out to be the wrong game's.</summary>
     public void ClearFetchedCover()
     {
@@ -172,7 +235,9 @@ internal sealed class GameTile : INotifyPropertyChanged
 
     private void CoverChanged()
     {
-        foreach (var name in new[] { nameof(Cover), nameof(Icon), nameof(HasCover), nameof(ShowsIcon) })
+        // The colours are taken from the cover, so the card's brush is made again from the new ones.
+        _cardBrush = null;
+        foreach (var name in new[] { nameof(Cover), nameof(Icon), nameof(HasCover), nameof(ShowsIcon), nameof(CardBrush) })
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
@@ -225,12 +290,12 @@ internal sealed class GameTile : INotifyPropertyChanged
         return (stops[0].Color, stops[^1].Color);
     }
 
-    private static Brush Gradient(string top, string bottom)
+    private static Brush Gradient(string top, string bottom) =>
+        Gradient((Color)ColorConverter.ConvertFromString(top), (Color)ColorConverter.ConvertFromString(bottom), 90);
+
+    private static Brush Gradient(Color from, Color to, double angle)
     {
-        var brush = new LinearGradientBrush(
-            (Color)ColorConverter.ConvertFromString(top),
-            (Color)ColorConverter.ConvertFromString(bottom),
-            90);
+        var brush = new LinearGradientBrush(from, to, angle);
         brush.Freeze();
         return brush;
     }

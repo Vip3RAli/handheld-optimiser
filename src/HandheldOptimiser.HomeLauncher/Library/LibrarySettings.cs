@@ -8,6 +8,7 @@ internal enum BackgroundKind
 {
     Colours,
     Artwork,
+    Green,
     Plain
 }
 
@@ -43,18 +44,23 @@ internal enum SortOrder
     Name
 }
 
-/// <summary>How the games are laid out: a grid that scrolls down, or one row that scrolls across.</summary>
+/// <summary>
+/// How the games are laid out: a grid that scrolls down, one row that scrolls across, or Old School, a
+/// staggered line of big cards like the Xbox 360's.
+/// </summary>
 internal enum LibraryLayout
 {
     Grid,
-    Row
+    Row,
+    OldSchool
 }
 
 /// <summary>The layout on a TV or monitor.</summary>
 internal enum DockedLayout
 {
     Grid,
-    Row
+    Row,
+    OldSchool
 }
 
 /// <summary>
@@ -78,6 +84,8 @@ internal static class LibrarySettings
     private const string StoreClosingValue = "CloseStoreApps";
     private const string LayoutValue = "Layout";
     private const string ContinueValue = "ContinuePlaying";
+    private const string ContinueInfoValue = "ContinueInfo";
+    private const string StoreDetailsValue = "StoreDetails";
     private const string ResumeValue = "ResumeAfterSleep";
     private const string QuickResumeValue = "QuickResume";
     private const string PausedValue = "PausedProcesses";
@@ -87,6 +95,7 @@ internal static class LibrarySettings
     private const string NotInstalledValue = "ShowNotInstalled";
     private const string SteamKeyValue = "SteamWebApiKey";
     private const string DealsValue = "ShowDeals";
+    private const string EpicFreeValue = "EpicFreeGames";
     private const string DealsKeyValue = "IsThereAnyDealKey";
     private const string WishlistDealsValue = "WishlistDealsFirst";
 
@@ -98,12 +107,14 @@ internal static class LibrarySettings
         get => Read(BackgroundValue)?.ToLowerInvariant() switch
         {
             "artwork" => BackgroundKind.Artwork,
+            "green" => BackgroundKind.Green,
             "none" => BackgroundKind.Plain,
             _ => BackgroundKind.Colours
         };
         set => Write(BackgroundValue, value switch
         {
             BackgroundKind.Artwork => "artwork",
+            BackgroundKind.Green => "green",
             BackgroundKind.Plain => "none",
             _ => "gradient"
         });
@@ -203,11 +214,25 @@ internal static class LibrarySettings
         set => Write(LayoutValue, value.ToString().ToLowerInvariant());
     }
 
-    /// <summary>The last game played, and the few before it, above the grid.</summary>
+    /// <summary>The last game played, above the grid.</summary>
     public static bool ContinuePlaying
     {
         get => ReadSwitch(ContinueValue);
         set => WriteSwitch(ContinueValue, value);
+    }
+
+    /// <summary>The last game's play time, size and profile, beside its Last played card.</summary>
+    public static bool ContinueInfo
+    {
+        get => ReadSwitch(ContinueInfoValue);
+        set => WriteSwitch(ContinueInfoValue, value);
+    }
+
+    /// <summary>The last game's description and the like from Steam's store or Wikipedia. Off until switched on.</summary>
+    public static bool StoreDetails
+    {
+        get => ReadSwitch(StoreDetailsValue, on: false);
+        set => WriteSwitch(StoreDetailsValue, value);
     }
 
     /// <summary>Back to the game that was running, rather than the library, when the device wakes.</summary>
@@ -274,7 +299,14 @@ internal static class LibrarySettings
         set => WriteSwitch(DealsValue, value);
     }
 
-    /// <summary>The player's IsThereAnyDeal API key, which the Deals row needs. Null when none is set.</summary>
+    /// <summary>The Epic Games Store's free games of the week at the front of the Deals row, which need no key.</summary>
+    public static bool EpicFreeGames
+    {
+        get => ReadSwitch(EpicFreeValue);
+        set => WriteSwitch(EpicFreeValue, value);
+    }
+
+    /// <summary>The player's IsThereAnyDeal API key, for the sales in the Deals row. Null when none is set.</summary>
     public static string? DealsKey
     {
         get => Read(DealsKeyValue)?.Trim() is { Length: > 0 } key ? key : null;

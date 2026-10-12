@@ -25,10 +25,31 @@ internal static class OwnedGames
     // Tools that install through Steam but are not games, as in SteamLibrary.
     private static readonly HashSet<string> ExcludedSteamApps = ["228980", "250820"];
 
-    // The Epic Games Launcher's copy of the catalogue entries for the account's games: base64 JSON.
-    private static readonly string EpicCatalog = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "EpicGamesLauncher", "Saved", "Data", "Catalog", "catcache.bin");
+    // The Epic Games Launcher's copy of the catalogue entries for the account's games: base64 JSON. It
+    // keeps it with its other data for every user, where older versions kept it with the user's own.
+    private static readonly string[] EpicCatalogs =
+    [
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            "Epic", "EpicGamesLauncher", "Data", "Catalog", "catcache.bin"),
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "EpicGamesLauncher", "Saved", "Data", "Catalog", "catcache.bin")
+    ];
+
+    /// <summary>The catalogue the launcher wrote last, or the first place to look when there is none yet.</summary>
+    private static string EpicCatalog
+    {
+        get
+        {
+            try
+            {
+                return EpicCatalogs.Where(File.Exists).MaxBy(File.GetLastWriteTimeUtc) ?? EpicCatalogs[0];
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return EpicCatalogs[0];
+            }
+        }
+    }
 
     private static readonly string GalaxyDatabase = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
@@ -52,6 +73,12 @@ internal static class OwnedGames
         WHERE p.releaseKey LIKE 'gog\_%' ESCAPE '\'
           AND t.type IN ('title', 'originalTitle', 'originalImages')
           AND p.releaseKey IN (SELECT releaseKey FROM LibraryReleases)
+        """;
+
+    // Galaxy lists every add-on, outfit and discount code as a release of its own, marked as DLC.
+    private const string GalaxyNotDlc = """
+
+          AND p.releaseKey NOT IN (SELECT releaseKey FROM ReleaseProperties WHERE isDlc = 1)
         """;
 
     /// <summary>The owned games that are not among the installed ones, by title. Call it off the UI thread.</summary>
@@ -163,8 +190,61 @@ internal static class OwnedGames
             return [];
         }
 
-        var artDir = SteamLibrary.SteamDirectory() is { } steamDir ? Path.Combine(steamDir, "appcache", "librarycache") : null;
-        return Cached(SteamCachePath(steamId), path => ParseSteamOwned(File.ReadAllText(path), artDir));
+        var steamDir = SteamLibrary.SteamDirectory();
+        var artDir = steamDir is null ? null : Path.Combine(steamDir, "appcache", "librarycache");
+
+        // Steam's own answer is the exact list, for a player who has given a key.
+        var answer = SteamCachePath(steamId);
+        if (LibrarySettings.SteamKey is not null && File.Exists(answer))
+        {
+            return Cached(answer, path => ParseSteamOwned(File.ReadAllText(path), artDir));
+        }
+
+        // Without one, what the Steam app on this device keeps about the account's games.
+        if (steamDir is null)
+        {
+            return [];
+        }
+
+        var packages = Path.Combine(steamDir, "appcache", "packageinfo.vdf");
+        return Cached(Path.Combine(steamDir, "appcache", "appinfo.vdf"), path =>
+        {
+            try
+            {
+                return SteamGamesFromCache(SteamAppInfo.ParseApps(File.ReadAllBytes(path)),
+                    SteamAppInfo.ParsePackageApps(File.ReadAllBytes(packages)), artDir);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Steam is writing them; the next scan reads them again.
+                return [];
+            }
+        });
+    }
+
+    /// <summary>
+    /// The games the Steam app's caches say the account has: the apps it calls games that are in a package
+    /// the account holds a licence for. That counts free games added to the library and never played,
+    /// which Steam's own answer leaves out, and misses playtests, which it calls betas.
+    /// </summary>
+    public static List<Game> SteamGamesFromCache(IEnumerable<SteamApp> apps, IReadOnlySet<long> licensed, string? artDir) =>
+        apps.Where(app => app.Type == "game" && licensed.Contains(app.AppId) && !ExcludedSteamApps.Contains(app.AppId.ToString()))
+            .DistinctBy(app => app.AppId)
+            .Select(app => SteamGame(app.AppId, app.Name, artDir))
+            .ToList();
+
+    private static Game SteamGame(long appId, string name, string? artDir)
+    {
+        var cover = artDir is null ? null : SteamLibrary.FindArt(artDir, appId.ToString(), SteamLibrary.CoverNames);
+        return new Game(
+            Key: $"steam:{appId}",
+            Title: name,
+            Store: GameStore.Steam,
+            CoverPath: cover,
+            IconPath: null,
+            LaunchTarget: $"steam://install/{appId}",
+            Installed: false,
+            CoverUrl: cover is null ? $"https://cdn.cloudflare.steamstatic.com/steam/apps/{appId}/library_600x900.jpg" : null);
     }
 
     /// <summary>The Steam games in a GetOwnedGames answer, as games to install.</summary>
@@ -189,16 +269,7 @@ internal static class OwnedGames
                     continue;
                 }
 
-                var cover = artDir is null ? null : SteamLibrary.FindArt(artDir, appId.ToString(), SteamLibrary.CoverNames);
-                games.Add(new Game(
-                    Key: $"steam:{appId}",
-                    Title: name,
-                    Store: GameStore.Steam,
-                    CoverPath: cover,
-                    IconPath: null,
-                    LaunchTarget: $"steam://install/{appId}",
-                    Installed: false,
-                    CoverUrl: cover is null ? $"https://cdn.cloudflare.steamstatic.com/steam/apps/{appId}/library_600x900.jpg" : null));
+                games.Add(SteamGame(appId, name, artDir));
             }
         }
         catch (JsonException)
@@ -238,7 +309,9 @@ internal static class OwnedGames
             {
                 var isGame = item.TryGetProperty("categories", out var categories) && categories.ValueKind == JsonValueKind.Array
                     && categories.EnumerateArray().Any(c => Str(c, "path") == "games");
-                var isAddOn = item.TryGetProperty("mainGameItem", out var main) && main.ValueKind == JsonValueKind.Object;
+                // The launcher now gives every entry a main game, left empty for one that is a game itself.
+                var isAddOn = (item.TryGetProperty("mainGameItem", out var main) && Str(main, "id") is not null)
+                    || (isGame && categories.EnumerateArray().Any(c => Str(c, "path") == "addons"));
 
                 if (!isGame || isAddOn || Str(item, "id") is not { } itemId || Str(item, "namespace") is not { } ns
                     || Str(item, "title") is not { } title || WindowsAppId(item) is not { } appId)
@@ -267,7 +340,8 @@ internal static class OwnedGames
 
     private static List<Game> GogGames(string path)
     {
-        if (Sqlite.Query(path, GalaxyQuery, 3) is not { } rows)
+        // An older Galaxy may not mark DLC, in which case everything it lists is shown as before.
+        if ((Sqlite.Query(path, GalaxyQuery + GalaxyNotDlc, 3) ?? Sqlite.Query(path, GalaxyQuery, 3)) is not { } rows)
         {
             Program.Log("GOG Galaxy's game list could not be read");
             return [];
