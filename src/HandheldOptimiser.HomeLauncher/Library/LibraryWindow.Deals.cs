@@ -238,7 +238,7 @@ public partial class LibraryWindow
         var buttons = new List<Button>();
         for (var i = 0; i < items.Items.Count; i++)
         {
-            if (items.ItemContainerGenerator.ContainerFromIndex(i) is ContentPresenter container
+            if (ItemContainers.At(items, i) is { } container
                 && VisualChild<Button>(container) is { } button)
             {
                 buttons.Add(button);

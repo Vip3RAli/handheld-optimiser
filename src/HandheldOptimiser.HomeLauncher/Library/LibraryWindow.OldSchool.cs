@@ -425,7 +425,7 @@ public partial class LibraryWindow
 
         // Giving it the focus brings it to the front. The card that already has the focus raises no
         // focus event, so the cards are sent to it as well.
-        if (stack.Items.ItemContainerGenerator.ContainerFromIndex(card) is ContentPresenter container)
+        if (ItemContainers.At(stack.Items, card) is { } container)
         {
             VisualChild<Button>(container)?.Focus();
         }
