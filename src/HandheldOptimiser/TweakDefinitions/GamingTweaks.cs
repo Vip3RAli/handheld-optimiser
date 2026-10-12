@@ -11,6 +11,8 @@ public static class GamingTweaks
 {
     private const string DeviceGuardKey = @"SYSTEM\CurrentControlSet\Control\DeviceGuard";
     private const string HvciKey = @"SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity";
+    private const string HelloKey = @"SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\WindowsHello";
+    private const string SecureBiometricsKey = @"SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\SecureBiometrics";
 
     private static readonly string[] VirtualisationFeatures = ["VirtualMachinePlatform", "HypervisorPlatform"];
 
@@ -51,28 +53,39 @@ public static class GamingTweaks
     };
 
     /// <summary>
-    /// Virtual Machine Platform plus the boot-time hypervisor. Disabling these removes the VBS overhead
-    /// that sits under every process, at the cost of WSL2, Sandbox and the Android subsystem.
+    /// Virtual Machine Platform plus everything that asks Windows to start VBS. Disabling these removes
+    /// the VBS overhead that sits under every process, at the cost of WSL2, Sandbox, the Android
+    /// subsystem and Windows Hello's protected sign-in.
+    ///
+    /// The two sign-in scenarios are what decide it. On a ROG Ally, with a fingerprint reader, Windows
+    /// kept starting VBS "due to VBS registry configuration" on every boot with the main switch at 0,
+    /// both features off and the boot hypervisor off, and stopped on the first boot with both
+    /// scenarios at 0. Either one alone is not known to be enough, so both are written.
     /// </summary>
     public static Tweak VirtualisationPlatform => new()
     {
         Id = "gaming.vmp",
         Name = "Disable Virtual Machine Platform & VBS",
         Description =
-            "Turns off Virtual Machine Platform, the Windows Hypervisor Platform and the boot " +
-            "hypervisor, removing virtualisation overhead from every process.",
+            "Turns off virtualisation-based security, with Virtual Machine Platform, the Windows " +
+            "Hypervisor Platform and Windows Hello's protected sign-in, which keep it running. Removes " +
+            "virtualisation overhead from every process.",
         Category = TweakCategory.Gaming,
         Risk = RiskLevel.Breaking,
         RequiresReboot = true,
         // Opt-in only: Vanguard and FACEIT games stop launching, which is too easy to miss in a one-click run.
         IncludeInOneClick = false,
         Warning =
-            "WSL, Windows Sandbox, the Windows Subsystem for Android, Hyper-V and Credential Guard stop " +
-            "working until reverted. Some anti-cheat (notably Vanguard and Faceit) needs virtualisation " +
-            "and will refuse to launch.",
+            "If Windows Hello is protected by it, your PIN has to be reset at the next sign-in, which " +
+            "needs your account password, and your fingerprint or face set up again without that " +
+            "protection. WSL, Windows Sandbox, the Windows Subsystem for Android, Hyper-V and Credential " +
+            "Guard stop working until reverted. Some anti-cheat (notably Vanguard and Faceit) needs " +
+            "virtualisation and will refuse to launch.",
         RegistryValues =
         [
-            new(RegistryRoot.LocalMachine, DeviceGuardKey, "EnableVirtualizationBasedSecurity", 0, RegistryValueKind.DWord)
+            new(RegistryRoot.LocalMachine, DeviceGuardKey, "EnableVirtualizationBasedSecurity", 0, RegistryValueKind.DWord),
+            new(RegistryRoot.LocalMachine, HelloKey, "Enabled", 0, RegistryValueKind.DWord),
+            new(RegistryRoot.LocalMachine, SecureBiometricsKey, "Enabled", 0, RegistryValueKind.DWord)
         ],
         ScriptDetect = async (ctx, ct) =>
         {
@@ -83,33 +96,12 @@ public static class GamingTweaks
                     $s = (Get-WindowsOptionalFeature -Online -FeatureName $f).State
                     Write-Output "FEATURE=$f=$s"
                 }
-                $line = bcdedit /enum '{current}' | Select-String -Pattern 'hypervisorlaunchtype'
-                if ($line) { Write-Output "BCD=$($line.ToString().Trim())" } else { Write-Output 'BCD=absent' }
                 """,
                 "Check virtualisation platform state",
                 ct,
                 echoScript: false);
 
-            var features = outcome.OutputLines
-                .Where(l => l.StartsWith("FEATURE=", StringComparison.Ordinal))
-                .Select(l => l.Split('=', 3))
-                .Where(p => p.Length == 3)
-                .ToDictionary(p => p[1], p => p[2], StringComparer.OrdinalIgnoreCase);
-
-            var bcdLine = outcome.OutputLines.FirstOrDefault(l => l.StartsWith("BCD=", StringComparison.Ordinal)) ?? string.Empty;
-            var hypervisorOff = bcdLine.Contains("off", StringComparison.OrdinalIgnoreCase);
-
-            var featuresDisabled = features.Count > 0 &&
-                                   features.Values.All(v => v.Equals("Disabled", StringComparison.OrdinalIgnoreCase));
-
-            if (features.Count == 0)
-            {
-                return TweakState.Unknown;
-            }
-
-            return featuresDisabled && hypervisorOff ? TweakState.Applied
-                : !featuresDisabled && !hypervisorOff ? TweakState.NotApplied
-                : TweakState.Partial;
+            return VirtualisationFeaturesState(outcome.OutputLines);
         },
         ScriptApply = async (ctx, journal, ct) =>
         {
@@ -263,6 +255,31 @@ public static class GamingTweaks
                 "StartupDelayInMSec", 0, RegistryValueKind.DWord)
         ]
     };
+
+    /// <summary>
+    /// The script half of the VBS tweak's state, from the FEATURE= lines its check prints: applied when
+    /// every virtualisation feature is off. The boot hypervisor setting is left out on purpose. Apply
+    /// still switches it off, but it neither starts nor stops VBS, and a Windows update removes it,
+    /// which made a tweak that was fully in place read as partly applied.
+    /// </summary>
+    public static TweakState VirtualisationFeaturesState(IEnumerable<string> outputLines)
+    {
+        var states = outputLines
+            .Where(l => l.StartsWith("FEATURE=", StringComparison.Ordinal))
+            .Select(l => l.Split('=', 3))
+            .Where(p => p.Length == 3)
+            .Select(p => p[2])
+            .ToList();
+
+        if (states.Count == 0)
+        {
+            return TweakState.Unknown;
+        }
+
+        return states.All(s => s.Equals("Disabled", StringComparison.OrdinalIgnoreCase))
+            ? TweakState.Applied
+            : TweakState.NotApplied;
+    }
 
     private static bool SafetyGuardCheck(string feature, TweakContext ctx, out TweakResult? blocked)
     {

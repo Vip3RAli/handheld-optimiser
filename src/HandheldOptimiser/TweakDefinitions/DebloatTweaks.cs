@@ -235,24 +235,150 @@ public static class DebloatTweaks
         ]
     };
 
+    /// <summary>The Widgets board: the Windows Web Experience Pack, by package name, family and Store ID.</summary>
+    public const string WidgetsPackage = "MicrosoftWindows.Client.WebExperience";
+    private const string WidgetsFamily = "MicrosoftWindows.Client.WebExperience_cw5n1h2txyewy";
+    private const string WidgetsStoreId = "9MSSGKG348SP";
+
     /// <summary>
-    /// The policy rather than the taskbar's TaskbarDa value: on current builds a driver blocks other
-    /// programs from writing TaskbarDa, and the policy also stops the board's host process starting.
+    /// Removes the Widgets app for this user, because Windows leaves no setting to write. A driver
+    /// blocks other programs from writing the taskbar's TaskbarDa value, and on current builds also
+    /// the AllowNewsAndInterests policy this tweak used to set: on a ROG Ally an administrator could
+    /// write any other value in that key and was refused that one.
+    ///
+    /// Only this user's registration goes. Windows usually keeps the app's files, so undoing it is a
+    /// matter of registering them again, and the Store is only needed where they have gone.
     /// </summary>
     public static Tweak Widgets => new()
     {
         Id = "debloat.widgets",
         Name = "Turn off Widgets",
         Description =
-            "Removes the Widgets board and its taskbar button, freeing 100 to 200 MB of memory.",
+            "Removes the Widgets board and its taskbar button, freeing 100 to 200 MB of memory. " +
+            "Reverting puts it back, from the Microsoft Store if Windows has not kept a copy.",
         Category = TweakCategory.Debloat,
         Risk = RiskLevel.Safe,
-        RequiresReboot = true,
-        RegistryValues =
+        // Nothing is written here any more. The policy stays listed so that undo data from a version
+        // that did write it, on a Windows that allowed it, can still be put back.
+        ScriptRegistryValues =
         [
             new(RegistryRoot.LocalMachine, @"SOFTWARE\Policies\Microsoft\Dsh", "AllowNewsAndInterests", 0, RegistryValueKind.DWord)
-        ]
+        ],
+        ScriptDetect = async (ctx, ct) =>
+        {
+            // Nothing is printed when the question itself fails, so a broken package service reads as
+            // unknown, not as Widgets already gone.
+            var outcome = await ctx.Runner.RunScriptAsync(
+                $$"""
+                try {
+                    if (Get-AppxPackage -Name '{{WidgetsPackage}}' -ErrorAction Stop) { Write-Output 'WIDGETS=Installed' }
+                    else { Write-Output 'WIDGETS=Absent' }
+                } catch { }
+                """,
+                "Check whether the Widgets app is installed",
+                ct,
+                echoScript: false);
+
+            return WidgetsState(outcome.OutputLines);
+        },
+        ScriptApply = async (ctx, journal, ct) =>
+        {
+            if (Services.SafetyGuard.IsAppxProtected(WidgetsPackage, out var reason))
+            {
+                ctx.Log.Error($"BLOCKED removal of {WidgetsPackage}: {reason}");
+                return TweakResult.Blocked("debloat.widgets", reason!);
+            }
+
+            var outcome = await ctx.Runner.RunScriptAsync(
+                $$"""
+                $ErrorActionPreference = 'Continue'
+                $failed = $false
+                foreach ($p in Get-AppxPackage -Name '{{WidgetsPackage}}' -ErrorAction SilentlyContinue) {
+                    Write-Output "Removing $($p.PackageFullName)"
+                    try {
+                        Remove-AppxPackage -Package $p.PackageFullName -ErrorAction Stop
+                        Write-Output 'RESULT=REMOVED'
+                    }
+                    catch { Write-Output "  failed: $($_.Exception.Message)"; $failed = $true }
+                }
+                if ($failed) { exit 1 }
+                """,
+                "Remove the Widgets app",
+                ct);
+
+            if (!outcome.Succeeded)
+            {
+                return TweakResult.Fail("debloat.widgets", "The Widgets app could not be removed. See log.");
+            }
+
+            if (!outcome.OutputLines.Contains("RESULT=REMOVED"))
+            {
+                return TweakResult.NoChange("debloat.widgets");
+            }
+
+            // An entry with nothing in it is not kept, and a tweak with no entry cannot be reverted.
+            journal.CapturedState["widgets.removed"] = WidgetsPackage;
+            return TweakResult.Ok("debloat.widgets", "Widgets removed.");
+        },
+        ScriptRevert = async (ctx, journal, ct) =>
+        {
+            var register = await ctx.Runner.RunScriptAsync(
+                $$"""
+                $ErrorActionPreference = 'Continue'
+                if (Get-AppxPackage -Name '{{WidgetsPackage}}' -ErrorAction SilentlyContinue) {
+                    Write-Output 'RESULT=PRESENT'
+                    exit 0
+                }
+                try {
+                    Add-AppxPackage -RegisterByFamilyName -MainPackage '{{WidgetsFamily}}' -ErrorAction Stop
+                    Write-Output 'RESULT=REGISTERED'
+                } catch {
+                    Write-Output "  Windows has not kept a copy: $($_.Exception.Message)"
+                    Write-Output 'RESULT=MISSING'
+                }
+                """,
+                "Put the Widgets app back",
+                ct);
+
+            if (register.OutputLines.Contains("RESULT=PRESENT"))
+            {
+                ctx.Log.Info("The Widgets app is installed; nothing to put back.");
+                return TweakResult.NoChange("debloat.widgets");
+            }
+
+            if (register.OutputLines.Contains("RESULT=REGISTERED"))
+            {
+                return TweakResult.Ok("debloat.widgets", "Widgets restored.");
+            }
+
+            var store = await ctx.Runner.RunProcessAsync(
+                "winget.exe",
+                [
+                    "install", "--id", WidgetsStoreId, "--exact", "--source", "msstore",
+                    "--accept-package-agreements", "--accept-source-agreements", "--disable-interactivity"
+                ],
+                "Install the Widgets app from the Microsoft Store",
+                ct);
+
+            return store.Succeeded
+                ? TweakResult.Ok("debloat.widgets", "Widgets restored from the Microsoft Store.")
+                : TweakResult.Fail(
+                    "debloat.widgets",
+                    "Widgets could not be put back. Install \"Windows Web Experience Pack\" from the Microsoft Store.");
+        }
     };
+
+    /// <summary>
+    /// The Widgets tweak's state, from the line its check prints: applied when the app is not installed
+    /// for this user, and unknown when Windows gave no answer.
+    /// </summary>
+    public static TweakState WidgetsState(IEnumerable<string> outputLines) =>
+        outputLines.FirstOrDefault(l => l.StartsWith("WIDGETS=", StringComparison.Ordinal)) switch
+        {
+            "WIDGETS=Absent" => TweakState.Applied,
+            "WIDGETS=Installed" => TweakState.NotApplied,
+            _ => TweakState.Unknown
+        };
 
     public static Tweak EdgeBackground => new()
     {

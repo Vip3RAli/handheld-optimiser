@@ -332,8 +332,21 @@ public static class SafetyGuard
         return null;
     }
 
+    /// <summary>
+    /// The one package let through a protected name: the Windows Web Experience Pack, which is the
+    /// Widgets board and nothing else. It is a Store app Windows itself lets the user uninstall, where
+    /// the rest of "MicrosoftWindows.Client" is the shell. Matched exactly, so none of that comes with it.
+    /// </summary>
+    private const string WidgetsAppx = "MicrosoftWindows.Client.WebExperience";
+
     public static bool IsAppxProtected(string packageIdentityName, out string? reason)
     {
+        if (string.Equals(packageIdentityName, WidgetsAppx, StringComparison.OrdinalIgnoreCase))
+        {
+            reason = null;
+            return false;
+        }
+
         var lower = packageIdentityName.ToLowerInvariant();
 
         foreach (var fragment in ProtectedAppxFragments)

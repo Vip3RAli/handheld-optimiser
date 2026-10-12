@@ -233,8 +233,8 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
         var outcome = await _runner.RunScriptAsync(
             """
             $ErrorActionPreference = 'SilentlyContinue'
-            $line = bcdedit /enum '{current}' | Select-String -Pattern 'hypervisorlaunchtype'
-            if ($line) { Write-Output "BCD=$(($line.ToString().Trim() -split '\s+')[-1])" } else { Write-Output 'BCD=absent' }
+            $vbs = (Get-CimInstance -Namespace root\Microsoft\Windows\DeviceGuard -ClassName Win32_DeviceGuard).VirtualizationBasedSecurityStatus
+            Write-Output "VBS=$vbs"
             $vmp = (Get-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform).State
             Write-Output "VMP=$vmp"
             """,
@@ -242,18 +242,10 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
             ct,
             echoScript: false);
 
-        var bcd = outcome.OutputLines.FirstOrDefault(l => l.StartsWith("BCD=", StringComparison.Ordinal))?[4..] ?? "unknown";
+        var vbs = outcome.OutputLines.FirstOrDefault(l => l.StartsWith("VBS=", StringComparison.Ordinal))?[4..];
         var vmp = outcome.OutputLines.FirstOrDefault(l => l.StartsWith("VMP=", StringComparison.Ordinal))?[4..] ?? "unknown";
 
-        var hypervisorOff = bcd.Equals("off", StringComparison.OrdinalIgnoreCase);
-
-        checks.Add(new HealthCheck
-        {
-            Name = "[Performance] Boot hypervisor",
-            Detail = $"hypervisorlaunchtype = {bcd}",
-            Status = hypervisorOff ? HealthStatus.Good : HealthStatus.Warning,
-            Advice = hypervisorOff ? null : "Disabling the boot hypervisor removes VBS overhead from every process."
-        });
+        checks.Add(VbsCheck(vbs));
 
         checks.Add(new HealthCheck
         {
@@ -263,6 +255,27 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
         });
 
         return checks;
+    }
+
+    /// <summary>
+    /// Whether VBS is running, from the status Windows itself reports for this boot: 0 is off, 1 is
+    /// switched on but not running, 2 is running. This replaced a check of the boot hypervisor setting,
+    /// which read "off" on a ROG Ally while VBS ran, and "absent" once VBS had really stopped.
+    /// </summary>
+    public static HealthCheck VbsCheck(string? status)
+    {
+        const string name = "[Performance] Virtualisation-based security (VBS)";
+        const string advice =
+            "VBS adds overhead to every process. Disable Virtual Machine Platform & VBS on the Gaming " +
+            "Tweaks page turns it off, then restart.";
+
+        return status?.Trim() switch
+        {
+            "0" => new HealthCheck { Name = name, Detail = "Off", Status = HealthStatus.Good },
+            "1" => new HealthCheck { Name = name, Detail = "Switched on, not running", Status = HealthStatus.Warning, Advice = advice },
+            "2" => new HealthCheck { Name = name, Detail = "Running", Status = HealthStatus.Warning, Advice = advice },
+            _ => new HealthCheck { Name = name, Detail = "Windows did not say", Status = HealthStatus.Unknown }
+        };
     }
 
     /// <summary>
