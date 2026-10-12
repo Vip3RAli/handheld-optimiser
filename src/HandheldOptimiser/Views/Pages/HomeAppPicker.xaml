@@ -18,7 +18,7 @@
                 <RadioButton GroupName="HomeApp" IsChecked="{Binding IsLibrary, Mode=TwoWay}" MinHeight="40">
                     <StackPanel>
                         <TextBlock Text="Handheld Optimiser library" FontWeight="SemiBold" />
-                        <TextBlock Text="A lightweight game library for Steam, Xbox, Epic Games, Battle.net, GOG, EA App and Ubisoft Connect games. Uses about 115 MB while open, against about 1.4 GB for Big Picture." FontSize="11.5" Opacity="0.6" TextWrapping="Wrap" />
+                        <TextBlock Text="A lightweight game library for Steam, Xbox, Epic Games, Battle.net, GOG, EA App and Ubisoft Connect games." FontSize="11.5" Opacity="0.6" TextWrapping="Wrap" />
                     </StackPanel>
                 </RadioButton>
 
