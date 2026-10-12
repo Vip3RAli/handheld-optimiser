@@ -53,8 +53,9 @@ public partial class LibraryWindow
 
         // A cover already on disk needs no key and no request. This also catches one that finished
         // downloading for a tile a rescan has since replaced.
-        // Apps keep their own icon: SteamGridDB is for games, and would find the wrong thing for most.
-        var wanted = (notInstalled ?? _allTiles.Where(t => t.IsInstalled && !t.IsApp))
+        // Apps are asked about too. SteamGridDB keeps programs beside its games, and Artwork only takes
+        // one of those for an app, never a game that shares its name.
+        var wanted = (notInstalled ?? _allTiles.Where(t => t.IsInstalled))
             .Where(t => t.NeedsCover && (Artwork.CachedCover(t.Game) is not null
                 || ((mayAsk || t.Game.CoverUrl is not null) && _coversAsked.Add(t.Game.Key))))
             .ToList();

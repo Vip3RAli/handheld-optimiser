@@ -28,30 +28,61 @@ public partial class LibraryWindow
         MenuStore.Text = "Game library";
         RefreshSettings();
 
-        MenuOverlay.Visibility = Visibility.Visible;
+        ShowMenuOverlay();
         ShowMenuItems();
     }
 
-    private void OnOpenBackgroundSettings(object sender, RoutedEventArgs e) => OpenSettingsGroup(BackgroundItems, "Art and Background");
+    // The categories the settings list opens, each a short list of groups.
+    private const string LibraryDisplay = "Library Display";
+    private const string GamesApps = "Games and Apps";
+    private const string SleepTweaks = "Sleep and Tweaks";
 
-    private void OnOpenDisplaySettings(object sender, RoutedEventArgs e) => OpenSettingsGroup(DisplayItems, "Library View Options");
+    private void OnOpenLibraryDisplay(object sender, RoutedEventArgs e) => OpenSettingsCategory(LibraryDisplayItems);
 
-    /// <summary>One group of settings, in place of the settings list.</summary>
-    private void OpenSettingsGroup(StackPanel group, string title)
+    private void OnOpenGamesApps(object sender, RoutedEventArgs e) => OpenSettingsCategory(GamesAppsItems);
+
+    private void OnOpenSleepTweaks(object sender, RoutedEventArgs e) => OpenSettingsCategory(SleepTweaksItems);
+
+    /// <summary>One category's groups, in place of the settings list.</summary>
+    private void OpenSettingsCategory(StackPanel category, Button? focus = null)
     {
-        SettingsItems.Visibility = Visibility.Collapsed;
+        var title = ReferenceEquals(category, LibraryDisplayItems) ? LibraryDisplay
+            : ReferenceEquals(category, GamesAppsItems) ? GamesApps
+            : SleepTweaks;
+
+        OpenSettingsGroup(category, title, "Settings", focus);
+    }
+
+    private void OnOpenBackgroundSettings(object sender, RoutedEventArgs e) =>
+        OpenSettingsGroup(BackgroundItems, "Art and Background", LibraryDisplay);
+
+    private void OnOpenDisplaySettings(object sender, RoutedEventArgs e) =>
+        OpenSettingsGroup(DisplayItems, "Library View Options", LibraryDisplay);
+
+    /// <summary>One group of settings, in place of the list it was opened from, which is named under its title.</summary>
+    private void OpenSettingsGroup(StackPanel group, string title, string from, Button? focus = null)
+    {
+        HideMenuLists();
         _menu = group;
 
         MenuTitle.Text = title;
-        MenuStore.Text = "Settings";
-        ShowMenuItems();
+        MenuStore.Text = from;
+        ShowMenuItems(focus);
     }
 
-    private void OnSettingsBack(object sender, RoutedEventArgs e) => BackToSettings();
+    private void OnSettingsBack(object sender, RoutedEventArgs e)
+    {
+        // Nowhere to go back to: a list opened from its own Old School card, which closes.
+        if (!BackToSettings())
+        {
+            CloseMenu();
+        }
+    }
 
     /// <summary>
-    /// From a group of settings, goes back to the settings list with that group's row focused, and from a
-    /// game's profile back to its quick actions. False when no group is open, so Back closes the menu instead.
+    /// From a group of settings, goes back to its category with that group's row focused, from a category
+    /// back to the settings list, and from a game's profile back to its quick actions. False when none of
+    /// those is open, so Back closes the menu instead.
     /// </summary>
     private bool BackToSettings()
     {
@@ -103,7 +134,22 @@ public partial class LibraryWindow
             : ReferenceEquals(_menu, MaintenanceItems) ? MaintenanceGroup
             : null;
 
-        if (row is null)
+        // A group goes back to its category, which is the list its row is in.
+        if (row?.Parent is StackPanel category)
+        {
+            _confirming = null;
+            OpenSettingsCategory(category, row);
+            return true;
+        }
+
+        row = ReferenceEquals(_menu, LibraryDisplayItems) ? LibraryDisplayGroup
+            : ReferenceEquals(_menu, GamesAppsItems) ? GamesAppsGroup
+            : ReferenceEquals(_menu, SleepTweaksItems) ? SleepTweaksGroup
+            : null;
+
+        // One of the three lists opened from its own Old School card has no settings list behind it:
+        // Back turns the card over again.
+        if (row is null || _menuFromCard)
         {
             return false;
         }
@@ -121,11 +167,12 @@ public partial class LibraryWindow
     private void RefreshSettings()
     {
         UpdateSetting.Visibility = _update is null ? Visibility.Collapsed : Visibility.Visible;
-        UpdateSetting.Tag = _update is null ? null : $"Handheld Optimiser {Updates.Display(_update)} is available";
+        UpdateSetting.Tag = _update is null ? null : Updates.Display(_update);
 
         BackgroundSetting.Tag = _background switch
         {
             BackgroundKind.Artwork => "Game artwork",
+            BackgroundKind.Green => "Green",
             BackgroundKind.Plain => "Plain",
             _ => "Game colours"
         };
@@ -146,17 +193,12 @@ public partial class LibraryWindow
         StatusSetting.Tag = OnOff(_showStatus);
         FilterSetting.Tag = OnOff(_showFilter);
         QuickActionsSetting.Tag = OnOff(_quickActions);
-        SortSetting.Tag = SortName(_sort) + ". Favourites always come first";
+        SortSetting.Tag = SortName(_sort);
+        HiddenSetting.Tag = OnOff(_showHidden);
 
-        var hidden = _allTiles.Count(t => t.IsHidden);
-        HiddenSetting.Tag = (_showHidden ? "On, faded in the grid" : "Off")
-            + (hidden == 0 ? ". No games are hidden" : hidden == 1 ? ". 1 game is hidden" : $". {hidden} games are hidden");
-
-        // Only the end of the key is shown: enough to tell which one it is.
+        // Where to get a key is on the screen it is typed in.
         ArtworkKeySetting.Visibility = _background == BackgroundKind.Artwork ? Visibility.Visible : Visibility.Collapsed;
-        ArtworkKeySetting.Tag = LibrarySettings.ArtworkKey is not { } key ? "Not set. Free to create at steamgriddb.com"
-            : key.Length > 4 ? $"Set, ending in {key[^4..]}"
-            : "Set";
+        ArtworkKeySetting.Tag = LibrarySettings.ArtworkKey is null ? "Not set" : "Set";
     }
 
     private static string OnOff(bool on) => on ? "On" : "Off";
@@ -216,19 +258,19 @@ public partial class LibraryWindow
         if (MainApp.ShowIfRunning())
         {
             Program.Log("Switched to the main app, which was already open");
-            StatusText.Text = "Handheld Optimiser is already open.";
+            Notice = "Handheld Optimiser is already open.";
             return;
         }
 
         if (MainApp.Start() is { } problem)
         {
             Program.Log($"Could not open the main app from settings: {problem}");
-            StatusText.Text = $"Handheld Optimiser was not opened: {problem}";
+            Notice = $"Handheld Optimiser was not opened: {problem}";
             return;
         }
 
         Program.Log("Opened the main app from settings");
-        StatusText.Text = "Opening Handheld Optimiser...";
+        Notice = "Opening Handheld Optimiser...";
     }
 
     /// <summary>Closes the library. Windows starts it again on the next home button press.</summary>
@@ -336,6 +378,6 @@ public partial class LibraryWindow
 
     private void OnEditArtworkKey(object sender, RoutedEventArgs e) =>
         BeginEdit(MenuEditor.ArtworkKey, "SteamGridDB API key",
-            "Free at steamgriddb.com, under Preferences then API. Fetches artwork for games outside Steam, whose titles are sent to SteamGridDB. Leave empty to remove the key.",
+            "Free at steamgriddb.com, under Preferences then API. Fetches artwork for apps and for games outside Steam, whose names are sent to SteamGridDB. Leave empty to remove the key.",
             LibrarySettings.ArtworkKey);
 }

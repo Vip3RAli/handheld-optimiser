@@ -103,7 +103,7 @@ public partial class LibraryWindow
 
         if (session.Played >= TimeSpan.FromMinutes(1))
         {
-            StatusText.Text = $"Played {session.Game.Title} for {PlayStats.Duration(session.Played)}.";
+            Notice = $"Played {session.Game.Title} for {PlayStats.Duration(session.Played)}.";
         }
 
         _ = RefreshStatsAsync();

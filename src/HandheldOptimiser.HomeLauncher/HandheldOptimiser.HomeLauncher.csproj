@@ -7,7 +7,7 @@
   -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -30,13 +30,31 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!--
+      The collector also packs the heap down sooner, where it would leave gaps to save itself work.
+      Measured on the Old School cards, 2026-10-12: about 10 MB less in front and 4 MB less behind a
+      game, the same at levels 5, 7 and 9 of 9.
+    -->
+    <RuntimeHostConfigurationOption Include="System.GC.ConserveMemory" Value="7" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- The library's pure logic is tested without a window. -->
     <InternalsVisibleTo Include="HandheldOptimiser.Tests" />
   </ItemGroup>
 
   <ItemGroup>
+    <!--
+      Open Sans, the game library's font wherever Convection is not installed. Built into the app, and
+      its licence, which asks to travel with it, is copied beside the app.
+    -->
+    <Resource Include="Fonts\*.ttf" />
+    <Content Include="Fonts\OFL.txt" Link="Open Sans licence.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- The screen brightness control in quick settings, which Windows only offers through WMI. -->
-    <PackageReference Include="System.Management" Version="8.0.0" />
+    <PackageReference Include="System.Management" Version="10.0.12" />
   </ItemGroup>
 
 </Project>

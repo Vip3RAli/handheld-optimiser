@@ -664,6 +664,7 @@ internal static partial class Native
     {
         GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
         GC.WaitForPendingFinalizers();
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
         SetProcessWorkingSetSize(GetCurrentProcess(), -1, -1);
     }
 }

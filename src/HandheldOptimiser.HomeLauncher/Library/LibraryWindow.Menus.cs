@@ -26,6 +26,9 @@ public partial class LibraryWindow
 
     // The game the quick actions are for, and which text setting is being typed.
     private GameTile? _menuTile;
+
+    // The exe or folder whose properties the open game's menu shows, when it has found one.
+    private string? _propertiesOf;
     private MenuEditor? _editing;
 
     private void OpenMenu(GameTile tile)
@@ -39,7 +42,7 @@ public partial class LibraryWindow
         MenuStore.Text = GameSubtitle(tile);
         RefreshGameItems(tile);
 
-        MenuOverlay.Visibility = Visibility.Visible;
+        ShowMenuOverlay();
         ShowMenuItems();
     }
 
@@ -48,7 +51,8 @@ public partial class LibraryWindow
     {
         foreach (var list in new[]
         {
-            GameItems, ProfileItems, SettingsItems, BackgroundItems, DisplayItems, AddItems, PowerItems, QuickItems,
+            GameItems, ProfileItems, SettingsItems, LibraryDisplayItems, GamesAppsItems, SleepTweaksItems,
+            BackgroundItems, DisplayItems, AddItems, PowerItems, QuickItems,
             WhilePlayingItems, AppsToCloseItems, RunningAppsItems, MaintenanceItems, StartupItems, EmulatorItems,
             TvItems, OwnedItems, DealsItems
         })
@@ -76,56 +80,47 @@ public partial class LibraryWindow
         // A game that is not installed can only be installed or hidden.
         var installed = tile.IsInstalled;
         InstallItem.Visibility = installed ? Visibility.Collapsed : Visibility.Visible;
-        InstallItem.Tag = $"Opens {Game.NameOf(game.Store)} to install it";
         foreach (var row in new[] { FavouriteItem, ProfileItem, ArgumentsItem, FolderItem, PropertiesItem })
         {
             row.Visibility = installed ? Visibility.Visible : Visibility.Collapsed;
         }
 
         FavouriteItem.Content = tile.IsFavourite ? "Remove from favourites" : "Add to favourites";
-        FavouriteItem.Tag = tile.IsFavourite ? $"Back among the other {(tile.IsApp ? "apps" : "games")}"
-            : tile.IsApp ? "Kept at the front of Apps, with a star"
-            : "Kept at the front of the library, with a star";
 
         // Profiles only change things for games.
         ProfileItem.Visibility = installed && !tile.IsApp ? Visibility.Visible : Visibility.Collapsed;
-        ProfileItem.Tag = GameProfiles.For(game).Describe();
+        ProfileItem.Tag = GameProfiles.For(game) is { IsEmpty: true, CloseApps: null } ? "Not set" : "Set";
         RefreshCloseGameItem(tile);
 
         var added = AddedPrograms.IsAdded(game);
         MoveItem.Visibility = added ? Visibility.Visible : Visibility.Collapsed;
         MoveItem.Content = tile.IsApp ? "Move to games" : "Move to Apps";
-        MoveItem.Tag = tile.IsApp ? "Listed with the games, with play time and game profiles"
-            : "For programs that are not games, like a browser or Discord";
-
         HideItem.Content = added ? "Remove from library" : tile.IsHidden ? "Show in library" : "Hide from library";
-        HideItem.Tag = added ? "Takes it off the list. Nothing is deleted"
-            : tile.IsHidden ? "Back in the grid with the other games"
-            : "Off the grid. Show hidden games in Settings brings it back";
 
         var takesArguments = GameCatalog.SupportsCustomArguments(game);
         ArgumentsItem.IsEnabled = takesArguments;
-        ArgumentsItem.Tag = !takesArguments ? game.IsApp ? "Not available for this app" : $"Not available for {game.StoreName} games"
+        ArgumentsItem.Tag = !takesArguments ? "Not available"
             : GameCatalog.CustomArguments(game) is { Length: > 0 } arguments ? arguments
             : "None";
 
         var folder = game.InstallDirectory is { } dir && Directory.Exists(dir) ? dir : null;
         FolderItem.IsEnabled = folder is not null;
-        FolderItem.Tag = folder ?? "Install folder not found";
+        FolderItem.Tag = folder is null ? "Not found" : null;
 
         // Steam does not record which exe is the game, so its games show the folder's properties.
         var exe = game.ExecutablePath is { } path && File.Exists(path) ? path : null;
         PropertiesItem.IsEnabled = (exe ?? folder) is not null;
         PropertiesItem.Content = exe is null && folder is not null ? "Install folder properties" : "Executable properties";
-        PropertiesItem.Tag = exe ?? folder ?? "Executable not found";
+        PropertiesItem.Tag = (exe ?? folder) is null ? "Not found" : null;
+        _propertiesOf = exe ?? folder;
 
         var canLookUp = Artwork.HasApiKey;
-        ArtworkItem.Visibility = _background == BackgroundKind.Artwork && !tile.IsApp ? Visibility.Visible : Visibility.Collapsed;
+        // Wherever SteamGridDB's answer is on show: behind the library, on an Old School card, and on
+        // every tile of an app, whose name is all there is to look it up by.
+        ArtworkItem.Visibility = _background == BackgroundKind.Artwork || _layout == LibraryLayout.OldSchool || tile.IsApp
+            ? Visibility.Visible : Visibility.Collapsed;
         ArtworkItem.IsEnabled = canLookUp;
-        ArtworkItem.Tag = !canLookUp ? "Add a free SteamGridDB key in Settings to change this"
-            : Artwork.SearchTitle(game) is { } corrected ? $"Looked up as \"{corrected}\""
-            : game.HeroPath is not null ? "Steam's own artwork. Enter a title to look it up instead"
-            : "Looked up by the game's own title";
+        ArtworkItem.Tag = !canLookUp ? "Needs a SteamGridDB key" : Artwork.SearchTitle(game);
     }
 
     /// <summary>The open list of rows, which is also where cancelling the text box goes back to.</summary>
@@ -139,6 +134,11 @@ public partial class LibraryWindow
         _editing = null;
         TextEditor.Visibility = Visibility.Collapsed;
         _menu.Visibility = Visibility.Visible;
+        ShowMenuHints(_menu);
+
+        // From the top, with its heading: the last list may have been left scrolled, and the row that
+        // takes the focus is brought back into view if it is further down.
+        MenuScroller.ScrollToVerticalOffset(0);
 
         // Wait for the rows to be laid out before one can take focus.
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded,
@@ -156,7 +156,8 @@ public partial class LibraryWindow
         _menuTile = null;
         _editing = null;
         _confirming = null;
-        MenuOverlay.Visibility = Visibility.Collapsed;
+        HideMenuOverlay();
+        PlaceNotice();
         RestoreFocus();
     }
 
@@ -207,8 +208,8 @@ public partial class LibraryWindow
     {
         if (_menuTile is { } tile)
         {
-            BeginEdit(MenuEditor.ArtworkTitle, "Background artwork",
-                "The name to look this game up by on SteamGridDB, for when the background shows the wrong game. Leave empty to go back to the game's own title.",
+            BeginEdit(MenuEditor.ArtworkTitle, "Artwork",
+                "The name to look this up by on SteamGridDB, for when its artwork is the wrong one, or there is none. Leave empty to go back to its own name.",
                 Artwork.SearchTitle(tile.Game));
         }
     }
@@ -252,7 +253,7 @@ public partial class LibraryWindow
             ShowMenuItems();
             if (text.Length > 0)
             {
-                SteamKeySetting.Tag = "Asking Steam for your games...";
+                SteamKeySetting.Tag = "Asking...";
                 _ = RefreshOwnedAsync(force: true);
             }
 
@@ -288,7 +289,7 @@ public partial class LibraryWindow
             var saved = GameCatalog.SaveCustomArguments(tile.Game, text);
             CloseMenu();
 
-            StatusText.Text = !saved ? $"The launch arguments for {tile.Title} could not be saved."
+            Notice = !saved ? $"The launch arguments for {tile.Title} could not be saved."
                 : text.Length == 0 ? $"Launch arguments cleared for {tile.Title}."
                 : $"Launch arguments saved for {tile.Title}.";
         }
@@ -303,13 +304,23 @@ public partial class LibraryWindow
                 tile.ClearFetchedCover();
                 _coversAsked.Remove(tile.Game.Key);
                 _ = FetchCoversAsync();
+
+                // Its square icon in the row was looked up under the old title as well.
+                tile.ShowSquare(null);
+                _squaresAsked.Remove(tile.Game.Key);
+                LoadSquares();
+
+                // And the picture on its Old School card.
+                tile.ShowWide(null);
+                _noCardArt.Remove(tile.Game.Key);
+                LoadCardArt();
             }
 
             // Closing the menu puts focus back on the tile, which loads its background again.
             _backdropKey = null;
             CloseMenu();
 
-            StatusText.Text = !saved ? $"The artwork title for {tile.Title} could not be saved."
+            Notice = !saved ? $"The artwork title for {tile.Title} could not be saved."
                 : text.Length == 0 ? $"Looking up artwork for {tile.Title} by its own title."
                 : $"Looking up artwork for {tile.Title} as \"{text}\".";
         }
@@ -333,14 +344,13 @@ public partial class LibraryWindow
         }
         catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
         {
-            StatusText.Text = $"The install folder could not be opened: {ex.Message}";
+            Notice = $"The install folder could not be opened: {ex.Message}";
         }
     }
 
     private void OnShowProperties(object sender, RoutedEventArgs e)
     {
-        // The row's detail line is the exe or folder that OpenMenu found.
-        if (_menuTile is null || PropertiesItem.Tag is not string target)
+        if (_menuTile is null || _propertiesOf is not { } target)
         {
             return;
         }
@@ -348,7 +358,7 @@ public partial class LibraryWindow
         CloseMenu();
         if (!Native.ShowProperties(target))
         {
-            StatusText.Text = "The properties window could not be opened.";
+            Notice = "The properties window could not be opened.";
         }
     }
 }

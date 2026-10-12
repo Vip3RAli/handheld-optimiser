@@ -6,7 +6,7 @@ namespace HandheldOptimiser.Tests;
 
 /// <summary>
 /// The game library's pure logic: reading Steam's config format, naming and listing ROM files, the
-/// play time wording, game profiles, screen sizes, docked mode, Continue playing, the stores' lists
+/// play time wording, game profiles, screen sizes, docked mode, Last played, store details, the stores' lists
 /// of owned games, which games Quick Resume may pause and which added programs are apps. Nothing here
 /// reads or writes the registry.
 /// </summary>
@@ -222,6 +222,132 @@ public sealed class LibraryFeatureTests : IDisposable
         Assert.Empty(RecentGames.Pick(played.Keys, k => played[k], 0));
     }
 
+    [Theory]
+    [InlineData("The Witcher® 3: Wild Hunt", "witcher", true)]
+    [InlineData("The Witcher® 3: Wild Hunt", "WITCHER 3", true)]
+    [InlineData("The Witcher® 3: Wild Hunt", "hunt wild", true)]
+    [InlineData("The Witcher® 3: Wild Hunt", "wit", true)]
+    [InlineData("The Witcher® 3: Wild Hunt", "witcher 2", false)]
+    [InlineData("Baldur's Gate 3", "baldurs", true)]
+    [InlineData("Baldur's Gate 3", "", true)]
+    [InlineData("Baldur's Gate 3", "  ", true)]
+    [InlineData("Baldur's Gate 3", "gate x", false)]
+    public void GameSearch_FindsEveryWordInTheTitle(string title, string search, bool found) =>
+        Assert.Equal(found, GameSearch.Matches(title, search));
+
+    [Fact]
+    public void StoreDetails_ReadsSteamsAnswer()
+    {
+        const string json = """
+            {
+                "620": {
+                    "success": true,
+                    "data": {
+                        "short_description": "The &quot;perpetual testing initiative&quot; has been expanded.",
+                        "developers": ["Valve"],
+                        "genres": [{ "id": "1", "description": "Action" }, { "id": "25", "description": "Adventure" }],
+                        "release_date": { "coming_soon": false, "date": "18 Apr, 2011" }
+                    }
+                },
+                "999": { "success": false }
+            }
+            """;
+
+        var details = StoreDetails.ParseDetails(json, "620");
+
+        Assert.NotNull(details);
+        Assert.Equal("The \"perpetual testing initiative\" has been expanded.", details.Description);
+        Assert.Equal(["Action", "Adventure"], details.Genres);
+        Assert.Equal("18 Apr, 2011", details.Released);
+        Assert.Equal("Valve", details.Developer);
+
+        Assert.Null(StoreDetails.ParseDetails(json, "999"));
+        Assert.Null(StoreDetails.ParseDetails(json, "1"));
+        Assert.Null(StoreDetails.ParseDetails("not json", "620"));
+    }
+
+    [Fact]
+    public void StoreDetails_OnlyTakesAnExactTitleFromASearch()
+    {
+        const string json = """
+            {
+                "total": 2,
+                "items": [
+                    { "type": "app", "name": "Cyberpunk 2077: Phantom Liberty", "id": 2138330 },
+                    { "type": "app", "name": "Cyberpunk 2077", "id": 1091500 }
+                ]
+            }
+            """;
+
+        Assert.Equal("1091500", StoreDetails.ParseSearch(json, "Cyberpunk 2077"));
+        Assert.Equal("1091500", StoreDetails.ParseSearch(json, "CYBERPUNK 2077®"));
+        Assert.Null(StoreDetails.ParseSearch(json, "Cyberpunk"));
+        Assert.Null(StoreDetails.ParseSearch(json, "™"));
+        Assert.Null(StoreDetails.ParseSearch("{}", "Cyberpunk 2077"));
+    }
+
+    [Fact]
+    public void StoreDetails_ReadsWikidataAndWikipedia()
+    {
+        const string search = """
+            {
+                "search": [
+                    { "id": "Q1", "label": "Fortnite", "description": "American media franchise" },
+                    { "id": "Q349375", "label": "Fortnite", "description": "2017 video game developed by Epic Games" },
+                    { "id": "Q55577848", "label": "Fortnite: Save the World", "description": "co-op sandbox survival game" }
+                ]
+            }
+            """;
+
+        Assert.Equal("Q349375", StoreDetails.ParseWikidataSearch(search, "Fortnite®"));
+        Assert.Null(StoreDetails.ParseWikidataSearch(search, "Fortnite 2"));
+        Assert.Null(StoreDetails.ParseWikidataSearch("{}", "Fortnite"));
+
+        const string entry = """
+            {
+                "entities": {
+                    "Q349375": {
+                        "claims": {
+                            "P136": [
+                                { "mainsnak": { "datavalue": { "value": { "id": "Q10" } } } },
+                                { "mainsnak": { "snaktype": "novalue" } }
+                            ],
+                            "P178": [{ "mainsnak": { "datavalue": { "value": { "id": "Q20" } } } }],
+                            "P577": [
+                                { "mainsnak": { "datavalue": { "value": { "time": "+2020-11-10T00:00:00Z", "precision": 11 } } } },
+                                { "mainsnak": { "datavalue": { "value": { "time": "+2017-07-25T00:00:00Z", "precision": 11 } } } }
+                            ]
+                        },
+                        "sitelinks": { "enwiki": { "site": "enwiki", "title": "Fortnite" } }
+                    }
+                }
+            }
+            """;
+
+        var read = StoreDetails.ParseWikidataEntry(entry, "Q349375");
+
+        Assert.NotNull(read);
+        Assert.Equal(["Q10"], read.Genres);
+        Assert.Equal(["Q20"], read.Developers);
+        Assert.Equal("25 Jul 2017", read.Released);
+        Assert.Equal("Fortnite", read.Article);
+        Assert.Null(StoreDetails.ParseWikidataEntry(entry, "Q2"));
+
+        const string labels = """
+            { "entities": { "Q10": { "labels": { "en": { "language": "en", "value": "survival game" } } }, "Q20": { "labels": { "mul": { "language": "mul", "value": "Epic Games" } } }, "Q30": { "labels": {} } } }
+            """;
+
+        var names = StoreDetails.ParseWikidataLabels(labels);
+
+        Assert.Equal(2, names.Count);
+        Assert.Equal("survival game", names["Q10"]);
+        Assert.Equal("Epic Games", names["Q20"]);
+
+        Assert.Equal("Fortnite is an online video game.",
+            StoreDetails.ParseWikipediaSummary("""{ "type": "standard", "extract": "Fortnite is an online video game. " }"""));
+        Assert.Null(StoreDetails.ParseWikipediaSummary("""{ "type": "disambiguation", "extract": "Fortnite may refer to:" }"""));
+    }
+
     [Fact]
     public void OwnedGames_ReadsEpicsCatalogueCache()
     {
@@ -229,6 +355,7 @@ public sealed class LibraryFeatureTests : IDisposable
             [
               { "id": "item1", "namespace": "ns1", "title": "Hades",
                 "categories": [ { "path": "games" }, { "path": "applications" } ],
+                "mainGameItem": { "namespace": "", "id": "" },
                 "releaseInfo": [ { "appId": "Min", "platform": [ "Windows", "Mac" ] } ],
                 "keyImages": [ { "type": "Thumbnail", "url": "https://cdn1.epicgames.com/t.jpg" },
                                { "type": "DieselGameBoxTall", "url": "https://cdn1.epicgames.com/tall.jpg" } ] },
@@ -253,6 +380,134 @@ public sealed class LibraryFeatureTests : IDisposable
         Assert.False(hades.Installed);
         Assert.Equal("https://cdn1.epicgames.com/tall.jpg", hades.CoverUrl);
         Assert.Equal("com.epicgames.launcher://apps/ns1%3Aitem1%3AMin?action=install", hades.LaunchTarget);
+    }
+
+    [Fact]
+    public void EpicFreeGames_ReadsTheGiveawaysOnly()
+    {
+        const string json = """
+            { "data": { "Catalog": { "searchStore": { "elements": [
+                { "title": "On Sale", "id": "a", "offerType": "BASE_GAME", "productSlug": "on-sale",
+                  "price": { "totalPrice": { "fmtPrice": { "originalPrice": "$59.95" } } },
+                  "promotions": { "promotionalOffers": [],
+                    "upcomingPromotionalOffers": [ { "promotionalOffers": [
+                      { "startDate": "2026-10-12T17:00:00.000Z", "endDate": "2027-01-07T23:59:00.000Z",
+                        "discountSetting": { "discountType": "PERCENTAGE", "discountPercentage": 20 } } ] } ] } },
+                { "title": "Free Next Week", "id": "b", "offerType": "BASE_GAME", "urlSlug": "free-next-week",
+                  "keyImages": [ { "type": "Thumbnail", "url": "https://cdn1.epicgames.com/thumb.jpg" } ],
+                  "promotions": { "promotionalOffers": [],
+                    "upcomingPromotionalOffers": [ { "promotionalOffers": [
+                      { "startDate": "2026-10-15T15:00:00.000Z", "endDate": "2026-10-22T15:00:00.000Z",
+                        "discountSetting": { "discountType": "PERCENTAGE", "discountPercentage": 0 } } ] } ] } },
+                { "title": "Free Now", "id": "c", "offerType": "BUNDLE", "productSlug": "[]",
+                  "offerMappings": [ { "pageSlug": "free-now-b96ca8", "pageType": "productHome" } ],
+                  "keyImages": [ { "type": "OfferImageTall", "url": "https://cdn1.epicgames.com/tall.jpg" },
+                                 { "type": "OfferImageWide", "url": "https://cdn1.epicgames.com/wide.jpg" } ],
+                  "price": { "totalPrice": { "fmtPrice": { "originalPrice": "$21.95", "discountPrice": "0" } } },
+                  "promotions": { "promotionalOffers": [ { "promotionalOffers": [
+                      { "startDate": "2026-10-08T15:00:00.000Z", "endDate": "2026-10-15T15:00:00.000Z",
+                        "discountSetting": { "discountType": "PERCENTAGE", "discountPercentage": 0 } } ] } ],
+                    "upcomingPromotionalOffers": [] } },
+                { "title": "Free Before", "id": "d", "promotions": null }
+            ] } } } }
+            """;
+
+        var deals = EpicFreeGames.Parse(json, new DateTimeOffset(2026, 10, 9, 12, 0, 0, TimeSpan.Zero));
+
+        Assert.Equal(["Free Now", "Free Next Week"], deals.Select(d => d.Title));
+
+        var now = deals[0];
+        Assert.Equal("epic-free:c", now.Id);
+        Assert.Equal("Free", now.Price);
+        Assert.Equal("$21.95", now.Regular);
+        Assert.Equal(100, now.Cut);
+        Assert.Equal("Free this week", now.Note);
+        Assert.Equal("https://store.epicgames.com/bundles/free-now-b96ca8", now.Url);
+        Assert.Equal("https://cdn1.epicgames.com/wide.jpg", now.Image);
+        Assert.Equal(new DateTimeOffset(2026, 10, 15, 15, 0, 0, TimeSpan.Zero), now.Expiry);
+
+        var next = deals[1];
+        Assert.Equal("https://store.epicgames.com/p/free-next-week", next.Url);
+        Assert.StartsWith("Free from ", next.Note);
+        Assert.Null(next.Expiry);
+
+        // A week on, the first giveaway is over and the second has begun.
+        var later = Assert.Single(EpicFreeGames.Parse(json, new DateTimeOffset(2026, 10, 16, 12, 0, 0, TimeSpan.Zero)));
+        Assert.Equal("Free Next Week", later.Title);
+        Assert.Equal("Free this week", later.Note);
+
+        Assert.Empty(EpicFreeGames.Parse("{}", DateTimeOffset.UtcNow));
+        Assert.Empty(EpicFreeGames.Parse("not json", DateTimeOffset.UtcNow));
+    }
+
+    [Theory]
+    [InlineData(0x28)]
+    [InlineData(0x29)]
+    public void SteamAppInfo_ReadsTheSteamAppsCaches(int version)
+    {
+        // From version 29 an entry is named by its place in a table at the end of the file.
+        var names = new List<string>();
+        byte[] Name(string name)
+        {
+            if (version < 0x29)
+            {
+                return [.. System.Text.Encoding.UTF8.GetBytes(name), 0];
+            }
+
+            if (!names.Contains(name))
+            {
+                names.Add(name);
+            }
+
+            return BitConverter.GetBytes(names.IndexOf(name));
+        }
+
+        byte[] Text(string name, string value) => [1, .. Name(name), .. System.Text.Encoding.UTF8.GetBytes(value), 0];
+        byte[] Number(string name, int value) => [2, .. Name(name), .. BitConverter.GetBytes(value)];
+        byte[] Group(string name, params byte[][] entries) => [0, .. Name(name), .. entries.SelectMany(e => e), 8];
+
+        byte[] App(uint id, string name, string type)
+        {
+            byte[] values = [.. Group("appinfo", Number("appid", (int)id), Group("common", Text("name", name), Text("type", type))), 8];
+            byte[] header = new byte[4 + 4 + 8 + 20 + 4 + 20];
+            return [.. BitConverter.GetBytes(id), .. BitConverter.GetBytes(header.Length + values.Length), .. header, .. values];
+        }
+
+        byte[] apps = [.. App(620, "Portal 2", "Game"), .. App(1001, "Portal 2 Soundtrack", "DLC"), .. App(777, "Never Bought", "game"), 0, 0, 0, 0];
+        byte[] table = [.. BitConverter.GetBytes(names.Count), .. names.SelectMany(n => (byte[])[.. System.Text.Encoding.UTF8.GetBytes(n), 0])];
+        byte[] appInfo = version < 0x29
+            ? [(byte)version, 0x44, 0x56, 0x07, 1, 0, 0, 0, .. apps]
+            : [(byte)version, 0x44, 0x56, 0x07, 1, 0, 0, 0, .. BitConverter.GetBytes(16L + apps.Length), .. apps, .. table];
+
+        var read = SteamAppInfo.ParseApps(appInfo);
+
+        Assert.Equal([620L, 1001L, 777L], read.Select(a => a.AppId));
+        Assert.Equal("Portal 2", read[0].Name);
+        Assert.Equal(["game", "dlc", "game"], read.Select(a => a.Type));
+        Assert.Empty(SteamAppInfo.ParseApps(appInfo[..^9]));
+        Assert.Empty(SteamAppInfo.ParseApps([1, 2, 3]));
+
+        // The packages are always named in full. Package 0 is the one everybody has.
+        version = 0x28;
+        byte[] Package(uint id, params int[] appIds) =>
+        [
+            .. BitConverter.GetBytes(id), .. new byte[20 + 4 + 8],
+            .. Group(id.ToString(), Number("packageid", (int)id),
+                Group("appids", appIds.Select((app, i) => Number(i.ToString(), app)).ToArray())),
+            8
+        ];
+
+        byte[] packageInfo = [0x28, 0x55, 0x56, 0x06, 1, 0, 0, 0, .. Package(0, 7, 777), .. Package(54029, 620, 1001), 0xFF, 0xFF, 0xFF, 0xFF];
+
+        var licensed = SteamAppInfo.ParsePackageApps(packageInfo);
+
+        Assert.Equal([620L, 1001L], licensed.Order());
+
+        var portal = Assert.Single(OwnedGames.SteamGamesFromCache(read, licensed, artDir: null));
+        Assert.Equal("steam:620", portal.Key);
+        Assert.Equal("Portal 2", portal.Title);
+        Assert.Equal("steam://install/620", portal.LaunchTarget);
+        Assert.False(portal.Installed);
     }
 
     [Theory]
@@ -377,6 +632,157 @@ public sealed class LibraryFeatureTests : IDisposable
     [InlineData(@"C:\Games\Discordia\Discordia.exe")]
     [InlineData(null)]
     public void AddedPrograms_TreatsTheRestAsGames(string? exe) => Assert.False(AddedPrograms.LooksLikeApp(exe));
+
+    [Fact]
+    public void OldSchoolStack_FrontCardIsFullSizeAtTheLeft()
+    {
+        var (scale, left, opacity) = OldSchoolStack.Place(0);
+
+        Assert.Equal(1, scale);
+        Assert.Equal(0, left);
+        Assert.Equal(1, opacity);
+    }
+
+    [Fact]
+    public void OldSchoolStack_CardsBehindGetSmallerAndFurtherRight()
+    {
+        var behind = Enumerable.Range(0, 6).Select(depth => OldSchoolStack.Place(depth)).ToList();
+
+        for (var i = 1; i < behind.Count; i++)
+        {
+            Assert.True(behind[i].Scale < behind[i - 1].Scale);
+            Assert.True(behind[i].Left > behind[i - 1].Left);
+
+            // Each is tucked behind the one before: its right edge is further right, its left edge is not past that one's.
+            Assert.True(behind[i].Left < behind[i - 1].Left + (behind[i - 1].Scale * OldSchoolStack.CardWidth));
+            Assert.True(behind[i].Left + (behind[i].Scale * OldSchoolStack.CardWidth)
+                > behind[i - 1].Left + (behind[i - 1].Scale * OldSchoolStack.CardWidth));
+        }
+    }
+
+    [Fact]
+    public void OldSchoolStack_HalfWayIsBetweenTheTwoPlaces()
+    {
+        var (scale, left, opacity) = OldSchoolStack.Place(0.5);
+
+        Assert.Equal((OldSchoolStack.Place(0).Scale + OldSchoolStack.Place(1).Scale) / 2, scale, 6);
+        Assert.Equal((OldSchoolStack.Place(0).Left + OldSchoolStack.Place(1).Left) / 2, left, 6);
+        Assert.Equal(1, opacity);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(-4)]
+    [InlineData(5)]
+    [InlineData(40)]
+    public void OldSchoolStack_CardsPassedAndFarBehindAreOutOfSight(double depth) =>
+        Assert.Equal(0, OldSchoolStack.Place(depth).Opacity);
+
+    [Fact]
+    public void OldSchoolStack_CardSlidingOutFadesToTheLeft()
+    {
+        var (scale, left, opacity) = OldSchoolStack.Place(-0.5);
+
+        Assert.True(scale > 1);
+        Assert.True(left < 0);
+        Assert.InRange(opacity, 0.01, 0.99);
+    }
+
+    [Theory]
+    [InlineData(0, 20, 0, 5)]
+    [InlineData(7, 20, 6, 12)]
+    [InlineData(19, 20, 18, 19)]
+    [InlineData(0, 1, 0, 0)]
+    [InlineData(3, 2, 1, 1)]
+    public void OldSchoolStack_HoldsArtForTheCardsOnScreen(int front, int count, int first, int last) =>
+        Assert.Equal((first, last), OldSchoolStack.Window(front, count));
+
+    [Theory]
+    [InlineData(800, 1)]
+    [InlineData(1183.4, 1)]
+    [InlineData(1775.1, 1.5)]
+    [InlineData(5000, 1.75)]
+    [InlineData(double.PositiveInfinity, 1)]
+    public void OldSchoolStack_GrowsToFillAWideScreenButNeverShrinks(double width, double fit) =>
+        Assert.Equal(fit, OldSchoolStack.Fit(width), 3);
+
+    [Theory]
+    [InlineData(2.4, 0, 9, 2)]
+    [InlineData(2.6, 0, 9, 3)]
+    // A flick carries on a little way, and a slow drag does not.
+    [InlineData(2.2, 4, 9, 3)]
+    [InlineData(2.8, -4, 9, 2)]
+    // Never past either end, however hard the flick.
+    [InlineData(0.3, -40, 9, 0)]
+    [InlineData(7.9, 40, 9, 8)]
+    [InlineData(0, 0, 0, 0)]
+    public void OldSchoolSwipe_SettlesOnTheNearestCardInTheWayItWasMoving(double position, double speed, int count, int card) =>
+        Assert.Equal(card, OldSchoolSwipe.Rest(position, speed, count));
+
+    [Theory]
+    [InlineData(3.5, 9, 3.5)]
+    [InlineData(-0.9, 9, -0.3)]
+    [InlineData(8.6, 9, 8.2)]
+    public void OldSchoolSwipe_FollowsTheFingerAndResistsPastTheEnds(double dragged, int count, double held) =>
+        Assert.Equal(held, OldSchoolSwipe.Held(dragged, count), 6);
+
+    [Fact]
+    public void OldSchoolList_OpenCategoryIsFullSizeAndTheOnesAboveShrinkAndFade()
+    {
+        var places = Enumerable.Range(0, 6).Select(place => OldSchoolList.At(place)).ToList();
+
+        Assert.Equal((1, 0, 1), places[0]);
+        for (var i = 1; i < places.Count; i++)
+        {
+            Assert.True(places[i].Scale < places[i - 1].Scale);
+            Assert.True(places[i].Up > places[i - 1].Up);
+            Assert.True(places[i].Opacity < places[i - 1].Opacity);
+        }
+
+        // The one just left has gone, and so have those too far up the list to show.
+        Assert.Equal(0, OldSchoolList.At(-1).Opacity);
+        Assert.Equal(0, OldSchoolList.At(9).Opacity);
+    }
+
+    [Theory]
+    // A long list goes round: the last is the one below the first, on its way out of sight.
+    [InlineData(1, 0, 8, 1)]
+    [InlineData(7, 0, 8, 7)]
+    [InlineData(0, 0.5, 8, -0.5)]
+    [InlineData(0, 8, 8, 0)]
+    [InlineData(3, -1, 8, 4)]
+    // A short one does not.
+    [InlineData(3, 0, 4, 3)]
+    [InlineData(0, 3, 4, -3)]
+    public void OldSchoolList_PlacesCategoriesUpTheListFromTheOpenOne(int index, double position, int count, double place) =>
+        Assert.Equal(place, OldSchoolList.Place(index, position, count), 6);
+
+    [Theory]
+    [InlineData(0, 1, 8, 1)]
+    [InlineData(7, 1, 8, 0)]
+    [InlineData(0, -1, 8, 7)]
+    [InlineData(3, 1, 4, 3)]
+    [InlineData(0, -1, 4, 0)]
+    [InlineData(0, 1, 0, 0)]
+    public void OldSchoolList_StepsRoundALongListAndStopsAtTheEndsOfAShortOne(int from, int step, int count, int to) =>
+        Assert.Equal(to, OldSchoolList.Step(from, step, count));
+
+    [Theory]
+    [InlineData(0, 2, 8, 2)]
+    [InlineData(0, 7, 8, -1)]
+    [InlineData(6, 1, 8, 3)]
+    [InlineData(0, 3, 4, 3)]
+    [InlineData(3, 0, 4, -3)]
+    public void OldSchoolList_TakesTheShorterWayRound(int from, int to, int count, int steps) =>
+        Assert.Equal(steps, OldSchoolList.Steps(from, to, count));
+
+    [Fact]
+    public void OldSchoolStack_NoGamesNoArt()
+    {
+        var (first, last) = OldSchoolStack.Window(0, 0);
+
+        Assert.True(last < first);
+    }
 
     private void Touch(string name, string text = "")
     {

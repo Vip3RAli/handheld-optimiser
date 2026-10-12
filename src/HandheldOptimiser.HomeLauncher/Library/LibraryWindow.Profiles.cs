@@ -49,25 +49,25 @@ public partial class LibraryWindow
         ProfilePowerSetting.IsEnabled = powerModes || _profile.PowerMode is not null;
         ProfilePowerSetting.Tag = _profile.PowerMode is { } mode ? PowerModes.Name(mode)
             : powerModes ? Unchanged
-            : "Only with Windows' Balanced power plan";
+            : "Not available";
 
         ProfileResolutionSetting.IsEnabled = _profileSizes.Count > 1 || _profile.Resolution is not null;
         ProfileResolutionSetting.Tag = _profile.Resolution is { } size ? size.ToString()
             : _profileSizes.Count > 1 ? Unchanged
-            : "This screen has one resolution";
+            : "Not available";
 
         ProfileRefreshSetting.IsEnabled = _profileRates.Count > 1 || _profile.RefreshRate is not null;
         ProfileRefreshSetting.Tag = _profile.RefreshRate is { } hertz ? $"{hertz} Hz"
             : _profileRates.Count > 1 ? Unchanged
-            : "This screen has one refresh rate";
+            : "Not available";
 
         ProfileBrightnessSetting.Tag = _profile.Brightness is { } level ? $"{level}%" : Unchanged;
 
         ProfileAppsSetting.Tag = _profile.CloseApps switch
         {
-            true => "Closed while it plays",
+            true => "Closed",
             false => "Left running",
-            null => LibrarySettings.GameMode ? "As set under Play and Sleep: closed" : "As set under Play and Sleep: left running"
+            null => Unchanged
         };
     }
 
@@ -121,7 +121,7 @@ public partial class LibraryWindow
         }
         else
         {
-            StatusText.Text = "The game profile could not be saved.";
+            Notice = "The game profile could not be saved.";
         }
 
         RefreshProfileItems();

@@ -264,7 +264,9 @@ public static class HomeAppRegistration
     {
         try
         {
-            var certificate = new X509Certificate2(CertificatePath);
+            // The loader that only reads a certificate, where the old constructor took whatever kind of
+            // file it was handed.
+            var certificate = X509CertificateLoader.LoadCertificateFromFile(CertificatePath);
             if (certificate.Subject == SigningSubject)
             {
                 return certificate;

@@ -37,14 +37,14 @@ public partial class LibraryWindow
 
         if (!GameCatalog.SetFavourite(tile.Game, favourite))
         {
-            StatusText.Text = $"{tile.Title} could not be saved as a favourite.";
+            Notice = $"{tile.Title} could not be saved as a favourite.";
             return;
         }
 
         tile.IsFavourite = favourite;
         ApplyFilter();
         RestoreFocus();
-        StatusText.Text = favourite ? $"{tile.Title} added to favourites." : $"{tile.Title} removed from favourites.";
+        Notice = favourite ? $"{tile.Title} added to favourites." : $"{tile.Title} removed from favourites.";
     }
 
     /// <summary>
@@ -63,7 +63,7 @@ public partial class LibraryWindow
 
         if (AddedPrograms.SetApp(tile.Game, app) is not { } moved)
         {
-            StatusText.Text = $"{tile.Title} could not be moved.";
+            Notice = $"{tile.Title} could not be moved.";
             return;
         }
 
@@ -77,7 +77,7 @@ public partial class LibraryWindow
         _filter = app ? TileFilter.AppsTab : TileFilter.All;
         ApplyFilter();
         RestoreFocus();
-        StatusText.Text = app ? $"{tile.Title} moved to Apps." : $"{tile.Title} moved to the games.";
+        Notice = app ? $"{tile.Title} moved to Apps." : $"{tile.Title} moved to the games.";
     }
 
     /// <summary>Hides or shows a game, or takes a program the player added off the library altogether.</summary>
@@ -102,29 +102,29 @@ public partial class LibraryWindow
         {
             if (!AddedPrograms.Remove(tile.Game))
             {
-                StatusText.Text = $"{tile.Title} could not be removed.";
+                Notice = $"{tile.Title} could not be removed.";
                 return;
             }
 
             _allTiles = _allTiles.Where(t => t != tile).ToList();
             ApplyFilter();
             RestoreFocus();
-            StatusText.Text = $"{tile.Title} removed from the library.";
+            Notice = $"{tile.Title} removed from the library.";
             return;
         }
 
         var hidden = !tile.IsHidden;
         if (!GameCatalog.SetHidden(tile.Game, hidden))
         {
-            StatusText.Text = $"{tile.Title} could not be {(hidden ? "hidden" : "shown")}.";
+            Notice = $"{tile.Title} could not be {(hidden ? "hidden" : "shown")}.";
             return;
         }
 
         tile.IsHidden = hidden;
         ApplyFilter();
         RestoreFocus();
-        StatusText.Text = !hidden ? $"{tile.Title} is back in the library."
+        Notice = !hidden ? $"{tile.Title} is back in the library."
             : _showHidden ? $"{tile.Title} is hidden. It shows faded while Show hidden games is on."
-            : $"{tile.Title} is hidden. Show hidden games in Settings, Library View Options brings it back.";
+            : $"{tile.Title} is hidden. Show hidden games in Settings, Library Display brings it back.";
     }
 }

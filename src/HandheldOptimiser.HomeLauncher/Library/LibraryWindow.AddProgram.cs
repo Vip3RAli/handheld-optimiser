@@ -24,7 +24,7 @@ public partial class LibraryWindow
         }
 
         _programRows.Clear();
-        OpenSettingsGroup(AddItems, _filter.Apps ? "Add an app" : "Add a program");
+        OpenSettingsGroup(AddItems, _filter.Apps ? "Add an app" : "Add a program", GamesApps);
         MenuStore.Text = "Looking through the Start menu...";
         _ = ListStartMenuProgramsAsync();
     }
@@ -51,8 +51,7 @@ public partial class LibraryWindow
             var row = new Button
             {
                 Style = (Style)FindResource("MenuButton"),
-                Content = title,
-                Tag = target
+                Content = title
             };
 
             row.Click += (_, _) => AddProgram(shortcut, title);
@@ -85,7 +84,7 @@ public partial class LibraryWindow
 
         if (!File.Exists(path) || AddedPrograms.Add(path, title, _filter.Apps ? true : null) is not { } game)
         {
-            StatusText.Text = $"{title ?? Path.GetFileNameWithoutExtension(path)} could not be added.";
+            Notice = $"{title ?? Path.GetFileNameWithoutExtension(path)} could not be added.";
             return;
         }
 
@@ -98,7 +97,7 @@ public partial class LibraryWindow
             ApplyFilter();
         }
 
-        StatusText.Text = game.IsApp ? $"{game.Title} added to Apps. Move to games in its quick actions if it is a game."
+        Notice = game.IsApp ? $"{game.Title} added to Apps. Move to games in its quick actions if it is a game."
             : $"{game.Title} added to the library.";
         _ = ScanAsync();
     }

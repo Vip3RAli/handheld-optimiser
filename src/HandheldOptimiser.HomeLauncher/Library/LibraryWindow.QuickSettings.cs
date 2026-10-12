@@ -6,6 +6,8 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 /// <summary>
 /// Quick settings, the library's take on Armoury Crate's Command Center: volume, screen brightness,
 /// Windows' power mode, the resolution and the refresh rate, all of which a standard user may change.
+/// Nothing opens it for now: its button in the top bar and the controller's Y button were taken away,
+/// and Refresh library moved to the settings. The menu itself is kept for when it comes back.
 /// </summary>
 public partial class LibraryWindow
 {
@@ -24,7 +26,7 @@ public partial class LibraryWindow
     private int? _brightnessWanted;
     private bool _settingBrightness;
 
-    /// <summary>From the button in the top bar or the controller's Y button.</summary>
+    /// <summary>Once from the button in the top bar or the controller's Y button, neither of which is there now.</summary>
     private void OpenQuickSettings()
     {
         _menuTile = null;
@@ -45,7 +47,7 @@ public partial class LibraryWindow
         RefreshCloseAppsNow();
         _ = ReadBrightnessAsync();
 
-        MenuOverlay.Visibility = Visibility.Visible;
+        ShowMenuOverlay();
         ShowMenuItems();
     }
 
@@ -59,27 +61,25 @@ public partial class LibraryWindow
     private void RefreshQuickSettings()
     {
         VolumeSetting.IsEnabled = _volume is not null;
-        VolumeSetting.Tag = _volume is not { } volume ? "No speakers found"
-            : volume.Muted ? $"Muted ({volume.Percent}%). A unmutes"
-            : $"{volume.Percent}%. A mutes";
+        VolumeSetting.Tag = _volume is not { } volume ? "No speakers"
+            : volume.Muted ? "Muted"
+            : $"{volume.Percent}%";
 
         BrightnessSetting.IsEnabled = _brightness is not null;
         BrightnessSetting.Tag = !_brightnessRead ? "Reading..."
             : _brightness is { } level ? $"{level}%"
-            : "Not adjustable on this screen";
+            : "Not available";
 
         PowerModeSetting.IsEnabled = _powerMode is not null;
         PowerModeSetting.Tag = _powerMode is { } mode ? PowerModes.Name(mode)
-            : PowerModes.Available ? "Set to a mode Windows does not name"
-            : "Only with Windows' Balanced power plan";
+            : PowerModes.Available ? "Custom"
+            : "Not available";
 
         ResolutionSetting.IsEnabled = _resolutions is { Available.Count: > 1 };
-        ResolutionSetting.Tag = _resolutions is not { } sizes ? "Not available on this screen"
-            : sizes.Available.Count > 0 && sizes.Current != sizes.Available[0] ? $"{sizes.Current}. Lower uses less battery"
-            : sizes.Current.ToString();
+        ResolutionSetting.Tag = _resolutions is { } sizes ? sizes.Current.ToString() : "Not available";
 
         RefreshRateSetting.IsEnabled = _refreshRates is { Available.Count: > 1 };
-        RefreshRateSetting.Tag = _refreshRates is { } rates ? $"{rates.Current} Hz" : "Not available on this screen";
+        RefreshRateSetting.Tag = _refreshRates is { } rates ? $"{rates.Current} Hz" : "Not available";
     }
 
     /// <summary>Left and right on a quick settings row.</summary>
@@ -169,7 +169,7 @@ public partial class LibraryWindow
                 _brightnessWanted = null;
                 if (!await Task.Run(() => Brightness.Set(wanted)))
                 {
-                    StatusText.Text = "The screen did not accept the brightness change.";
+                    Notice = "The screen did not accept the brightness change.";
                     break;
                 }
             }
@@ -196,7 +196,7 @@ public partial class LibraryWindow
         }
         else
         {
-            StatusText.Text = "Windows did not change the power mode.";
+            Notice = "Windows did not change the power mode.";
             _powerMode = PowerModes.Read();
         }
 
@@ -216,7 +216,7 @@ public partial class LibraryWindow
         var next = rates.Available[(Math.Max(index, 0) + step + rates.Available.Count) % rates.Available.Count];
         if (RefreshRates.Set(next) is { } error)
         {
-            StatusText.Text = error;
+            Notice = error;
         }
 
         _refreshRates = RefreshRates.Read();
@@ -238,7 +238,7 @@ public partial class LibraryWindow
         var next = sizes.Available[(Math.Max(index, 0) - step + sizes.Available.Count) % sizes.Available.Count];
         if (Resolutions.Set(next) is { } error)
         {
-            StatusText.Text = error;
+            Notice = error;
         }
 
         // The rates on offer can differ at the new size.
@@ -253,7 +253,7 @@ public partial class LibraryWindow
     private void OnRescan(object sender, RoutedEventArgs e)
     {
         CloseMenu();
-        StatusText.Text = "Looking for games...";
+        Notice = "Looking for games...";
         _ = RescanAsync();
     }
 
@@ -261,7 +261,7 @@ public partial class LibraryWindow
     {
         // An explicit refresh also looks for emulators installed meanwhile.
         await ScanAsync(refreshEmulators: true);
-        StatusText.Text = _allTiles.Count == 1 ? "1 game in the library." : $"{_allTiles.Count} games in the library.";
+        Notice = _allTiles.Count == 1 ? "1 game in the library." : $"{_allTiles.Count} games in the library.";
     }
 
     private void OnOpenQuickSettings(object sender, RoutedEventArgs e) => OpenQuickSettings();

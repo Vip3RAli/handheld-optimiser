@@ -13,7 +13,7 @@ public partial class LibraryWindow
     private readonly Dictionary<Button, (GameSystem System, int Games)> _systemRows = [];
 
     // A row's own detail line, put back when a press to confirm is abandoned.
-    private readonly Dictionary<Button, string> _confirmDetails = [];
+    private readonly Dictionary<Button, string?> _confirmDetails = [];
 
     private Dictionary<string, List<EmulatorChoice>> _emulators = [];
 
@@ -60,14 +60,14 @@ public partial class LibraryWindow
 
         foreach (var (system, count) in consoles)
         {
-            var row = AddRow(EmulatorItems, AddRomFolderItem, system.Name, SystemDetail(system, count), () => StepEmulator(system, 1));
+            var row = AddRow(EmulatorItems, AddRomFolderItem, system.Name, SystemDetail(system), () => StepEmulator(system, 1));
             _systemRows[row] = (system, count);
         }
 
         foreach (var folder in folders)
         {
             var mine = added.Contains(folder, StringComparer.OrdinalIgnoreCase);
-            var detail = mine ? "Added by you. A removes it" : "Found automatically";
+            var detail = mine ? "Added" : "Found";
             Button? row = null;
             row = AddRow(EmulatorItems, AddRomFolderItem, folder, detail, () =>
             {
@@ -90,14 +90,8 @@ public partial class LibraryWindow
         }
     }
 
-    private string SystemDetail(GameSystem system, int games)
-    {
-        var count = games == 1 ? "1 game" : $"{games} games";
-        var choices = _emulators.GetValueOrDefault(system.Id) ?? [];
-        return Emulators.ChosenFor(system, _emulators) is not { } chosen
-            ? $"No emulator found for its {count}. Find an emulator below"
-            : $"{chosen.Name}. {count}" + (choices.Count > 1 ? ". Left and right pick another emulator" : string.Empty);
-    }
+    private string SystemDetail(GameSystem system) =>
+        Emulators.ChosenFor(system, _emulators) is { } chosen ? chosen.Name : "No emulator";
 
     /// <summary>Moves a console on to its next emulator, and the library's games with it.</summary>
     private void StepEmulator(GameSystem system, int step)
@@ -113,7 +107,7 @@ public partial class LibraryWindow
         var next = choices[(index + step + choices.Count) % choices.Count];
         if (!Emulators.Choose(system, next))
         {
-            StatusText.Text = $"The emulator for {system.Name} could not be saved.";
+            Notice = $"The emulator for {system.Name} could not be saved.";
             return;
         }
 
@@ -121,7 +115,7 @@ public partial class LibraryWindow
         {
             if (rowSystem == system)
             {
-                row.Tag = SystemDetail(system, games);
+                row.Tag = SystemDetail(system);
             }
         }
 
@@ -144,12 +138,13 @@ public partial class LibraryWindow
         if (!ReferenceEquals(_confirming, row))
         {
             _confirming = row;
-            row.Tag = "Press again to remove it. Its games leave the library, nothing is deleted";
+            row.Tag = "Press again to remove";
+            Notice = "Its games leave the library. Nothing is deleted.";
             return;
         }
 
         _confirming = null;
-        StatusText.Text = Emulators.RemoveFolder(folder) ? $"{folder} removed." : $"{folder} could not be removed.";
+        Notice = Emulators.RemoveFolder(folder) ? $"{folder} removed." : $"{folder} could not be removed.";
         OpenEmulators(AddRomFolderItem);
         _ = ScanAsync();
     }
@@ -162,7 +157,7 @@ public partial class LibraryWindow
             return;
         }
 
-        StatusText.Text = Emulators.AddFolder(picker.FolderName) ? $"{picker.FolderName} added." : $"{picker.FolderName} could not be added.";
+        Notice = Emulators.AddFolder(picker.FolderName) ? $"{picker.FolderName} added." : $"{picker.FolderName} could not be added.";
         OpenEmulators(AddRomFolderItem);
         _ = ScanAsync();
     }
@@ -183,11 +178,11 @@ public partial class LibraryWindow
 
         if (!Emulators.IsKnown(picker.FileName))
         {
-            StatusText.Text = $"That is not an emulator the library knows. It works with {Emulators.KnownNames}.";
+            Notice = $"That is not an emulator the library knows. It works with {Emulators.KnownNames}.";
             return;
         }
 
-        StatusText.Text = Emulators.AddProgram(picker.FileName) ? "Emulator added." : "The emulator could not be saved.";
+        Notice = Emulators.AddProgram(picker.FileName) ? "Emulator added." : "The emulator could not be saved.";
         _ = RescanEmulatorsAsync();
     }
 
