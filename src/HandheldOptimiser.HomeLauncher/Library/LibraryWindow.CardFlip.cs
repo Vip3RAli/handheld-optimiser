@@ -246,7 +246,7 @@ public partial class LibraryWindow
 
     /// <summary>The card at the front of a stack.</summary>
     private static Button? FrontCard(CardStack stack) =>
-        stack.Items.ItemContainerGenerator.ContainerFromIndex(stack.Front) is ContentPresenter container
+        ItemContainers.At(stack.Items, stack.Front) is { } container
             ? VisualChild<Button>(container)
             : null;
 }

@@ -408,7 +408,7 @@ public partial class LibraryWindow
     private static void NavigateCards(CardStack stack, FocusNavigationDirection direction)
     {
         var to = stack.Front + (direction == FocusNavigationDirection.Left ? -1 : direction == FocusNavigationDirection.Right ? 1 : 0);
-        if (to != stack.Front && stack.Items.ItemContainerGenerator.ContainerFromIndex(to) is ContentPresenter container)
+        if (to != stack.Front && ItemContainers.At(stack.Items, to) is { } container)
         {
             VisualChild<Button>(container)?.Focus();
         }
@@ -426,7 +426,7 @@ public partial class LibraryWindow
 
             var at = OpenKind is { } kind && ReferenceEquals(stack, ActionStack) ? _actionAt.GetValueOrDefault(kind) : stack.Front;
             at = Math.Clamp(at, 0, stack.Items.Items.Count - 1);
-            if (stack.Items.ItemContainerGenerator.ContainerFromIndex(at) is ContentPresenter container)
+            if (ItemContainers.At(stack.Items, at) is { } container)
             {
                 VisualChild<Button>(container)?.Focus();
             }

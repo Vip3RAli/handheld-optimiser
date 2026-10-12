@@ -158,8 +158,7 @@ public partial class LibraryWindow
         }
     }
 
-    private ContentPresenter? TileContainer(int index) =>
-        Tiles.ItemContainerGenerator.ContainerFromIndex(index) as ContentPresenter;
+    private ContentPresenter? TileContainer(int index) => ItemContainers.At(Tiles, index);
 
     private void OnGamepadPressed(GamepadAction action)
     {
