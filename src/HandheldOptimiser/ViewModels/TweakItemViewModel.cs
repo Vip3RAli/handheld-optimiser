@@ -6,9 +6,10 @@ using HandheldOptimiser.Services;
 namespace HandheldOptimiser.ViewModels;
 
 /// <summary>
-/// One tweak row: a toggle switch, a risk badge, and its state as last found.
+/// One tweak's tile: its name and its switch, with the risk badge, the description and any warning
+/// in the detail that opens when the tile is pressed.
 /// </summary>
-public sealed partial class TweakItemViewModel : ObservableObject
+public sealed partial class TweakItemViewModel : ObservableObject, ITile
 {
     private readonly TweakEngine _engine;
     private readonly TweakStateStore _states;
@@ -30,8 +31,12 @@ public sealed partial class TweakItemViewModel : ObservableObject
     /// show "off" for a tweak that may be on, and pressing it would apply or revert on a guess.
     /// </summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(StateText))]
+    [NotifyPropertyChangedFor(nameof(StateText), nameof(HasStateNote))]
     private bool _isKnown;
+
+    /// <summary>Whether this tile's detail is showing under its row.</summary>
+    [ObservableProperty]
+    private bool _isOpen;
 
     [ObservableProperty]
     private bool _isOn;
@@ -79,6 +84,12 @@ public sealed partial class TweakItemViewModel : ObservableObject
         _ => string.Empty
     };
 
+    /// <summary>
+    /// Whether the tile says what state the tweak is in. The switch already says on or off, so the
+    /// tile only adds words when the answer is neither: still being checked, partly applied, or an error.
+    /// </summary>
+    public bool HasStateNote => !IsKnown || State is TweakState.Partial or TweakState.Error or TweakState.Unknown;
+
     public string StateText => !IsKnown ? "Checking…" : State switch
     {
         TweakState.Applied => "Optimised",
@@ -102,6 +113,7 @@ public sealed partial class TweakItemViewModel : ObservableObject
     partial void OnStateChanged(TweakState value)
     {
         OnPropertyChanged(nameof(StateText));
+        OnPropertyChanged(nameof(HasStateNote));
         SyncToggleToState();
     }
 
@@ -137,7 +149,8 @@ public sealed partial class TweakItemViewModel : ObservableObject
 
         var turningOn = IsOn;
 
-        if (turningOn && (Tweak.Risk is RiskLevel.SecurityTradeoff or RiskLevel.Breaking || !IsForThisDevice))
+        // The warning is not on show until the tile is opened, so it is put in front of the player here.
+        if (turningOn && TweakPrompts.AsksFirst(Tweak, IsForThisDevice))
         {
             string?[] parts =
             [

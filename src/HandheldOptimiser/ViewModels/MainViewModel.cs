@@ -108,9 +108,9 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         Pages.Add(dashboard);
 
         // What each kind of section in the map is made of.
-        SectionViewModel Build(SectionSpec spec) => spec.Kind switch
+        SectionViewModel Build(SectionSpec spec, OpenTile open) => spec.Kind switch
         {
-            SectionKind.Tweaks => new TweakSectionViewModel(spec.Category!.Value, engine, states, this) { Heading = spec.Heading },
+            SectionKind.Tweaks => new TweakSectionViewModel(spec.Category!.Value, engine, states, this, open) { Heading = spec.Heading },
             SectionKind.HomeApp => new HomeAppPickerViewModel(log, this) { Heading = spec.Heading },
             SectionKind.Startup => new StartupViewModel(startupService, this) { Heading = spec.Heading },
             SectionKind.PreinstalledApps => new BloatwareViewModel(appxService, restorePoints, journal, log, this) { Heading = spec.Heading },
@@ -124,7 +124,9 @@ public sealed partial class MainViewModel : ObservableObject, IShell
 
         foreach (var goal in HubLayout.Goals)
         {
-            Pages.Add(new GoalPageViewModel(goal, [.. goal.Sections.Select(Build)], engine, states, this));
+            // One per page, so that only one tile is open on a page whichever section it is in.
+            var open = new OpenTile();
+            Pages.Add(new GoalPageViewModel(goal, [.. goal.Sections.Select(s => Build(s, open))], engine, states, this));
         }
 
         Cards = [.. Pages.OfType<GoalPageViewModel>()];

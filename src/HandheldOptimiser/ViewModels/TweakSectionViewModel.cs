@@ -14,12 +14,23 @@ public sealed class TweakSectionViewModel : SectionViewModel
 
     public IReadOnlyList<TweakItemViewModel> Tweaks { get; }
 
-    public TweakSectionViewModel(TweakCategory category, TweakEngine engine, TweakStateStore states, IShell shell)
+    /// <summary>The tiles as the page draws them, three across, with the open one's detail under its row.</summary>
+    public TileCells Cells { get; }
+
+    public TweakSectionViewModel(
+        TweakCategory category,
+        TweakEngine engine,
+        TweakStateStore states,
+        IShell shell,
+        OpenTile open)
         : base(shell)
     {
         _states = states;
         _tweaks = engine.AllTweaks.Where(t => t.Category == category).ToList();
         Tweaks = _tweaks.Select(t => new TweakItemViewModel(t, engine, states, shell)).ToList();
+
+        Cells = new TileCells(columns: 3, open);
+        Cells.Reset(Tweaks);
 
         // Sections live as long as the app does, so this is never unhooked.
         var ids = _tweaks.Select(t => t.Id).ToHashSet(StringComparer.Ordinal);

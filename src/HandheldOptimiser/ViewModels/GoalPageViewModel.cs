@@ -140,14 +140,16 @@ public sealed partial class GoalPageViewModel : PageViewModelBase
             return;
         }
 
-        var risky = pending.Where(t => t.Risk is RiskLevel.SecurityTradeoff or RiskLevel.Breaking).ToList();
+        // Every one that carries a warning is named, not only the riskiest: the warnings themselves
+        // are a press away on each tile, and this list is what stops Apply all being pressed blind.
+        var warned = TweakPrompts.WarnedNames(pending);
 
         var message = $"{pending.Count} tweak(s) will be applied after a System Restore point is created." + skippedNote;
 
-        if (risky.Count > 0)
+        if (warned.Count > 0)
         {
             message += "\n\nIncluding these, which carry warnings:\n" +
-                       string.Join("\n", risky.Select(t => $"  • {t.Name}"));
+                       string.Join("\n", warned.Select(name => $"  • {name}"));
         }
 
         if (!await Shell.ConfirmAsync($"Apply all on {Title}", message, "Create restore point & apply"))

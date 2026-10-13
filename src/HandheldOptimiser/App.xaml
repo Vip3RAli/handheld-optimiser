@@ -97,6 +97,56 @@
                 <Setter Property="Foreground" Value="{StaticResource BrandOnAccent}" />
             </Style>
 
+            <!--
+                A tile: a name and a switch, a few to a row, so a whole goal fits on a screen or two. The
+                tile itself is a button, and pressing it anywhere but on its switch opens what it does
+                beneath its row. Its edge turns cyan while that detail is open (see ITile).
+            -->
+            <Style x:Key="Tile" TargetType="Button">
+                <Setter Property="MinHeight" Value="64" />
+                <Setter Property="Padding" Value="14,8" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Foreground" Value="White" />
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Shape"
+                                    CornerRadius="8"
+                                    Background="{DynamicResource CardBackground}"
+                                    BorderBrush="{DynamicResource CardBorderBrush}"
+                                    BorderThickness="1">
+                                <Border x:Name="Tint" CornerRadius="8" Padding="{TemplateBinding Padding}" Background="Transparent">
+                                    <ContentPresenter VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                                </Border>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Tint" Property="Background" Value="#0AFFFFFF" />
+                                </Trigger>
+                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                    <Setter TargetName="Tint" Property="Background" Value="#0FFFFFFF" />
+                                </Trigger>
+                                <DataTrigger Binding="{Binding IsOpen}" Value="True">
+                                    <Setter TargetName="Shape" Property="BorderBrush" Value="{StaticResource BrandAccent}" />
+                                    <Setter TargetName="Tint" Property="Background" Value="#1422D3EE" />
+                                </DataTrigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- The open tile's detail, the full width of the grid under the tile's row. -->
+            <Style x:Key="TileDetail" TargetType="Border">
+                <Setter Property="Background" Value="#1422D3EE" />
+                <Setter Property="BorderBrush" Value="#7322D3EE" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="Padding" Value="16,12" />
+            </Style>
+
             <Style TargetType="{x:Type ui:FontIcon}">
                 <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" />
             </Style>
