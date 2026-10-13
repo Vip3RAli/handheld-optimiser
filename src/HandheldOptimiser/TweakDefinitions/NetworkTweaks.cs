@@ -24,7 +24,7 @@ public static class NetworkTweaks
         Description =
             "Stops Windows sharing update downloads with other PCs. Updates still download from " +
             "Microsoft as normal. Matters most when docked on a network with other Windows PCs.",
-        Category = TweakCategory.Network,
+        Category = TweakCategory.BackgroundActivity,
         Risk = RiskLevel.Moderate,
         RequiresReboot = true,
         IncludeInOneClick = false,

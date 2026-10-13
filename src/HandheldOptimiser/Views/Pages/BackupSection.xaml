@@ -1,0 +1,32 @@
+<UserControl x:Class="HandheldOptimiser.Views.Pages.BackupSection"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+
+    <ui:Card Margin="0,0,0,10">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
+                <TextBlock Text="{Binding RevertSummary}" FontSize="13" TextWrapping="Wrap" />
+                <TextBlock Margin="0,4,0,0" TextWrapping="Wrap" FontSize="11.5" Opacity="0.55"
+                           Text="Undo all changes puts every setting back as it was. Removed bloatware is not restored." />
+            </StackPanel>
+
+            <!-- Sized for a thumb on a 7" touchscreen. -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <ui:Button Content="Create restore point"
+                           MinHeight="46"
+                           Command="{Binding CreateRestorePointOnlyCommand}"
+                           Margin="0,0,10,0" />
+                <ui:Button Content="Undo all changes"
+                           MinHeight="46"
+                           Command="{Binding RevertAllCommand}"
+                           IsEnabled="{Binding CanRevert}" />
+            </StackPanel>
+        </Grid>
+    </ui:Card>
+</UserControl>

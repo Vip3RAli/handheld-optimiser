@@ -75,20 +75,18 @@ public partial class App : Application
 
         // The game library cannot install updates itself, so its Update now starts this app with --update.
         var installUpdate = e.Args.Contains("--update", StringComparer.OrdinalIgnoreCase);
-        _ = viewModel.CheckForUpdatesOnStartupAsync(installUpdate);
 
-        // Everything is read once now, so no page has to scan when it is opened. Not when the app was
-        // only opened to install an update: it is about to close, and a Store check cut off midway
-        // would leave the updates it found paused in the Store's queue. Pages still load when opened.
-        if (!installUpdate)
-        {
-            _ = viewModel.ScanAtLaunchAsync();
-        }
+        // Everything is read once now, so no page has to scan when it is opened. When the app was only
+        // opened to install an update, that waits until the update is settled: see StartupOrder.
+        _ = StartupOrder.RunAsync(
+            installUpdate,
+            () => viewModel.CheckForUpdatesOnStartupAsync(installUpdate),
+            viewModel.ScanAtLaunchAsync);
     }
 
     /// <summary>
     /// Pins the accent to the app's cyan instead of the Windows accent, so primary buttons, toggles,
-    /// checkboxes, badges and the sidebar highlight look the same on every device. Dark theme fills
+    /// checkboxes, badges and the open tile's edge look the same on every device. Dark theme fills
     /// use the lighter steps, matching how Fluent derives them from a system accent.
     /// </summary>
     private static void ApplyBrandAccent()

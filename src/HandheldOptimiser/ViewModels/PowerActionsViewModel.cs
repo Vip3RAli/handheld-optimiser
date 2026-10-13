@@ -106,12 +106,8 @@ public sealed partial class PowerActionItemViewModel(PowerAction action, TweakEn
 /// <summary>
 /// One-shot maintenance jobs. Buttons, not toggles: none of these has an "on" state or anything to undo.
 /// </summary>
-public sealed class PowerActionsViewModel : PageViewModelBase
+public sealed class PowerActionsViewModel : SectionViewModel
 {
-    public override string Title => "Power Actions";
-    public override string Glyph => "";
-    public override string Subtitle => "One-click maintenance. Each runs once; there is nothing to switch back off.";
-
     public IReadOnlyList<PowerActionItemViewModel> Actions { get; }
 
     public PowerActionsViewModel(TweakEngine engine, TweakStateStore states, IShell shell) : base(shell)

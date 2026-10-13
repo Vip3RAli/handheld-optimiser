@@ -2,8 +2,11 @@ using System.Collections.Specialized;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Interop;
 using HandheldOptimiser.ViewModels;
+using HandheldOptimiser.Views;
 using Wpf.Ui.Controls;
 
 namespace HandheldOptimiser;
@@ -28,6 +31,15 @@ public partial class MainWindow : FluentWindow
         InitializeComponent();
         FitToWorkArea();
         DataContextChanged += OnDataContextChanged;
+
+        // The first card has the keyboard as the app opens, so a D-pad works from the start.
+        Loaded += (_, _) =>
+        {
+            if (DataContext is MainViewModel vm)
+            {
+                PlaceFocus(vm, cameFrom: null);
+            }
+        };
     }
 
     /// <summary>
@@ -83,15 +95,45 @@ public partial class MainWindow : FluentWindow
     }
 
     /// <summary>
-    /// Pressing the group that is already open closes its list of pages, and pressing it again opens it.
-    /// A press on another group selects it instead, which opens its list.
+    /// Escape, Alt+Left and the keyboard's Back key go back to the Dashboard, as the Back button does.
+    /// Handled as the key bubbles up, not as it tunnels down, so a control that uses Escape for
+    /// itself (an open drop-down, say) gets it first.
     /// </summary>
-    private void OnGroupHeaderPressed(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    protected override void OnKeyDown(KeyEventArgs e)
     {
-        if (sender is FrameworkElement { TemplatedParent: ListBoxItem { IsSelected: true } } && DataContext is MainViewModel vm)
+        base.OnKeyDown(e);
+
+        // With Alt held, the key arrives as a system key.
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        var typing = Keyboard.FocusedElement is TextBoxBase;
+
+        if (!e.Handled && BackKeys.GoesBack(key, Keyboard.Modifiers, typing) && GoHome())
         {
-            vm.IsGroupOpen = !vm.IsGroupOpen;
+            e.Handled = true;
         }
+    }
+
+    /// <summary>The back button on the side of a mouse does the same.</summary>
+    protected override void OnPreviewMouseDown(MouseButtonEventArgs e)
+    {
+        base.OnPreviewMouseDown(e);
+
+        if (e.ChangedButton == MouseButton.XButton1 && GoHome())
+        {
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>Goes back to the Dashboard. False when it is already showing, so the press is left alone.</summary>
+    private bool GoHome()
+    {
+        if (DataContext is not MainViewModel { IsHome: false } vm)
+        {
+            return false;
+        }
+
+        vm.GoHomeCommand.Execute(null);
+        return true;
     }
 
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -100,11 +142,13 @@ public partial class MainWindow : FluentWindow
         {
             // A console the user has to manually scroll is useless during a long run.
             vm.Log.Entries.CollectionChanged += OnLogChanged;
+            WatchFocus(vm);
         }
 
         if (e.OldValue is MainViewModel old)
         {
             old.Log.Entries.CollectionChanged -= OnLogChanged;
+            UnwatchFocus(old);
         }
     }
 

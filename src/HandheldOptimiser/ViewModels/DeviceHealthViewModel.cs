@@ -16,14 +16,10 @@ namespace HandheldOptimiser.ViewModels;
 /// MSI Center M on an MSI Claw.
 /// </summary>
 public sealed partial class DeviceHealthViewModel(SystemStateService systemState, LogService log, IShell shell)
-    : PageViewModelBase(shell)
+    : SectionViewModel(shell)
 {
     private readonly SystemStateService _systemState = systemState;
     private readonly LogService _log = log;
-
-    public override string Title => "Device & System Health";
-    public override string Glyph => "";
-    public override string Subtitle => "Protected components, sleep, power plans and storage, as Windows reports them. No toggles here by design.";
 
     /// <summary>The rows marked yellow or red, lifted to the top of the page with their explanation.</summary>
     public ObservableCollection<HealthRowViewModel> Attention { get; } = [];
@@ -49,11 +45,13 @@ public sealed partial class DeviceHealthViewModel(SystemStateService systemState
 
     private bool _isChecking;
 
+    /// <summary>How many rows need a look, for the Dashboard's card.</summary>
+    public override CardStatus? Status => CardStatus.ForHealth(Attention.Count, WorstStatus);
+
     public override Task LoadAsync() => Sections.Count == 0 ? RefreshAsync() : Task.CompletedTask;
 
     /// <summary>Runs the checks in the background. Only a repair holds the app busy.</summary>
-    [RelayCommand]
-    private async Task RefreshAsync()
+    public override async Task RefreshAsync()
     {
         if (_isChecking)
         {
@@ -101,6 +99,7 @@ public sealed partial class DeviceHealthViewModel(SystemStateService systemState
             : HealthStatus.Good;
         AttentionText = HasAttention ? $"{page.Attention.Count} to look at" : "Nothing needs a look";
         FineText = $"{page.Fine} fine";
+        OnPropertyChanged(nameof(Status));
     }
 
     /// <summary>Opens the Windows page a row points to. The row is the button's parameter.</summary>

@@ -4,6 +4,7 @@ using System.Windows.Data;
 using System.Windows.Media;
 using HandheldOptimiser.Models;
 using HandheldOptimiser.Services;
+using HandheldOptimiser.ViewModels;
 
 namespace HandheldOptimiser.Views;
 
@@ -16,6 +17,16 @@ public sealed class InverseBooleanConverter : IValueConverter
         value is bool b && !b;
 }
 
+/// <summary>Shows a thing only while something is not so, such as a switch while its tweak is not being changed.</summary>
+public sealed class InverseBooleanToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is bool b && b ? Visibility.Collapsed : Visibility.Visible;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
 public sealed class BooleanToVisibilityConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
@@ -23,6 +34,31 @@ public sealed class BooleanToVisibilityConverter : IValueConverter
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
         value is Visibility v && v == Visibility.Visible;
+}
+
+/// <summary>
+/// A length less the amount given as the parameter, and never below nothing. A Dashboard card's icon
+/// is as tall as the space the card has to spare, less the gap kept above the card's name.
+/// </summary>
+public sealed class LessConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is double length && double.TryParse(parameter as string, NumberStyles.Float, CultureInfo.InvariantCulture, out var less)
+            ? Math.Max(0, length - less)
+            : 0d;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
+/// <summary>A section's heading is written in capitals, which a TextBlock cannot do by itself.</summary>
+public sealed class UpperCaseConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        (value as string)?.ToUpper(culture) ?? string.Empty;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
 }
 
 public sealed class StringNotEmptyToVisibilityConverter : IValueConverter
@@ -152,6 +188,25 @@ public sealed class UpdateRowStateToBrushConverter : IValueConverter
                 ViewModels.UpdateRowState.Working => Color.FromRgb(0x22, 0xD3, 0xEE),
                 ViewModels.UpdateRowState.Failed => Color.FromRgb(0xE0, 0x6C, 0x6C),
                 _ => Color.FromRgb(0x90, 0x90, 0x90)
+            })
+            : Brushes.Gray;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
+/// <summary>The dot on a Dashboard card: green, yellow or red for how the goal stands, cyan for a plain fact.</summary>
+public sealed class CardLevelToBrushConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is CardLevel level
+            ? new SolidColorBrush(level switch
+            {
+                CardLevel.Good => Color.FromRgb(0x6C, 0xC0, 0x7A),
+                CardLevel.Attention => Color.FromRgb(0xE8, 0xC4, 0x5F),
+                CardLevel.Bad => Color.FromRgb(0xE0, 0x6C, 0x6C),
+                CardLevel.Neutral => Color.FromRgb(0x22, 0xD3, 0xEE),
+                _ => Color.FromArgb(0x66, 0xFF, 0xFF, 0xFF)
             })
             : Brushes.Gray;
 

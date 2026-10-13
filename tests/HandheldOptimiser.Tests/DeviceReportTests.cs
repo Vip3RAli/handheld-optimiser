@@ -70,7 +70,7 @@ public sealed class DeviceReportTests
 
         Assert.Equal(HealthStatus.Warning, check.Status);
         Assert.Contains("(4.0% an hour)", check.Detail);
-        Assert.Contains("Sleep & Battery", check.Advice);
+        Assert.Contains("Battery & Sleep", check.Advice);
     }
 
     [Fact]

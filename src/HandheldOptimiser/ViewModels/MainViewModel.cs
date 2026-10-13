@@ -15,17 +15,18 @@ public sealed partial class MainViewModel : ObservableObject, IShell
 
     public LogService Log { get; }
 
-    /// <summary>Every page, in the order they are built. The sidebar shows them through <see cref="Groups"/>.</summary>
+    /// <summary>Everything the window can show: the Dashboard, then one page per goal in the map's order.</summary>
     public ObservableCollection<PageViewModelBase> Pages { get; } = [];
 
-    /// <summary>The sidebar: five groups, each dropping its pages down as a list while it is open.</summary>
-    public ObservableCollection<NavGroup> Groups { get; } = [];
+    /// <summary>The goals' pages, which the Dashboard shows as a card each.</summary>
+    public IReadOnlyList<GoalPageViewModel> Cards { get; }
 
     [ObservableProperty]
-    private NavGroup? _selectedGroup;
-
-    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsHome))]
     private PageViewModelBase? _selectedPage;
+
+    /// <summary>Whether the Dashboard is on screen. Every other page has the header, with Back, above it.</summary>
+    public bool IsHome => SelectedPage is DashboardViewModel;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(FooterText), nameof(IsWorking))]
@@ -57,13 +58,6 @@ public sealed partial class MainViewModel : ObservableObject, IShell
 
     [ObservableProperty]
     private bool _isLogExpanded;
-
-    /// <summary>
-    /// Whether the open group's list of pages is showing. Pressing the open group again closes it,
-    /// and choosing another group opens that one's.
-    /// </summary>
-    [ObservableProperty]
-    private bool _isGroupOpen = true;
 
     private readonly UpdateService _updates;
     private readonly TweakStateStore _states;
@@ -110,193 +104,45 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         _updates = updates;
         _states = states;
 
-        Pages.Add(new DashboardViewModel(engine, states, systemState, hardware, restorePoints, this));
+        var dashboard = new DashboardViewModel(engine, states, systemState, hardware, restorePoints, this);
+        Pages.Add(dashboard);
 
-        Pages.Add(new TweakListViewModel(
-            "Gaming Tweaks",
-            "",
-            "Handheld performance changes. These are where the frame rate comes from.",
-            [TweakCategory.Gaming],
-            engine,
-            states,
-            this));
-
-        Pages.Add(new TweakListViewModel(
-            "System Debloat",
-            "",
-            "Telemetry, search, assistants and background activity.",
-            [TweakCategory.Debloat, TweakCategory.Privacy],
-            engine,
-            states,
-            this));
-
-        Pages.Add(new TweakListViewModel(
-            "CPU & Kernel",
-            "",
-            "Scheduler settings that put the game ahead of background work.",
-            [TweakCategory.CpuKernel],
-            engine,
-            states,
-            this));
-
-        Pages.Add(new TweakListViewModel(
-            "Network",
-            "",
-            "Latency and memory fixes for the network stack.",
-            [TweakCategory.Network],
-            engine,
-            states,
-            this));
-
-        Pages.Add(new TweakListViewModel(
-            "Deep Services",
-            "",
-            "Background services a gaming handheld does not need. Security, update and vendor services are protected.",
-            [TweakCategory.Services],
-            engine,
-            states,
-            this));
-
-        Pages.Add(new TweakListViewModel(
-            "Interface",
-            "",
-            "Desktop responsiveness and touch behaviour. Games are unaffected.",
-            [TweakCategory.Interface],
-            engine,
-            states,
-            this));
-
-        Pages.Add(new TweakListViewModel(
-            "Storage",
-            "",
-            "Cuts needless NTFS writes to save SSD wear. Only affects files from now on.",
-            [TweakCategory.Storage],
-            engine,
-            states,
-            this));
-
-        Pages.Add(new TweakListViewModel(
-            "Graphics & Scheduling",
-            "",
-            "How Windows prioritises the game and schedules the GPU.",
-            [TweakCategory.Graphics],
-            engine,
-            states,
-            this));
-
-        Pages.Add(new TweakListViewModel(
-            "Handheld Usability",
-            "",
-            "Stops pop-ups and background throttling from interrupting a game.",
-            [TweakCategory.Usability],
-            engine,
-            states,
-            this));
-
-        Pages.Add(new TweakListViewModel(
-            "Sleep & Battery",
-            "",
-            "Modern Standby keeps draining the battery. These hibernate after a short sleep and stop things waking the device.",
-            [TweakCategory.Sleep],
-            engine,
-            states,
-            this));
-
-        Pages.Add(new TweakListViewModel(
-            "Full Screen Mode",
-            "",
-            "Choose what the Windows full screen experience opens, and whether to sign straight into it.",
-            [TweakCategory.FullScreen],
-            engine,
-            states,
-            this,
-            new HomeAppPickerViewModel(log)));
-
-        Pages.Add(new BloatwareViewModel(appxService, restorePoints, journal, log, this));
-        Pages.Add(new StartupViewModel(startupService, this));
-        Pages.Add(new PowerActionsViewModel(engine, states, this));
-        Pages.Add(new GameRuntimesViewModel(runtimeService, this));
-        Pages.Add(new DeviceHealthViewModel(systemState, log, this));
-        Pages.Add(new UpdatesViewModel(updateSources, restorePoints, log, this));
-
-        // Looked up by title so a page that is renamed or removed fails here, at start-up, rather than
-        // quietly dropping out of the sidebar.
-        PageViewModelBase Page(string title) => Pages.First(p => p.Title == title);
-
-        Groups.Add(new NavGroup("Dashboard", Page("Dashboard").Glyph, [Page("Dashboard")]));
-
-        Groups.Add(new NavGroup("Performance Tweaks", "",
-        [
-            Page("Gaming Tweaks"),
-            Page("CPU & Kernel"),
-            Page("Graphics & Scheduling"),
-            Page("Network"),
-            Page("Storage"),
-            Page("Sleep & Battery"),
-            Page("Interface")
-        ]));
-
-        Groups.Add(new NavGroup("Debloat Tool", "",
-        [
-            Page("System Debloat"),
-            Page("Deep Services"),
-            Page("Bloatware"),
-            Page("Startup Apps")
-        ]));
-
-        Groups.Add(new NavGroup("Settings & Hardware", "",
-        [
-            Page("Full Screen Mode"),
-            Page("Power Actions"),
-            Page("Device & System Health"),
-            Page("Handheld Usability")
-        ]));
-
-        Groups.Add(new NavGroup("Updates", Page("Updates").Glyph,
-        [
-            Page("Updates"),
-            Page("Game Runtimes")
-        ]));
-
-        SelectedGroup = Groups[0];
-    }
-
-    /// <summary>Choosing a group in the sidebar opens the page that was last open in it.</summary>
-    partial void OnSelectedGroupChanged(NavGroup? value)
-    {
-        // A list's selection can be cleared (Ctrl+click); the page on screen stays where it is then.
-        if (value is not null)
+        // What each kind of section in the map is made of.
+        SectionViewModel Build(SectionSpec spec, OpenTile open) => spec.Kind switch
         {
-            IsGroupOpen = true;
-            SelectedPage = value.SelectedPage;
+            SectionKind.Tweaks => new TweakSectionViewModel(spec.Category!.Value, engine, states, this, open) { Heading = spec.Heading },
+            SectionKind.HomeApp => new HomeAppPickerViewModel(log, this) { Heading = spec.Heading },
+            SectionKind.Startup => new StartupViewModel(startupService, this, open) { Heading = spec.Heading },
+            SectionKind.PreinstalledApps => new BloatwareViewModel(appxService, restorePoints, journal, log, this, open) { Heading = spec.Heading },
+            SectionKind.Backup => new BackupViewModel(engine, states, restorePoints, this) { Heading = spec.Heading },
+            SectionKind.Jobs => new PowerActionsViewModel(engine, states, this) { Heading = spec.Heading },
+            SectionKind.Health => new DeviceHealthViewModel(systemState, log, this) { Heading = spec.Heading },
+            SectionKind.Updates => new UpdatesViewModel(updateSources, restorePoints, log, this) { Heading = spec.Heading },
+            SectionKind.Runtimes => new GameRuntimesViewModel(runtimeService, this) { Heading = spec.Heading },
+            _ => throw new InvalidOperationException($"No section is built for {spec.Kind}.")
+        };
+
+        foreach (var goal in HubLayout.Goals)
+        {
+            // One per page, so that only one tile is open on a page whichever section it is in.
+            var open = new OpenTile();
+            Pages.Add(new GoalPageViewModel(goal, [.. goal.Sections.Select(s => Build(s, open))], engine, states, this));
         }
+
+        Cards = [.. Pages.OfType<GoalPageViewModel>()];
+        SelectedPage = dashboard;
     }
 
-    /// <summary>A page in the open group's list was pressed.</summary>
+    /// <summary>A card on the Dashboard was pressed.</summary>
     [RelayCommand]
-    private void OpenPage(PageViewModelBase page)
-    {
-        if (SelectedGroup is { } group && group.Pages.Contains(page))
-        {
-            group.SelectedPage = page;
-        }
+    private void OpenPage(PageViewModelBase page) => SelectedPage = page;
 
-        SelectedPage = page;
-    }
+    /// <summary>Back. There are only two levels, so it always goes to the Dashboard.</summary>
+    [RelayCommand]
+    private void GoHome() => SelectedPage = Pages[0];
 
-    partial void OnSelectedPageChanged(PageViewModelBase? oldValue, PageViewModelBase? newValue)
-    {
-        if (oldValue is not null)
-        {
-            oldValue.IsCurrent = false;
-            oldValue.OnNavigatedFrom();
-        }
-
-        if (newValue is not null)
-        {
-            newValue.IsCurrent = true;
-        }
-    }
+    partial void OnSelectedPageChanged(PageViewModelBase? oldValue, PageViewModelBase? newValue) =>
+        oldValue?.OnNavigatedFrom();
 
     partial void OnSelectedPageChanged(PageViewModelBase? value)
     {
@@ -401,48 +247,68 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         ScanText = _scans.Count == 0 ? string.Empty : $"Checking {string.Join(", ", _scans.Distinct())}…";
 
     /// <summary>
-    /// Reads everything the app shows, once, as it opens: every tweak's state and each page's own
+    /// Reads everything the app shows, once, as it opens: every tweak's state and each section's own
     /// list. Opening a page used to start its scan and hold the app busy until it finished. What only
-    /// reads this device goes first and is done in a few seconds; Updates and Game Runtimes ask the
-    /// internet and follow, so they do not slow the rest down.
+    /// reads this device goes first and is done in a few seconds; the sections that ask the internet
+    /// (Updates and Game runtimes) follow, so they do not slow the rest down.
     /// </summary>
     public async Task ScanAtLaunchAsync()
     {
         var clock = System.Diagnostics.Stopwatch.StartNew();
+        var sections = Cards.SelectMany(card => card.Sections.Select(section => (card.Title, Section: section))).ToList();
 
         // Only the ones not asked about yet: the Dashboard is already on screen and has asked for its own.
         var tweaks = RunScanAsync("tweaks", ct => _states.CheckMissingAsync(_states.Tweaks, ct));
-        await Task.WhenAll(Pages.Where(p => !p.LoadsFromInternet).Select(LoadPageAsync).Append(tweaks));
+        await Task.WhenAll(sections
+            .Where(s => !s.Section.LoadsFromInternet)
+            .Select(s => LoadQuietlyAsync(s.Title, s.Section.LoadAsync))
+            .Append(LoadQuietlyAsync(Pages[0].Title, Pages[0].LoadAsync))
+            .Append(tweaks));
         Log.Info($"Start-up scan: this device read in {clock.Elapsed.TotalSeconds:0.0} s.");
 
-        await Task.WhenAll(Pages.Where(p => p.LoadsFromInternet).Select(LoadPageAsync));
+        await Task.WhenAll(sections
+            .Where(s => s.Section.LoadsFromInternet)
+            .Select(s => LoadQuietlyAsync(s.Title, s.Section.LoadAsync)));
         Log.Info($"Start-up scan: updates and runtimes read after {clock.Elapsed.TotalSeconds:0.0} s.");
     }
 
-    /// <summary>One page failing to load must not stop the others, so each reports its own failure.</summary>
-    private async Task LoadPageAsync(PageViewModelBase page)
+    /// <summary>One section failing to load must not stop the others, so each reports its own failure.</summary>
+    private async Task LoadQuietlyAsync(string page, Func<Task> load)
     {
         try
         {
-            await page.LoadAsync();
+            await load();
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Log.Error($"Failed to load {page.Title}: {ex.Message}");
+            Log.Error($"Failed to load {page}: {ex.Message}");
         }
     }
 
     public async Task<bool> ConfirmAsync(string title, string message, string confirmText)
     {
+        var text = new System.Windows.Controls.TextBlock
+        {
+            Text = message,
+            TextWrapping = System.Windows.TextWrapping.Wrap,
+            MaxWidth = 460
+        };
+
+        // Only a long message, such as every app about to be removed, scrolls inside the dialog, so
+        // its buttons stay on a 720 unit tall screen. A short one is plain text, as it always was.
+        System.Windows.UIElement content = DialogText.NeedsScrolling(message)
+            ? new System.Windows.Controls.ScrollViewer
+            {
+                MaxHeight = 320,
+                VerticalScrollBarVisibility = System.Windows.Controls.ScrollBarVisibility.Auto,
+                Content = text
+            }
+            : text;
+
         var box = new Wpf.Ui.Controls.MessageBox
         {
             Title = title,
-            Content = new System.Windows.Controls.TextBlock
-            {
-                Text = message,
-                TextWrapping = System.Windows.TextWrapping.Wrap,
-                MaxWidth = 460
-            },
+            Content = content,
             PrimaryButtonText = confirmText,
             PrimaryButtonAppearance = Wpf.Ui.Controls.ControlAppearance.Primary,
             CloseButtonText = confirmText == "OK" ? "Close" : "Cancel",
@@ -512,7 +378,8 @@ public sealed partial class MainViewModel : ObservableObject, IShell
     /// True when the game library's Update now opened the app. The update was already chosen there and
     /// the administrator prompt accepted, so it installs without asking again, and a failed check is said.
     /// </param>
-    public async Task CheckForUpdatesOnStartupAsync(bool installNow = false)
+    /// <returns>True when the app is closing to install the update, so nothing else should be started.</returns>
+    public async Task<bool> CheckForUpdatesOnStartupAsync(bool installNow = false)
     {
         try
         {
@@ -527,13 +394,10 @@ public sealed partial class MainViewModel : ObservableObject, IShell
                 await ConfirmAsync("Could not check for updates", $"{ex.Message}\n\nCheck the internet connection and try again.", "OK");
             }
 
-            return;
+            return false;
         }
 
-        if (installNow && AvailableUpdate is { CanInstallInApp: true } offer)
-        {
-            await DownloadAndInstallAsync(offer);
-        }
+        return installNow && AvailableUpdate is { CanInstallInApp: true } offer && await DownloadAndInstallAsync(offer);
     }
 
     [RelayCommand]
@@ -589,7 +453,8 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         await DownloadAndInstallAsync(offer);
     }
 
-    private async Task DownloadAndInstallAsync(UpdateOffer offer)
+    /// <returns>True when the installer was started and the app is closing for it.</returns>
+    private async Task<bool> DownloadAndInstallAsync(UpdateOffer offer)
     {
         string? installer = null;
         string? failure = null;
@@ -615,12 +480,12 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         if (failure is not null)
         {
             await ConfirmAsync("Update not installed", failure, "OK");
-            return;
+            return false;
         }
 
         if (installer is null)
         {
-            return;
+            return false;
         }
 
         try
@@ -631,11 +496,12 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         {
             Log.Error($"Could not start the update installer: {ex.Message}");
             await ConfirmAsync("Update not installed", $"The installer could not be started ({ex.Message}).", "OK");
-            return;
+            return false;
         }
 
         // The installer waits for this process to close before replacing its files.
         System.Windows.Application.Current.Shutdown();
+        return true;
     }
 
     /// <summary>

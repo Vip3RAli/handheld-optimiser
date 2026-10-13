@@ -127,7 +127,7 @@ public static partial class SleepHealth
         }
 
         // Whether the network stays on in Modern Standby is a power plan setting, not something the
-        // device can or cannot do, and Turn Wi-Fi off during sleep on the Sleep & Battery page shows it.
+        // device can or cannot do, and Turn Wi-Fi off during sleep on the Battery & Sleep page shows it.
         // The short answer names the states. The sentence under it says what that means for the battery,
         // so the two never repeat each other.
         var meaning = states.ModernStandby && states.HibernateFile
@@ -153,7 +153,7 @@ public static partial class SleepHealth
             Status = exposed ? HealthStatus.Warning : HealthStatus.Info,
             Advice = exposed
                 ? "Sleep is the only rest this handheld gets, and it keeps using the battery. Hibernate " +
-                  "after 15 minutes of sleep, on the Sleep & Battery page, switches hibernate on."
+                  "after 15 minutes of sleep, on the Battery & Sleep page, switches hibernate on."
                 : null
         };
     }
@@ -244,8 +244,8 @@ public static partial class SleepHealth
             Summary = string.Create(CultureInfo.InvariantCulture, $"{rate:0.0}% an hour, over {hours:0.#} hours asleep"),
             Status = high ? HealthStatus.Warning : HealthStatus.Good,
             Advice = high
-                ? "That is a lot for a device that is asleep. The two hibernate settings on the Sleep & " +
-                  "Battery page stop it, and the rows below show what was keeping it busy."
+                ? "That is a lot for a device that is asleep. The two hibernate settings on the Battery & " +
+                  "Sleep page stop it, and the rows below show what was keeping it busy."
                 : null
         };
     }
@@ -406,7 +406,7 @@ public static partial class SleepHealth
             Status = HealthStatus.Warning,
             Advice =
                 "A bump on any of these wakes the handheld in a bag. Only the power button wakes the " +
-                "handheld, on the Sleep & Battery page, stops them."
+                "handheld, on the Battery & Sleep page, stops them."
         };
     }
 
