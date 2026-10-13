@@ -7,6 +7,7 @@
     <UserControl.Resources>
         <views:InverseBooleanConverter x:Key="InverseBool" />
         <views:CardLevelToBrushConverter x:Key="LevelBrush" />
+        <views:LessConverter x:Key="Less" />
 
         <!-- A hardware figure beside the title: an outline icon and a label, the figure, then a word or two about it. -->
         <Style x:Key="TileIcon" TargetType="ui:FontIcon" BasedOn="{StaticResource {x:Type ui:FontIcon}}">
@@ -46,8 +47,11 @@
             the themed button would draw its own padding and hover fill inside the card.
         -->
         <Style x:Key="GoalCard" TargetType="Button">
+            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
             <Setter Property="Margin" Value="0,0,12,12" />
-            <Setter Property="MinHeight" Value="150" />
+            <!-- The least that holds the icon, the name and its two lines. On the handheld's own screen
+                 (1280 x 672 units, maximised) two rows of cards this tall just fit without scrolling. -->
+            <Setter Property="MinHeight" Value="140" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Foreground" Value="White" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -67,9 +71,6 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Tint" Property="Background" Value="#0FFFFFFF" />
-                            </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="Shape" Property="BorderBrush" Value="{StaticResource BrandAccent}" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="Tint" Property="Background" Value="#1AFFFFFF" />
@@ -283,13 +284,35 @@
                                 Command="{Binding DataContext.OpenPageCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                 CommandParameter="{Binding}">
                             <Grid>
-                                <ui:FontIcon Glyph="{Binding Glyph}" FontSize="28"
-                                             HorizontalAlignment="Left" VerticalAlignment="Top"
-                                             Foreground="{StaticResource BrandAccent}" />
-                                <ui:FontIcon Glyph="&#xE76C;" FontSize="12" Opacity="0.55"
+                                <!--
+                                    The icon takes what height the card has to spare, less a gap above
+                                    the name. On the handheld's own screen that leaves it at 28. Docked
+                                    to a bigger screen the cards are much taller, and it grows to fill
+                                    them, up to 96.
+
+                                    It sits in a Canvas because a Canvas asks for no height of its own.
+                                    Placed in the row directly, the icon asked for its full 96 on every
+                                    screen, and the second row of cards was pushed out of the window.
+                                    For the same reason the gap is taken off in the binding and is not
+                                    a margin, which would make every card 54 taller at the least: on
+                                    the handheld's own screen two rows of cards only just fit as it is.
+                                -->
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <Canvas x:Name="IconSpace" Grid.Row="0">
+                                    <Viewbox Stretch="Uniform" MinHeight="28" MaxHeight="96"
+                                             Height="{Binding ActualHeight, ElementName=IconSpace, Converter={StaticResource Less}, ConverterParameter=54}">
+                                        <ui:FontIcon Glyph="{Binding Glyph}" FontSize="28"
+                                                     Foreground="{StaticResource BrandAccent}" />
+                                    </Viewbox>
+                                </Canvas>
+                                <ui:FontIcon Grid.Row="0" Glyph="&#xE76C;" FontSize="12" Opacity="0.55"
                                              HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,4,0,0" />
 
-                                <StackPanel VerticalAlignment="Bottom">
+                                <StackPanel Grid.Row="1">
                                     <TextBlock Text="{Binding Title}" FontSize="19" FontWeight="SemiBold"
                                                FontFamily="{StaticResource AppDisplayFont}" TextWrapping="Wrap" />
 

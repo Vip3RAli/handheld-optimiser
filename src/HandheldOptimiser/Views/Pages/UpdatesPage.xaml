@@ -18,7 +18,9 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
+                    <!-- Enter ticks it as well as Space: Enter is the controller's A button. -->
                     <CheckBox Grid.Column="0"
+                              KeyboardNavigation.AcceptsReturn="True"
                               IsChecked="{Binding IsSelected, Mode=TwoWay}"
                               IsEnabled="{Binding CanSelect}"
                               VerticalAlignment="Center"

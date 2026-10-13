@@ -152,7 +152,8 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <Button Grid.Column="0"
+                <Button x:Name="BackButton"
+                        Grid.Column="0"
                         Style="{StaticResource BackButton}"
                         Margin="0,0,14,0"
                         AutomationProperties.Name="Back"
@@ -180,7 +181,10 @@
                 </StackPanel>
             </Grid>
 
-            <ContentControl Grid.Row="1"
+            <!-- Not a keyboard stop itself: the keyboard goes to what is on the page (see MainWindow.Focus.cs). -->
+            <ContentControl x:Name="PageHost"
+                            Grid.Row="1"
+                            Focusable="False"
                             Content="{Binding SelectedPage}"
                             IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}" />
         </Grid>

@@ -48,11 +48,30 @@
             </Style>
 
             <!--
+                The ring around the control that has the keyboard. A handheld's controller reaches the
+                app as arrow keys, so this is what shows where the D-pad is. WPF only draws it once a
+                key has been pressed, so touch and the mouse never leave it behind. Controls drawn with
+                their own template here (pills, cards, tiles) would otherwise get WPF's default, a
+                dotted black line that cannot be seen on a dark window.
+            -->
+            <Style x:Key="FocusRing">
+                <Setter Property="Control.Template">
+                    <Setter.Value>
+                        <ControlTemplate>
+                            <Rectangle Margin="-3" RadiusX="11" RadiusY="11" StrokeThickness="2"
+                                       Stroke="{StaticResource BrandAccent}" SnapsToDevicePixels="True" />
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!--
                 A pill: the one-click button. A plain Button with
                 its own template, because the rounded-rectangle look of the themed button is the thing
                 being replaced.
             -->
             <Style x:Key="Pill" TargetType="Button">
+                <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
                 <Setter Property="MinHeight" Value="40" />
                 <Setter Property="Padding" Value="18,0" />
                 <Setter Property="FontSize" Value="13.5" />
@@ -104,6 +123,8 @@
                 beneath its row. Its edge turns cyan while that detail is open (see ITile).
             -->
             <Style x:Key="Tile" TargetType="Button">
+                <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
+                <Setter Property="views:TileKeys.Enabled" Value="True" />
                 <Setter Property="MinHeight" Value="64" />
                 <Setter Property="Padding" Value="14,8" />
                 <Setter Property="Cursor" Value="Hand" />
@@ -125,9 +146,6 @@
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
                                     <Setter TargetName="Tint" Property="Background" Value="#0AFFFFFF" />
-                                </Trigger>
-                                <Trigger Property="IsKeyboardFocused" Value="True">
-                                    <Setter TargetName="Tint" Property="Background" Value="#0FFFFFFF" />
                                 </Trigger>
                                 <DataTrigger Binding="{Binding IsOpen}" Value="True">
                                     <Setter TargetName="Shape" Property="BorderBrush" Value="{StaticResource BrandAccent}" />

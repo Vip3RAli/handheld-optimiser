@@ -31,6 +31,15 @@ public partial class MainWindow : FluentWindow
         InitializeComponent();
         FitToWorkArea();
         DataContextChanged += OnDataContextChanged;
+
+        // The first card has the keyboard as the app opens, so a D-pad works from the start.
+        Loaded += (_, _) =>
+        {
+            if (DataContext is MainViewModel vm)
+            {
+                PlaceFocus(vm, cameFrom: null);
+            }
+        };
     }
 
     /// <summary>
@@ -133,11 +142,13 @@ public partial class MainWindow : FluentWindow
         {
             // A console the user has to manually scroll is useless during a long run.
             vm.Log.Entries.CollectionChanged += OnLogChanged;
+            WatchFocus(vm);
         }
 
         if (e.OldValue is MainViewModel old)
         {
             old.Log.Entries.CollectionChanged -= OnLogChanged;
+            UnwatchFocus(old);
         }
     }
 

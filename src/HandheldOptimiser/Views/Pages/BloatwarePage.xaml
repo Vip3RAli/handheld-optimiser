@@ -26,11 +26,14 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- Wide and tall enough to hit with a thumb without opening the tile instead. -->
+                    <!-- Wide and tall enough to hit with a thumb without opening the tile instead. Enter
+                         ticks it too: that is the controller's A button, and a tick box by itself only
+                         answers to Space. -->
                     <CheckBox Grid.Column="0"
                               IsChecked="{Binding IsSelected, Mode=TwoWay}"
                               Checked="OnSelectionChanged"
                               Unchecked="OnSelectionChanged"
+                              KeyboardNavigation.AcceptsReturn="True"
                               MinWidth="40"
                               MinHeight="40"
                               Padding="0"

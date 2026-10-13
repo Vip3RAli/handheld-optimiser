@@ -36,6 +36,21 @@ public sealed class BooleanToVisibilityConverter : IValueConverter
         value is Visibility v && v == Visibility.Visible;
 }
 
+/// <summary>
+/// A length less the amount given as the parameter, and never below nothing. A Dashboard card's icon
+/// is as tall as the space the card has to spare, less the gap kept above the card's name.
+/// </summary>
+public sealed class LessConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is double length && double.TryParse(parameter as string, NumberStyles.Float, CultureInfo.InvariantCulture, out var less)
+            ? Math.Max(0, length - less)
+            : 0d;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
 /// <summary>A section's heading is written in capitals, which a TextBlock cannot do by itself.</summary>
 public sealed class UpperCaseConverter : IValueConverter
 {
