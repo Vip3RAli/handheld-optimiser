@@ -7,7 +7,10 @@ public enum HealthStatus
     Good,
     Warning,
     Bad,
-    Unknown
+    Unknown,
+
+    /// <summary>A fact worth showing that is neither good nor bad, such as what a power plan holds.</summary>
+    Info
 }
 
 public sealed class HealthCheck
@@ -16,13 +19,21 @@ public sealed class HealthCheck
     public required string Detail { get; init; }
     public required HealthStatus Status { get; init; }
     public string? Advice { get; init; }
+
+    /// <summary>The label of a button that opens the Windows page for this row, where there is one.</summary>
+    public string? OpenText { get; init; }
+
+    /// <summary>What that button opens: a Settings page, as an ms-settings link.</summary>
+    public string? OpenUri { get; init; }
 }
 
 /// <summary>
 /// Read-only inspection of the machine. Backs the Device &amp; System Health page, which deliberately
 /// contains no toggles: the user's constraints forbid touching the handheld vendor's software and the
 /// AMD, Intel and Realtek drivers, so the useful thing this app can offer for that hardware is proof that
-/// it left everything alone.
+/// it left everything alone. The same page shows what Windows reports about sleep, the power plans and
+/// storage (<see cref="SleepHealth"/>, <see cref="ProcessorPowerReport"/>, <see cref="StorageHealth"/>),
+/// which is evidence for the tweaks elsewhere and changes nothing either.
 /// </summary>
 public sealed class SystemStateService(LogService log, PowerShellRunner runner, RegistryHelper registry)
 {
@@ -133,6 +144,12 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
 
         var checks = new List<HealthCheck>();
 
+        // Started now and collected at the end, so they run alongside the service checks: between them
+        // they wait on powercfg for a couple of seconds.
+        var sleep = SleepHealth.RunAsync(_runner, ct);
+        var plans = ProcessorPowerReport.RunAsync(_runner, ct);
+        var storage = StorageHealth.RunAsync(_runner, ct);
+
         var watched = WatchedServices();
         var serviceNames = string.Join(",", watched.Select(s => $"'{s.ServiceName.Replace("'", "''")}'"));
 
@@ -203,6 +220,17 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
         }
 
         checks.AddRange(await GetVirtualisationChecksAsync(ct));
+
+        var reported = checks.Count;
+        checks.AddRange(await sleep);
+        checks.AddRange(await plans);
+        checks.AddRange(await storage);
+
+        // Their scripts are not echoed into the log, so what they found is written here.
+        foreach (var check in checks.Skip(reported))
+        {
+            _log.Info($"{check.Name}: {check.Detail.Replace("\n", " | ")}");
+        }
 
         _log.Info($"Health check complete: {checks.Count(c => c.Status == HealthStatus.Good)} good, " +
                   $"{checks.Count(c => c.Status == HealthStatus.Warning)} warnings, " +

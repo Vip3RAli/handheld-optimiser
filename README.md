@@ -61,7 +61,8 @@ Tap a section in the sidebar to drop down its pages.
 - **Apply Now** includes turning off **Memory Integrity**, usually the biggest frame rate gain on the Ally, at the cost of some protection against malicious drivers. The confirmation lists every trade-off first.
 - **Bloatware** removes preinstalled apps such as TikTok, Candy Crush and Copilot. Nothing is selected until you choose it.
 - **Power Actions** are one-off jobs: flush DNS, clear shader caches, deep cleanup and Compact OS.
-- **Device & System Health** checks that your handheld's own services are running and can re-enable any that other tools disabled.
+- **Sleep & Battery** can hibernate the handheld after a short sleep or at a press of the power button, so it uses no power in a bag.
+- **Device & System Health** checks that your handheld's own services are running and can re-enable any that other tools disabled. It also shows what Windows reports about sleep (battery used while asleep, and what can wake the handheld or keep it awake), the processor settings in each power plan, free space and device encryption. It changes none of them.
 - **Updates** lists Windows, Store and winget updates together and installs the ones you tick. Driver updates are off unless you switch them on. Games, the BIOS and firmware are not listed.
 
 ## Full Screen Mode and the game library

@@ -6,7 +6,8 @@ using HandheldOptimiser.Services;
 namespace HandheldOptimiser.ViewModels;
 
 /// <summary>
-/// Read-only verification page.
+/// Read-only verification page. Below the protected components it shows what Windows reports about
+/// sleep, the power plans and storage, which changes nothing either.
 ///
 /// This app is forbidden from disabling the handheld vendor's software, the AMD, Intel and Realtek
 /// drivers, Defender or Windows Update, so this page has no toggles at all. Its job is to show that those
@@ -14,14 +15,15 @@ namespace HandheldOptimiser.ViewModels;
 /// Which vendor it inspects follows the device: Armoury Crate on a ROG Ally, Legion Space on a Legion Go,
 /// MSI Center M on an MSI Claw.
 /// </summary>
-public sealed partial class DeviceHealthViewModel(SystemStateService systemState, IShell shell)
+public sealed partial class DeviceHealthViewModel(SystemStateService systemState, LogService log, IShell shell)
     : PageViewModelBase(shell)
 {
     private readonly SystemStateService _systemState = systemState;
+    private readonly LogService _log = log;
 
     public override string Title => "Device & System Health";
     public override string Glyph => "";
-    public override string Subtitle => "Verify protected components are untouched. No toggles here by design.";
+    public override string Subtitle => "Protected components, sleep, power plans and storage, as Windows reports them. No toggles here by design.";
 
     public ObservableCollection<HealthCheck> Checks { get; } = [];
 
@@ -83,8 +85,18 @@ public sealed partial class DeviceHealthViewModel(SystemStateService systemState
         SummaryText = bad > 0
             ? $"{bad} problem(s) found. Something has disabled a component that should be running."
             : warn > 0
-                ? $"All protected components healthy. {warn} performance opportunit{(warn == 1 ? "y" : "ies")} available."
+                ? $"All protected components healthy. {warn} row{(warn == 1 ? " is" : "s are")} worth a look, marked in yellow."
                 : "All protected components healthy and fully optimised.";
+    }
+
+    /// <summary>Opens the Windows page a row points to. The row is the button's parameter.</summary>
+    [RelayCommand]
+    private void OpenCheck(HealthCheck? check)
+    {
+        if (check?.OpenUri is { } uri)
+        {
+            ShellLinks.Open(uri, _log);
+        }
     }
 
     private static string ProtectionNoteFor((string Vendor, string App)? vendor) =>

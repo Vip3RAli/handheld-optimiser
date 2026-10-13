@@ -16,18 +16,34 @@ namespace HandheldOptimiser.TweakDefinitions;
 public static class SleepTweaks
 {
     private const string SleepSubgroup = "238c9fa8-0aad-41ed-83f4-97be242c8f20";
+    private const string ButtonsSubgroup = "4f971e89-eebd-4455-a8de-9e59040e7347";
     private const string NoSubgroup = "fea3413e-7e05-4911-9a71-700331f1c294";
 
     private const string HibernateAfterSetting = "9d7815a6-7ee4-497e-8888-515a05f02364";
+    private const string PowerButtonSetting = "7648efa3-dd9c-4e3e-b566-50f929386280";
     private const string ConnectivityInStandbySetting = "f15576e8-98b7-4186-b944-eafa664402d9";
 
     private const int HibernateAfterSeconds = 15 * 60;
+
+    /// <summary>What the power button does: 0 nothing, 1 sleep, 2 hibernate, 3 shut down, 4 display off.</summary>
+    private const int PowerButtonHibernate = 2;
+
+    /// <summary>
+    /// The settings that only work with hibernate on. Reverting one of them leaves hibernate on while
+    /// another is still set, or the device would be told to hibernate and have no way to.
+    /// </summary>
+    private static readonly (string Id, string Subgroup, string Setting, int? Ac, int? Dc)[] NeedHibernate =
+    [
+        ("sleep.hibernateafter", SleepSubgroup, HibernateAfterSetting, null, HibernateAfterSeconds),
+        ("sleep.powerbutton", ButtonsSubgroup, PowerButtonSetting, null, PowerButtonHibernate)
+    ];
 
     private const string PowerKey = @"SYSTEM\CurrentControlSet\Control\Power";
 
     public static IReadOnlyList<Tweak> All =>
     [
         HibernateAfterStandby,
+        PowerButtonHibernates,
         DisconnectInStandby,
         NoWakeDevices,
         DisableCardReader,
@@ -47,6 +63,25 @@ public static class SleepTweaks
         setting: HibernateAfterSetting,
         ac: null,
         dc: HibernateAfterSeconds,
+        needsHibernate: true);
+
+    /// <summary>
+    /// The timer above still leaves 15 minutes of sleep after every press. This removes them for a
+    /// press of the button, and the timer goes on covering sleeps that start by themselves.
+    /// </summary>
+    public static Tweak PowerButtonHibernates => PowerSetting(
+        id: "sleep.powerbutton",
+        name: "Power button hibernates on battery",
+        description:
+            "On battery, pressing the power button hibernates the handheld, so it uses no power in a " +
+            "bag. Plugged in, it still sleeps. ASUS recommends this for the ROG Ally.",
+        warning:
+            "Waking takes 10 to 20 seconds instead of being instant. Most games carry on where you left " +
+            "them, but some have to be restarted and online games lose their connection.",
+        subgroup: ButtonsSubgroup,
+        setting: PowerButtonSetting,
+        ac: null,
+        dc: PowerButtonHibernate,
         needsHibernate: true);
 
     public static Tweak DisconnectInStandby => PowerSetting(
@@ -165,8 +200,15 @@ public static class SleepTweaks
 
             if (journal.CapturedState.ContainsKey(HibernateSwitchedOn))
             {
-                var off = await ctx.Runner.RunScriptAsync("& powercfg.exe /hibernate off", "Switch hibernate back off", ct);
-                ok &= off.Succeeded;
+                if (await AnotherSettingNeedsHibernateAsync(ctx, id, ct))
+                {
+                    ctx.Log.Info("Hibernate is left on: another Sleep & Battery setting still uses it.");
+                }
+                else
+                {
+                    var off = await ctx.Runner.RunScriptAsync("& powercfg.exe /hibernate off", "Switch hibernate back off", ct);
+                    ok &= off.Succeeded;
+                }
             }
 
             return ok
@@ -174,6 +216,21 @@ public static class SleepTweaks
                 : TweakResult.Fail(id, "One or more power plans could not be restored. See log.");
         }
     };
+
+    /// <summary>Whether any power plan still holds another setting that hibernates the device.</summary>
+    private static async Task<bool> AnotherSettingNeedsHibernateAsync(TweakContext ctx, string revertingId, CancellationToken ct)
+    {
+        foreach (var other in NeedHibernate.Where(n => n.Id != revertingId))
+        {
+            var plans = await ReadPlansAsync(ctx, other.Subgroup, other.Setting, ct);
+            if (plans.Any(p => Matches(p, other.Ac, other.Dc)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private sealed record PlanValue(string Scheme, uint Ac, uint Dc);
 
@@ -184,6 +241,8 @@ public static class SleepTweaks
     /// The setting's current value in every power plan. The plan list and the values are picked out of
     /// powercfg's output by shape (GUIDs, and the trailing hex values) rather than by its labels, which
     /// are translated on non-English Windows. A plan that does not report the setting cleanly is left out.
+    /// Asked with /qh, which also shows the settings Windows hides from its own power options, such as
+    /// what the power button does.
     /// </summary>
     private static async Task<List<PlanValue>> ReadPlansAsync(TweakContext ctx, string subgroup, string setting, CancellationToken ct)
     {
@@ -191,7 +250,7 @@ public static class SleepTweaks
             $$"""
             $plans = & powercfg.exe /list | Select-String '[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}' | ForEach-Object { $_.Matches[0].Value }
             foreach ($plan in $plans) {
-                $hex = @(& powercfg.exe /q $plan {{subgroup}} {{setting}} 2>$null | Select-String '(0x[0-9a-fA-F]{8})\s*$' | ForEach-Object { $_.Matches[0].Groups[1].Value })
+                $hex = @(& powercfg.exe /qh $plan {{subgroup}} {{setting}} 2>$null | Select-String '(0x[0-9a-fA-F]{8})\s*$' | ForEach-Object { $_.Matches[0].Groups[1].Value })
                 # A list setting prints 2 values (AC, DC); a range setting prints min, max and step first.
                 if ($hex.Count -eq 2 -or $hex.Count -eq 5) {
                     Write-Output ("PLAN={0}={1}={2}" -f $plan, [Convert]::ToUInt32($hex[-2], 16), [Convert]::ToUInt32($hex[-1], 16))
@@ -294,7 +353,7 @@ public static class SleepTweaks
     /// translated elsewhere). Keeping only names that are also in the list of devices that can be
     /// configured to wake drops the placeholder in any language.
     /// </summary>
-    private const string ListArmedScript =
+    internal const string ListArmedScript =
         """
         $programmable = @(& powercfg.exe /devicequery wake_programmable | ForEach-Object { $_.Trim() } | Where-Object { $_ })
         & powercfg.exe /devicequery wake_armed | ForEach-Object { $_.Trim() } | Where-Object { $_ -and $programmable -contains $_ } | ForEach-Object { Write-Output ("DEV=" + $_) }
