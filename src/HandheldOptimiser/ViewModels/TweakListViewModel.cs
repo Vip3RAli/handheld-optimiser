@@ -18,10 +18,7 @@ public interface IPageSection
 public sealed partial class TweakListViewModel : PageViewModelBase
 {
     private readonly TweakEngine _engine;
-    private readonly TweakCategory[] _categories;
-
-    // The engine's change count when this page last checked its tweaks, or null before the first check.
-    private int? _checkedAt;
+    private readonly TweakStateStore _states;
 
     public override string Title { get; }
     public override string Glyph { get; }
@@ -41,6 +38,7 @@ public sealed partial class TweakListViewModel : PageViewModelBase
         string subtitle,
         TweakCategory[] categories,
         TweakEngine engine,
+        TweakStateStore states,
         IShell shell,
         IPageSection? header = null)
         : base(shell)
@@ -48,57 +46,37 @@ public sealed partial class TweakListViewModel : PageViewModelBase
         Title = title;
         Glyph = glyph;
         Subtitle = subtitle;
-        _categories = categories;
         _engine = engine;
+        _states = states;
         Header = header;
 
         foreach (var tweak in engine.AllTweaks.Where(t => categories.Contains(t.Category)))
         {
-            Tweaks.Add(new TweakItemViewModel(tweak, engine, shell));
+            Tweaks.Add(new TweakItemViewModel(tweak, engine, states, shell));
         }
     }
+
+    private List<Tweak> PageTweaks => Tweaks.Select(t => t.Tweak).ToList();
 
     /// <summary>
-    /// Coming back to the page only checks the tweaks again when something has been applied or reverted
-    /// since the last check. Some checks start PowerShell, so doing them on every visit made switching
-    /// tabs slow. Re-check always checks everything, for changes made outside the app.
+    /// Every tweak is checked when the app starts and again after any change, so opening the page
+    /// checks nothing. It only asks about tweaks that have never been asked about, which happens when
+    /// the scan at start-up did not run.
     /// </summary>
-    public override async Task OnNavigatedToAsync()
-    {
-        if (_checkedAt == _engine.ChangeCount)
-        {
-            Header?.Reload();
-            return;
-        }
+    public override Task LoadAsync() => _states.CheckMissingAsync(PageTweaks);
 
-        await RefreshAsync();
+    public override Task OnNavigatedToAsync()
+    {
+        Header?.Reload();
+        return LoadAsync();
     }
 
+    /// <summary>Re-check: asks about every tweak on the page again, for changes made outside the app.</summary>
     [RelayCommand]
-    private async Task RefreshAsync()
+    private Task RefreshAsync()
     {
-        await Shell.RunExclusiveAsync($"Checking {Title.ToLowerInvariant()}…", async (progress, ct) =>
-        {
-            Header?.Reload();
-            await CheckAllAsync(progress, ct);
-        });
-    }
-
-    /// <summary>
-    /// Checks every tweak on the page at once rather than one after another. Each check only reads, and
-    /// the ones that start PowerShell or powercfg spend most of their time waiting on it.
-    /// </summary>
-    private async Task CheckAllAsync(IProgress<string>? progress, CancellationToken ct)
-    {
-        var changeCount = _engine.ChangeCount;
-
-        await Task.WhenAll(Tweaks.Select(async item =>
-        {
-            await item.RefreshStateAsync(ct);
-            progress?.Report($"Checked {item.Name}");
-        }));
-
-        _checkedAt = changeCount;
+        Header?.Reload();
+        return Shell.RunScanAsync(Title.ToLowerInvariant(), ct => _states.CheckAsync(PageTweaks, ct));
     }
 
     [RelayCommand]
@@ -149,7 +127,9 @@ public sealed partial class TweakListViewModel : PageViewModelBase
                 Shell.NotifyRebootRequired();
             }
 
-            await CheckAllAsync(null, ct);
+            // Everything is checked again, since one tweak can move another. The dialog only waits for
+            // this page's own.
+            await _states.CheckAllAsync(waitFor: PageTweaks, ct);
         });
     }
 }

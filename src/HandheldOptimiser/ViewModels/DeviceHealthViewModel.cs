@@ -37,17 +37,30 @@ public sealed partial class DeviceHealthViewModel(SystemStateService systemState
     [ObservableProperty]
     private bool _hasProblems;
 
-    public override async Task OnNavigatedToAsync()
+    private bool _isChecking;
+
+    public override Task LoadAsync() => Checks.Count == 0 ? RefreshAsync() : Task.CompletedTask;
+
+    /// <summary>Runs the checks in the background. Only a repair holds the app busy.</summary>
+    [RelayCommand]
+    private async Task RefreshAsync()
     {
-        if (Checks.Count == 0)
+        if (_isChecking)
         {
-            await RefreshCommand.ExecuteAsync(null);
+            return;
+        }
+
+        _isChecking = true;
+
+        try
+        {
+            await Shell.RunScanAsync("device health", LoadChecksAsync);
+        }
+        finally
+        {
+            _isChecking = false;
         }
     }
-
-    [RelayCommand]
-    private async Task RefreshAsync() =>
-        await Shell.RunExclusiveAsync("Checking protected components…", (progress, ct) => LoadChecksAsync(ct));
 
     private async Task LoadChecksAsync(CancellationToken ct)
     {

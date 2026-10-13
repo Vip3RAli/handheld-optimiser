@@ -28,10 +28,26 @@ public sealed partial class MainViewModel : ObservableObject, IShell
     private PageViewModelBase? _selectedPage;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FooterText), nameof(IsWorking))]
     private bool _isBusy;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FooterText))]
     private string _statusText = "Ready";
+
+    // What is being read in the background right now, in the order it started.
+    private readonly List<string> _scans = [];
+
+    /// <summary>"Checking tweaks, updates…" while background scans run, and empty when none does.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FooterText), nameof(IsWorking))]
+    private string _scanText = string.Empty;
+
+    /// <summary>The line at the bottom of the window: the running operation, else what is being checked.</summary>
+    public string FooterText => IsBusy || ScanText.Length == 0 ? StatusText : ScanText;
+
+    /// <summary>Whether the ring at the bottom of the window turns: for an operation or a background scan.</summary>
+    public bool IsWorking => IsBusy || ScanText.Length > 0;
 
     [ObservableProperty]
     private string _progressDetail = string.Empty;
@@ -50,6 +66,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
     private bool _isGroupOpen = true;
 
     private readonly UpdateService _updates;
+    private readonly TweakStateStore _states;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(UpdateTitle), nameof(UpdateMessage), nameof(CanInstallUpdate))]
@@ -78,6 +95,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
     public MainViewModel(
         LogService log,
         TweakEngine engine,
+        TweakStateStore states,
         SystemStateService systemState,
         HardwareInfoService hardware,
         RestorePointService restorePoints,
@@ -90,8 +108,9 @@ public sealed partial class MainViewModel : ObservableObject, IShell
     {
         Log = log;
         _updates = updates;
+        _states = states;
 
-        Pages.Add(new DashboardViewModel(engine, systemState, hardware, restorePoints, log, this));
+        Pages.Add(new DashboardViewModel(engine, states, systemState, hardware, restorePoints, this));
 
         Pages.Add(new TweakListViewModel(
             "Gaming Tweaks",
@@ -99,6 +118,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
             "Handheld performance changes. These are where the frame rate comes from.",
             [TweakCategory.Gaming],
             engine,
+            states,
             this));
 
         Pages.Add(new TweakListViewModel(
@@ -107,6 +127,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
             "Telemetry, search, assistants and background activity.",
             [TweakCategory.Debloat, TweakCategory.Privacy],
             engine,
+            states,
             this));
 
         Pages.Add(new TweakListViewModel(
@@ -115,6 +136,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
             "Scheduler settings that put the game ahead of background work.",
             [TweakCategory.CpuKernel],
             engine,
+            states,
             this));
 
         Pages.Add(new TweakListViewModel(
@@ -123,6 +145,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
             "Latency and memory fixes for the network stack.",
             [TweakCategory.Network],
             engine,
+            states,
             this));
 
         Pages.Add(new TweakListViewModel(
@@ -131,6 +154,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
             "Background services a gaming handheld does not need. Security, update and vendor services are protected.",
             [TweakCategory.Services],
             engine,
+            states,
             this));
 
         Pages.Add(new TweakListViewModel(
@@ -139,6 +163,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
             "Desktop responsiveness and touch behaviour. Games are unaffected.",
             [TweakCategory.Interface],
             engine,
+            states,
             this));
 
         Pages.Add(new TweakListViewModel(
@@ -147,6 +172,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
             "Cuts needless NTFS writes to save SSD wear. Only affects files from now on.",
             [TweakCategory.Storage],
             engine,
+            states,
             this));
 
         Pages.Add(new TweakListViewModel(
@@ -155,6 +181,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
             "How Windows prioritises the game and schedules the GPU.",
             [TweakCategory.Graphics],
             engine,
+            states,
             this));
 
         Pages.Add(new TweakListViewModel(
@@ -163,6 +190,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
             "Stops pop-ups and background throttling from interrupting a game.",
             [TweakCategory.Usability],
             engine,
+            states,
             this));
 
         Pages.Add(new TweakListViewModel(
@@ -171,6 +199,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
             "Modern Standby keeps draining the battery. These hibernate after a short sleep and stop things waking the device.",
             [TweakCategory.Sleep],
             engine,
+            states,
             this));
 
         Pages.Add(new TweakListViewModel(
@@ -179,12 +208,13 @@ public sealed partial class MainViewModel : ObservableObject, IShell
             "Choose what the Windows full screen experience opens, and whether to sign straight into it.",
             [TweakCategory.FullScreen],
             engine,
+            states,
             this,
             new HomeAppPickerViewModel(log)));
 
         Pages.Add(new BloatwareViewModel(appxService, restorePoints, journal, log, this));
         Pages.Add(new StartupViewModel(startupService, this));
-        Pages.Add(new PowerActionsViewModel(engine, this));
+        Pages.Add(new PowerActionsViewModel(engine, states, this));
         Pages.Add(new GameRuntimesViewModel(runtimeService, this));
         Pages.Add(new DeviceHealthViewModel(systemState, this));
         Pages.Add(new UpdatesViewModel(updateSources, restorePoints, log, this));
@@ -283,14 +313,12 @@ public sealed partial class MainViewModel : ObservableObject, IShell
     {
         try
         {
-            // Page loads wait for any running operation instead of being dropped by RunExclusiveAsync,
-            // otherwise a page opened during the startup scan never reads its state and shows "Unknown".
-            // Everything here runs on the UI thread, so nothing can take the gate between the release
-            // and the page's own RunExclusiveAsync call.
+            // A page opened while something is being applied waits for that to finish before it reads
+            // anything, so it does not show a state caught halfway through a change.
             await _gate.WaitAsync();
             _gate.Release();
 
-            // The user may have moved on while we waited; only scan the page they are looking at.
+            // The user may have moved on while we waited; only load the page they are looking at.
             if (!ReferenceEquals(SelectedPage, page))
             {
                 return;
@@ -342,6 +370,65 @@ public sealed partial class MainViewModel : ObservableObject, IShell
             StatusText = "Ready";
             ProgressDetail = string.Empty;
             _gate.Release();
+        }
+    }
+
+    public async Task RunScanAsync(string what, Func<CancellationToken, Task> scan)
+    {
+        _scans.Add(what);
+        ShowScans();
+
+        try
+        {
+            await scan(CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+            // Nothing to say: whatever was shown before still is.
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"Checking {what} failed: {ex.Message}");
+        }
+        finally
+        {
+            _scans.Remove(what);
+            ShowScans();
+        }
+    }
+
+    private void ShowScans() =>
+        ScanText = _scans.Count == 0 ? string.Empty : $"Checking {string.Join(", ", _scans.Distinct())}…";
+
+    /// <summary>
+    /// Reads everything the app shows, once, as it opens: every tweak's state and each page's own
+    /// list. Opening a page used to start its scan and hold the app busy until it finished. What only
+    /// reads this device goes first and is done in a few seconds; Updates and Game Runtimes ask the
+    /// internet and follow, so they do not slow the rest down.
+    /// </summary>
+    public async Task ScanAtLaunchAsync()
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+
+        // Only the ones not asked about yet: the Dashboard is already on screen and has asked for its own.
+        var tweaks = RunScanAsync("tweaks", ct => _states.CheckMissingAsync(_states.Tweaks, ct));
+        await Task.WhenAll(Pages.Where(p => !p.LoadsFromInternet).Select(LoadPageAsync).Append(tweaks));
+        Log.Info($"Start-up scan: this device read in {clock.Elapsed.TotalSeconds:0.0} s.");
+
+        await Task.WhenAll(Pages.Where(p => p.LoadsFromInternet).Select(LoadPageAsync));
+        Log.Info($"Start-up scan: updates and runtimes read after {clock.Elapsed.TotalSeconds:0.0} s.");
+    }
+
+    /// <summary>One page failing to load must not stop the others, so each reports its own failure.</summary>
+    private async Task LoadPageAsync(PageViewModelBase page)
+    {
+        try
+        {
+            await page.LoadAsync();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.Error($"Failed to load {page.Title}: {ex.Message}");
         }
     }
 

@@ -509,6 +509,13 @@ public static class DebloatTweaks
         ]
     };
 
+    /// <summary>
+    /// Asks Task Scheduler directly, through its COM object, for each task's state. Get-ScheduledTask
+    /// gives the same answer but takes about half a second a task: four seconds for this list on a ROG
+    /// Ally against a third of a second this way, on a check the Dashboard and System Debloat both run.
+    /// The states are printed under the names Get-ScheduledTask uses, which is what undo data from
+    /// earlier versions holds. A task that does not exist prints nothing, as before.
+    /// </summary>
     private static string BuildTaskStateScript()
     {
         var list = string.Join(",\n    ", TelemetryTasks.Select(t => $"'{t}'"));
@@ -518,11 +525,14 @@ public static class DebloatTweaks
             $tasks = @(
                 {{list}}
             )
+            $names = @{ 0 = 'Unknown'; 1 = 'Disabled'; 2 = 'Queued'; 3 = 'Ready'; 4 = 'Running' }
+            $scheduler = New-Object -ComObject Schedule.Service
+            $scheduler.Connect()
             foreach ($full in $tasks) {
-                $leaf = Split-Path $full -Leaf
-                $parent = (Split-Path $full -Parent) + '\'
-                $t = Get-ScheduledTask -TaskPath $parent -TaskName $leaf -ErrorAction SilentlyContinue
-                if ($t) { Write-Output "TASK=$full=$($t.State)" }
+                try {
+                    $t = $scheduler.GetFolder((Split-Path $full -Parent)).GetTask((Split-Path $full -Leaf))
+                    Write-Output "TASK=$full=$($names[[int]$t.State])"
+                } catch { }
             }
             """;
     }
