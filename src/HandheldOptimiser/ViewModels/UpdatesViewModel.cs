@@ -101,6 +101,13 @@ public sealed partial class UpdateSectionViewModel(
         }
     }
 
+    /// <summary>Said in place of the count while this source is being asked. Its rows stay as they were.</summary>
+    public void ShowChecking()
+    {
+        ErrorText = string.Empty;
+        SummaryText = "Checking…";
+    }
+
     public void RefreshSummary()
     {
         if (ErrorText.Length > 0)
@@ -131,8 +138,9 @@ public sealed partial class SkippedUpdateViewModel(SkippedUpdate entry, UpdatesV
 
 /// <summary>
 /// One place to update everything: Windows Update, Microsoft Store apps, and desktop apps winget knows
-/// about. Checking asks all three at once; updating runs them one after another, apps first and Windows
-/// Update last, since that is the one most likely to want a restart.
+/// about. Checking asks all three at once, in the background, and shows each list as its source
+/// answers: winget takes a few seconds and the Store about twenty. Updating runs them one after
+/// another, apps first and Windows Update last, since that is the one most likely to want a restart.
 /// </summary>
 public sealed partial class UpdatesViewModel : PageViewModelBase
 {
@@ -144,7 +152,13 @@ public sealed partial class UpdatesViewModel : PageViewModelBase
     private readonly LogService _log;
     private bool _hasScanned;
 
+    /// <summary>True while the sources are being asked. Nothing can be installed until they have answered.</summary>
+    [ObservableProperty]
+    private bool _isChecking;
+
     public override string Title => "Updates";
+
+    public override bool LoadsFromInternet => true;
     public override string Glyph => "";
     public override string Subtitle =>
         "Windows Update, Microsoft Store apps and your other apps, checked and updated together.";
@@ -224,13 +238,7 @@ public sealed partial class UpdatesViewModel : PageViewModelBase
 
     private IEnumerable<UpdateRowViewModel> AllRows => Sections.SelectMany(s => s.Rows);
 
-    public override async Task OnNavigatedToAsync()
-    {
-        if (!_hasScanned)
-        {
-            await CheckCommand.ExecuteAsync(null);
-        }
-    }
+    public override Task LoadAsync() => _hasScanned ? Task.CompletedTask : CheckAsync();
 
     partial void OnIncludeDriversChanged(bool value)
     {
@@ -245,54 +253,109 @@ public sealed partial class UpdatesViewModel : PageViewModelBase
     [RelayCommand]
     private async Task CheckAsync()
     {
-        await Shell.RunExclusiveAsync("Checking for updates…", async (progress, ct) =>
+        // Not while updates are installing: a list refilled under a running install loses its rows.
+        if (IsChecking || Shell.IsBusy)
         {
-            var pending = new List<string> { "Windows Update", "Microsoft Store", "winget" };
+            return;
+        }
 
-            void Report() => progress.Report(pending.Count == 0 ? string.Empty : $"Waiting on {string.Join(", ", pending)}");
+        IsChecking = true;
+        SummaryText = "Checking…";
 
-            async Task<UpdateScan> Run(string name, Func<Task<UpdateScan>> scan)
+        foreach (var section in Sections)
+        {
+            section.ShowChecking();
+        }
+
+        try
+        {
+            await Shell.RunScanAsync("updates", CheckSourcesAsync);
+        }
+        finally
+        {
+            IsChecking = false;
+
+            // A source that never answered (the check itself failed) must not go on saying "Checking…".
+            foreach (var section in Sections.Where(s => s.SummaryText == "Checking…"))
             {
-                UpdateScan result;
-                try
-                {
-                    result = await scan();
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    _log.Error($"{name} check failed: {ex.Message}");
-                    result = UpdateScan.Failed($"Could not check: {ex.Message}");
-                }
-
-                pending.Remove(name);
-                Report();
-                return result;
+                section.RefreshSummary();
             }
 
-            Report();
-            _log.Info("=== Checking for updates ===");
+            if (SummaryText == "Checking…")
+            {
+                SummaryText = "Could not check. The console has the detail.";
+            }
+        }
+    }
 
-            // Windows Update is the slowest by far, so all three run side by side.
-            var windows = Run("Windows Update", () => _windows.ScanAsync(IncludeDrivers, ct));
-            var store = Run("Microsoft Store", () => _store.ScanAsync(ct));
-            var winget = Run("winget", () => _winget.ScanAsync(ct));
-            await Task.WhenAll(windows, store, winget);
+    private async Task CheckSourcesAsync(CancellationToken ct)
+    {
+        _log.Info("=== Checking for updates ===");
 
-            var storeNames = new HashSet<string>(store.Result.Items.Select(i => i.Name), StringComparer.OrdinalIgnoreCase);
+        async Task<UpdateScan> Run(string name, Func<Task<UpdateScan>> scan)
+        {
+            try
+            {
+                return await scan();
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _log.Error($"{name} check failed: {ex.Message}");
+                return UpdateScan.Failed($"Could not check: {ex.Message}");
+            }
+        }
 
-            Fill(WindowsSection, windows.Result.Items, windows.Result.Error);
-            Fill(StoreSection, store.Result.Items, store.Result.Error);
+        // winget also tracks some Store apps under its own IDs. Updating those through the Store is the
+        // way their publisher intends, so they are only listed once, under the Store. The Store answers
+        // last, so the winget list is shown as it comes and those apps are taken out of it afterwards.
+        HashSet<string>? storeNames = null;
 
-            // winget also tracks some Store apps under its own IDs. Updating those through the Store is
-            // the one their publisher intends, so they are only listed once, under the Store.
-            Fill(AppsSection, winget.Result.Items.Where(i => !storeNames.Contains(i.Name)).ToList(), winget.Result.Error);
+        async Task CheckWindowsAsync()
+        {
+            var found = await Run("Windows Update", () => _windows.ScanAsync(IncludeDrivers, ct));
+            Fill(WindowsSection, found.Items, found.Error);
+        }
 
-            _hasScanned = true;
-            var total = AllRows.Count();
-            SummaryText = total == 0
-                ? $"Everything is up to date. Checked at {DateTime.Now:t}."
-                : $"{total} update(s) available. Checked at {DateTime.Now:t}.";
-        });
+        async Task CheckStoreAsync()
+        {
+            var found = await Run("Microsoft Store", () => _store.ScanAsync(ct));
+            Fill(StoreSection, found.Items, found.Error);
+
+            storeNames = new HashSet<string>(found.Items.Select(i => i.Name), StringComparer.OrdinalIgnoreCase);
+            Remove(AppsSection, row => storeNames.Contains(row.Name));
+        }
+
+        async Task CheckAppsAsync()
+        {
+            var found = await Run("winget", () => _winget.ScanAsync(ct));
+            Fill(AppsSection, found.Items.Where(i => storeNames?.Contains(i.Name) != true).ToList(), found.Error);
+        }
+
+        await Task.WhenAll(CheckWindowsAsync(), CheckStoreAsync(), CheckAppsAsync());
+
+        _hasScanned = true;
+        var total = AllRows.Count();
+        SummaryText = total == 0
+            ? $"Everything is up to date. Checked at {DateTime.Now:t}."
+            : $"{total} update(s) available. Checked at {DateTime.Now:t}.";
+    }
+
+    /// <summary>Takes rows out of a section that is already showing, keeping what is ticked on the rest.</summary>
+    private void Remove(UpdateSectionViewModel section, Func<UpdateRowViewModel, bool> which)
+    {
+        foreach (var row in section.Rows.Where(which).ToList())
+        {
+            row.PropertyChanged -= OnRowChanged;
+            section.Rows.Remove(row);
+        }
+
+        // Left alone while the section is still waiting for its own answer.
+        if (section.SummaryText != "Checking…")
+        {
+            section.RefreshSummary();
+        }
+
+        CountSelected();
     }
 
     private void Fill(UpdateSectionViewModel section, IReadOnlyList<UpdateItem> items, string? error)
@@ -379,6 +442,12 @@ public sealed partial class UpdatesViewModel : PageViewModelBase
     [RelayCommand]
     private async Task UpdateSelectedAsync()
     {
+        if (IsChecking)
+        {
+            await Shell.ConfirmAsync("Still checking", "Wait for the check to finish, then choose what to install.", "OK");
+            return;
+        }
+
         var rows = AllRows.Where(r => r.IsSelected && r.CanSelect).ToList();
 
         if (rows.Count == 0)

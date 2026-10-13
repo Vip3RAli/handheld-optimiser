@@ -6,11 +6,12 @@ using HandheldOptimiser.Services;
 namespace HandheldOptimiser.ViewModels;
 
 /// <summary>
-/// One tweak row: a toggle switch, a risk badge, and its live detected state.
+/// One tweak row: a toggle switch, a risk badge, and its state as last found.
 /// </summary>
 public sealed partial class TweakItemViewModel : ObservableObject
 {
     private readonly TweakEngine _engine;
+    private readonly TweakStateStore _states;
     private readonly IShell _shell;
 
     /// <summary>
@@ -24,17 +25,37 @@ public sealed partial class TweakItemViewModel : ObservableObject
     [ObservableProperty]
     private TweakState _state = TweakState.Unknown;
 
+    /// <summary>
+    /// False until the tweak's first check answers. The switch cannot be used before then: it would
+    /// show "off" for a tweak that may be on, and pressing it would apply or revert on a guess.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StateText))]
+    private bool _isKnown;
+
     [ObservableProperty]
     private bool _isOn;
 
     [ObservableProperty]
     private bool _isWorking;
 
-    public TweakItemViewModel(Tweak tweak, TweakEngine engine, IShell shell)
+    public TweakItemViewModel(Tweak tweak, TweakEngine engine, TweakStateStore states, IShell shell)
     {
         Tweak = tweak;
         _engine = engine;
+        _states = states;
         _shell = shell;
+
+        // Rows live as long as the app does, so this is never unhooked.
+        _states.Changed += changed =>
+        {
+            if (changed.Id == Tweak.Id)
+            {
+                ShowState();
+            }
+        };
+
+        ShowState();
     }
 
     public string Name => Tweak.Name;
@@ -58,7 +79,7 @@ public sealed partial class TweakItemViewModel : ObservableObject
         _ => string.Empty
     };
 
-    public string StateText => State switch
+    public string StateText => !IsKnown ? "Checking…" : State switch
     {
         TweakState.Applied => "Optimised",
         TweakState.NotApplied => "Default",
@@ -66,6 +87,17 @@ public sealed partial class TweakItemViewModel : ObservableObject
         TweakState.Error => "Error",
         _ => "Unknown"
     };
+
+    /// <summary>
+    /// Shows what the store holds for this tweak. While a later check is out the last state stays up,
+    /// so a re-check changes rows in place and does not blank them.
+    /// </summary>
+    private void ShowState()
+    {
+        var found = _states.StateOf(Tweak);
+        IsKnown = found is not null;
+        State = found ?? TweakState.Unknown;
+    }
 
     partial void OnStateChanged(TweakState value)
     {
@@ -85,11 +117,6 @@ public sealed partial class TweakItemViewModel : ObservableObject
         _suppressToggleHandling = false;
     }
 
-    public async Task RefreshStateAsync(CancellationToken ct = default)
-    {
-        State = await _engine.DetectAsync(Tweak, ct);
-    }
-
     /// <summary>
     /// Called by the view when the user flips the switch. Applying runs the full pipeline including a
     /// restore point; reverting uses the journal.
@@ -102,7 +129,7 @@ public sealed partial class TweakItemViewModel : ObservableObject
             return;
         }
 
-        if (_shell.IsBusy)
+        if (_shell.IsBusy || !IsKnown)
         {
             SyncToggleToState();
             return;
@@ -171,7 +198,9 @@ public sealed partial class TweakItemViewModel : ObservableObject
                         }
                     }
 
-                    await RefreshStateAsync(ct);
+                    // One tweak can move another (two that share a setting), so all are checked again.
+                    // Only this one is waited for; the rest answer in the background.
+                    await _states.CheckAllAsync(waitFor: [Tweak], ct);
                 }
                 finally
                 {

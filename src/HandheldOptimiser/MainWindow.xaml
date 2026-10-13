@@ -336,10 +336,11 @@
                                  IsIndeterminate="True"
                                  Width="18" Height="18"
                                  Margin="0,0,10,0"
-                                 Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />
+                                 Visibility="{Binding IsWorking, Converter={StaticResource BoolToVis}}" />
 
+                <!-- The running operation, or what is being checked in the background while none is. -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
-                    <TextBlock Text="{Binding StatusText}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding FooterText}" FontWeight="SemiBold" VerticalAlignment="Center" />
                     <TextBlock Text="{Binding ProgressDetail}" Opacity="0.65" Margin="10,0,0,0"
                                VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                                Visibility="{Binding ProgressDetail, Converter={StaticResource StringToVis}}" />

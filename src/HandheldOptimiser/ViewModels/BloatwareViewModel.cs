@@ -53,6 +53,7 @@ public sealed partial class BloatwareViewModel(
     private readonly LogService _log = log;
 
     private bool _hasScanned;
+    private bool _isScanning;
 
     public override string Title => "Bloatware";
     public override string Glyph => "";
@@ -65,17 +66,35 @@ public sealed partial class BloatwareViewModel(
 
     private IEnumerable<AppxRowViewModel> AllRows => Groups.SelectMany(g => g.Items);
 
-    public override async Task OnNavigatedToAsync()
+    public override Task LoadAsync() => _hasScanned ? Task.CompletedTask : ScanAsync();
+
+    /// <summary>Reads the installed apps in the background. Only removing them holds the app busy.</summary>
+    [RelayCommand]
+    private async Task ScanAsync()
     {
-        if (!_hasScanned)
+        if (_isScanning)
         {
-            await ScanCommand.ExecuteAsync(null);
+            return;
+        }
+
+        _isScanning = true;
+        SummaryText = "Scanning…";
+
+        try
+        {
+            await Shell.RunScanAsync("installed apps", LoadPackagesAsync);
+        }
+        finally
+        {
+            _isScanning = false;
+
+            // Still saying so means the scan failed, which the console explains.
+            if (SummaryText == "Scanning…")
+            {
+                SummaryText = "The installed apps could not be read. The console has the detail.";
+            }
         }
     }
-
-    [RelayCommand]
-    private async Task ScanAsync() =>
-        await Shell.RunExclusiveAsync("Scanning installed apps…", (progress, ct) => LoadPackagesAsync(ct));
 
     private async Task LoadPackagesAsync(CancellationToken ct)
     {

@@ -70,8 +70,12 @@ public sealed partial class GameRuntimesViewModel : PageViewModelBase
 {
     private readonly RuntimeService _service;
     private bool _hasScanned;
+    private bool _isScanning;
 
     public override string Title => "Game Runtimes";
+
+    /// <summary>The scan asks winget what is installed and what is newer, which goes to the internet.</summary>
+    public override bool LoadsFromInternet => true;
     public override string Glyph => "";
     public override string Subtitle =>
         "Visual C++, DirectX and .NET runtimes that games need. Installs come from Microsoft and vendor " +
@@ -96,22 +100,50 @@ public sealed partial class GameRuntimesViewModel : PageViewModelBase
 
     private IEnumerable<RuntimeRowViewModel> AllRows => EssentialRows.Concat(LegacyRows);
 
-    public override async Task OnNavigatedToAsync()
-    {
-        if (!_hasScanned)
-        {
-            await ScanCommand.ExecuteAsync(null);
-        }
-    }
+    public override Task LoadAsync() => _hasScanned ? Task.CompletedTask : ScanAsync();
 
+    /// <summary>Checks the runtimes in the background. Only installing one holds the app busy.</summary>
     [RelayCommand]
     private async Task ScanAsync()
     {
-        await Shell.RunExclusiveAsync("Checking game runtimes…", async (progress, ct) =>
+        if (_isScanning)
         {
-            await ScanRowsAsync(AllRows.ToList(), progress, ct);
-            _hasScanned = true;
+            return;
+        }
+
+        _isScanning = true;
+        SummaryText = "Checking…";
+
+        // How far the scan has got, shown where the result will be. A report can arrive after the
+        // scan has finished, and must not replace the result.
+        var progress = new Progress<string>(step =>
+        {
+            if (_isScanning)
+            {
+                SummaryText = step;
+            }
         });
+
+        var finished = false;
+
+        try
+        {
+            await Shell.RunScanAsync("game runtimes", async ct =>
+            {
+                await ScanRowsAsync(AllRows.ToList(), progress, ct);
+                _hasScanned = true;
+                finished = true;
+            });
+        }
+        finally
+        {
+            _isScanning = false;
+
+            if (!finished)
+            {
+                SummaryText = "The runtimes could not be checked. The console has the detail.";
+            }
+        }
     }
 
     [RelayCommand]

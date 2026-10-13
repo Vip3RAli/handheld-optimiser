@@ -13,6 +13,13 @@ public interface IShell
 
     Task RunExclusiveAsync(string statusText, Func<IProgress<string>, CancellationToken, Task> work);
 
+    /// <summary>
+    /// Runs something that only reads, in the background. It does not take the busy gate, so the app
+    /// stays usable while it runs and it can run beside other scans. <paramref name="what"/> is what
+    /// is being checked ("updates"), shown at the bottom of the window until it finishes.
+    /// </summary>
+    Task RunScanAsync(string what, Func<CancellationToken, Task> scan);
+
     Task<bool> ConfirmAsync(string title, string message, string confirmText);
 
     void NotifyRebootRequired();
@@ -33,8 +40,23 @@ public abstract partial class PageViewModelBase(IShell shell) : ObservableObject
     [ObservableProperty]
     private bool _isCurrent;
 
-    /// <summary>Called when the page becomes visible. Used to lazily scan system state.</summary>
-    public virtual Task OnNavigatedToAsync() => Task.CompletedTask;
+    /// <summary>
+    /// Whether what this page shows comes from the internet. At start-up those pages load after the
+    /// ones that only read this device, so the quick answers are not held up by the slow ones.
+    /// </summary>
+    public virtual bool LoadsFromInternet => false;
+
+    /// <summary>
+    /// Reads what the page shows, unless it has been read or is being read already. Every page is
+    /// loaded once when the app starts, so opening one does not mean waiting for it.
+    /// </summary>
+    public virtual Task LoadAsync() => Task.CompletedTask;
+
+    /// <summary>
+    /// Called when the page becomes visible. Loads the page if start-up did not get to it, which is
+    /// the case when the app was opened only to install an update.
+    /// </summary>
+    public virtual Task OnNavigatedToAsync() => LoadAsync();
 
     /// <summary>Called when another page takes over. Used to stop anything that only runs while visible.</summary>
     public virtual void OnNavigatedFrom()

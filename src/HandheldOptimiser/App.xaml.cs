@@ -58,8 +58,15 @@ public partial class App : Application
         journal.ImportLegacyFile(id => engine.FindById(id) is not null);
         UpdateService.CleanUpOldDownloads(log);
 
+        // One answer per tweak, shared by every page. Checks run on this thread and wait on PowerShell
+        // where they need it, as the pages' own checks did.
+        var states = new TweakStateStore(
+            engine.AllTweaks,
+            (tweak, ct) => engine.DetectAsync(tweak, ct),
+            (tweak, ex) => log.Warning($"Could not check \"{tweak.Name}\": {ex.Message}"));
+
         var viewModel = new MainViewModel(
-            log, engine, systemState, hardware, restorePoints, appxService, startupService, journal, runtimes,
+            log, engine, states, systemState, hardware, restorePoints, appxService, startupService, journal, runtimes,
             updateSources, updates);
 
         var window = new MainWindow { DataContext = viewModel };
@@ -69,6 +76,14 @@ public partial class App : Application
         // The game library cannot install updates itself, so its Update now starts this app with --update.
         var installUpdate = e.Args.Contains("--update", StringComparer.OrdinalIgnoreCase);
         _ = viewModel.CheckForUpdatesOnStartupAsync(installUpdate);
+
+        // Everything is read once now, so no page has to scan when it is opened. Not when the app was
+        // only opened to install an update: it is about to close, and a Store check cut off midway
+        // would leave the updates it found paused in the Store's queue. Pages still load when opened.
+        if (!installUpdate)
+        {
+            _ = viewModel.ScanAtLaunchAsync();
+        }
     }
 
     /// <summary>

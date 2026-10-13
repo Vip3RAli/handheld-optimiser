@@ -58,18 +58,13 @@ public sealed partial class StartupViewModel(StartupService service, IShell shel
     [ObservableProperty]
     private string _summaryText = "Not scanned yet.";
 
-    public override async Task OnNavigatedToAsync()
-    {
-        if (Entries.Count == 0)
-        {
-            await ScanAsync();
-        }
-    }
+    public override Task LoadAsync() => Entries.Count == 0 ? ScanAsync() : Task.CompletedTask;
 
+    /// <summary>Reads the startup entries. It only reads, so it does not hold the app busy.</summary>
     [RelayCommand]
     private async Task ScanAsync()
     {
-        await Shell.RunExclusiveAsync("Reading startup entries…", (progress, ct) =>
+        await Shell.RunScanAsync("startup apps", ct =>
         {
             var found = _service.Scan();
 
