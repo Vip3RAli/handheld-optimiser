@@ -15,8 +15,34 @@ public static class StorageTweaks
     [
         DisableLastAccess,
         Disable8dot3Names,
-        ReservedStorage
+        ReservedStorage,
+        SmallCrashDumps
     ];
+
+    /// <summary>
+    /// 3 is a small dump, 7 the automatic one Windows defaults to. With the automatic setting, a second
+    /// crash within four weeks also makes Windows raise the page file to the size of the memory.
+    /// </summary>
+    public static Tweak SmallCrashDumps => new()
+    {
+        Id = "storage.crashdump",
+        Name = "Keep crash dumps small",
+        Description =
+            "After a blue screen, Windows saves a small crash file instead of a memory dump that can " +
+            "take several gigabytes.",
+        Category = TweakCategory.Storage,
+        Risk = RiskLevel.Moderate,
+        RequiresReboot = true,
+        IncludeInOneClick = false,
+        Warning =
+            "A small crash file holds less for tracking down a faulty driver. Revert this if someone " +
+            "helping you asks for a full memory dump.",
+        RegistryValues =
+        [
+            new(RegistryRoot.LocalMachine, @"SYSTEM\CurrentControlSet\Control\CrashControl",
+                "CrashDumpEnabled", 3, RegistryValueKind.DWord)
+        ]
+    };
 
     private const string ReservedStateScript =
         """

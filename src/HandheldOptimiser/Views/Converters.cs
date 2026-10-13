@@ -61,6 +61,7 @@ public sealed class HealthStatusToBrushConverter : IValueConverter
                 HealthStatus.Good => Color.FromRgb(0x6C, 0xC0, 0x7A),
                 HealthStatus.Warning => Color.FromRgb(0xE8, 0xC4, 0x5F),
                 HealthStatus.Bad => Color.FromRgb(0xE0, 0x6C, 0x6C),
+                HealthStatus.Info => Color.FromRgb(0x7F, 0xB0, 0xE0),
                 _ => Color.FromRgb(0x90, 0x90, 0x90)
             })
             : Brushes.Gray;
@@ -78,6 +79,7 @@ public sealed class HealthStatusToGlyphConverter : IValueConverter
                 HealthStatus.Good => "",
                 HealthStatus.Warning => "",
                 HealthStatus.Bad => "",
+                HealthStatus.Info => "",
                 _ => ""
             }
             : "";

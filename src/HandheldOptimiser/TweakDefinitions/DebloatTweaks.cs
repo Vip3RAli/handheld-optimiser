@@ -16,12 +16,15 @@ public static class DebloatTweaks
     private const string ExplorerAdvanced = @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced";
     private const string EdgePolicy = @"SOFTWARE\Policies\Microsoft\Edge";
     private const string SystemPolicy = @"SOFTWARE\Policies\Microsoft\Windows\System";
+    private const string Notifications = @"Software\Microsoft\Windows\CurrentVersion\Notifications\Settings";
+    private const string WindowsAiPolicy = @"Software\Policies\Microsoft\Windows\WindowsAI";
 
     public static IReadOnlyList<Tweak> All =>
     [
         Telemetry,
         WebSearch,
         CortanaAndCopilot,
+        WindowsAi,
         ConsumerFeatures,
         ShellAds,
         Widgets,
@@ -186,6 +189,111 @@ public static class DebloatTweaks
         ]
     };
 
+    /// <summary>The service that runs Windows' on-device AI models. Only Copilot+ PCs have it.</summary>
+    public const string AiService = "WSAIFabricSvc";
+
+    private const string AiServiceKey = @"SYSTEM\CurrentControlSet\Services\" + AiService;
+    private const string AiServiceStart = "aiservice.start";
+    private const string AiServiceDelayed = "aiservice.delayed";
+
+    /// <summary>
+    /// Recall, Click to Do and the service behind them, by the policies Microsoft documents for them.
+    /// The service is set to start on demand, not disabled, so anything that does ask for it still
+    /// works. On a handheld without the hardware for these features there is no service, and the
+    /// policies only keep the features from arriving.
+    /// </summary>
+    public static Tweak WindowsAi => new()
+    {
+        Id = "debloat.windows_ai",
+        Name = "Turn off Recall and Windows AI",
+        Description =
+            "Turns off Recall, which saves pictures of your screen, and Click to Do, and stops the " +
+            "Windows AI service starting by itself. Only Copilot+ handhelds have these.",
+        Category = TweakCategory.Privacy,
+        Risk = RiskLevel.Moderate,
+        IncludeInOneClick = false,
+        Warning =
+            "If Recall is switched on, the pictures it has saved are deleted.",
+        RegistryValues = WindowsAiPolicies,
+        ScriptDetect = (ctx, _) =>
+        {
+            var set = WindowsAiPolicies.Count(ctx.Registry.ValueMatches);
+            var policies = set == WindowsAiPolicies.Length ? TweakState.Applied
+                : set == 0 ? TweakState.NotApplied
+                : TweakState.Partial;
+
+            return Task.FromResult(
+                AiServiceState(ctx.Registry.ReadValue(RegistryRoot.LocalMachine, AiServiceKey, "Start"), policies));
+        },
+        ScriptApply = async (ctx, journal, ct) =>
+        {
+            // Only a service that starts by itself is changed. One that is absent, on demand already
+            // or disabled by another tool is left exactly as it is.
+            if (ctx.Registry.ReadValue(RegistryRoot.LocalMachine, AiServiceKey, "Start") is not 2)
+            {
+                return TweakResult.NoChange("debloat.windows_ai");
+            }
+
+            if (Services.SafetyGuard.IsServiceProtected(AiService, out var reason))
+            {
+                ctx.Log.Error($"BLOCKED service {AiService}: {reason}");
+                return TweakResult.Blocked("debloat.windows_ai", reason!);
+            }
+
+            var delayed = ctx.Registry.ReadValue(RegistryRoot.LocalMachine, AiServiceKey, "DelayedAutostart");
+            journal.CapturedState[AiServiceStart] = "2";
+            journal.CapturedState[AiServiceDelayed] = delayed is 1 ? "1" : "0";
+
+            var outcome = await ctx.Runner.RunProcessAsync(
+                "sc.exe",
+                ["config", AiService, "start=", "demand"],
+                "Set the Windows AI service to start on demand",
+                ct);
+
+            return outcome.Succeeded
+                ? TweakResult.Ok("debloat.windows_ai", "The Windows AI service starts on demand now.")
+                : TweakResult.Fail("debloat.windows_ai", "The Windows AI service could not be changed. See log.");
+        },
+        ScriptRevert = async (ctx, journal, ct) =>
+        {
+            if (!journal.CapturedState.TryGetValue(AiServiceStart, out var start) || start != "2")
+            {
+                return TweakResult.NoChange("debloat.windows_ai");
+            }
+
+            journal.CapturedState.TryGetValue(AiServiceDelayed, out var delayed);
+
+            var outcome = await ctx.Runner.RunProcessAsync(
+                "sc.exe",
+                ["config", AiService, "start=", delayed == "1" ? "delayed-auto" : "auto"],
+                "Let the Windows AI service start by itself again",
+                ct);
+
+            return outcome.Succeeded
+                ? TweakResult.Ok("debloat.windows_ai", "The Windows AI service starts by itself again.")
+                : TweakResult.Fail("debloat.windows_ai", "The Windows AI service could not be restored. See log.");
+        }
+    };
+
+    private static readonly RegistryValueSpec[] WindowsAiPolicies =
+    [
+        new(RegistryRoot.LocalMachine, WindowsAiPolicy, "AllowRecallEnablement", 0, RegistryValueKind.DWord),
+        new(RegistryRoot.LocalMachine, WindowsAiPolicy, "TurnOffSavingSnapshots", 1, RegistryValueKind.DWord),
+        new(RegistryRoot.LocalMachine, WindowsAiPolicy, "DisableAIDataAnalysis", 1, RegistryValueKind.DWord),
+        new(RegistryRoot.LocalMachine, WindowsAiPolicy, "DisableClickToDo", 1, RegistryValueKind.DWord),
+        new(RegistryRoot.CurrentUser, WindowsAiPolicy, "DisableAIDataAnalysis", 1, RegistryValueKind.DWord),
+        new(RegistryRoot.CurrentUser, WindowsAiPolicy, "DisableClickToDo", 1, RegistryValueKind.DWord)
+    ];
+
+    /// <summary>
+    /// The service half of the Windows AI tweak, from the service's start type: 2 starts by itself and
+    /// counts against the tweak. Anything else, no service at all included, leaves nothing to do, so
+    /// the answer is whatever the policies say. Answering "applied" or "unknown" there would show the
+    /// tweak as partly applied on every handheld that has no such service and has never been touched.
+    /// </summary>
+    public static TweakState AiServiceState(object? startType, TweakState policies) =>
+        startType is 2 ? TweakState.NotApplied : policies;
+
     public static Tweak ConsumerFeatures => new()
     {
         Id = "debloat.consumer_features",
@@ -216,11 +324,21 @@ public static class DebloatTweaks
         Name = "Hide ads in Start, Settings and File Explorer",
         Description =
             "Turns off recommendations, account nags and tips in Start, Settings, File Explorer and the " +
-            "lock screen, plus the \"finish setting up your device\" screen.",
+            "lock screen, the \"finish setting up your device\" screen, and the pop-ups suggesting " +
+            "backup, phone linking and Microsoft account features.",
         Category = TweakCategory.Debloat,
         Risk = RiskLevel.Safe,
         RegistryValues =
         [
+            // The pop-ups: suggested notifications, backup reminders, phone linking, account prompts
+            // and tips. None is in a key that Windows guards against other programs.
+            new(RegistryRoot.CurrentUser, Notifications + @"\Windows.SystemToast.Suggested", "Enabled", 0, RegistryValueKind.DWord),
+            new(RegistryRoot.CurrentUser, Notifications + @"\Windows.SystemToast.BackupReminder", "Enabled", 0, RegistryValueKind.DWord),
+            new(RegistryRoot.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Mobility", "OptedIn", 0, RegistryValueKind.DWord),
+            new(RegistryRoot.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\SystemSettings\AccountNotifications",
+                "EnableAccountNotifications", 0, RegistryValueKind.DWord),
+            new(RegistryRoot.CurrentUser, ContentDelivery, "SoftLandingEnabled", 0, RegistryValueKind.DWord),
+
             new(RegistryRoot.CurrentUser, ExplorerAdvanced, "Start_IrisRecommendations", 0, RegistryValueKind.DWord),
             new(RegistryRoot.CurrentUser, ExplorerAdvanced, "Start_AccountNotifications", 0, RegistryValueKind.DWord),
             new(RegistryRoot.CurrentUser, ExplorerAdvanced, "ShowSyncProviderNotifications", 0, RegistryValueKind.DWord),

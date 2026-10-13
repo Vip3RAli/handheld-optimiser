@@ -73,31 +73,12 @@ public sealed partial class UpdateSectionViewModel(
     [ObservableProperty]
     private string _errorText = string.Empty;
 
-    /// <summary>
-    /// Opened through Explorer rather than the shell, so Settings or the Store start in the user's normal,
-    /// unelevated session instead of as administrator.
-    /// </summary>
     [RelayCommand]
     private void Open()
     {
-        if (openUri is null)
+        if (openUri is not null)
         {
-            return;
-        }
-
-        try
-        {
-            var explorer = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe"),
-                UseShellExecute = false
-            };
-            explorer.ArgumentList.Add(openUri);
-            System.Diagnostics.Process.Start(explorer);
-        }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
-        {
-            log.Error($"Could not open {Title}: {ex.Message}");
+            ShellLinks.Open(openUri, log);
         }
     }
 
