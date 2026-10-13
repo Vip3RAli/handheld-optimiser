@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/app-dashboard.png" alt="Handheld Optimiser dashboard with the Apply Now button, the ring of applied tweaks, hardware readings and safety options" width="900">
+  <img src="docs/dashboard-cards.png" alt="Handheld Optimiser dashboard with the Apply Now button, how many recommended tweaks are applied, hardware readings and a card for each of eight goals" width="900">
 </p>
 
 ---
@@ -77,6 +77,10 @@ Windows 11's full screen experience normally opens the Xbox app. Handheld Optimi
 
 <p align="center">
   <img src="docs/game-library.jpg" alt="The game library with the Games, Apps and Not installed tabs, a row of game covers and the selected game's artwork as the background" width="900">
+</p>
+
+<p align="center">
+  <img src="docs/game-library-old-school.jpg" alt="The game library's Old School layout: a list of categories above a stack of large staggered game cards, like the Xbox 360 dashboard" width="900">
 </p>
 
 1. Open **Full Screen Mode** and choose **Handheld Optimiser library** or **Another launcher**.
