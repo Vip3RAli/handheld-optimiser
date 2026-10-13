@@ -116,7 +116,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
             "Gaming Tweaks",
             "",
             "Handheld performance changes. These are where the frame rate comes from.",
-            [TweakCategory.Gaming],
+            [TweakCategory.Games],
             engine,
             states,
             this));
@@ -125,7 +125,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
             "System Debloat",
             "",
             "Telemetry, search, assistants and background activity.",
-            [TweakCategory.Debloat, TweakCategory.Privacy],
+            [TweakCategory.Privacy, TweakCategory.AdsAndAssistants, TweakCategory.BackgroundActivity],
             engine,
             states,
             this));
@@ -134,7 +134,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
             "CPU & Kernel",
             "",
             "Scheduler settings that put the game ahead of background work.",
-            [TweakCategory.CpuKernel],
+            [TweakCategory.System],
             engine,
             states,
             this));
@@ -161,7 +161,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
             "Interface",
             "",
             "Desktop responsiveness and touch behaviour. Games are unaffected.",
-            [TweakCategory.Interface],
+            [TweakCategory.TouchAndDesktop],
             engine,
             states,
             this));
@@ -171,24 +171,6 @@ public sealed partial class MainViewModel : ObservableObject, IShell
             "",
             "Cuts needless NTFS writes to save SSD wear. Only affects files from now on.",
             [TweakCategory.Storage],
-            engine,
-            states,
-            this));
-
-        Pages.Add(new TweakListViewModel(
-            "Graphics & Scheduling",
-            "",
-            "How Windows prioritises the game and schedules the GPU.",
-            [TweakCategory.Graphics],
-            engine,
-            states,
-            this));
-
-        Pages.Add(new TweakListViewModel(
-            "Handheld Usability",
-            "",
-            "Stops pop-ups and background throttling from interrupting a game.",
-            [TweakCategory.Usability],
             engine,
             states,
             this));
@@ -229,7 +211,6 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         [
             Page("Gaming Tweaks"),
             Page("CPU & Kernel"),
-            Page("Graphics & Scheduling"),
             Page("Network"),
             Page("Storage"),
             Page("Sleep & Battery"),
@@ -248,8 +229,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         [
             Page("Full Screen Mode"),
             Page("Power Actions"),
-            Page("Device & System Health"),
-            Page("Handheld Usability")
+            Page("Device & System Health")
         ]));
 
         Groups.Add(new NavGroup("Updates", Page("Updates").Glyph,

@@ -23,7 +23,7 @@ public static class CpuKernelTweaks
         Name = "Maximise foreground priority (Win32PrioritySeparation)",
         Description =
             "Gives the game in the foreground the CPU ahead of background work. Takes effect immediately.",
-        Category = TweakCategory.CpuKernel,
+        Category = TweakCategory.System,
         Risk = RiskLevel.Safe,
         RegistryValues =
         [

@@ -39,7 +39,7 @@ public static class GamingTweaks
         Description =
             "Turns off hypervisor-enforced integrity checks on drivers. Usually the largest single frame " +
             "rate gain in CPU-heavy games.",
-        Category = TweakCategory.Gaming,
+        Category = TweakCategory.Games,
         Risk = RiskLevel.SecurityTradeoff,
         RequiresReboot = true,
         Warning =
@@ -70,7 +70,7 @@ public static class GamingTweaks
             "Turns off virtualisation-based security, with Virtual Machine Platform, the Windows " +
             "Hypervisor Platform and Windows Hello's protected sign-in, which keep it running. Removes " +
             "virtualisation overhead from every process.",
-        Category = TweakCategory.Gaming,
+        Category = TweakCategory.Games,
         Risk = RiskLevel.Breaking,
         RequiresReboot = true,
         // Opt-in only: Vanguard and FACEIT games stop launching, which is too easy to miss in a one-click run.
@@ -227,7 +227,7 @@ public static class GamingTweaks
         Description =
             "Stops the Game Bar recording gameplay in the background. The Xbox app, Game Pass, cloud " +
             "saves and the overlay keep working.",
-        Category = TweakCategory.Gaming,
+        Category = TweakCategory.Games,
         Risk = RiskLevel.Safe,
         RegistryValues =
         [
@@ -245,7 +245,7 @@ public static class GamingTweaks
         Description =
             "Removes the delay of about ten seconds Windows puts on startup apps, so Armoury Crate and " +
             "the desktop are ready sooner after boot.",
-        Category = TweakCategory.Gaming,
+        Category = TweakCategory.System,
         Risk = RiskLevel.Safe,
         RequiresReboot = true,
         RegistryValues =

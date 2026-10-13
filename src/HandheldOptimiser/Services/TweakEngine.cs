@@ -48,20 +48,7 @@ public sealed class TweakEngine
         _context = new TweakContext(log, registry, runner);
         Device = device;
 
-        AllTweaks =
-        [
-            .. GamingTweaks.All,
-            .. DebloatTweaks.All,
-            .. CpuKernelTweaks.All,
-            .. NetworkTweaks.All,
-            .. ServiceTweaks.All,
-            .. InterfaceTweaks.All,
-            .. StorageTweaks.All,
-            .. GraphicsTweaks.All,
-            .. UsabilityTweaks.All,
-            .. FullScreenTweaks.All,
-            .. SleepTweaks.All
-        ];
+        AllTweaks = TweakCatalog.All;
 
         PowerActions = TweakDefinitions.PowerActions.All;
     }

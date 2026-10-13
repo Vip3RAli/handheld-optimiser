@@ -40,7 +40,7 @@ public sealed class TweakEngineRevertTests
         Id = id,
         Name = id,
         Description = "Test tweak",
-        Category = TweakCategory.Gaming,
+        Category = TweakCategory.Games,
         RegistryValues = values ?? [],
         ScriptRevert = scriptRevert
     };
