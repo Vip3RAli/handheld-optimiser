@@ -4,6 +4,7 @@ using System.Windows.Data;
 using System.Windows.Media;
 using HandheldOptimiser.Models;
 using HandheldOptimiser.Services;
+using HandheldOptimiser.ViewModels;
 
 namespace HandheldOptimiser.Views;
 
@@ -162,6 +163,25 @@ public sealed class UpdateRowStateToBrushConverter : IValueConverter
                 ViewModels.UpdateRowState.Working => Color.FromRgb(0x22, 0xD3, 0xEE),
                 ViewModels.UpdateRowState.Failed => Color.FromRgb(0xE0, 0x6C, 0x6C),
                 _ => Color.FromRgb(0x90, 0x90, 0x90)
+            })
+            : Brushes.Gray;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
+/// <summary>The dot on a Dashboard card: green, yellow or red for how the goal stands, cyan for a plain fact.</summary>
+public sealed class CardLevelToBrushConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is CardLevel level
+            ? new SolidColorBrush(level switch
+            {
+                CardLevel.Good => Color.FromRgb(0x6C, 0xC0, 0x7A),
+                CardLevel.Attention => Color.FromRgb(0xE8, 0xC4, 0x5F),
+                CardLevel.Bad => Color.FromRgb(0xE0, 0x6C, 0x6C),
+                CardLevel.Neutral => Color.FromRgb(0x22, 0xD3, 0xEE),
+                _ => Color.FromArgb(0x66, 0xFF, 0xFF, 0xFF)
             })
             : Brushes.Gray;
 
