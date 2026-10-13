@@ -5,7 +5,7 @@ using HandheldOptimiser.Services;
 
 namespace HandheldOptimiser.ViewModels;
 
-public sealed partial class PowerActionItemViewModel(PowerAction action, TweakEngine engine, IShell shell)
+public sealed partial class PowerActionItemViewModel(PowerAction action, TweakEngine engine, TweakStateStore states, IShell shell)
     : ObservableObject
 {
     public PowerAction Action { get; } = action;
@@ -82,6 +82,10 @@ public sealed partial class PowerActionItemViewModel(PowerAction action, TweakEn
                 return;
             }
 
+            // Some of these undo what a tweak set (resetting the network, switching hibernate), so the
+            // tweaks are checked again, in the background: nothing here waits on the answer.
+            _ = states.CheckAllAsync(ct: CancellationToken.None);
+
             var result = summary.Results.FirstOrDefault();
             LastResult = $"{DateTime.Now:HH:mm}: {result?.Message ?? "Finished."}";
 
@@ -110,8 +114,8 @@ public sealed class PowerActionsViewModel : PageViewModelBase
 
     public IReadOnlyList<PowerActionItemViewModel> Actions { get; }
 
-    public PowerActionsViewModel(TweakEngine engine, IShell shell) : base(shell)
+    public PowerActionsViewModel(TweakEngine engine, TweakStateStore states, IShell shell) : base(shell)
     {
-        Actions = engine.PowerActions.Select(a => new PowerActionItemViewModel(a, engine, shell)).ToList();
+        Actions = engine.PowerActions.Select(a => new PowerActionItemViewModel(a, engine, states, shell)).ToList();
     }
 }

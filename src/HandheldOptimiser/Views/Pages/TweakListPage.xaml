@@ -95,6 +95,7 @@
                                                      Margin="0,0,0,6"
                                                      Visibility="{Binding IsWorking, Converter={StaticResource BoolToVis}}" />
                                     <ui:ToggleSwitch IsChecked="{Binding IsOn, Mode=TwoWay}"
+                                                     IsEnabled="{Binding IsKnown}"
                                                      Click="OnToggleClicked"
                                                      MinWidth="48" />
                                 </StackPanel>

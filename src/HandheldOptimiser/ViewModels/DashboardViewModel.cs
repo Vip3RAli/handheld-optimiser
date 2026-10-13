@@ -9,22 +9,41 @@ namespace HandheldOptimiser.ViewModels;
 /// The one-click page. "Apply Optimised Tweaks" applies every tweak marked for it, after a restore point and after
 /// an explicit confirmation listing exactly what carries a warning.
 /// </summary>
-public sealed partial class DashboardViewModel(
-    TweakEngine engine,
-    SystemStateService systemState,
-    HardwareInfoService hardware,
-    RestorePointService restorePoints,
-    LogService log,
-    IShell shell)
-    : PageViewModelBase(shell)
+public sealed partial class DashboardViewModel : PageViewModelBase
 {
     private static readonly TimeSpan BatteryRefreshInterval = TimeSpan.FromSeconds(2);
 
-    private readonly TweakEngine _engine = engine;
-    private readonly SystemStateService _systemState = systemState;
-    private readonly HardwareInfoService _hardware = hardware;
-    private readonly RestorePointService _restorePoints = restorePoints;
-    private readonly LogService _log = log;
+    private readonly TweakEngine _engine;
+    private readonly TweakStateStore _states;
+    private readonly SystemStateService _systemState;
+    private readonly HardwareInfoService _hardware;
+    private readonly RestorePointService _restorePoints;
+
+    // The device's own details (model, graphics, System Protection) are read once. They do not change
+    // while the app is open, apart from what Re-check and the restore point button read again.
+    private bool _deviceRead;
+    private bool _readingDevice;
+
+    public DashboardViewModel(
+        TweakEngine engine,
+        TweakStateStore states,
+        SystemStateService systemState,
+        HardwareInfoService hardware,
+        RestorePointService restorePoints,
+        IShell shell)
+        : base(shell)
+    {
+        _engine = engine;
+        _states = states;
+        _systemState = systemState;
+        _hardware = hardware;
+        _restorePoints = restorePoints;
+
+        // The ring follows the shared tweak states, so it fills in as the scan at start-up answers
+        // and moves when a tweak is applied on any page.
+        _states.Changed += _ => ShowTweaks();
+        ShowTweaks();
+    }
 
     public override string Title => "Dashboard";
     public override string Glyph => "";
@@ -110,8 +129,17 @@ public sealed partial class DashboardViewModel(
     public override async Task OnNavigatedToAsync()
     {
         StartBatteryUpdates();
-        await RefreshCommand.ExecuteAsync(null);
+        ShowUndoState();
+        await LoadAsync();
     }
+
+    /// <summary>
+    /// The tweaks behind the ring are asked about here too, in case nothing else has: this is the first
+    /// page shown, and the scan at start-up is skipped when the app was opened to install an update.
+    /// </summary>
+    public override Task LoadAsync() => Task.WhenAll(
+        _states.CheckMissingAsync(_engine.OneClickTweaks),
+        _deviceRead || _readingDevice ? Task.CompletedTask : Shell.RunScanAsync("this device", ReadDeviceAsync));
 
     public override void OnNavigatedFrom() => _batteryTimer?.Stop();
 
@@ -217,38 +245,52 @@ public sealed partial class DashboardViewModel(
         GraphicsDriverTip = string.Join(" · ", details.Where(d => !string.IsNullOrWhiteSpace(d)));
     }
 
+    /// <summary>Re-check: reads the device and every tweak again, for changes made outside the app.</summary>
     [RelayCommand]
-    private async Task RefreshAsync() =>
-        await Shell.RunExclusiveAsync("Checking current state…", (progress, ct) => LoadStateAsync(progress, ct));
+    private Task RefreshAsync() =>
+        Shell.RunScanAsync("current state", ct => Task.WhenAll(ReadDeviceAsync(ct), _states.CheckAllAsync(ct: ct)));
 
-    private async Task LoadStateAsync(IProgress<string> progress, CancellationToken ct)
+    private async Task ReadDeviceAsync(CancellationToken ct)
     {
-        HardwareModel = _systemState.GetHardwareModel();
-        IsRecognisedDevice = _systemState.DetectDevice() != HandheldDevice.Unknown;
+        _readingDevice = true;
 
-        ShowGraphics(await _hardware.GetGraphicsAsync(ct));
-
-        ProtectionEnabled = await _restorePoints.IsProtectionEnabledAsync(ct);
-
-        var tweaks = _engine.OneClickTweaks.ToList();
-        TotalCount = tweaks.Count;
-
-        var applied = 0;
-        foreach (var tweak in tweaks)
+        try
         {
-            progress.Report($"Checking {tweak.Name}");
-            if (await _engine.DetectAsync(tweak, ct) == TweakState.Applied)
-            {
-                applied++;
-            }
+            HardwareModel = _systemState.GetHardwareModel();
+            IsRecognisedDevice = _systemState.DetectDevice() != HandheldDevice.Unknown;
+
+            // Two separate questions, asked side by side.
+            var graphics = _hardware.GetGraphicsAsync(ct);
+            var protection = _restorePoints.IsProtectionEnabledAsync(ct);
+
+            ShowGraphics(await graphics);
+            ProtectionEnabled = await protection;
+            ShowUndoState();
+
+            _deviceRead = true;
         }
+        finally
+        {
+            _readingDevice = false;
+        }
+    }
 
-        AppliedCount = applied;
+    /// <summary>How many of the one-click tweaks are applied, from the shared states.</summary>
+    private void ShowTweaks()
+    {
+        var summary = _states.Summarise(_engine.OneClickTweaks);
 
-        OptimisationStatus = applied == 0 ? "Stock Windows: nothing optimised yet"
-            : applied == TotalCount ? "Fully optimised"
-            : $"Partially optimised: {TotalCount - applied} tweak(s) still available";
+        TotalCount = summary.Total;
+        AppliedCount = summary.Applied;
 
+        OptimisationStatus = !summary.IsComplete ? "Checking…"
+            : summary.Applied == 0 ? "Stock Windows: nothing optimised yet"
+            : summary.Applied == summary.Total ? "Fully optimised"
+            : $"Partially optimised: {summary.Total - summary.Applied} tweak(s) still available";
+    }
+
+    private void ShowUndoState()
+    {
         CanRevert = _engine.HasUndoData;
         RevertSummary = CanRevert
             ? "Undo data is available for previously applied tweaks."
@@ -294,7 +336,9 @@ public sealed partial class DashboardViewModel(
                 Shell.NotifyRebootRequired();
             }
 
-            await LoadStateAsync(progress, ct);
+            progress.Report("Checking what changed");
+            await _states.CheckAllAsync(ct: ct);
+            ShowUndoState();
 
             await Shell.ConfirmAsync(
                 "Optimisation complete",
@@ -329,7 +373,9 @@ public sealed partial class DashboardViewModel(
                 Shell.NotifyRebootRequired();
             }
 
-            await LoadStateAsync(progress, ct);
+            progress.Report("Checking what changed");
+            await _states.CheckAllAsync(ct: ct);
+            ShowUndoState();
 
             await Shell.ConfirmAsync(
                 "Undo finished",
