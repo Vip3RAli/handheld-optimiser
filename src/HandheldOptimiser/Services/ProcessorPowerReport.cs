@@ -24,8 +24,9 @@ public static partial class ProcessorPowerReport
     public const string MinCores = "0cc5b647-c1df-4637-891a-dec35c318583";
     public const string MaxCores = "ea062031-0e34-4ff1-9b6d-eb1059334028";
 
-    private const string InUseNote =
-        "\nA vendor tool such as Armoury Crate writes these and changes plan with its performance mode, " +
+    /// <summary>Why these are shown and never changed. Said once, under the plans.</summary>
+    public const string VendorNote =
+        "A vendor tool such as Armoury Crate writes these and changes plan with its performance mode, " +
         "so this app leaves them alone.";
 
     private const string GuidPattern ="[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}";
@@ -125,8 +126,9 @@ public static partial class ProcessorPowerReport
             checks.Add(new HealthCheck
             {
                 Name = $"{Group} {plan.Name}{(plan.Active ? " (in use)" : string.Empty)}",
-                // Said in the detail, not as advice: advice is drawn in yellow, and this is not a fault.
-                Detail = $"Plugged in: {pluggedIn}.\nOn battery: {onBattery}." + (plan.Active ? InUseNote : string.Empty),
+                // The sentences are what the log keeps; the page draws the table.
+                Detail = $"Plugged in: {pluggedIn}.\nOn battery: {onBattery}.",
+                Table = Table(settings),
                 Status = HealthStatus.Info
             });
         }
@@ -173,6 +175,38 @@ public static partial class ProcessorPowerReport
         }
 
         return string.Join(", ", parts);
+    }
+
+    /// <summary>The same settings as a table, one line each, for the page to draw side by side.</summary>
+    public static IReadOnlyList<HealthTableRow> Table(IReadOnlyDictionary<string, (uint Ac, uint Dc)> settings)
+    {
+        var rows = new List<HealthTableRow>();
+
+        if (settings.TryGetValue(BoostMode, out var boost))
+        {
+            rows.Add(new HealthTableRow("Boost", BoostName(boost.Ac), BoostName(boost.Dc)));
+        }
+
+        if (settings.TryGetValue(MaxFrequency, out var cap))
+        {
+            static string Cap(uint mhz) => mhz == 0 ? "none" : $"{mhz} MHz";
+            rows.Add(new HealthTableRow("Speed cap", Cap(cap.Ac), Cap(cap.Dc)));
+        }
+
+        if (settings.TryGetValue(EnergyPreference, out var preference))
+        {
+            rows.Add(new HealthTableRow("Power saving preference", $"{preference.Ac} of 100", $"{preference.Dc} of 100"));
+        }
+
+        if (settings.TryGetValue(MinCores, out var min) && settings.TryGetValue(MaxCores, out var max))
+        {
+            static string Cores(uint least, uint most) =>
+                least >= 100 && most >= 100 ? "all" : least == most ? $"{least}%" : $"{least}% to {most}%";
+
+            rows.Add(new HealthTableRow("Cores kept awake", Cores(min.Ac, max.Ac), Cores(min.Dc, max.Dc)));
+        }
+
+        return rows;
     }
 
     /// <summary>Windows' own names for the boost modes, in the order of their numbers.</summary>

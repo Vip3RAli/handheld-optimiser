@@ -119,7 +119,7 @@ public static partial class SleepHealth
 
     public static HealthCheck SleepStatesCheck(SleepStates? states)
     {
-        const string name = $"{Group} How this device sleeps";
+        const string name = $"{Group} Sleeps by";
 
         if (states is null)
         {
@@ -128,15 +128,19 @@ public static partial class SleepHealth
 
         // Whether the network stays on in Modern Standby is a power plan setting, not something the
         // device can or cannot do, and Turn Wi-Fi off during sleep on the Sleep & Battery page shows it.
-        var sleep = states.ModernStandby
-            ? "Modern Standby, which keeps part of the system running while asleep"
-            : states.ClassicSleep
-                ? "Classic sleep (S3), which uses almost no power"
-                : "No sleep state";
+        // The short answer names the states. The sentence under it says what that means for the battery,
+        // so the two never repeat each other.
+        var meaning = states.ModernStandby && states.HibernateFile
+            ? "Asleep, part of the system keeps running and uses the battery. Hibernating uses none."
+            : states.ModernStandby
+                ? "Asleep, part of the system keeps running and uses the battery, and there is no hibernate to fall back on."
+                : states.ClassicSleep
+                    ? "Asleep, the handheld uses almost no power."
+                    : "Windows reports no way for this device to sleep.";
 
-        var hibernate = !states.Hibernate ? "This device cannot hibernate"
-            : states.HibernateFile ? "Hibernate is ready"
-            : "Hibernate is switched off";
+        var summary =
+            (states.ModernStandby ? "Modern Standby" : states.ClassicSleep ? "Classic sleep (S3)" : "No sleep state") +
+            (!states.Hibernate ? ", no hibernate" : states.HibernateFile ? ", hibernate ready" : ", hibernate off");
 
         // Modern Standby with no hibernate to fall back on is the case that empties a battery in a bag.
         var exposed = states.ModernStandby && states.Hibernate && !states.HibernateFile;
@@ -144,7 +148,8 @@ public static partial class SleepHealth
         return new HealthCheck
         {
             Name = name,
-            Detail = $"{sleep}. {hibernate}.",
+            Detail = meaning,
+            Summary = summary,
             Status = exposed ? HealthStatus.Warning : HealthStatus.Info,
             Advice = exposed
                 ? "Sleep is the only rest this handheld gets, and it keeps using the battery. Hibernate " +
@@ -203,7 +208,7 @@ public static partial class SleepHealth
 
     public static HealthCheck BatteryAsleepCheck(IReadOnlyList<SleepSession>? sessions)
     {
-        const string name = $"{Group} Battery used while asleep";
+        const string name = $"{Group} Battery while asleep";
 
         if (sessions is null)
         {
@@ -219,7 +224,8 @@ public static partial class SleepHealth
             return new HealthCheck
             {
                 Name = name,
-                Detail = $"No sleep of 10 minutes or more on battery in the last {StudyDays} days, so there is nothing to measure.",
+                Detail = $"No sleep of 10 minutes or more on battery in the last {StudyDays} days.",
+                Summary = "Nothing to measure yet",
                 Status = HealthStatus.Info
             };
         }
@@ -235,6 +241,7 @@ public static partial class SleepHealth
             Detail = string.Create(CultureInfo.InvariantCulture,
                 $"On battery in the last {StudyDays} days: asleep for {hours:0.#} hours over {sleeps.Count} " +
                 $"sleep{(sleeps.Count == 1 ? "" : "s")}, using {drain:0.#}% of the battery ({rate:0.0}% an hour)."),
+            Summary = string.Create(CultureInfo.InvariantCulture, $"{rate:0.0}% an hour, over {hours:0.#} hours asleep"),
             Status = high ? HealthStatus.Warning : HealthStatus.Good,
             Advice = high
                 ? "That is a lot for a device that is asleep. The two hibernate settings on the Sleep & " +
@@ -298,7 +305,7 @@ public static partial class SleepHealth
 
     public static HealthCheck RequestsCheck(IReadOnlyList<PowerRequest> requests)
     {
-        const string name = $"{Group} Keeping the device awake right now";
+        const string name = $"{Group} Keeping it awake now";
 
         if (requests.Count == 0)
         {
@@ -309,6 +316,7 @@ public static partial class SleepHealth
         {
             Name = name,
             Detail = string.Join("\n", requests.Select(r => r.Why.Length > 0 ? $"{Short(r.Who)}: {r.Why}" : Short(r.Who))),
+            Summary = requests.Count == 1 ? "1 thing" : $"{requests.Count} things",
             Status = HealthStatus.Warning,
             Advice =
                 "A game, video or download does this while it runs, which is normal. Anything still " +
@@ -358,7 +366,7 @@ public static partial class SleepHealth
 
     public static HealthCheck WakeTimersCheck(IReadOnlyList<string> timers)
     {
-        const string name = $"{Group} Timers set to wake the device";
+        const string name = $"{Group} Wake timers";
 
         if (timers.Count == 0)
         {
@@ -369,6 +377,7 @@ public static partial class SleepHealth
         {
             Name = name,
             Detail = string.Join("\n", timers),
+            Summary = timers.Count == 1 ? "1 timer" : $"{timers.Count} timers",
             Status = HealthStatus.Warning,
             Advice = "A wake timer switches the handheld on by itself at that time, in a bag as well."
         };
@@ -377,7 +386,7 @@ public static partial class SleepHealth
     /// <param name="devices">The devices allowed to wake it, or null when Windows was not asked.</param>
     public static HealthCheck WakeDevicesCheck(IReadOnlyList<string>? devices)
     {
-        const string name = $"{Group} Devices that can wake it";
+        const string name = $"{Group} Can wake it";
 
         if (devices is null)
         {
@@ -393,6 +402,7 @@ public static partial class SleepHealth
         {
             Name = name,
             Detail = string.Join(", ", devices),
+            Summary = devices.Count == 1 ? "1 device besides the power button" : $"{devices.Count} devices besides the power button",
             Status = HealthStatus.Warning,
             Advice =
                 "A bump on any of these wakes the handheld in a bag. Only the power button wakes the " +
@@ -406,7 +416,7 @@ public static partial class SleepHealth
     /// </summary>
     public static HealthCheck LastWakeCheck(IEnumerable<string> lines)
     {
-        const string name = $"{Group} What woke it last";
+        const string name = $"{Group} Last woken by";
 
         var facts = lines
             .Select(l => l.Trim())

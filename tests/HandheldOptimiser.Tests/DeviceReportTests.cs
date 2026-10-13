@@ -1,4 +1,5 @@
 using HandheldOptimiser.Services;
+using HandheldOptimiser.ViewModels;
 using Xunit;
 
 namespace HandheldOptimiser.Tests;
@@ -211,13 +212,19 @@ public sealed class DeviceReportTests
 
         var ready = SleepHealth.SleepStatesCheck(ally);
         Assert.Equal(HealthStatus.Info, ready.Status);
+        Assert.Equal("Modern Standby, hibernate ready", ready.Summary);
         Assert.Equal(
-            "Modern Standby, which keeps part of the system running while asleep. Hibernate is ready.",
+            "Asleep, part of the system keeps running and uses the battery. Hibernating uses none.",
             ready.Detail);
 
         var exposed = SleepHealth.SleepStatesCheck(ally with { HibernateFile = false });
         Assert.Equal(HealthStatus.Warning, exposed.Status);
-        Assert.Contains("Hibernate is switched off", exposed.Detail);
+        Assert.Equal("Modern Standby, hibernate off", exposed.Summary);
+        Assert.Contains("no hibernate to fall back on", exposed.Detail);
+
+        var classic = SleepHealth.SleepStatesCheck(new SleepStates(ModernStandby: false, ClassicSleep: true, Hibernate: false, HibernateFile: false));
+        Assert.Equal("Classic sleep (S3), no hibernate", classic.Summary);
+        Assert.Equal(HealthStatus.Info, classic.Status);
 
         Assert.Equal(HealthStatus.Unknown, SleepHealth.SleepStatesCheck(null).Status);
     }
@@ -280,10 +287,12 @@ public sealed class DeviceReportTests
 
         Assert.Equal(2, checks.Count);
         Assert.Equal("[Power plan] Turbo (in use)", checks[0].Name);
-        Assert.StartsWith("Plugged in: boost off, no speed cap.\nOn battery: boost off, capped at 4000 MHz.\n", checks[0].Detail);
-        Assert.EndsWith("so this app leaves them alone.", checks[0].Detail);
+        Assert.Equal("Plugged in: boost off, no speed cap.\nOn battery: boost off, capped at 4000 MHz.", checks[0].Detail);
         Assert.Equal(HealthStatus.Info, checks[0].Status);
         Assert.Null(checks[0].Advice);
+        Assert.Equal(
+            [new HealthTableRow("Boost", "off", "off"), new HealthTableRow("Speed cap", "none", "4000 MHz")],
+            checks[0].Table);
 
         Assert.Equal("[Power plan] Balanced", checks[1].Name);
         Assert.Equal("Plugged in: boost aggressive.\nOn battery: boost aggressive.", checks[1].Detail);
@@ -320,14 +329,154 @@ public sealed class DeviceReportTests
         var exfat = StorageHealth.CardCheck("D:", "exFAT");
 
         Assert.Equal("[Storage] Card in D:", exfat.Name);
+        Assert.Equal("exFAT", exfat.Summary);
         Assert.Contains("Xbox app", exfat.Detail);
         Assert.Contains("erases", exfat.Advice);
         Assert.Equal(HealthStatus.Info, exfat.Status);
 
         var ntfs = StorageHealth.CardCheck("E:", "NTFS");
 
-        Assert.StartsWith("NTFS.", ntfs.Detail);
+        Assert.Equal("NTFS", ntfs.Summary);
         Assert.Null(ntfs.Advice);
+    }
+
+    private static HealthCheck Check(string name, HealthStatus status, string? summary = null, string detail = "detail") =>
+        new() { Name = name, Detail = detail, Status = status, Summary = summary };
+
+    [Fact]
+    public void A_rows_group_and_title_come_out_of_its_name()
+    {
+        var check = Check("[AMD / Realtek] Windows Audio", HealthStatus.Good);
+
+        Assert.Equal("AMD / Realtek", check.Group);
+        Assert.Equal("Windows Audio", check.Title);
+
+        var bare = Check("No group here", HealthStatus.Good);
+
+        Assert.Equal(string.Empty, bare.Group);
+        Assert.Equal("No group here", bare.Title);
+    }
+
+    /// <summary>A page like the Ally's: one service worth a look, the rest fine.</summary>
+    private static readonly HealthCheck[] PageChecks =
+    [
+        Check("[ASUS] Armoury Crate Control Interface", HealthStatus.Warning, "Stopped", "Stopped, though it is set to start by itself"),
+        Check("[ASUS] Armoury Crate Service", HealthStatus.Unknown, "Not installed"),
+        Check("[Security] Windows Firewall", HealthStatus.Good, "Running"),
+        Check("[Windows Update] Background Transfer (BITS)", HealthStatus.Good, "Resting"),
+        Check("[Performance] Virtualisation-based security (VBS)", HealthStatus.Good, detail: "Off"),
+        Check("[Sleep] Wake timers", HealthStatus.Good, detail: "None"),
+        Check("[Sleep] Sleeps by", HealthStatus.Info, "Modern Standby, hibernate ready"),
+        new()
+        {
+            Name = "[Power plan] Turbo (in use)", Detail = "sentences", Status = HealthStatus.Info,
+            Table = [new HealthTableRow("Boost", "off", "off")]
+        },
+        new()
+        {
+            Name = "[Power plan] Balanced", Detail = "sentences", Status = HealthStatus.Info,
+            Table = [new HealthTableRow("Boost", "aggressive", "aggressive")]
+        },
+        Check("[Storage] Device encryption", HealthStatus.Info, "Off", "Anyone who takes the drive out can read it.")
+    ];
+
+    [Fact]
+    public void Rows_that_need_a_look_are_lifted_to_the_top_worst_first()
+    {
+        HealthCheck[] checks = [.. PageChecks, Check("[Security] Microsoft Defender Antivirus", HealthStatus.Bad, "Disabled")];
+
+        var page = HealthLayout.Build(checks, "note");
+
+        Assert.Equal(["Microsoft Defender Antivirus", "Armoury Crate Control Interface"], page.Attention.Select(r => r.Title));
+        Assert.Equal("Security", page.Attention[0].Tag);
+        Assert.Equal(4, page.Fine);
+    }
+
+    [Fact]
+    public void Sections_come_in_reading_order_with_the_protected_components_last()
+    {
+        var page = HealthLayout.Build(PageChecks, "note");
+
+        Assert.Equal(
+            ["Sleep", "Power plan", "Storage", "Gaming performance", "Protected components"],
+            page.Sections.Select(s => s.Title));
+        Assert.Empty(HealthLayout.Build([], "note").Sections);
+    }
+
+    [Fact]
+    public void The_protected_components_fold_into_one_line_that_still_says_what_needs_a_look()
+    {
+        var section = HealthLayout.Build(PageChecks, "the note").Sections[^1];
+
+        Assert.Equal("1 to look at, 2 fine", section.Summary);
+        Assert.Equal("the note", section.Note);
+        Assert.True(section.CanToggle);
+        Assert.False(section.ShowRows);
+        Assert.Equal("Show all", section.ToggleText);
+        Assert.Equal(4, section.Rows.Count);
+        Assert.Equal("ASUS", section.Rows[0].Tag);
+
+        section.ToggleCommand.Execute(null);
+
+        Assert.True(section.ShowRows);
+        Assert.Equal("Hide", section.ToggleText);
+    }
+
+    [Fact]
+    public void A_section_with_nothing_wrong_says_nothing_and_shows_its_rows()
+    {
+        var sleep = HealthLayout.Build(PageChecks, "note").Sections[0];
+
+        Assert.Equal(string.Empty, sleep.Summary);
+        Assert.False(sleep.CanToggle);
+        Assert.True(sleep.ShowRows);
+        Assert.Equal(string.Empty, sleep.Rows[0].Tag);
+    }
+
+    [Fact]
+    public void The_plan_in_use_is_shown_and_the_others_fold_away()
+    {
+        var plans = HealthLayout.Build(PageChecks, "note").Sections[1];
+
+        Assert.Equal("Turbo (in use)", Assert.Single(plans.Tables).Heading);
+        Assert.Equal("Balanced", Assert.Single(plans.MoreTables).Heading);
+        Assert.Empty(plans.Rows);
+        Assert.Equal("1 other plan", plans.ToggleText);
+        Assert.Equal(ProcessorPowerReport.VendorNote, plans.Note);
+
+        plans.IsExpanded = true;
+
+        Assert.Equal("Hide other plans", plans.ToggleText);
+    }
+
+    [Fact]
+    public void A_row_shows_its_short_answer_and_explains_only_when_it_is_not_simply_fine()
+    {
+        var fine = new HealthRowViewModel(Check("[Security] Windows Firewall", HealthStatus.Good, "Running", "Running, start type Automatic"));
+        Assert.Equal("Running", fine.Value);
+        Assert.Equal(string.Empty, fine.Note);
+
+        var fact = new HealthRowViewModel(Check("[Storage] Device encryption", HealthStatus.Info, "Off", "Anyone can read it."));
+        Assert.Equal("Off", fact.Value);
+        Assert.Equal("Anyone can read it.", fact.Note);
+
+        var plain = new HealthRowViewModel(Check("[Sleep] Wake timers", HealthStatus.Good, detail: "None"));
+        Assert.Equal("None", plain.Value);
+        Assert.Equal(string.Empty, plain.Note);
+
+        var absent = new HealthRowViewModel(Check("[ASUS] Armoury Crate Service", HealthStatus.Unknown, "Not installed", "Not installed on this system"));
+        Assert.Equal(string.Empty, absent.Note);
+    }
+
+    [Fact]
+    public void Free_space_is_drawn_as_how_full_the_drive_is()
+    {
+        const long gb = 1024L * 1024 * 1024;
+
+        var row = new HealthRowViewModel(StorageHealth.FreeSpaceCheck("C:", 250 * gb, 1000 * gb));
+
+        Assert.True(row.HasBar);
+        Assert.Equal(75, row.BarValue, 3);
     }
 
     [Fact]
@@ -351,22 +500,29 @@ public sealed class DeviceReportTests
 
         var check = Assert.Single(ProcessorPowerReport.Checks(lines));
 
-        Assert.StartsWith(
+        Assert.Equal(
             "Plugged in: power saving preference 0 of 100, every core kept awake.\n" +
-            "On battery: power saving preference 60 of 100, 25% to 100% of cores kept awake.\n",
+            "On battery: power saving preference 60 of 100, 25% to 100% of cores kept awake.",
             check.Detail);
+        Assert.Equal(
+            [
+                new HealthTableRow("Power saving preference", "0 of 100", "60 of 100"),
+                new HealthTableRow("Cores kept awake", "all", "25% to 100%")
+            ],
+            check.Table);
     }
 
     [Theory]
-    [InlineData("1|1", "On.")]
-    [InlineData("0|0", "Off.")]
-    [InlineData("0|1", "Encrypted, but not protected yet.")]
-    [InlineData("0|2", "Part way")]
-    public void Encryption_is_reported_and_never_marked_as_something_to_fix(string status, string starts)
+    [InlineData("1|1", "On")]
+    [InlineData("0|0", "Off")]
+    [InlineData("0|1", "Not protected yet")]
+    [InlineData("0|2", "Changing")]
+    public void Encryption_is_reported_and_never_marked_as_something_to_fix(string status, string summary)
     {
         var check = StorageHealth.EncryptionCheck(status);
 
-        Assert.StartsWith(starts, check.Detail);
+        Assert.Equal(summary, check.Summary);
+        Assert.NotEmpty(check.Detail);
         Assert.Equal(HealthStatus.Info, check.Status);
         Assert.Equal("ms-settings:deviceencryption", check.OpenUri);
     }
@@ -378,6 +534,18 @@ public sealed class DeviceReportTests
     public void No_answer_about_encryption_is_unknown(string? status)
     {
         Assert.Equal(HealthStatus.Unknown, StorageHealth.EncryptionCheck(status).Status);
+    }
+
+    [Theory]
+    [InlineData("Running", "Automatic", HealthStatus.Good)]
+    [InlineData("Running", "Manual", HealthStatus.Good)]
+    [InlineData("Stopped", "Manual", HealthStatus.Good)]       // BITS between downloads
+    [InlineData("Stopped", "Automatic", HealthStatus.Warning)] // should be running and is not
+    [InlineData("Stopped", "Disabled", HealthStatus.Bad)]
+    [InlineData("Running", "Disabled", HealthStatus.Bad)]
+    public void A_service_that_starts_on_demand_is_healthy_while_stopped(string status, string startType, HealthStatus expected)
+    {
+        Assert.Equal(expected, SystemStateService.ServiceStatus(status, startType));
     }
 
     [Theory]
