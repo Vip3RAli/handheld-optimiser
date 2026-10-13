@@ -71,6 +71,9 @@ public sealed partial class StartupViewModel(StartupService service, IShell shel
 
     public override Task RefreshAsync() => ScanAsync();
 
+    /// <summary>A tile left open would bring the page back scrolled to it. A page opens at its top, with none open.</summary>
+    public override void OnHidden() => Cells.Close();
+
     /// <summary>Reads the startup entries. It only reads, so it does not hold the app busy.</summary>
     [RelayCommand]
     private async Task ScanAsync()

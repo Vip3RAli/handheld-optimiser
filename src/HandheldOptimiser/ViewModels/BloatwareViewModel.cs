@@ -78,6 +78,15 @@ public sealed partial class BloatwareViewModel(
 
     public override Task RefreshAsync() => ScanAsync();
 
+    /// <summary>A tile left open would bring the page back scrolled to it. A page opens at its top, with none open.</summary>
+    public override void OnHidden()
+    {
+        foreach (var group in Groups)
+        {
+            group.Cells.Close();
+        }
+    }
+
     /// <summary>Reads the installed apps in the background. Only removing them holds the app busy.</summary>
     [RelayCommand]
     private async Task ScanAsync()

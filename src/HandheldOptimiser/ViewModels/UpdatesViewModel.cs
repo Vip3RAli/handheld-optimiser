@@ -141,7 +141,9 @@ public sealed partial class UpdatesViewModel : SectionViewModel
     /// <summary>How many updates are waiting, once the sources have answered.</summary>
     public override CardStatus? Status => IsChecking || !_hasScanned
         ? CardStatus.Checking
-        : CardStatus.ForUpdates(AllRows.Count(r => r.State != UpdateRowState.Done));
+        : CardStatus.ForUpdates(
+            AllRows.Count(r => r.State != UpdateRowState.Done),
+            couldNotCheck: Sections.Any(s => s.ErrorText.Length > 0));
 
     public override bool LoadsFromInternet => true;
 

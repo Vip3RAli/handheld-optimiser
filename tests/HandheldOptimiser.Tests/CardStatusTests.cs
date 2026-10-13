@@ -53,10 +53,21 @@ public sealed class CardStatusTests
     [Fact]
     public void Updates_waiting() => Assert.Equal(
         new CardStatus("3 waiting", CardLevel.Attention),
-        CardStatus.ForUpdates(3));
+        CardStatus.ForUpdates(3, couldNotCheck: false));
 
     [Fact]
     public void No_updates() => Assert.Equal(
         new CardStatus("Up to date", CardLevel.Good),
-        CardStatus.ForUpdates(0));
+        CardStatus.ForUpdates(0, couldNotCheck: false));
+
+    /// <summary>Offline at launch is common on a handheld. Finding nothing is not the same as there being nothing.</summary>
+    [Fact]
+    public void A_check_that_failed_is_not_up_to_date() => Assert.Equal(
+        new CardStatus("Could not check", CardLevel.Attention),
+        CardStatus.ForUpdates(0, couldNotCheck: true));
+
+    [Fact]
+    public void Updates_found_are_still_counted_when_one_source_failed() => Assert.Equal(
+        new CardStatus("2 waiting", CardLevel.Attention),
+        CardStatus.ForUpdates(2, couldNotCheck: true));
 }

@@ -46,6 +46,12 @@ public sealed record CardStatus(string Text, CardLevel Level)
         _ => new($"{toLookAt} to look at", CardLevel.Attention)
     };
 
-    public static CardStatus ForUpdates(int waiting) =>
-        waiting == 0 ? new("Up to date", CardLevel.Good) : new($"{waiting} waiting", CardLevel.Attention);
+    /// <summary>
+    /// Updates: how many are waiting. Finding none is only "Up to date" when every source answered:
+    /// a handheld is often offline as the app opens, and a check that failed found nothing either.
+    /// </summary>
+    public static CardStatus ForUpdates(int waiting, bool couldNotCheck) =>
+        waiting > 0 ? new($"{waiting} waiting", CardLevel.Attention)
+            : couldNotCheck ? new("Could not check", CardLevel.Attention)
+            : new("Up to date", CardLevel.Good);
 }

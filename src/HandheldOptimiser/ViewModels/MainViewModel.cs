@@ -372,7 +372,8 @@ public sealed partial class MainViewModel : ObservableObject, IShell
     /// True when the game library's Update now opened the app. The update was already chosen there and
     /// the administrator prompt accepted, so it installs without asking again, and a failed check is said.
     /// </param>
-    public async Task CheckForUpdatesOnStartupAsync(bool installNow = false)
+    /// <returns>True when the app is closing to install the update, so nothing else should be started.</returns>
+    public async Task<bool> CheckForUpdatesOnStartupAsync(bool installNow = false)
     {
         try
         {
@@ -387,13 +388,10 @@ public sealed partial class MainViewModel : ObservableObject, IShell
                 await ConfirmAsync("Could not check for updates", $"{ex.Message}\n\nCheck the internet connection and try again.", "OK");
             }
 
-            return;
+            return false;
         }
 
-        if (installNow && AvailableUpdate is { CanInstallInApp: true } offer)
-        {
-            await DownloadAndInstallAsync(offer);
-        }
+        return installNow && AvailableUpdate is { CanInstallInApp: true } offer && await DownloadAndInstallAsync(offer);
     }
 
     [RelayCommand]
@@ -449,7 +447,8 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         await DownloadAndInstallAsync(offer);
     }
 
-    private async Task DownloadAndInstallAsync(UpdateOffer offer)
+    /// <returns>True when the installer was started and the app is closing for it.</returns>
+    private async Task<bool> DownloadAndInstallAsync(UpdateOffer offer)
     {
         string? installer = null;
         string? failure = null;
@@ -475,12 +474,12 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         if (failure is not null)
         {
             await ConfirmAsync("Update not installed", failure, "OK");
-            return;
+            return false;
         }
 
         if (installer is null)
         {
-            return;
+            return false;
         }
 
         try
@@ -491,11 +490,12 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         {
             Log.Error($"Could not start the update installer: {ex.Message}");
             await ConfirmAsync("Update not installed", $"The installer could not be started ({ex.Message}).", "OK");
-            return;
+            return false;
         }
 
         // The installer waits for this process to close before replacing its files.
         System.Windows.Application.Current.Shutdown();
+        return true;
     }
 
     /// <summary>

@@ -54,6 +54,9 @@ public sealed class TweakSectionViewModel : SectionViewModel
     /// </summary>
     public override Task LoadAsync() => _states.CheckMissingAsync(_tweaks);
 
+    /// <summary>A tile left open would bring the page back scrolled to it. A page opens at its top, with none open.</summary>
+    public override void OnHidden() => Cells.Close();
+
     /// <summary>Re-check: asks about every tweak in the section again, for changes made outside the app.</summary>
     public override Task RefreshAsync() => Shell.RunScanAsync("tweaks", ct => _states.CheckAsync(_tweaks, ct));
 }
