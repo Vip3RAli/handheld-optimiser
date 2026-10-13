@@ -24,7 +24,11 @@ public static partial class ProcessorPowerReport
     public const string MinCores = "0cc5b647-c1df-4637-891a-dec35c318583";
     public const string MaxCores = "ea062031-0e34-4ff1-9b6d-eb1059334028";
 
-    private const string GuidPattern = "[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}";
+    private const string InUseNote =
+        "\nA vendor tool such as Armoury Crate writes these and changes plan with its performance mode, " +
+        "so this app leaves them alone.";
+
+    private const string GuidPattern ="[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}";
 
     // Plans and values are found by shape, as the Sleep & Battery tweaks do it: powercfg's labels are
     // translated, its GUIDs and trailing hex values are not. /qh also shows the settings Windows hides.
@@ -121,13 +125,9 @@ public static partial class ProcessorPowerReport
             checks.Add(new HealthCheck
             {
                 Name = $"{Group} {plan.Name}{(plan.Active ? " (in use)" : string.Empty)}",
-                Detail = $"Plugged in: {pluggedIn}.\nOn battery: {onBattery}.",
-                Status = HealthStatus.Info,
-                Advice = plan.Active
-                    ? "These are the processor settings Windows is running with. A vendor tool such as " +
-                      "Armoury Crate writes them and changes plan with its performance mode, so this app " +
-                      "leaves them alone."
-                    : null
+                // Said in the detail, not as advice: advice is drawn in yellow, and this is not a fault.
+                Detail = $"Plugged in: {pluggedIn}.\nOn battery: {onBattery}." + (plan.Active ? InUseNote : string.Empty),
+                Status = HealthStatus.Info
             });
         }
 

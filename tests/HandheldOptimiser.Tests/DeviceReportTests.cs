@@ -280,9 +280,10 @@ public sealed class DeviceReportTests
 
         Assert.Equal(2, checks.Count);
         Assert.Equal("[Power plan] Turbo (in use)", checks[0].Name);
-        Assert.Equal("Plugged in: boost off, no speed cap.\nOn battery: boost off, capped at 4000 MHz.", checks[0].Detail);
+        Assert.StartsWith("Plugged in: boost off, no speed cap.\nOn battery: boost off, capped at 4000 MHz.\n", checks[0].Detail);
+        Assert.EndsWith("so this app leaves them alone.", checks[0].Detail);
         Assert.Equal(HealthStatus.Info, checks[0].Status);
-        Assert.NotNull(checks[0].Advice);
+        Assert.Null(checks[0].Advice);
 
         Assert.Equal("[Power plan] Balanced", checks[1].Name);
         Assert.Equal("Plugged in: boost aggressive.\nOn battery: boost aggressive.", checks[1].Detail);
@@ -350,9 +351,9 @@ public sealed class DeviceReportTests
 
         var check = Assert.Single(ProcessorPowerReport.Checks(lines));
 
-        Assert.Equal(
+        Assert.StartsWith(
             "Plugged in: power saving preference 0 of 100, every core kept awake.\n" +
-            "On battery: power saving preference 60 of 100, 25% to 100% of cores kept awake.",
+            "On battery: power saving preference 60 of 100, 25% to 100% of cores kept awake.\n",
             check.Detail);
     }
 
