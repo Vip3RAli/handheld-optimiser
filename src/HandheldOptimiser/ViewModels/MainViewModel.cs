@@ -216,7 +216,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         Pages.Add(new StartupViewModel(startupService, this));
         Pages.Add(new PowerActionsViewModel(engine, states, this));
         Pages.Add(new GameRuntimesViewModel(runtimeService, this));
-        Pages.Add(new DeviceHealthViewModel(systemState, this));
+        Pages.Add(new DeviceHealthViewModel(systemState, log, this));
         Pages.Add(new UpdatesViewModel(updateSources, restorePoints, log, this));
 
         // Looked up by title so a page that is renamed or removed fails here, at start-up, rather than

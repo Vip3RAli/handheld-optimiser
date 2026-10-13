@@ -64,6 +64,12 @@
                                     <TextBlock Text="{Binding Advice}" FontSize="11.5" Foreground="#E8C45F"
                                                Opacity="0.9" Margin="0,5,0,0" TextWrapping="Wrap"
                                                Visibility="{Binding Advice, Converter={StaticResource StringToVis}}" />
+                                    <ui:Button Content="{Binding OpenText}"
+                                               Command="{Binding DataContext.OpenCheckCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                               CommandParameter="{Binding}"
+                                               HorizontalAlignment="Left"
+                                               Margin="0,8,0,0"
+                                               Visibility="{Binding OpenText, Converter={StaticResource StringToVis}}" />
                                 </StackPanel>
                             </Grid>
                         </Border>
