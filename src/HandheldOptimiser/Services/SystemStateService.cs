@@ -301,7 +301,7 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
             Detail = hvciOn ? "Enabled (costing frame rate)" : "Disabled (optimised for gaming)",
             Summary = hvciOn ? "On" : "Off",
             Status = hvciOn ? HealthStatus.Warning : HealthStatus.Good,
-            Advice = hvciOn ? "Disable this on the Gaming Tweaks page for the largest single FPS gain." : null
+            Advice = hvciOn ? "Disable this on the Performance page for the largest single FPS gain." : null
         });
 
         var outcome = await _runner.RunScriptAsync(
@@ -340,8 +340,8 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
     {
         const string name = "[Performance] Virtualisation-based security (VBS)";
         const string advice =
-            "VBS adds overhead to every process. Disable Virtual Machine Platform & VBS on the Gaming " +
-            "Tweaks page turns it off, then restart.";
+            "VBS adds overhead to every process. Disable Virtual Machine Platform & VBS on the Performance " +
+            "page turns it off, then restart.";
 
         return status?.Trim() switch
         {

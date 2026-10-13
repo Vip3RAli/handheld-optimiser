@@ -630,7 +630,7 @@ public static class DebloatTweaks
     /// <summary>
     /// Asks Task Scheduler directly, through its COM object, for each task's state. Get-ScheduledTask
     /// gives the same answer but takes about half a second a task: four seconds for this list on a ROG
-    /// Ally against a third of a second this way, on a check the Dashboard and System Debloat both run.
+    /// Ally against a third of a second this way, on a check the Dashboard and Clean Up both run.
     /// The states are printed under the names Get-ScheduledTask uses, which is what undo data from
     /// earlier versions holds. A task that does not exist prints nothing, as before.
     /// </summary>

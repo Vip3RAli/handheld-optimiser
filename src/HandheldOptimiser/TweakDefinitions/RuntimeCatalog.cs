@@ -3,7 +3,7 @@ using HandheldOptimiser.Models;
 namespace HandheldOptimiser.TweakDefinitions;
 
 /// <summary>
-/// The runtimes the Game Runtimes page scans and installs. All are official Microsoft or vendor
+/// The runtimes the Game runtimes section scans and installs. All are official Microsoft or vendor
 /// packages from the winget community repository, which verifies each installer's hash before running it.
 /// </summary>
 public static class RuntimeCatalog

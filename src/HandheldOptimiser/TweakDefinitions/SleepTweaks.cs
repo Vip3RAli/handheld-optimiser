@@ -202,7 +202,7 @@ public static class SleepTweaks
             {
                 if (await AnotherSettingNeedsHibernateAsync(ctx, id, ct))
                 {
-                    ctx.Log.Info("Hibernate is left on: another Sleep & Battery setting still uses it.");
+                    ctx.Log.Info("Hibernate is left on: another Battery & Sleep setting still uses it.");
                 }
                 else
                 {

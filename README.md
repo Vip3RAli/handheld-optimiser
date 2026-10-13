@@ -48,21 +48,27 @@ Windows ships set up for a desktop PC, not a 7-inch handheld. Handheld Optimiser
 
 ## The app
 
-Tap a section in the sidebar to drop down its pages.
+The Dashboard has a card for each thing you might want to do. Tap a card to open its page, and Back to return.
 
-| Section | Pages |
+| Card | On its page |
 |---|---|
-| **Dashboard** | Apply Now, how many recommended tweaks are applied, hardware readings, restore point and undo |
-| **Performance Tweaks** | Gaming Tweaks · CPU & Kernel · Graphics & Scheduling · Network · Storage · Sleep & Battery · Interface |
-| **Debloat Tool** | System Debloat · Deep Services · Bloatware · Startup Apps |
-| **Settings & Hardware** | Full Screen Mode · Power Actions · Device & System Health · Handheld Usability |
-| **Updates** | Updates · Game Runtimes |
+| **Performance** | Tweaks for games, the system and the network |
+| **Battery & Sleep** | Hibernate, wake and standby tweaks |
+| **Clean Up** | Privacy, ads and assistants, background activity and services |
+| **Apps** | Startup programs and preinstalled apps |
+| **Full Screen** | The home app, signing in to full screen mode, touch and desktop tweaks |
+| **Maintenance & Backup** | Restore point and undo, one-off jobs, storage tweaks |
+| **Health** | What Windows reports about the device |
+| **Updates** | Windows, Store and winget updates, and game runtimes |
 
+The Dashboard also has Apply Now, how many recommended tweaks are applied, and hardware readings.
+
+- A tweak is a tile with its name and its switch. Tap the tile to read what it does. One that carries a warning asks before it is switched on.
 - **Apply Now** includes turning off **Memory Integrity**, usually the biggest frame rate gain on the Ally, at the cost of some protection against malicious drivers. The confirmation lists every trade-off first.
-- **Bloatware** removes preinstalled apps such as TikTok, Candy Crush and Copilot. Nothing is selected until you choose it.
-- **Power Actions** are one-off jobs: flush DNS, clear shader caches, deep cleanup and Compact OS.
-- **Sleep & Battery** can hibernate the handheld after a short sleep or at a press of the power button, so it uses no power in a bag.
-- **Device & System Health** checks that your handheld's own services are running and can re-enable any that other tools disabled. It also shows what Windows reports about sleep (battery used while asleep, and what can wake the handheld or keep it awake), the processor settings in each power plan, free space and device encryption. It changes none of them.
+- **Apps** removes preinstalled apps such as TikTok, Candy Crush and Copilot. Nothing is selected until you choose it.
+- **Maintenance & Backup** has the one-off jobs: flush DNS, clear shader caches, deep cleanup and Compact OS.
+- **Battery & Sleep** can hibernate the handheld after a short sleep or at a press of the power button, so it uses no power in a bag.
+- **Health** checks that your handheld's own services are running and can re-enable any that other tools disabled. It also shows what Windows reports about sleep (battery used while asleep, and what can wake the handheld or keep it awake), the processor settings in each power plan, free space and device encryption. It changes none of them.
 - **Updates** lists Windows, Store and winget updates together and installs the ones you tick. Driver updates are off unless you switch them on. Games, the BIOS and firmware are not listed.
 
 ## Full Screen Mode and the game library

@@ -88,7 +88,7 @@ public partial class App : Application
 
     /// <summary>
     /// Pins the accent to the app's cyan instead of the Windows accent, so primary buttons, toggles,
-    /// checkboxes, badges and the sidebar highlight look the same on every device. Dark theme fills
+    /// checkboxes, badges and the open tile's edge look the same on every device. Dark theme fills
     /// use the lighter steps, matching how Fluent derives them from a system accent.
     /// </summary>
     private static void ApplyBrandAccent()
