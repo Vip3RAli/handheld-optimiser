@@ -66,20 +66,15 @@ public sealed partial class RuntimeRowViewModel(RuntimePackage package, GameRunt
 /// <summary>
 /// Scans the shared runtimes games depend on and installs or updates them through winget.
 /// </summary>
-public sealed partial class GameRuntimesViewModel : PageViewModelBase
+public sealed partial class GameRuntimesViewModel : SectionViewModel
 {
     private readonly RuntimeService _service;
     private bool _hasScanned;
     private bool _isScanning;
 
-    public override string Title => "Game Runtimes";
 
     /// <summary>The scan asks winget what is installed and what is newer, which goes to the internet.</summary>
     public override bool LoadsFromInternet => true;
-    public override string Glyph => "";
-    public override string Subtitle =>
-        "Visual C++, DirectX and .NET runtimes that games need. Installs come from Microsoft and vendor " +
-        "servers through winget, which checks each installer before running it.";
 
     public ObservableCollection<RuntimeRowViewModel> EssentialRows { get; } = [];
     public ObservableCollection<RuntimeRowViewModel> LegacyRows { get; } = [];
@@ -101,6 +96,8 @@ public sealed partial class GameRuntimesViewModel : PageViewModelBase
     private IEnumerable<RuntimeRowViewModel> AllRows => EssentialRows.Concat(LegacyRows);
 
     public override Task LoadAsync() => _hasScanned ? Task.CompletedTask : ScanAsync();
+
+    public override Task RefreshAsync() => ScanAsync();
 
     /// <summary>Checks the runtimes in the background. Only installing one holds the app busy.</summary>
     [RelayCommand]

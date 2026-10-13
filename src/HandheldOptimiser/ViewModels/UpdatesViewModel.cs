@@ -123,7 +123,7 @@ public sealed partial class SkippedUpdateViewModel(SkippedUpdate entry, UpdatesV
 /// answers: winget takes a few seconds and the Store about twenty. Updating runs them one after
 /// another, apps first and Windows Update last, since that is the one most likely to want a restart.
 /// </summary>
-public sealed partial class UpdatesViewModel : PageViewModelBase
+public sealed partial class UpdatesViewModel : SectionViewModel
 {
     private readonly WindowsUpdates _windows;
     private readonly StoreUpdates _store;
@@ -135,14 +135,16 @@ public sealed partial class UpdatesViewModel : PageViewModelBase
 
     /// <summary>True while the sources are being asked. Nothing can be installed until they have answered.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Status))]
     private bool _isChecking;
 
-    public override string Title => "Updates";
+    /// <summary>How many updates are waiting, once the sources have answered.</summary>
+    public override CardStatus? Status => IsChecking || !_hasScanned
+        ? CardStatus.Checking
+        : CardStatus.ForUpdates(AllRows.Count(r => r.State != UpdateRowState.Done));
+
 
     public override bool LoadsFromInternet => true;
-    public override string Glyph => "";
-    public override string Subtitle =>
-        "Windows Update, Microsoft Store apps and your other apps, checked and updated together.";
 
     public UpdateSectionViewModel WindowsSection { get; }
     public UpdateSectionViewModel StoreSection { get; }
@@ -220,6 +222,8 @@ public sealed partial class UpdatesViewModel : PageViewModelBase
     private IEnumerable<UpdateRowViewModel> AllRows => Sections.SelectMany(s => s.Rows);
 
     public override Task LoadAsync() => _hasScanned ? Task.CompletedTask : CheckAsync();
+
+    public override Task RefreshAsync() => CheckAsync();
 
     partial void OnIncludeDriversChanged(bool value)
     {
@@ -370,7 +374,12 @@ public sealed partial class UpdatesViewModel : PageViewModelBase
         }
     }
 
-    private void CountSelected() => SelectedCount = AllRows.Count(r => r.IsSelected && r.CanSelect);
+    /// <summary>Called whenever a row is added, taken away, ticked or changes state.</summary>
+    private void CountSelected()
+    {
+        SelectedCount = AllRows.Count(r => r.IsSelected && r.CanSelect);
+        OnPropertyChanged(nameof(Status));
+    }
 
     [RelayCommand]
     private void SelectAll()

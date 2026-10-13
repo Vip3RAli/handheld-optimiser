@@ -8,21 +8,12 @@
         <views:BooleanToVisibilityConverter x:Key="BoolToVis" />
     </UserControl.Resources>
 
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+    <StackPanel>
 
-        <StackPanel Grid.Row="0" Margin="4,0,4,12">
-            <TextBlock Text="Bloatware" FontSize="28" FontWeight="SemiBold" FontFamily="{StaticResource AppDisplayFont}" />
-            <TextBlock Text="{Binding Subtitle}" Opacity="0.7" FontSize="13" Margin="0,2,0,0" TextWrapping="Wrap" />
-
+        <StackPanel Margin="0,0,0,12">
             <ui:InfoBar Severity="Informational"
                         IsOpen="True"
                         IsClosable="False"
-                        Margin="0,12,0,0"
                         Title="One-way operation"
                         Message="Removal cannot be undone by the Revert button. Getting an app back means reinstalling it from the Microsoft Store. ASUS, AMD, Realtek, Xbox/Game Pass, Store and codec packages are never listed here and are blocked from removal." />
 
@@ -35,62 +26,60 @@
             <TextBlock Text="{Binding SummaryText}" Opacity="0.7" FontSize="12" Margin="0,10,0,0" />
         </StackPanel>
 
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <ItemsControl ItemsSource="{Binding Groups}" Margin="4,0,4,8">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <StackPanel Margin="0,0,0,16">
-                            <TextBlock Text="{Binding Header}" FontSize="14" FontWeight="SemiBold"
-                                       Opacity="0.85" Margin="2,0,0,8" />
+        <ItemsControl ItemsSource="{Binding Groups}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Margin="0,0,0,16">
+                        <TextBlock Text="{Binding Header}" FontSize="14" FontWeight="SemiBold"
+                                   Opacity="0.85" Margin="2,0,0,8" />
 
-                            <ItemsControl ItemsSource="{Binding Items}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Style="{StaticResource Panel}" Padding="12,10" Margin="0,0,0,6">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto" />
-                                                    <ColumnDefinition Width="*" />
-                                                </Grid.ColumnDefinitions>
+                        <ItemsControl ItemsSource="{Binding Items}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource Panel}" Padding="12,10" Margin="0,0,0,6">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
 
-                                                <CheckBox Grid.Column="0"
-                                                          IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                                          Checked="OnSelectionChanged"
-                                                          Unchecked="OnSelectionChanged"
-                                                          VerticalAlignment="Center"
-                                                          Margin="0,0,12,0" />
+                                            <CheckBox Grid.Column="0"
+                                                      IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                      Checked="OnSelectionChanged"
+                                                      Unchecked="OnSelectionChanged"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,12,0" />
 
-                                                <StackPanel Grid.Column="1">
-                                                    <StackPanel Orientation="Horizontal">
-                                                        <TextBlock Text="{Binding FriendlyName}" FontSize="14"
-                                                                   FontWeight="SemiBold" VerticalAlignment="Center" />
-                                                        <ui:Badge Content="Recommended" FontSize="9" Margin="8,0,0,0"
-                                                                  VerticalAlignment="Center"
-                                                                  Visibility="{Binding Recommended, Converter={StaticResource BoolToVis}}" />
-                                                    </StackPanel>
-
-                                                    <!-- The real package ID, so nothing is removed sight-unseen. -->
-                                                    <TextBlock Text="{Binding IdentityName}" FontFamily="Consolas"
-                                                               FontSize="11" Opacity="0.5" Margin="0,3,0,0" />
-                                                    <TextBlock Text="{Binding ScopeText}" FontSize="11" Opacity="0.5" />
-
-                                                    <TextBlock Text="{Binding KeepIfNote}" FontSize="11.5"
-                                                               Foreground="#E8C45F" Opacity="0.9" TextWrapping="Wrap"
-                                                               Margin="0,5,0,0"
-                                                               Visibility="{Binding HasKeepNote, Converter={StaticResource BoolToVis}}" />
+                                            <StackPanel Grid.Column="1">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding FriendlyName}" FontSize="14"
+                                                               FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                    <ui:Badge Content="Recommended" FontSize="9" Margin="8,0,0,0"
+                                                              VerticalAlignment="Center"
+                                                              Visibility="{Binding Recommended, Converter={StaticResource BoolToVis}}" />
                                                 </StackPanel>
-                                            </Grid>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
 
-        <Border Grid.Row="2" Padding="4,12,4,0">
+                                                <!-- The real package ID, so nothing is removed sight-unseen. -->
+                                                <TextBlock Text="{Binding IdentityName}" FontFamily="Consolas"
+                                                           FontSize="11" Opacity="0.5" Margin="0,3,0,0" />
+                                                <TextBlock Text="{Binding ScopeText}" FontSize="11" Opacity="0.5" />
+
+                                                <TextBlock Text="{Binding KeepIfNote}" FontSize="11.5"
+                                                           Foreground="#E8C45F" Opacity="0.9" TextWrapping="Wrap"
+                                                           Margin="0,5,0,0"
+                                                           Visibility="{Binding HasKeepNote, Converter={StaticResource BoolToVis}}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <Border Padding="0,4,0,0">
             <ui:Button Content="Remove selected apps"
                        Appearance="Primary"
                        Height="52"
@@ -99,5 +88,5 @@
                        HorizontalContentAlignment="Center"
                        Command="{Binding RemoveSelectedCommand}" />
         </Border>
-    </Grid>
+    </StackPanel>
 </UserControl>

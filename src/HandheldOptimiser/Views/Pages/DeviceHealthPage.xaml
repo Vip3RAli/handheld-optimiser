@@ -98,17 +98,10 @@
         </DataTemplate>
     </UserControl.Resources>
 
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
+    <StackPanel>
 
-        <StackPanel Grid.Row="0" Margin="4,0,4,12">
-            <TextBlock Text="Device &amp; System Health" FontSize="28" FontWeight="SemiBold" FontFamily="{StaticResource AppDisplayFont}" />
-            <TextBlock Text="{Binding HardwareModel}" Opacity="0.7" FontSize="13" Margin="0,2,0,0" />
-
-            <Grid Margin="0,12,0,0">
+        <StackPanel Margin="0,0,0,12">
+            <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -132,107 +125,103 @@
                     </Border>
                 </StackPanel>
 
-                <StackPanel Grid.Column="1" Orientation="Horizontal">
-                    <ui:Button Content="Re-check" Command="{Binding RefreshCommand}" Margin="0,0,10,0" />
-                    <ui:Button Content="Repair disabled services"
-                               Appearance="Primary"
-                               Command="{Binding RepairCommand}" />
-                </StackPanel>
+                <ui:Button Grid.Column="1"
+                           Content="Repair disabled services"
+                           Appearance="Primary"
+                           Command="{Binding RepairCommand}" />
             </Grid>
         </StackPanel>
 
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="4,0,4,8">
+        <StackPanel>
 
-                <!-- Whatever is yellow or red, with its explanation, so it is never below the fold. -->
-                <Border Style="{StaticResource Panel}" Padding="14,10" Margin="0,0,0,8"
-                        BorderBrush="{Binding WorstStatus, Converter={StaticResource HealthBrush}}"
-                        Visibility="{Binding HasAttention, Converter={StaticResource BoolToVis}}">
-                    <StackPanel>
-                        <TextBlock Text="NEEDS A LOOK" Style="{StaticResource SectionHeading}" Margin="0,0,0,4" />
-                        <ItemsControl ItemsSource="{Binding Attention}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid Margin="0,6">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="{StaticResource MarkWidth}" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
+            <!-- Whatever is yellow or red, with its explanation, so it is never below the fold. -->
+            <Border Style="{StaticResource Panel}" Padding="14,10" Margin="0,0,0,8"
+                    BorderBrush="{Binding WorstStatus, Converter={StaticResource HealthBrush}}"
+                    Visibility="{Binding HasAttention, Converter={StaticResource BoolToVis}}">
+                <StackPanel>
+                    <TextBlock Text="NEEDS A LOOK" Style="{StaticResource SectionHeading}" Margin="0,0,0,4" />
+                    <ItemsControl ItemsSource="{Binding Attention}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="{StaticResource MarkWidth}" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
 
-                                        <ui:FontIcon Grid.Column="0"
-                                                     Glyph="{Binding Status, Converter={StaticResource HealthGlyph}}"
-                                                     Foreground="{Binding Status, Converter={StaticResource HealthBrush}}"
-                                                     FontSize="14" HorizontalAlignment="Left" VerticalAlignment="Top"
-                                                     Margin="0,2,0,0" />
+                                    <ui:FontIcon Grid.Column="0"
+                                                 Glyph="{Binding Status, Converter={StaticResource HealthGlyph}}"
+                                                 Foreground="{Binding Status, Converter={StaticResource HealthBrush}}"
+                                                 FontSize="14" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                                 Margin="0,2,0,0" />
 
-                                        <StackPanel Grid.Column="1">
-                                            <TextBlock TextWrapping="Wrap">
-                                                <Run Text="{Binding Title, Mode=OneWay}" FontSize="13.5" FontWeight="SemiBold" />
-                                                <Run Text="  " />
-                                                <Run Text="{Binding Tag, Mode=OneWay}" FontSize="11.5" Foreground="#8CFFFFFF" />
-                                            </TextBlock>
-                                            <TextBlock Text="{Binding Detail}" FontSize="12.5" Opacity="0.8"
-                                                       Margin="0,3,0,0" TextWrapping="Wrap" />
-                                            <TextBlock Text="{Binding Advice}" FontSize="12" Foreground="#E8C45F"
-                                                       Margin="0,4,0,0" TextWrapping="Wrap"
-                                                       Visibility="{Binding Advice, Converter={StaticResource StringToVis}}" />
-                                        </StackPanel>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock TextWrapping="Wrap">
+                                            <Run Text="{Binding Title, Mode=OneWay}" FontSize="13.5" FontWeight="SemiBold" />
+                                            <Run Text="  " />
+                                            <Run Text="{Binding Tag, Mode=OneWay}" FontSize="11.5" Foreground="#8CFFFFFF" />
+                                        </TextBlock>
+                                        <TextBlock Text="{Binding Detail}" FontSize="12.5" Opacity="0.8"
+                                                   Margin="0,3,0,0" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Advice}" FontSize="12" Foreground="#E8C45F"
+                                                   Margin="0,4,0,0" TextWrapping="Wrap"
+                                                   Visibility="{Binding Advice, Converter={StaticResource StringToVis}}" />
+                                    </StackPanel>
 
-                                        <ui:Button Grid.Column="2"
-                                                   Content="{Binding OpenText}"
-                                                   Command="{Binding DataContext.OpenCheckCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                   CommandParameter="{Binding}"
-                                                   VerticalAlignment="Top"
-                                                   Margin="12,0,0,0"
-                                                   Visibility="{Binding OpenText, Converter={StaticResource StringToVis}}" />
-                                    </Grid>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </Border>
+                                    <ui:Button Grid.Column="2"
+                                               Content="{Binding OpenText}"
+                                               Command="{Binding DataContext.OpenCheckCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                               CommandParameter="{Binding}"
+                                               VerticalAlignment="Top"
+                                               Margin="12,0,0,0"
+                                               Visibility="{Binding OpenText, Converter={StaticResource StringToVis}}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
 
-                <ItemsControl ItemsSource="{Binding Sections}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Border Style="{StaticResource Panel}" Padding="14,10" Margin="0,0,0,8">
-                                <StackPanel>
-                                    <Grid MinHeight="30">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
+            <ItemsControl ItemsSource="{Binding Sections}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Style="{StaticResource Panel}" Padding="14,10" Margin="0,0,0,8">
+                            <StackPanel>
+                                <Grid MinHeight="30">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
 
-                                        <TextBlock Grid.Column="0" Text="{Binding Heading}" Style="{StaticResource SectionHeading}" />
-                                        <TextBlock Grid.Column="1" Text="{Binding Summary}" FontSize="12.5" Opacity="0.75"
-                                                   VerticalAlignment="Center" Margin="14,0,0,0" />
-                                        <ui:Button Grid.Column="2"
-                                                   Content="{Binding ToggleText}"
-                                                   Command="{Binding ToggleCommand}"
-                                                   Visibility="{Binding CanToggle, Converter={StaticResource BoolToVis}}" />
-                                    </Grid>
+                                    <TextBlock Grid.Column="0" Text="{Binding Heading}" Style="{StaticResource SectionHeading}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Summary}" FontSize="12.5" Opacity="0.75"
+                                               VerticalAlignment="Center" Margin="14,0,0,0" />
+                                    <ui:Button Grid.Column="2"
+                                               Content="{Binding ToggleText}"
+                                               Command="{Binding ToggleCommand}"
+                                               Visibility="{Binding CanToggle, Converter={StaticResource BoolToVis}}" />
+                                </Grid>
 
-                                    <ItemsControl ItemsSource="{Binding Rows}"
-                                                  ItemTemplate="{StaticResource HealthRow}"
-                                                  Visibility="{Binding ShowRows, Converter={StaticResource BoolToVis}}" />
+                                <ItemsControl ItemsSource="{Binding Rows}"
+                                              ItemTemplate="{StaticResource HealthRow}"
+                                              Visibility="{Binding ShowRows, Converter={StaticResource BoolToVis}}" />
 
-                                    <ItemsControl ItemsSource="{Binding Tables}" ItemTemplate="{StaticResource HealthTable}" />
+                                <ItemsControl ItemsSource="{Binding Tables}" ItemTemplate="{StaticResource HealthTable}" />
 
-                                    <ItemsControl ItemsSource="{Binding MoreTables}"
-                                                  ItemTemplate="{StaticResource HealthTable}"
-                                                  Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}" />
+                                <ItemsControl ItemsSource="{Binding MoreTables}"
+                                              ItemTemplate="{StaticResource HealthTable}"
+                                              Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}" />
 
-                                    <TextBlock Text="{Binding Note}" FontSize="11.5" Opacity="0.55" Margin="26,4,0,2"
-                                               TextWrapping="Wrap"
-                                               Visibility="{Binding Note, Converter={StaticResource StringToVis}}" />
-                                </StackPanel>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </StackPanel>
-        </ScrollViewer>
-    </Grid>
+                                <TextBlock Text="{Binding Note}" FontSize="11.5" Opacity="0.55" Margin="26,4,0,2"
+                                           TextWrapping="Wrap"
+                                           Visibility="{Binding Note, Converter={StaticResource StringToVis}}" />
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </StackPanel>
 </UserControl>

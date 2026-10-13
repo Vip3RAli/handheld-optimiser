@@ -10,8 +10,7 @@
 
     <ui:Card Margin="0,0,0,10">
         <StackPanel>
-            <TextBlock Text="Home app" FontSize="16" FontWeight="SemiBold" />
-            <TextBlock Text="{Binding AvailabilityText}" Opacity="0.7" FontSize="12.5" Margin="0,4,0,0" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding AvailabilityText}" Opacity="0.7" FontSize="12.5" TextWrapping="Wrap" />
 
             <!-- Sized for a thumb: each choice is a full-width row with its own note. -->
             <StackPanel Margin="0,12,0,0" IsEnabled="{Binding IsAvailable}">

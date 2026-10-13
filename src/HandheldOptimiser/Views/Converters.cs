@@ -25,6 +25,16 @@ public sealed class BooleanToVisibilityConverter : IValueConverter
         value is Visibility v && v == Visibility.Visible;
 }
 
+/// <summary>A section's heading is written in capitals, which a TextBlock cannot do by itself.</summary>
+public sealed class UpperCaseConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        (value as string)?.ToUpper(culture) ?? string.Empty;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
 public sealed class StringNotEmptyToVisibilityConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>

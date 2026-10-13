@@ -79,7 +79,7 @@
                         IsClosable="False"
                         Margin="0,0,0,12"
                         Title="System Protection is off"
-                        Message="Restore points cannot be created, so tweaks will refuse to run. Turn on System Protection for the C: drive, or use the button below which enables it automatically."
+                        Message="Restore points cannot be created, so tweaks will refuse to run. Turn on System Protection for the C: drive, or use Create restore point on the Maintenance &amp; Backup page, which turns it on."
                         IsOpen="{Binding ProtectionEnabled, Converter={StaticResource InverseBool}}" />
 
             <!-- The headline action. -->
@@ -122,9 +122,9 @@
                 </Grid>
             </Border>
 
-            <!-- Three cards in a row on a handheld's screen, one above another when the window is narrow.
+            <!-- Two cards in a row on a handheld's screen, one above another when the window is narrow.
                  The column count is set from the width in the code-behind. -->
-            <UniformGrid x:Name="Cards" Columns="3" Margin="0,0,-12,0">
+            <UniformGrid x:Name="Cards" Columns="2" Margin="0,0,-12,0">
 
                 <!-- Current state -->
                 <ui:Card Style="{StaticResource DashCard}">
@@ -231,30 +231,33 @@
                         </UniformGrid>
                     </DockPanel>
                 </ui:Card>
-
-                <!-- Safety & Backup -->
-                <ui:Card Style="{StaticResource DashCard}">
-                    <DockPanel>
-                        <TextBlock DockPanel.Dock="Top" Text="Safety &amp; Backup" Style="{StaticResource CardTitle}" />
-                        <TextBlock DockPanel.Dock="Top" Text="{Binding RevertSummary}" Opacity="0.75" FontSize="12.5"
-                                   Margin="0,4,0,0" TextWrapping="Wrap" />
-
-                        <TextBlock DockPanel.Dock="Bottom" Margin="0,10,0,0" TextWrapping="Wrap" FontSize="11.5" Opacity="0.55"
-                                   Text="Puts every setting back as it was. Removed bloatware is not restored." />
-
-                        <StackPanel VerticalAlignment="Center" Margin="0,12,0,0">
-                            <ui:Button Style="{StaticResource OutlineButton}"
-                                       Content="Create restore point"
-                                       Command="{Binding CreateRestorePointOnlyCommand}"
-                                       Margin="0,0,0,10" />
-                            <ui:Button Style="{StaticResource OutlineButton}"
-                                       Content="Undo all changes"
-                                       Command="{Binding RevertAllCommand}"
-                                       IsEnabled="{Binding CanRevert}" />
-                        </StackPanel>
-                    </DockPanel>
-                </ui:Card>
             </UniformGrid>
+
+            <!-- A card per goal. Pressing one opens its page. -->
+            <ItemsControl ItemsSource="{Binding DataContext.Cards, RelativeSource={RelativeSource AncestorType=Window}}"
+                          Margin="0,0,-12,0" Focusable="False">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Columns="4" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <ui:Button Margin="0,0,12,12"
+                                   MinHeight="72"
+                                   HorizontalAlignment="Stretch"
+                                   HorizontalContentAlignment="Left"
+                                   AutomationProperties.Name="{Binding Title}"
+                                   Command="{Binding DataContext.OpenPageCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                   CommandParameter="{Binding}">
+                            <StackPanel>
+                                <TextBlock Text="{Binding Title}" Style="{StaticResource CardTitle}" />
+                                <TextBlock Text="{Binding Status.Text}" FontSize="12.5" Opacity="0.75" />
+                            </StackPanel>
+                        </ui:Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
 
         </StackPanel>
     </ScrollViewer>

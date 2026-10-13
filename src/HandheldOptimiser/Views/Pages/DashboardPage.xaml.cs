@@ -18,5 +18,5 @@ public partial class DashboardPage : UserControl
     }
 
     private void OnSizeChanged(object sender, SizeChangedEventArgs e) =>
-        Cards.Columns = e.NewSize.Width >= ThreeAcrossMinWidth ? 3 : 1;
+        Cards.Columns = e.NewSize.Width >= ThreeAcrossMinWidth ? 2 : 1;
 }

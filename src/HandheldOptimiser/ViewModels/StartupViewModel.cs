@@ -45,20 +45,25 @@ public sealed partial class StartupRowViewModel(StartupEntry entry, StartupServi
 /// Startup entry manager. Every Run-key entry can be switched on or off, including vendor and security
 /// ones; the change is a Task Manager flag, so it is always reversible from here or Task Manager.
 /// </summary>
-public sealed partial class StartupViewModel(StartupService service, IShell shell) : PageViewModelBase(shell)
+public sealed partial class StartupViewModel(StartupService service, IShell shell) : SectionViewModel(shell)
 {
     private readonly StartupService _service = service;
 
-    public override string Title => "Startup Apps";
-    public override string Glyph => "";
-    public override string Subtitle => "Turn startup programs on or off.";
 
     public ObservableCollection<StartupRowViewModel> Entries { get; } = [];
 
     [ObservableProperty]
     private string _summaryText = "Not scanned yet.";
 
-    public override Task LoadAsync() => Entries.Count == 0 ? ScanAsync() : Task.CompletedTask;
+    private bool _hasScanned;
+
+    /// <summary>How many programs start with Windows, once they have been read.</summary>
+    public override CardStatus? Status =>
+        _hasScanned ? CardStatus.Neutral($"{Entries.Count(e => e.IsEnabled)} at startup") : null;
+
+    public override Task LoadAsync() => _hasScanned ? Task.CompletedTask : ScanAsync();
+
+    public override Task RefreshAsync() => ScanAsync();
 
     /// <summary>Reads the startup entries. It only reads, so it does not hold the app busy.</summary>
     [RelayCommand]
@@ -71,10 +76,23 @@ public sealed partial class StartupViewModel(StartupService service, IShell shel
             Entries.Clear();
             foreach (var entry in found)
             {
-                Entries.Add(new StartupRowViewModel(entry, _service, Shell));
+                var row = new StartupRowViewModel(entry, _service, Shell);
+
+                // A program switched on or off changes the count on the Dashboard's card.
+                row.PropertyChanged += (_, e) =>
+                {
+                    if (e.PropertyName == nameof(StartupRowViewModel.IsEnabled))
+                    {
+                        OnPropertyChanged(nameof(Status));
+                    }
+                };
+
+                Entries.Add(row);
             }
 
             SummaryText = $"{found.Count} entries, {found.Count(e => e.IsEnabled)} enabled.";
+            _hasScanned = true;
+            OnPropertyChanged(nameof(Status));
 
             return Task.CompletedTask;
         });

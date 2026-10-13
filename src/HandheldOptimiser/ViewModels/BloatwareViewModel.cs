@@ -45,7 +45,7 @@ public sealed partial class BloatwareViewModel(
     TweakJournalService journal,
     LogService log,
     IShell shell)
-    : PageViewModelBase(shell)
+    : SectionViewModel(shell)
 {
     private readonly AppxService _appxService = appxService;
     private readonly RestorePointService _restorePoints = restorePoints;
@@ -55,9 +55,6 @@ public sealed partial class BloatwareViewModel(
     private bool _hasScanned;
     private bool _isScanning;
 
-    public override string Title => "Bloatware";
-    public override string Glyph => "";
-    public override string Subtitle => "Remove preinstalled apps. Nothing is selected until you choose it.";
 
     public ObservableCollection<AppxGroupViewModel> Groups { get; } = [];
 
@@ -67,6 +64,8 @@ public sealed partial class BloatwareViewModel(
     private IEnumerable<AppxRowViewModel> AllRows => Groups.SelectMany(g => g.Items);
 
     public override Task LoadAsync() => _hasScanned ? Task.CompletedTask : ScanAsync();
+
+    public override Task RefreshAsync() => ScanAsync();
 
     /// <summary>Reads the installed apps in the background. Only removing them holds the app busy.</summary>
     [RelayCommand]
