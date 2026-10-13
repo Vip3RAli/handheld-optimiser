@@ -88,13 +88,14 @@ public static class StorageHealth
         {
             Name = $"{Group} Free space on {drive}",
             Detail = string.Create(CultureInfo.InvariantCulture, $"{freeBytes / gb:0} GB free of {totalBytes / gb:0} GB"),
+            Used = totalBytes > 0 ? Math.Clamp(1 - (double)freeBytes / totalBytes, 0, 1) : null,
             Status = low ? HealthStatus.Warning : HealthStatus.Good,
             Advice = low
                 ? "When a game needs more memory than the handheld has, Windows makes room on this drive. " +
                   "With little free it cannot, and games can close with \"out of memory\" errors. Updates " +
                   "need room too."
                 : null,
-            OpenText = low ? "Open Storage" : null,
+            OpenText = low ? "Open in Settings" : null,
             OpenUri = low ? "ms-settings:storagesense" : null
         };
     }
@@ -108,8 +109,9 @@ public static class StorageHealth
         {
             Name = $"{Group} Card in {drive}",
             Detail = ntfs
-                ? "NTFS. Every launcher can install games to it."
-                : $"{fileSystem}. The Xbox app only installs games to cards formatted as NTFS. Steam and the other launchers work as it is.",
+                ? "Every launcher can install games to it."
+                : "The Xbox app only installs games to cards formatted as NTFS. Steam and the other launchers work as it is.",
+            Summary = fileSystem,
             Status = HealthStatus.Info,
             Advice = ntfs ? null : "Formatting a card erases it, so copy off anything you want to keep first."
         };
@@ -128,28 +130,30 @@ public static class StorageHealth
         var protection = parts.Length == 2 ? parts[0].Trim() : null;
         var conversion = parts.Length == 2 ? parts[1].Trim() : null;
 
-        var detail = (protection, conversion) switch
+        (string Summary, string Detail)? found = (protection, conversion) switch
         {
-            ("1", _) =>
-                "On. If the handheld is lost or stolen, nobody can read the drive or the logins saved on it. " +
-                "It costs some drive speed.",
-            ("0", "0") =>
-                "Off. Anyone who takes the drive out can read it, saved logins included.",
-            ("0", "1") =>
-                "Encrypted, but not protected yet. Windows finishes switching it on when you sign in with a Microsoft account.",
-            ("0", _) =>
-                "Part way through being switched on or off.",
+            ("1", _) => ("On",
+                "If the handheld is lost or stolen, nobody can read the drive or the logins saved on it. " +
+                "It costs some drive speed."),
+            ("0", "0") => ("Off",
+                "Anyone who takes the drive out can read it, saved logins included."),
+            ("0", "1") => ("Not protected yet",
+                "The drive is encrypted, but Windows only finishes switching protection on when you sign in " +
+                "with a Microsoft account."),
+            ("0", _) => ("Changing",
+                "Part way through being switched on or off."),
             _ => null
         };
 
-        return detail is null
+        return found is not var (summary, detail)
             ? new HealthCheck { Name = name, Detail = "Windows did not say", Status = HealthStatus.Unknown }
             : new HealthCheck
             {
                 Name = name,
                 Detail = detail,
+                Summary = summary,
                 Status = HealthStatus.Info,
-                OpenText = "Open device encryption",
+                OpenText = "Open in Settings",
                 OpenUri = "ms-settings:deviceencryption"
             };
     }

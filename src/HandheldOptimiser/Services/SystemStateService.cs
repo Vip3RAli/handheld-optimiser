@@ -13,12 +13,35 @@ public enum HealthStatus
     Info
 }
 
+/// <summary>One line of a table inside a row: a setting, and its value plugged in and on battery.</summary>
+public sealed record HealthTableRow(string Label, string PluggedIn, string OnBattery);
+
 public sealed class HealthCheck
 {
+    /// <summary>The row's group in square brackets, then its title: "[Sleep] Wake timers".</summary>
     public required string Name { get; init; }
+
     public required string Detail { get; init; }
     public required HealthStatus Status { get; init; }
     public string? Advice { get; init; }
+
+    /// <summary>
+    /// The answer in a few words ("Running", "Off", "0.6% an hour"), for a page that is read at a
+    /// glance. Left out where <see cref="Detail"/> is already that short.
+    /// </summary>
+    public string? Summary { get; init; }
+
+    /// <summary>How full something is, from 0 to 1, where the row is about space. Drawn as a bar.</summary>
+    public double? Used { get; init; }
+
+    /// <summary>The row's values as a table, where it has one per power source.</summary>
+    public IReadOnlyList<HealthTableRow> Table { get; init; } = [];
+
+    /// <summary>The group out of <see cref="Name"/>, without its brackets, or empty where there is none.</summary>
+    public string Group => Name.StartsWith('[') && Name.IndexOf(']') is > 0 and var end ? Name[1..end] : string.Empty;
+
+    /// <summary>The title out of <see cref="Name"/>, without its group.</summary>
+    public string Title => Group.Length == 0 ? Name : Name[(Group.Length + 2)..].TrimStart();
 
     /// <summary>The label of a button that opens the Windows page for this row, where there is one.</summary>
     public string? OpenText { get; init; }
@@ -192,6 +215,7 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
                 {
                     Name = $"[{group}] {friendly}",
                     Detail = "Not installed on this system",
+                    Summary = "Not installed",
                     Status = absentStatus,
                     Advice = absentStatus == HealthStatus.Bad
                         ? "This service should exist on Windows 11. Investigate before applying tweaks."
@@ -201,20 +225,21 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
             }
 
             var disabled = state.StartType.Equals("Disabled", StringComparison.OrdinalIgnoreCase);
+            var status = ServiceStatus(state.Status, state.StartType);
             var running = state.Status.Equals("Running", StringComparison.OrdinalIgnoreCase);
-
-            var status = disabled ? HealthStatus.Bad
-                : running ? HealthStatus.Good
-                : HealthStatus.Warning;
+            var resting = status == HealthStatus.Good && !running;
 
             checks.Add(new HealthCheck
             {
                 Name = $"[{group}] {friendly}",
-                Detail = $"{state.Status}, start type {state.StartType}",
+                Detail = resting ? $"Stopped until Windows needs it, start type {state.StartType}"
+                    : status == HealthStatus.Warning ? $"{state.Status}, though it is set to start by itself"
+                    : $"{state.Status}, start type {state.StartType}",
+                Summary = disabled ? "Disabled" : running ? "Running" : resting ? "Resting" : state.Status,
                 Status = status,
                 Advice = disabled
                     ? "This service is disabled. Handheld Optimiser never disables it, so another tool likely did. " +
-                      "Re-enable it from the repair action below."
+                      "Repair disabled services, at the top of this page, switches it back on."
                     : null
             });
         }
@@ -239,6 +264,26 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
         return checks;
     }
 
+    /// <summary>
+    /// How a watched service stands, from its run state and start type as Get-Service names them.
+    /// Disabled is the fault this page exists to find. A service set to Manual starts when something
+    /// asks for it and stops itself when the work is done (BITS between downloads, Windows Update
+    /// between checks), so stopped is its normal state and not something to look into. Only a service
+    /// that should start by itself and is not running is worth a look.
+    /// </summary>
+    public static HealthStatus ServiceStatus(string status, string startType)
+    {
+        if (startType.Equals("Disabled", StringComparison.OrdinalIgnoreCase))
+        {
+            return HealthStatus.Bad;
+        }
+
+        return status.Equals("Running", StringComparison.OrdinalIgnoreCase)
+               || startType.Equals("Manual", StringComparison.OrdinalIgnoreCase)
+            ? HealthStatus.Good
+            : HealthStatus.Warning;
+    }
+
     private async Task<IReadOnlyList<HealthCheck>> GetVirtualisationChecksAsync(CancellationToken ct)
     {
         var checks = new List<HealthCheck>();
@@ -254,6 +299,7 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
         {
             Name = "[Performance] Memory Integrity (HVCI)",
             Detail = hvciOn ? "Enabled (costing frame rate)" : "Disabled (optimised for gaming)",
+            Summary = hvciOn ? "On" : "Off",
             Status = hvciOn ? HealthStatus.Warning : HealthStatus.Good,
             Advice = hvciOn ? "Disable this on the Gaming Tweaks page for the largest single FPS gain." : null
         });

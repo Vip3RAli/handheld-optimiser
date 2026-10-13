@@ -25,23 +25,31 @@ public sealed partial class DeviceHealthViewModel(SystemStateService systemState
     public override string Glyph => "";
     public override string Subtitle => "Protected components, sleep, power plans and storage, as Windows reports them. No toggles here by design.";
 
-    public ObservableCollection<HealthCheck> Checks { get; } = [];
+    /// <summary>The rows marked yellow or red, lifted to the top of the page with their explanation.</summary>
+    public ObservableCollection<HealthRowViewModel> Attention { get; } = [];
+
+    public ObservableCollection<HealthSectionViewModel> Sections { get; } = [];
 
     [ObservableProperty]
     private string _hardwareModel = "Detecting…";
 
+    /// <summary>The first thing read on the page: how many rows need a look, or that none does.</summary>
     [ObservableProperty]
-    private string _protectionNote = ProtectionNoteFor(null);
+    private string _attentionText = "Checking…";
+
+    /// <summary>The colour of that line: the worst status found, and grey until the first check answers.</summary>
+    [ObservableProperty]
+    private HealthStatus _worstStatus = HealthStatus.Unknown;
 
     [ObservableProperty]
-    private string _summaryText = "Not checked yet.";
+    private string _fineText = string.Empty;
 
     [ObservableProperty]
-    private bool _hasProblems;
+    private bool _hasAttention;
 
     private bool _isChecking;
 
-    public override Task LoadAsync() => Checks.Count == 0 ? RefreshAsync() : Task.CompletedTask;
+    public override Task LoadAsync() => Sections.Count == 0 ? RefreshAsync() : Task.CompletedTask;
 
     /// <summary>Runs the checks in the background. Only a repair holds the app busy.</summary>
     [RelayCommand]
@@ -67,33 +75,39 @@ public sealed partial class DeviceHealthViewModel(SystemStateService systemState
     private async Task LoadChecksAsync(CancellationToken ct)
     {
         HardwareModel = _systemState.GetHardwareModel();
-        ProtectionNote = ProtectionNoteFor(_systemState.GetVendorSoftware());
 
         var results = await _systemState.RunHealthChecksAsync(ct);
+        var page = HealthLayout.Build(results, ProtectionNoteFor(_systemState.GetVendorSoftware()));
 
-        Checks.Clear();
-        foreach (var check in results)
+        // A re-check keeps open what the user had opened.
+        var open = Sections.Where(s => s.IsExpanded).Select(s => s.Title).ToHashSet();
+
+        Attention.Clear();
+        foreach (var row in page.Attention)
         {
-            Checks.Add(check);
+            Attention.Add(row);
         }
 
-        var bad = results.Count(c => c.Status == HealthStatus.Bad);
-        var warn = results.Count(c => c.Status == HealthStatus.Warning);
+        Sections.Clear();
+        foreach (var section in page.Sections)
+        {
+            section.IsExpanded = open.Contains(section.Title);
+            Sections.Add(section);
+        }
 
-        HasProblems = bad > 0;
-
-        SummaryText = bad > 0
-            ? $"{bad} problem(s) found. Something has disabled a component that should be running."
-            : warn > 0
-                ? $"All protected components healthy. {warn} row{(warn == 1 ? " is" : "s are")} worth a look, marked in yellow."
-                : "All protected components healthy and fully optimised.";
+        HasAttention = page.Attention.Count > 0;
+        WorstStatus = page.Attention.Any(r => r.Status == HealthStatus.Bad) ? HealthStatus.Bad
+            : HasAttention ? HealthStatus.Warning
+            : HealthStatus.Good;
+        AttentionText = HasAttention ? $"{page.Attention.Count} to look at" : "Nothing needs a look";
+        FineText = $"{page.Fine} fine";
     }
 
     /// <summary>Opens the Windows page a row points to. The row is the button's parameter.</summary>
     [RelayCommand]
-    private void OpenCheck(HealthCheck? check)
+    private void OpenCheck(HealthRowViewModel? row)
     {
-        if (check?.OpenUri is { } uri)
+        if (row?.Check.OpenUri is { } uri)
         {
             ShellLinks.Open(uri, _log);
         }
@@ -101,9 +115,8 @@ public sealed partial class DeviceHealthViewModel(SystemStateService systemState
 
     private static string ProtectionNoteFor((string Vendor, string App)? vendor) =>
         (vendor is var (name, app) ? $"{app}, {name} services, " : string.Empty) +
-        "AMD and Intel drivers, Realtek audio, Defender and Windows Update are all on a hard denylist that " +
-        "blocks modification at write time. This page verifies they are intact, and can re-enable them if " +
-        "another tool disabled them.";
+        "AMD and Intel drivers, Realtek audio, Defender, Windows Update and Game Pass. This app cannot " +
+        "change any of them; this only checks that nothing else has.";
 
     [RelayCommand]
     private async Task RepairAsync()
