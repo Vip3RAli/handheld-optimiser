@@ -16,7 +16,7 @@ public sealed class TweakStateStoreTests
         Id = id,
         Name = id,
         Description = "Test tweak",
-        Category = TweakCategory.Gaming,
+        Category = TweakCategory.Games,
         IncludeInOneClick = oneClick
     };
 

@@ -160,7 +160,7 @@ public static class DebloatTweaks
         Description =
             "Start menu search returns local results only, so it is instant and never hangs on flaky " +
             "Wi-Fi.",
-        Category = TweakCategory.Debloat,
+        Category = TweakCategory.AdsAndAssistants,
         Risk = RiskLevel.Safe,
         RegistryValues =
         [
@@ -178,7 +178,7 @@ public static class DebloatTweaks
         Name = "Disable Cortana & Copilot",
         Description =
             "Turns off Cortana and Copilot and removes the Copilot taskbar button.",
-        Category = TweakCategory.Debloat,
+        Category = TweakCategory.AdsAndAssistants,
         Risk = RiskLevel.Safe,
         RegistryValues =
         [
@@ -301,7 +301,7 @@ public static class DebloatTweaks
         Description =
             "Stops Windows installing promoted apps, showing suggestions in Start and re-adding " +
             "bloatware you remove. Apply before removing bloatware.",
-        Category = TweakCategory.Debloat,
+        Category = TweakCategory.AdsAndAssistants,
         Risk = RiskLevel.Safe,
         RegistryValues =
         [
@@ -326,7 +326,7 @@ public static class DebloatTweaks
             "Turns off recommendations, account nags and tips in Start, Settings, File Explorer and the " +
             "lock screen, the \"finish setting up your device\" screen, and the pop-ups suggesting " +
             "backup, phone linking and Microsoft account features.",
-        Category = TweakCategory.Debloat,
+        Category = TweakCategory.AdsAndAssistants,
         Risk = RiskLevel.Safe,
         RegistryValues =
         [
@@ -374,7 +374,7 @@ public static class DebloatTweaks
         Description =
             "Removes the Widgets board and its taskbar button, freeing 100 to 200 MB of memory. " +
             "Reverting puts it back, from the Microsoft Store if Windows has not kept a copy.",
-        Category = TweakCategory.Debloat,
+        Category = TweakCategory.AdsAndAssistants,
         Risk = RiskLevel.Safe,
         // Nothing is written here any more. The policy stays listed so that undo data from a version
         // that did write it, on a Windows that allowed it, can still be put back.
@@ -505,7 +505,7 @@ public static class DebloatTweaks
         Description =
             "Stops Edge preloading at sign-in and staying open after you close it, freeing the memory it " +
             "holds.",
-        Category = TweakCategory.Debloat,
+        Category = TweakCategory.BackgroundActivity,
         Risk = RiskLevel.Safe,
         Warning =
             "Edge opens slightly slower. Its settings page will say it is managed by your organisation, " +
@@ -573,7 +573,7 @@ public static class DebloatTweaks
         Description =
             "Stops OneDrive running and syncing, so it never interrupts a game. Game cloud saves use " +
             "Steam, Xbox and the other launchers, not OneDrive.",
-        Category = TweakCategory.Debloat,
+        Category = TweakCategory.BackgroundActivity,
         Risk = RiskLevel.Moderate,
         IncludeInOneClick = false,
         Warning =
@@ -612,7 +612,7 @@ public static class DebloatTweaks
         Description =
             "Stops Store apps running in the background, freeing memory and CPU. Desktop programs, " +
             "Armoury Crate and services are unaffected.",
-        Category = TweakCategory.Debloat,
+        Category = TweakCategory.BackgroundActivity,
         Risk = RiskLevel.Moderate,
         Warning =
             "Store apps stop sending notifications until reverted. Leave this off if you rely on them.",
@@ -630,7 +630,7 @@ public static class DebloatTweaks
     /// <summary>
     /// Asks Task Scheduler directly, through its COM object, for each task's state. Get-ScheduledTask
     /// gives the same answer but takes about half a second a task: four seconds for this list on a ROG
-    /// Ally against a third of a second this way, on a check the Dashboard and System Debloat both run.
+    /// Ally against a third of a second this way, on a check the Dashboard and Clean Up both run.
     /// The states are printed under the names Get-ScheduledTask uses, which is what undo data from
     /// earlier versions holds. A task that does not exist prints nothing, as before.
     /// </summary>

@@ -18,7 +18,9 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
+                    <!-- Enter ticks it as well as Space: Enter is the controller's A button. -->
                     <CheckBox Grid.Column="0"
+                              KeyboardNavigation.AcceptsReturn="True"
                               IsChecked="{Binding IsSelected, Mode=TwoWay}"
                               IsEnabled="{Binding CanSelect}"
                               VerticalAlignment="Center"
@@ -61,18 +63,10 @@
         </DataTemplate>
     </UserControl.Resources>
 
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+    <StackPanel>
 
-        <StackPanel Grid.Row="0" Margin="4,0,4,12">
-            <TextBlock Text="{Binding Title}" FontSize="28" FontWeight="SemiBold" FontFamily="{StaticResource AppDisplayFont}" />
-            <TextBlock Text="{Binding Subtitle}" Opacity="0.7" FontSize="13" Margin="0,2,0,0" TextWrapping="Wrap" />
-
-            <WrapPanel Orientation="Horizontal" Margin="0,12,0,0">
+        <StackPanel Margin="0,0,0,12">
+            <WrapPanel Orientation="Horizontal">
                 <ui:Button Content="Check for updates" Command="{Binding CheckCommand}" Margin="0,0,10,6" />
                 <ui:Button Content="Select all" Command="{Binding SelectAllCommand}" Margin="0,0,10,6" />
                 <ui:Button Content="Select none" Command="{Binding SelectNoneCommand}" Margin="0,0,16,6" />
@@ -84,78 +78,76 @@
             <TextBlock Text="{Binding SummaryText}" Opacity="0.7" FontSize="12" Margin="0,4,0,0" />
         </StackPanel>
 
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="4,0,4,8">
-                <ItemsControl ItemsSource="{Binding Sections}">
+        <StackPanel>
+            <ItemsControl ItemsSource="{Binding Sections}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Margin="0,0,0,18">
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold"
+                                                   VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding SummaryText}" FontSize="12" Opacity="0.6"
+                                                   Margin="10,0,0,0" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding Description}" FontSize="12" Opacity="0.6"
+                                               TextWrapping="Wrap" Margin="0,2,0,0" />
+                                    <TextBlock Text="{Binding ErrorText}" FontSize="12" Foreground="#E8C45F"
+                                               TextWrapping="Wrap" Margin="0,6,0,0"
+                                               Visibility="{Binding ErrorText, Converter={StaticResource StringToVis}}" />
+                                </StackPanel>
+
+                                <ui:Button Grid.Column="1"
+                                           Content="{Binding OpenText}"
+                                           Command="{Binding OpenCommand}"
+                                           Visibility="{Binding OpenText, Converter={StaticResource StringToVis}}"
+                                           MinHeight="36"
+                                           VerticalAlignment="Top" />
+                            </Grid>
+
+                            <ItemsControl ItemsSource="{Binding Rows}" ItemTemplate="{StaticResource UpdateRow}" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Expander Margin="0,4,0,0" IsExpanded="False"
+                      Visibility="{Binding HasSkipped, Converter={StaticResource BoolToVis}}">
+                <Expander.Header>
+                    <StackPanel>
+                        <TextBlock Text="{Binding SkippedHeader}" FontSize="16" FontWeight="SemiBold" />
+                        <TextBlock Text="These are left out of every check. Unskip one to see it again next time."
+                                   FontSize="12" Opacity="0.6" Margin="0,2,0,0" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Expander.Header>
+                <ItemsControl ItemsSource="{Binding Skipped}" Margin="0,8,0,0">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <StackPanel Margin="0,0,0,18">
-                                <Grid Margin="0,0,0,8">
+                            <Border Style="{StaticResource Panel}" Padding="12,8" Margin="0,0,0,6">
+                                <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-
-                                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold"
-                                                       VerticalAlignment="Center" />
-                                            <TextBlock Text="{Binding SummaryText}" FontSize="12" Opacity="0.6"
-                                                       Margin="10,0,0,0" VerticalAlignment="Center" />
-                                        </StackPanel>
-                                        <TextBlock Text="{Binding Description}" FontSize="12" Opacity="0.6"
-                                                   TextWrapping="Wrap" Margin="0,2,0,0" />
-                                        <TextBlock Text="{Binding ErrorText}" FontSize="12" Foreground="#E8C45F"
-                                                   TextWrapping="Wrap" Margin="0,6,0,0"
-                                                   Visibility="{Binding ErrorText, Converter={StaticResource StringToVis}}" />
-                                    </StackPanel>
-
-                                    <ui:Button Grid.Column="1"
-                                               Content="{Binding OpenText}"
-                                               Command="{Binding OpenCommand}"
-                                               Visibility="{Binding OpenText, Converter={StaticResource StringToVis}}"
-                                               MinHeight="36"
-                                               VerticalAlignment="Top" />
+                                    <TextBlock Text="{Binding Name}" FontSize="13" VerticalAlignment="Center"
+                                               TextWrapping="Wrap" Margin="0,0,12,0" />
+                                    <ui:Button Grid.Column="1" Content="Unskip" Command="{Binding UnskipCommand}"
+                                               MinWidth="80" MinHeight="40" />
                                 </Grid>
-
-                                <ItemsControl ItemsSource="{Binding Rows}" ItemTemplate="{StaticResource UpdateRow}" />
-                            </StackPanel>
+                            </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+            </Expander>
+        </StackPanel>
 
-                <Expander Margin="0,4,0,0" IsExpanded="False"
-                          Visibility="{Binding HasSkipped, Converter={StaticResource BoolToVis}}">
-                    <Expander.Header>
-                        <StackPanel>
-                            <TextBlock Text="{Binding SkippedHeader}" FontSize="16" FontWeight="SemiBold" />
-                            <TextBlock Text="These are left out of every check. Unskip one to see it again next time."
-                                       FontSize="12" Opacity="0.6" Margin="0,2,0,0" TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Expander.Header>
-                    <ItemsControl ItemsSource="{Binding Skipped}" Margin="0,8,0,0">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Style="{StaticResource Panel}" Padding="12,8" Margin="0,0,0,6">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="{Binding Name}" FontSize="13" VerticalAlignment="Center"
-                                                   TextWrapping="Wrap" Margin="0,0,12,0" />
-                                        <ui:Button Grid.Column="1" Content="Unskip" Command="{Binding UnskipCommand}"
-                                                   MinWidth="80" MinHeight="40" />
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </Expander>
-            </StackPanel>
-        </ScrollViewer>
-
-        <Border Grid.Row="2" Padding="4,12,4,0">
+        <Border Padding="0,4,0,0">
             <ui:Button Content="{Binding UpdateButtonText}"
                        Appearance="Primary"
                        Height="52"
@@ -164,5 +156,5 @@
                        HorizontalContentAlignment="Center"
                        Command="{Binding UpdateSelectedCommand}" />
         </Border>
-    </Grid>
+    </StackPanel>
 </UserControl>

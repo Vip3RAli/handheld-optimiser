@@ -25,30 +25,28 @@ public interface IShell
     void NotifyRebootRequired();
 }
 
+/// <summary>
+/// Something the window can show: the Dashboard, or one goal's page. Every page but the Dashboard is
+/// also a card on it, which is what <see cref="Glyph"/>, <see cref="Hint"/> and <see cref="Status"/> are for.
+/// </summary>
 public abstract partial class PageViewModelBase(IShell shell) : ObservableObject
 {
     protected IShell Shell { get; } = shell;
 
     public abstract string Title { get; }
 
-    /// <summary>Segoe Fluent Icons glyph shown in the sidebar.</summary>
+    /// <summary>Segoe Fluent Icons glyph shown on the page's Dashboard card.</summary>
     public abstract string Glyph { get; }
 
-    public virtual string Subtitle => string.Empty;
+    /// <summary>The card's last line: what is inside, said before the card is pressed.</summary>
+    public virtual string Hint => string.Empty;
 
-    /// <summary>Whether this is the page on screen, which is what highlights its tab.</summary>
-    [ObservableProperty]
-    private bool _isCurrent;
-
-    /// <summary>
-    /// Whether what this page shows comes from the internet. At start-up those pages load after the
-    /// ones that only read this device, so the quick answers are not held up by the slow ones.
-    /// </summary>
-    public virtual bool LoadsFromInternet => false;
+    /// <summary>What the page's card says about it, and the colour of its dot.</summary>
+    public virtual CardStatus Status => CardStatus.Checking;
 
     /// <summary>
-    /// Reads what the page shows, unless it has been read or is being read already. Every page is
-    /// loaded once when the app starts, so opening one does not mean waiting for it.
+    /// Reads what the page shows, unless it has been read or is being read already. Everything is
+    /// loaded once when the app starts, so opening a page does not mean waiting for it.
     /// </summary>
     public virtual Task LoadAsync() => Task.CompletedTask;
 

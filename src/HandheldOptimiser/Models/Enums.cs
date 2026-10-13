@@ -1,20 +1,22 @@
 namespace HandheldOptimiser.Models;
 
+/// <summary>
+/// The heading a tweak is shown under. Each value is one heading on one goal's page, and
+/// <c>HubLayout</c> says which page that is.
+/// </summary>
 public enum TweakCategory
 {
-    Gaming,
-    Debloat,
-    Privacy,
-    Startup,
-    CpuKernel,
+    Games,
+    System,
     Network,
+    Sleep,
+    Privacy,
+    AdsAndAssistants,
+    BackgroundActivity,
     Services,
-    Interface,
-    Storage,
-    Graphics,
-    Usability,
     FullScreen,
-    Sleep
+    TouchAndDesktop,
+    Storage
 }
 
 /// <summary>

@@ -25,7 +25,7 @@ public static class InterfaceTweaks
         Name = "Instant menus (zero menu show delay)",
         Description =
             "Removes the 400 ms pause before submenus open.",
-        Category = TweakCategory.Interface,
+        Category = TweakCategory.TouchAndDesktop,
         Risk = RiskLevel.Safe,
         RequiresReboot = true,
         RegistryValues =
@@ -42,7 +42,7 @@ public static class InterfaceTweaks
         Description =
             "Stops swipes from the screen edges opening Widgets, Notifications or Task View, which is " +
             "easy to do by accident in touch-heavy games.",
-        Category = TweakCategory.Interface,
+        Category = TweakCategory.TouchAndDesktop,
         Risk = RiskLevel.Moderate,
         RequiresReboot = true,
         IncludeInOneClick = false,
@@ -67,7 +67,7 @@ public static class InterfaceTweaks
         Description =
             "Turns off transparency and window animations. Less work for the iGPU and a snappier " +
             "desktop. Games are unaffected.",
-        Category = TweakCategory.Interface,
+        Category = TweakCategory.TouchAndDesktop,
         Risk = RiskLevel.Safe,
         RequiresReboot = true,
         IncludeInOneClick = false,

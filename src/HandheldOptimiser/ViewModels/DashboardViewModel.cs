@@ -83,12 +83,6 @@ public sealed partial class DashboardViewModel : PageViewModelBase
     private bool _protectionEnabled = true;
 
     [ObservableProperty]
-    private bool _canRevert;
-
-    [ObservableProperty]
-    private string _revertSummary = string.Empty;
-
-    [ObservableProperty]
     private string _batteryChargeText = "Checking…";
 
     [ObservableProperty]
@@ -129,8 +123,14 @@ public sealed partial class DashboardViewModel : PageViewModelBase
     public override async Task OnNavigatedToAsync()
     {
         StartBatteryUpdates();
-        ShowUndoState();
         await LoadAsync();
+
+        // Create restore point, on the Maintenance & Backup page, turns System Protection on. The
+        // warning about it being off is asked about again on coming back, so it clears.
+        if (_deviceRead && !ProtectionEnabled)
+        {
+            ProtectionEnabled = await _restorePoints.IsProtectionEnabledAsync(CancellationToken.None);
+        }
     }
 
     /// <summary>
@@ -265,7 +265,6 @@ public sealed partial class DashboardViewModel : PageViewModelBase
 
             ShowGraphics(await graphics);
             ProtectionEnabled = await protection;
-            ShowUndoState();
 
             _deviceRead = true;
         }
@@ -289,14 +288,6 @@ public sealed partial class DashboardViewModel : PageViewModelBase
             : $"Partially optimised: {summary.Total - summary.Applied} tweak(s) still available";
     }
 
-    private void ShowUndoState()
-    {
-        CanRevert = _engine.HasUndoData;
-        RevertSummary = CanRevert
-            ? "Undo data is available for previously applied tweaks."
-            : "No undo data recorded yet.";
-    }
-
     [RelayCommand]
     private async Task RunOneClickAsync()
     {
@@ -314,7 +305,7 @@ public sealed partial class DashboardViewModel : PageViewModelBase
                        "\n\n";
         }
 
-        message += "Each tweak can be individually reverted afterwards from its category page.";
+        message += "Each tweak can be individually reverted afterwards from its page.";
 
         if (!await Shell.ConfirmAsync("Apply Optimised Tweaks", message, "Create restore point & apply"))
         {
@@ -338,7 +329,6 @@ public sealed partial class DashboardViewModel : PageViewModelBase
 
             progress.Report("Checking what changed");
             await _states.CheckAllAsync(ct: ct);
-            ShowUndoState();
 
             await Shell.ConfirmAsync(
                 "Optimisation complete",
@@ -346,58 +336,8 @@ public sealed partial class DashboardViewModel : PageViewModelBase
                 $"{summary.AlreadyDone} were already set.\n" +
                 (summary.Failures > 0 ? $"{summary.Failures} failed. Check the log.\n" : string.Empty) +
                 (summary.RebootRequired ? "\nRestart required for some changes to take effect." : string.Empty) +
-                "\n\nBloatware removal is deliberately separate. Review it on the Bloatware page.",
+                "\n\nBloatware removal is deliberately separate. Review it on the Apps page.",
                 "OK");
-        });
-    }
-
-    [RelayCommand]
-    private async Task RevertAllAsync()
-    {
-        if (!await Shell.ConfirmAsync(
-                "Undo all changes",
-                "Every tweak this app applied will be restored to the value it had beforehand, using the " +
-                "recorded undo data.\n\nRemoved bloatware is not restored. That has to come back from the " +
-                "Microsoft Store.",
-                "Undo all changes"))
-        {
-            return;
-        }
-
-        await Shell.RunExclusiveAsync("Undoing all changes…", async (progress, ct) =>
-        {
-            var summary = await _engine.RevertAllAsync(progress, ct);
-
-            if (summary.RebootRequired)
-            {
-                Shell.NotifyRebootRequired();
-            }
-
-            progress.Report("Checking what changed");
-            await _states.CheckAllAsync(ct: ct);
-            ShowUndoState();
-
-            await Shell.ConfirmAsync(
-                "Undo finished",
-                $"{summary.Applied} tweak(s) reverted." +
-                (summary.Failures > 0 ? $"\n{summary.Failures} failed. Check the log." : string.Empty),
-                "OK");
-        });
-    }
-
-    [RelayCommand]
-    private async Task CreateRestorePointOnlyAsync()
-    {
-        await Shell.RunExclusiveAsync("Creating System Restore point…", async (progress, ct) =>
-        {
-            var result = await _restorePoints.CreateAsync("Handheld Optimiser: manual checkpoint", ct);
-
-            await Shell.ConfirmAsync(
-                result.Created ? "Restore point created" : "Could not create restore point",
-                result.Message,
-                "OK");
-
-            ProtectionEnabled = await _restorePoints.IsProtectionEnabledAsync(ct);
         });
     }
 }

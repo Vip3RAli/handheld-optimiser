@@ -1,7 +1,8 @@
 <Application x:Class="HandheldOptimiser.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:views="clr-namespace:HandheldOptimiser.Views">
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -47,11 +48,30 @@
             </Style>
 
             <!--
+                The ring around the control that has the keyboard. A handheld's controller reaches the
+                app as arrow keys, so this is what shows where the D-pad is. WPF only draws it once a
+                key has been pressed, so touch and the mouse never leave it behind. Controls drawn with
+                their own template here (pills, cards, tiles) would otherwise get WPF's default, a
+                dotted black line that cannot be seen on a dark window.
+            -->
+            <Style x:Key="FocusRing">
+                <Setter Property="Control.Template">
+                    <Setter.Value>
+                        <ControlTemplate>
+                            <Rectangle Margin="-3" RadiusX="11" RadiusY="11" StrokeThickness="2"
+                                       Stroke="{StaticResource BrandAccent}" SnapsToDevicePixels="True" />
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!--
                 A pill: the one-click button. A plain Button with
                 its own template, because the rounded-rectangle look of the themed button is the thing
                 being replaced.
             -->
             <Style x:Key="Pill" TargetType="Button">
+                <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
                 <Setter Property="MinHeight" Value="40" />
                 <Setter Property="Padding" Value="18,0" />
                 <Setter Property="FontSize" Value="13.5" />
@@ -97,6 +117,61 @@
                 <Setter Property="Foreground" Value="{StaticResource BrandOnAccent}" />
             </Style>
 
+            <!--
+                A tile: a name and a switch, a few to a row, so a whole goal fits on a screen or two. The
+                tile itself is a button, and pressing it anywhere but on its switch opens what it does
+                beneath its row. Its edge turns cyan while that detail is open (see ITile).
+            -->
+            <Style x:Key="Tile" TargetType="Button">
+                <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
+                <Setter Property="views:TileKeys.Enabled" Value="True" />
+                <Setter Property="MinHeight" Value="64" />
+                <Setter Property="Padding" Value="14,8" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Foreground" Value="White" />
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Shape"
+                                    CornerRadius="8"
+                                    Background="{DynamicResource CardBackground}"
+                                    BorderBrush="{DynamicResource CardBorderBrush}"
+                                    BorderThickness="1">
+                                <Border x:Name="Tint" CornerRadius="8" Padding="{TemplateBinding Padding}" Background="Transparent">
+                                    <ContentPresenter VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                                </Border>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Tint" Property="Background" Value="#0AFFFFFF" />
+                                </Trigger>
+                                <DataTrigger Binding="{Binding IsOpen}" Value="True">
+                                    <Setter TargetName="Shape" Property="BorderBrush" Value="{StaticResource BrandAccent}" />
+                                    <Setter TargetName="Tint" Property="Background" Value="#1422D3EE" />
+                                </DataTrigger>
+                                <!-- While a job runs the page is disabled, and a tile has to look it. -->
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter TargetName="Shape" Property="Opacity" Value="0.5" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- The open tile's detail, the full width of the grid under the tile's row. It is scrolled
+                 into view as it opens, since under the last row on screen it would be out of sight. -->
+            <Style x:Key="TileDetail" TargetType="Border">
+                <Setter Property="views:ShowWhenLoaded.Enabled" Value="True" />
+                <Setter Property="Background" Value="#1422D3EE" />
+                <Setter Property="BorderBrush" Value="#7322D3EE" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="Padding" Value="16,12" />
+            </Style>
+
             <Style TargetType="{x:Type ui:FontIcon}">
                 <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" />
             </Style>
@@ -109,6 +184,10 @@
 
             <!-- Drag anywhere in a list or page to scroll it, with momentum, as on a phone. -->
             <Style TargetType="ScrollViewer">
+                <!-- Never a stop for the keyboard. A scroll viewer that has it draws an outline round the
+                     whole page and takes the arrow keys to scroll with, so they stop moving between the
+                     controls inside it. It still scrolls to follow the keyboard as it moves among them. -->
+                <Setter Property="Focusable" Value="False" />
                 <Setter Property="PanningMode" Value="VerticalFirst" />
                 <Setter Property="PanningDeceleration" Value="0.003" />
                 <Setter Property="Template">
@@ -124,7 +203,13 @@
                                     <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
 
-                                <ScrollContentPresenter Grid.Row="0" Grid.Column="0"
+                                <!-- The name matters. An arrow key pressed on a control inside a scroll viewer
+                                     is the scroll viewer's to deal with: it moves the keyboard to the next
+                                     control that way, scrolling to it if need be. It finds its content by
+                                     this name, and without it it only scrolls, so arrow keys (which is how
+                                     a controller's D-pad arrives) never moved between controls at all. -->
+                                <ScrollContentPresenter x:Name="PART_ScrollContentPresenter"
+                                                        Grid.Row="0" Grid.Column="0"
                                                         Margin="{TemplateBinding Padding}"
                                                         CanContentScroll="{TemplateBinding CanContentScroll}" />
 

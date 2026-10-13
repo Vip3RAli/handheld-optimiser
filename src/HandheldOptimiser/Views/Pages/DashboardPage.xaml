@@ -5,28 +5,14 @@
              xmlns:views="clr-namespace:HandheldOptimiser.Views">
 
     <UserControl.Resources>
-        <views:BooleanToVisibilityConverter x:Key="BoolToVis" />
         <views:InverseBooleanConverter x:Key="InverseBool" />
-        <views:StringNotEmptyToVisibilityConverter x:Key="StringToVis" />
+        <views:CardLevelToBrushConverter x:Key="LevelBrush" />
+        <views:LessConverter x:Key="Less" />
 
-        <!-- One card of the three. They share a row, so each fills its cell to line up top and bottom. -->
-        <Style x:Key="DashCard" TargetType="ui:Card" BasedOn="{StaticResource {x:Type ui:Card}}">
-            <Setter Property="Margin" Value="0,0,12,12" />
-            <Setter Property="Padding" Value="18,16" />
-            <Setter Property="VerticalAlignment" Value="Stretch" />
-            <Setter Property="VerticalContentAlignment" Value="Stretch" />
-        </Style>
-
-        <Style x:Key="CardTitle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="16" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="FontFamily" Value="{StaticResource AppDisplayFont}" />
-        </Style>
-
-        <!-- A hardware tile: an outline icon and a label, the figure, then a word or two about it. -->
+        <!-- A hardware figure beside the title: an outline icon and a label, the figure, then a word or two about it. -->
         <Style x:Key="TileIcon" TargetType="ui:FontIcon" BasedOn="{StaticResource {x:Type ui:FontIcon}}">
-            <Setter Property="FontSize" Value="15" />
-            <Setter Property="Margin" Value="0,0,7,0" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Margin" Value="0,0,6,0" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="Foreground" Value="{StaticResource BrandAccent}" />
         </Style>
@@ -38,52 +24,151 @@
         </Style>
 
         <Style x:Key="TileValue" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="19" />
+            <Setter Property="FontSize" Value="16" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="FontFamily" Value="{StaticResource AppDisplayFont}" />
-            <Setter Property="Margin" Value="0,4,0,0" />
-            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="Margin" Value="0,2,0,0" />
         </Style>
 
         <Style x:Key="TileDetail" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="12.5" />
-            <Setter Property="Opacity" Value="0.75" />
-            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Opacity" Value="0.7" />
         </Style>
 
-        <!-- Outlined, as wide as its card. -->
-        <Style x:Key="OutlineButton" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
-            <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <!-- The figures sit in a row, each with the same gap before it. -->
+        <Style x:Key="Tile" TargetType="StackPanel">
+            <Setter Property="Margin" Value="26,0,0,0" />
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderBrush" Value="#59FFFFFF" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="MinHeight" Value="46" />
+            <Setter Property="VerticalAlignment" Value="Bottom" />
+        </Style>
+
+        <!--
+            A goal's card. The whole card is the button, so it is a plain Button with its own template:
+            the themed button would draw its own padding and hover fill inside the card.
+        -->
+        <Style x:Key="GoalCard" TargetType="Button">
+            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
+            <Setter Property="Margin" Value="0,0,12,12" />
+            <!-- The least that holds the icon, the name and its two lines. On the handheld's own screen
+                 (1280 x 672 units, maximised) two rows of cards this tall just fit without scrolling. -->
+            <Setter Property="MinHeight" Value="140" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Shape"
+                                CornerRadius="8"
+                                Background="{DynamicResource CardBackground}"
+                                BorderBrush="{DynamicResource CardBorderBrush}"
+                                BorderThickness="1">
+                            <Border x:Name="Tint" CornerRadius="8" Padding="18" Background="Transparent">
+                                <ContentPresenter />
+                            </Border>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Tint" Property="Background" Value="#0FFFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Tint" Property="Background" Value="#1AFFFFFF" />
+                            </Trigger>
+                            <!-- While a job runs the page is disabled, and a card has to look it. -->
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Shape" Property="Opacity" Value="0.5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </UserControl.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="4,0,4,8">
+    <ScrollViewer x:Name="Scroll" VerticalScrollBarVisibility="Auto">
+        <!--
+            At least as tall as the window gives it, so the cards share whatever height is left. When
+            the window is too short for two rows of cards at a usable height, the page scrolls.
+        -->
+        <Grid Margin="4,0,4,0" MinHeight="{Binding ViewportHeight, ElementName=Scroll}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
-            <TextBlock Text="Dashboard" FontSize="28" FontWeight="SemiBold" FontFamily="{StaticResource AppDisplayFont}" Margin="0,0,0,2" />
-            <TextBlock Text="{Binding HardwareModel}" Opacity="0.7" FontSize="13" Margin="0,0,0,14" />
+            <!-- The title, with the hardware beside it: read-only, and the battery figures update while the page shows. -->
+            <Grid Grid.Row="0" Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-            <!-- Warned about early: this tool assumes handheld behaviour. -->
-            <ui:InfoBar Severity="Warning"
-                        IsClosable="False"
-                        Margin="0,0,0,12"
-                        Title="Unrecognised hardware"
-                        Message="This device does not report as a handheld this app knows (ROG Ally, Legion Go, MSI Claw, Steam Deck, AYANEO, GPD or OneXPlayer). The tweaks are still valid Windows 11 changes, but they are tuned for handheld hardware."
-                        IsOpen="{Binding IsRecognisedDevice, Converter={StaticResource InverseBool}}" />
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Dashboard" FontSize="28" FontWeight="SemiBold" FontFamily="{StaticResource AppDisplayFont}" />
+                    <TextBlock Text="{Binding HardwareModel}" Opacity="0.7" FontSize="13" Margin="0,2,0,0" />
+                </StackPanel>
 
-            <ui:InfoBar Severity="Error"
-                        IsClosable="False"
-                        Margin="0,0,0,12"
-                        Title="System Protection is off"
-                        Message="Restore points cannot be created, so tweaks will refuse to run. Turn on System Protection for the C: drive, or use the button below which enables it automatically."
-                        IsOpen="{Binding ProtectionEnabled, Converter={StaticResource InverseBool}}" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <StackPanel Style="{StaticResource Tile}">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:FontIcon Glyph="&#xE83F;" Style="{StaticResource TileIcon}" />
+                            <TextBlock Text="Battery" Style="{StaticResource TileLabel}" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding BatteryChargeText}" Style="{StaticResource TileValue}" />
+                        <TextBlock Text="{Binding BatteryPowerText}" Style="{StaticResource TileDetail}" />
+                    </StackPanel>
 
-            <!-- The headline action. -->
-            <Border CornerRadius="8" Padding="24,22" Margin="0,0,0,12" BorderBrush="#26FFFFFF" BorderThickness="1">
+                    <StackPanel Style="{StaticResource Tile}" ToolTip="{Binding BatteryHealthTip}">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:FontIcon Glyph="&#xEB51;" Style="{StaticResource TileIcon}" />
+                            <TextBlock Text="Health" Style="{StaticResource TileLabel}" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding BatteryHealthText}" Style="{StaticResource TileValue}" />
+                        <TextBlock Text="{Binding BatteryHealthDetail}" Style="{StaticResource TileDetail}" />
+                    </StackPanel>
+
+                    <StackPanel Style="{StaticResource Tile}" ToolTip="{Binding GraphicsMemoryTip}">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:FontIcon Glyph="&#xE950;" Style="{StaticResource TileIcon}" />
+                            <TextBlock Text="GPU memory" Style="{StaticResource TileLabel}" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding GraphicsMemoryText}" Style="{StaticResource TileValue}" />
+                        <TextBlock Text="{Binding GraphicsMemoryDetail}" Style="{StaticResource TileDetail}" />
+                    </StackPanel>
+
+                    <StackPanel Style="{StaticResource Tile}" ToolTip="{Binding GraphicsDriverTip}">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:FontIcon Glyph="&#xE7F4;" Style="{StaticResource TileIcon}" />
+                            <TextBlock Text="GPU driver" Style="{StaticResource TileLabel}" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding GraphicsDriverText}" Style="{StaticResource TileValue}" />
+                        <TextBlock Text="{Binding GraphicsDriverDetail}" Style="{StaticResource TileDetail}" />
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+
+            <StackPanel Grid.Row="1">
+                <!-- Warned about early: this tool assumes handheld behaviour. -->
+                <ui:InfoBar Severity="Warning"
+                            IsClosable="False"
+                            Margin="0,0,0,12"
+                            Title="Unrecognised hardware"
+                            Message="This device does not report as a handheld this app knows (ROG Ally, Legion Go, MSI Claw, Steam Deck, AYANEO, GPD or OneXPlayer). The tweaks are still valid Windows 11 changes, but they are tuned for handheld hardware."
+                            IsOpen="{Binding IsRecognisedDevice, Converter={StaticResource InverseBool}}" />
+
+                <ui:InfoBar Severity="Error"
+                            IsClosable="False"
+                            Margin="0,0,0,12"
+                            Title="System Protection is off"
+                            Message="Restore points cannot be created, so tweaks will refuse to run. Turn on System Protection for the C: drive, or use Create restore point on the Maintenance &amp; Backup page, which turns it on."
+                            IsOpen="{Binding ProtectionEnabled, Converter={StaticResource InverseBool}}" />
+            </StackPanel>
+
+            <!-- The headline action, with how much of it is done. -->
+            <Border Grid.Row="2" CornerRadius="8" Padding="22,14" Margin="0,0,0,12" BorderBrush="#26FFFFFF" BorderThickness="1">
                 <Border.Background>
                     <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                         <GradientStop Color="#0B4A5C" Offset="0" />
@@ -94,18 +179,78 @@
 
                 <Grid>
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,20,0">
-                        <TextBlock Text="Recommended Tweaks" FontSize="24" FontWeight="SemiBold"
+                    <Grid Grid.Column="0" Width="72" Height="72" Margin="0,0,18,0" VerticalAlignment="Center">
+                        <ui:Arc Width="72" Height="72" StartAngle="0" EndAngle="359.99"
+                                Stroke="#24FFFFFF" StrokeThickness="7" />
+                        <!-- Red under a third applied, yellow from a third, green from two thirds. -->
+                        <ui:Arc Width="72" Height="72" StartAngle="0" EndAngle="{Binding AppliedAngle}"
+                                StrokeThickness="7">
+                            <ui:Arc.Style>
+                                <Style TargetType="ui:Arc">
+                                    <Setter Property="Stroke" Value="#E06C6C" />
+                                    <Setter Property="Effect">
+                                        <Setter.Value>
+                                            <DropShadowEffect Color="#E06C6C" BlurRadius="14" ShadowDepth="0" Opacity="0.9" />
+                                        </Setter.Value>
+                                    </Setter>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding AppliedLevel}" Value="Medium">
+                                            <Setter Property="Stroke" Value="#E8C45F" />
+                                            <Setter Property="Effect">
+                                                <Setter.Value>
+                                                    <DropShadowEffect Color="#E8C45F" BlurRadius="14" ShadowDepth="0" Opacity="0.9" />
+                                                </Setter.Value>
+                                            </Setter>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding AppliedLevel}" Value="High">
+                                            <Setter Property="Stroke" Value="#6CC07A" />
+                                            <Setter Property="Effect">
+                                                <Setter.Value>
+                                                    <DropShadowEffect Color="#6CC07A" BlurRadius="14" ShadowDepth="0" Opacity="0.9" />
+                                                </Setter.Value>
+                                            </Setter>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ui:Arc.Style>
+                        </ui:Arc>
+
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                            <TextBlock Text="{Binding AppliedCount}" HorizontalAlignment="Center" FontSize="18" FontWeight="SemiBold"
+                                       FontFamily="{StaticResource AppDisplayFont}" />
+                            <TextBlock HorizontalAlignment="Center" FontSize="11" Opacity="0.65" Margin="0,-2,0,0">
+                                <Run Text="of" />
+                                <Run Text="{Binding TotalCount, Mode=OneWay}" />
+                            </TextBlock>
+                        </StackPanel>
+                    </Grid>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0">
+                        <TextBlock Text="Recommended Tweaks" FontSize="22" FontWeight="SemiBold"
                                    FontFamily="{StaticResource AppDisplayFont}" />
-                        <TextBlock Text="Applies the optimised set of tweaks in one pass. A restore point is created first."
-                                   TextWrapping="Wrap" Opacity="0.8" FontSize="14" Margin="0,4,0,0" />
+                        <TextBlock TextWrapping="Wrap" Opacity="0.8" FontSize="14" Margin="0,2,0,0">
+                            <Run Text="{Binding AppliedCount, Mode=OneWay}" />
+                            <Run Text="of" />
+                            <Run Text="{Binding TotalCount, Mode=OneWay}" />
+                            <Run Text="applied. A restore point is created first." />
+                        </TextBlock>
                     </StackPanel>
 
-                    <Button Grid.Column="1"
+                    <ui:Button Grid.Column="2"
+                               Content="Re-check"
+                               MinHeight="44"
+                               Padding="18,0"
+                               Margin="0,0,12,0"
+                               VerticalAlignment="Center"
+                               Command="{Binding RefreshCommand}" />
+
+                    <Button Grid.Column="3"
                             Style="{StaticResource AccentPill}"
                             MinHeight="56"
                             Padding="28,0"
@@ -122,140 +267,70 @@
                 </Grid>
             </Border>
 
-            <!-- Three cards in a row on a handheld's screen, one above another when the window is narrow.
-                 The column count is set from the width in the code-behind. -->
-            <UniformGrid x:Name="Cards" Columns="3" Margin="0,0,-12,0">
+            <!-- A card per goal, four across. Pressing one opens its page; Back there returns here. -->
+            <ItemsControl Grid.Row="3"
+                          ItemsSource="{Binding DataContext.Cards, RelativeSource={RelativeSource AncestorType=Window}}"
+                          Margin="0,0,-12,0"
+                          Focusable="False">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Columns="4" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Button Style="{StaticResource GoalCard}"
+                                AutomationProperties.Name="{Binding Title}"
+                                Command="{Binding DataContext.OpenPageCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                CommandParameter="{Binding}">
+                            <Grid>
+                                <!--
+                                    The icon takes what height the card has to spare, less a gap above
+                                    the name. On the handheld's own screen that leaves it at 28. Docked
+                                    to a bigger screen the cards are much taller, and it grows to fill
+                                    them, up to 96.
 
-                <!-- Current state -->
-                <ui:Card Style="{StaticResource DashCard}">
-                    <DockPanel>
-                        <TextBlock DockPanel.Dock="Top" Text="Current state" Style="{StaticResource CardTitle}" />
+                                    It sits in a Canvas because a Canvas asks for no height of its own.
+                                    Placed in the row directly, the icon asked for its full 96 on every
+                                    screen, and the second row of cards was pushed out of the window.
+                                    For the same reason the gap is taken off in the binding and is not
+                                    a margin, which would make every card 54 taller at the least: on
+                                    the handheld's own screen two rows of cards only just fit as it is.
+                                -->
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
 
-                        <ui:Button DockPanel.Dock="Bottom"
-                                   Content="Re-check"
-                                   Command="{Binding RefreshCommand}"
-                                   HorizontalAlignment="Center"
-                                   Padding="22,0"
-                                   Margin="0,12,0,0" />
+                                <Canvas x:Name="IconSpace" Grid.Row="0">
+                                    <Viewbox Stretch="Uniform" MinHeight="28" MaxHeight="96"
+                                             Height="{Binding ActualHeight, ElementName=IconSpace, Converter={StaticResource Less}, ConverterParameter=54}">
+                                        <ui:FontIcon Glyph="{Binding Glyph}" FontSize="28"
+                                                     Foreground="{StaticResource BrandAccent}" />
+                                    </Viewbox>
+                                </Canvas>
+                                <ui:FontIcon Grid.Row="0" Glyph="&#xE76C;" FontSize="12" Opacity="0.55"
+                                             HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,4,0,0" />
 
-                        <Grid Width="150" Height="150" Margin="0,14,0,0" VerticalAlignment="Center">
-                            <ui:Arc Width="150" Height="150" StartAngle="0" EndAngle="359.99"
-                                    Stroke="#24FFFFFF" StrokeThickness="12" />
-                            <!-- Red under a third applied, yellow from a third, green from two thirds. -->
-                            <ui:Arc Width="150" Height="150" StartAngle="0" EndAngle="{Binding AppliedAngle}"
-                                    StrokeThickness="12">
-                                <ui:Arc.Style>
-                                    <Style TargetType="ui:Arc">
-                                        <Setter Property="Stroke" Value="#E06C6C" />
-                                        <Setter Property="Effect">
-                                            <Setter.Value>
-                                                <DropShadowEffect Color="#E06C6C" BlurRadius="22" ShadowDepth="0" Opacity="0.9" />
-                                            </Setter.Value>
-                                        </Setter>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding AppliedLevel}" Value="Medium">
-                                                <Setter Property="Stroke" Value="#E8C45F" />
-                                                <Setter Property="Effect">
-                                                    <Setter.Value>
-                                                        <DropShadowEffect Color="#E8C45F" BlurRadius="22" ShadowDepth="0" Opacity="0.9" />
-                                                    </Setter.Value>
-                                                </Setter>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding AppliedLevel}" Value="High">
-                                                <Setter Property="Stroke" Value="#6CC07A" />
-                                                <Setter Property="Effect">
-                                                    <Setter.Value>
-                                                        <DropShadowEffect Color="#6CC07A" BlurRadius="22" ShadowDepth="0" Opacity="0.9" />
-                                                    </Setter.Value>
-                                                </Setter>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </ui:Arc.Style>
-                            </ui:Arc>
+                                <StackPanel Grid.Row="1">
+                                    <TextBlock Text="{Binding Title}" FontSize="19" FontWeight="SemiBold"
+                                               FontFamily="{StaticResource AppDisplayFont}" TextWrapping="Wrap" />
 
-                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                <TextBlock HorizontalAlignment="Center" FontSize="30" FontWeight="SemiBold"
-                                           FontFamily="{StaticResource AppDisplayFont}">
-                                    <Run Text="{Binding AppliedCount, Mode=OneWay}" />
-                                    <Run Text="/" Foreground="#99FFFFFF" />
-                                    <Run Text="{Binding TotalCount, Mode=OneWay}" Foreground="#99FFFFFF" />
-                                </TextBlock>
-                                <TextBlock Text="applied" FontSize="12.5" Opacity="0.65" HorizontalAlignment="Center" />
-                            </StackPanel>
-                        </Grid>
-                    </DockPanel>
-                </ui:Card>
+                                    <!-- How the goal stands: green when nothing recommended is left to do. -->
+                                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                                        <Ellipse Width="8" Height="8" Margin="0,1,7,0" VerticalAlignment="Center"
+                                                 Fill="{Binding Status.Level, Converter={StaticResource LevelBrush}}" />
+                                        <TextBlock Text="{Binding Status.Text}" FontSize="13.5" Opacity="0.85" />
+                                    </StackPanel>
 
-                <!-- Hardware: read-only. The battery tiles update while the page is showing. -->
-                <ui:Card Style="{StaticResource DashCard}">
-                    <DockPanel>
-                        <TextBlock DockPanel.Dock="Top" Text="Hardware" Style="{StaticResource CardTitle}" />
-
-                        <UniformGrid Columns="2" Rows="2" Margin="0,8,0,0">
-                            <StackPanel Margin="0,8,10,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <ui:FontIcon Glyph="&#xE83F;" Style="{StaticResource TileIcon}" />
-                                    <TextBlock Text="Battery" Style="{StaticResource TileLabel}" />
+                                    <TextBlock Text="{Binding Hint}" FontSize="12.5" Opacity="0.55" Margin="0,2,0,0"
+                                               TextTrimming="CharacterEllipsis" />
                                 </StackPanel>
-                                <TextBlock Text="{Binding BatteryChargeText}" Style="{StaticResource TileValue}" />
-                                <TextBlock Text="{Binding BatteryPowerText}" Style="{StaticResource TileDetail}" />
-                            </StackPanel>
-
-                            <StackPanel Margin="0,8,0,0" ToolTip="{Binding BatteryHealthTip}" Background="Transparent">
-                                <StackPanel Orientation="Horizontal">
-                                    <ui:FontIcon Glyph="&#xEB51;" Style="{StaticResource TileIcon}" />
-                                    <TextBlock Text="Health" Style="{StaticResource TileLabel}" />
-                                </StackPanel>
-                                <TextBlock Text="{Binding BatteryHealthText}" Style="{StaticResource TileValue}" />
-                                <TextBlock Text="{Binding BatteryHealthDetail}" Style="{StaticResource TileDetail}" />
-                            </StackPanel>
-
-                            <StackPanel Margin="0,8,10,0" ToolTip="{Binding GraphicsMemoryTip}" Background="Transparent">
-                                <StackPanel Orientation="Horizontal">
-                                    <ui:FontIcon Glyph="&#xE950;" Style="{StaticResource TileIcon}" />
-                                    <TextBlock Text="GPU memory" Style="{StaticResource TileLabel}" />
-                                </StackPanel>
-                                <TextBlock Text="{Binding GraphicsMemoryText}" Style="{StaticResource TileValue}" />
-                                <TextBlock Text="{Binding GraphicsMemoryDetail}" Style="{StaticResource TileDetail}" />
-                            </StackPanel>
-
-                            <StackPanel Margin="0,8,0,0" ToolTip="{Binding GraphicsDriverTip}" Background="Transparent">
-                                <StackPanel Orientation="Horizontal">
-                                    <ui:FontIcon Glyph="&#xE7F4;" Style="{StaticResource TileIcon}" />
-                                    <TextBlock Text="GPU driver" Style="{StaticResource TileLabel}" />
-                                </StackPanel>
-                                <TextBlock Text="{Binding GraphicsDriverText}" Style="{StaticResource TileValue}" FontSize="15" Margin="0,7,0,1" />
-                                <TextBlock Text="{Binding GraphicsDriverDetail}" Style="{StaticResource TileDetail}" />
-                            </StackPanel>
-                        </UniformGrid>
-                    </DockPanel>
-                </ui:Card>
-
-                <!-- Safety & Backup -->
-                <ui:Card Style="{StaticResource DashCard}">
-                    <DockPanel>
-                        <TextBlock DockPanel.Dock="Top" Text="Safety &amp; Backup" Style="{StaticResource CardTitle}" />
-                        <TextBlock DockPanel.Dock="Top" Text="{Binding RevertSummary}" Opacity="0.75" FontSize="12.5"
-                                   Margin="0,4,0,0" TextWrapping="Wrap" />
-
-                        <TextBlock DockPanel.Dock="Bottom" Margin="0,10,0,0" TextWrapping="Wrap" FontSize="11.5" Opacity="0.55"
-                                   Text="Puts every setting back as it was. Removed bloatware is not restored." />
-
-                        <StackPanel VerticalAlignment="Center" Margin="0,12,0,0">
-                            <ui:Button Style="{StaticResource OutlineButton}"
-                                       Content="Create restore point"
-                                       Command="{Binding CreateRestorePointOnlyCommand}"
-                                       Margin="0,0,0,10" />
-                            <ui:Button Style="{StaticResource OutlineButton}"
-                                       Content="Undo all changes"
-                                       Command="{Binding RevertAllCommand}"
-                                       IsEnabled="{Binding CanRevert}" />
-                        </StackPanel>
-                    </DockPanel>
-                </ui:Card>
-            </UniformGrid>
-
-        </StackPanel>
+                            </Grid>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </Grid>
     </ScrollViewer>
 </UserControl>

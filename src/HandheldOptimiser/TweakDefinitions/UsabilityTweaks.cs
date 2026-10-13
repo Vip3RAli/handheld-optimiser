@@ -23,7 +23,7 @@ public static class UsabilityTweaks
         Name = "Disable Sticky Keys shortcut",
         Description =
             "Stops five presses of Shift opening the Sticky Keys prompt and dropping you out of a game.",
-        Category = TweakCategory.Usability,
+        Category = TweakCategory.TouchAndDesktop,
         Risk = RiskLevel.Safe,
         RequiresReboot = true,
         RegistryValues =
@@ -39,7 +39,7 @@ public static class UsabilityTweaks
         Description =
             "Stops holding right Shift for eight seconds turning on Filter Keys, which makes the " +
             "keyboard ignore quick presses.",
-        Category = TweakCategory.Usability,
+        Category = TweakCategory.TouchAndDesktop,
         Risk = RiskLevel.Safe,
         RequiresReboot = true,
         RegistryValues =
@@ -55,7 +55,7 @@ public static class UsabilityTweaks
         Description =
             "Stops Windows slowing down background apps, so overlays and launchers stay at full speed " +
             "while you play.",
-        Category = TweakCategory.Usability,
+        Category = TweakCategory.System,
         Risk = RiskLevel.Moderate,
         RequiresReboot = true,
         IncludeInOneClick = false,

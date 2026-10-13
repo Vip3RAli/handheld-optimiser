@@ -64,7 +64,7 @@ public static class GraphicsTweaks
         Description =
             "Gives DirectX 10 and 11 games in a window or borderless the same low latency as exclusive " +
             "full screen, plus Auto HDR and variable refresh rate. Applies the next time a game starts.",
-        Category = TweakCategory.Graphics,
+        Category = TweakCategory.Games,
         Risk = RiskLevel.Safe,
         ScriptRegistryValues = [GlobalSettings($"{WindowedSetting}=1;")],
 
@@ -145,7 +145,7 @@ public static class GraphicsTweaks
         Description =
             "Keeps Game Mode on, so Windows prioritises the game and holds back driver installs and " +
             "restart prompts while you play.",
-        Category = TweakCategory.Graphics,
+        Category = TweakCategory.Games,
         Risk = RiskLevel.Safe,
         RegistryValues =
         [
@@ -161,7 +161,7 @@ public static class GraphicsTweaks
         Description =
             "Lets the GPU manage its own memory and work queue. Lowers input latency slightly, and some " +
             "games need it for frame generation.",
-        Category = TweakCategory.Graphics,
+        Category = TweakCategory.Games,
         Risk = RiskLevel.Moderate,
         RequiresReboot = true,
         IncludeInOneClick = false,

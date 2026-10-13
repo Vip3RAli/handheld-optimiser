@@ -8,20 +8,39 @@ namespace HandheldOptimiser.ViewModels;
 /// Which app full screen mode opens. Saved as soon as it changes: the launcher reads it each time it
 /// starts, so a new choice takes effect on the next home button press without re-registering anything.
 /// </summary>
-public sealed partial class HomeAppPickerViewModel : ObservableObject, IPageSection
+public sealed partial class HomeAppPickerViewModel : SectionViewModel
 {
     private readonly LogService _log;
     private bool _loading;
 
-    public HomeAppPickerViewModel(LogService log)
+    public HomeAppPickerViewModel(LogService log, IShell shell)
+        : base(shell)
     {
         _log = log;
         Reload();
     }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsLibrary), nameof(IsOther), nameof(IsSteam), nameof(IsArmouryCrate), nameof(IsCustom))]
+    [NotifyPropertyChangedFor(nameof(IsLibrary), nameof(IsOther), nameof(IsSteam), nameof(IsArmouryCrate), nameof(IsCustom), nameof(Status))]
     private HomeAppTarget _target;
+
+    /// <summary>Which home app is chosen, for the Dashboard's card.</summary>
+    public override CardStatus? Status => CardStatus.Neutral(!IsAvailable ? "Not available" : Target switch
+    {
+        HomeAppTarget.Library => "Game library",
+        HomeAppTarget.Steam => "Steam Big Picture",
+        HomeAppTarget.ArmouryCrate => "Armoury Crate SE",
+        _ => "Another app"
+    });
+
+    /// <summary>The choice can be changed from the library's own settings, so it is read again each time.</summary>
+    public override void OnShown() => Reload();
+
+    public override Task RefreshAsync()
+    {
+        Reload();
+        return Task.CompletedTask;
+    }
 
     [ObservableProperty]
     private string _customPath = string.Empty;
@@ -33,6 +52,7 @@ public sealed partial class HomeAppPickerViewModel : ObservableObject, IPageSect
     private string _availabilityText = string.Empty;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Status))]
     private bool _isAvailable;
 
     public bool SteamInstalled { get; private set; }
