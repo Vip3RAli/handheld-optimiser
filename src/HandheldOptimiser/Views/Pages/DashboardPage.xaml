@@ -74,6 +74,10 @@
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="Tint" Property="Background" Value="#1AFFFFFF" />
                             </Trigger>
+                            <!-- While a job runs the page is disabled, and a card has to look it. -->
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Shape" Property="Opacity" Value="0.5" />
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>

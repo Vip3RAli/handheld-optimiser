@@ -133,6 +133,10 @@
                                     <Setter TargetName="Shape" Property="BorderBrush" Value="{StaticResource BrandAccent}" />
                                     <Setter TargetName="Tint" Property="Background" Value="#1422D3EE" />
                                 </DataTrigger>
+                                <!-- While a job runs the page is disabled, and a tile has to look it. -->
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter TargetName="Shape" Property="Opacity" Value="0.5" />
+                                </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
                     </Setter.Value>

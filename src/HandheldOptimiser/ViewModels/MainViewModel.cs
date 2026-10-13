@@ -287,22 +287,28 @@ public sealed partial class MainViewModel : ObservableObject, IShell
 
     public async Task<bool> ConfirmAsync(string title, string message, string confirmText)
     {
-        var box = new Wpf.Ui.Controls.MessageBox
+        var text = new System.Windows.Controls.TextBlock
         {
-            Title = title,
-            // A long message, such as every app about to be removed, scrolls inside the dialog rather
-            // than pushing its buttons off a 720 unit tall screen.
-            Content = new System.Windows.Controls.ScrollViewer
+            Text = message,
+            TextWrapping = System.Windows.TextWrapping.Wrap,
+            MaxWidth = 460
+        };
+
+        // Only a long message, such as every app about to be removed, scrolls inside the dialog, so
+        // its buttons stay on a 720 unit tall screen. A short one is plain text, as it always was.
+        System.Windows.UIElement content = DialogText.NeedsScrolling(message)
+            ? new System.Windows.Controls.ScrollViewer
             {
                 MaxHeight = 320,
                 VerticalScrollBarVisibility = System.Windows.Controls.ScrollBarVisibility.Auto,
-                Content = new System.Windows.Controls.TextBlock
-                {
-                    Text = message,
-                    TextWrapping = System.Windows.TextWrapping.Wrap,
-                    MaxWidth = 460
-                }
-            },
+                Content = text
+            }
+            : text;
+
+        var box = new Wpf.Ui.Controls.MessageBox
+        {
+            Title = title,
+            Content = content,
             PrimaryButtonText = confirmText,
             PrimaryButtonAppearance = Wpf.Ui.Controls.ControlAppearance.Primary,
             CloseButtonText = confirmText == "OK" ? "Close" : "Cancel",
