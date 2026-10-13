@@ -184,6 +184,10 @@
 
             <!-- Drag anywhere in a list or page to scroll it, with momentum, as on a phone. -->
             <Style TargetType="ScrollViewer">
+                <!-- Never a stop for the keyboard. A scroll viewer that has it draws an outline round the
+                     whole page and takes the arrow keys to scroll with, so they stop moving between the
+                     controls inside it. It still scrolls to follow the keyboard as it moves among them. -->
+                <Setter Property="Focusable" Value="False" />
                 <Setter Property="PanningMode" Value="VerticalFirst" />
                 <Setter Property="PanningDeceleration" Value="0.003" />
                 <Setter Property="Template">
@@ -199,7 +203,13 @@
                                     <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
 
-                                <ScrollContentPresenter Grid.Row="0" Grid.Column="0"
+                                <!-- The name matters. An arrow key pressed on a control inside a scroll viewer
+                                     is the scroll viewer's to deal with: it moves the keyboard to the next
+                                     control that way, scrolling to it if need be. It finds its content by
+                                     this name, and without it it only scrolls, so arrow keys (which is how
+                                     a controller's D-pad arrives) never moved between controls at all. -->
+                                <ScrollContentPresenter x:Name="PART_ScrollContentPresenter"
+                                                        Grid.Row="0" Grid.Column="0"
                                                         Margin="{TemplateBinding Padding}"
                                                         CanContentScroll="{TemplateBinding CanContentScroll}" />
 

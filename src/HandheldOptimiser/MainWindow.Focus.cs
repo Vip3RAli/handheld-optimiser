@@ -45,6 +45,23 @@ public partial class MainWindow
         }
     }
 
+    /// <summary>
+    /// With nothing holding the keyboard (a blank part of the page was touched, say), the first arrow
+    /// key gives it back to a control and is spent doing so. Left alone it would do nothing at all.
+    /// </summary>
+    protected override void OnPreviewKeyDown(KeyEventArgs e)
+    {
+        base.OnPreviewKeyDown(e);
+
+        var nothingHasIt = Keyboard.FocusedElement is null || ReferenceEquals(Keyboard.FocusedElement, this);
+
+        if (nothingHasIt && Views.FocusKeys.Wakes(e.Key) && DataContext is MainViewModel vm)
+        {
+            GiveFocus(vm);
+            e.Handled = true;
+        }
+    }
+
     private void OnShellChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (sender is not MainViewModel vm)
@@ -94,6 +111,12 @@ public partial class MainWindow
             return;
         }
 
+        GiveFocus(vm);
+    }
+
+    /// <summary>The control that last had the keyboard, if it is still there to take it, or else the page's first.</summary>
+    private void GiveFocus(MainViewModel vm)
+    {
         if (_lastFocus is UIElement { IsVisible: true, IsEnabled: true } last && PresentationSource.FromVisual(last) is not null)
         {
             last.Focus();
