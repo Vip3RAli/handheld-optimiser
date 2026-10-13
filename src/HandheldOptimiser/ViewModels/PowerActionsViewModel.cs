@@ -108,7 +108,6 @@ public sealed partial class PowerActionItemViewModel(PowerAction action, TweakEn
 /// </summary>
 public sealed class PowerActionsViewModel : SectionViewModel
 {
-
     public IReadOnlyList<PowerActionItemViewModel> Actions { get; }
 
     public PowerActionsViewModel(TweakEngine engine, TweakStateStore states, IShell shell) : base(shell)

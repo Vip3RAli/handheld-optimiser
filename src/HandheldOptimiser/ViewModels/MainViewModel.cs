@@ -112,8 +112,8 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         {
             SectionKind.Tweaks => new TweakSectionViewModel(spec.Category!.Value, engine, states, this, open) { Heading = spec.Heading },
             SectionKind.HomeApp => new HomeAppPickerViewModel(log, this) { Heading = spec.Heading },
-            SectionKind.Startup => new StartupViewModel(startupService, this) { Heading = spec.Heading },
-            SectionKind.PreinstalledApps => new BloatwareViewModel(appxService, restorePoints, journal, log, this) { Heading = spec.Heading },
+            SectionKind.Startup => new StartupViewModel(startupService, this, open) { Heading = spec.Heading },
+            SectionKind.PreinstalledApps => new BloatwareViewModel(appxService, restorePoints, journal, log, this, open) { Heading = spec.Heading },
             SectionKind.Backup => new BackupViewModel(engine, states, restorePoints, this) { Heading = spec.Heading },
             SectionKind.Jobs => new PowerActionsViewModel(engine, states, this) { Heading = spec.Heading },
             SectionKind.Health => new DeviceHealthViewModel(systemState, log, this) { Heading = spec.Heading },
@@ -290,11 +290,18 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         var box = new Wpf.Ui.Controls.MessageBox
         {
             Title = title,
-            Content = new System.Windows.Controls.TextBlock
+            // A long message, such as every app about to be removed, scrolls inside the dialog rather
+            // than pushing its buttons off a 720 unit tall screen.
+            Content = new System.Windows.Controls.ScrollViewer
             {
-                Text = message,
-                TextWrapping = System.Windows.TextWrapping.Wrap,
-                MaxWidth = 460
+                MaxHeight = 320,
+                VerticalScrollBarVisibility = System.Windows.Controls.ScrollBarVisibility.Auto,
+                Content = new System.Windows.Controls.TextBlock
+                {
+                    Text = message,
+                    TextWrapping = System.Windows.TextWrapping.Wrap,
+                    MaxWidth = 460
+                }
             },
             PrimaryButtonText = confirmText,
             PrimaryButtonAppearance = Wpf.Ui.Controls.ControlAppearance.Primary,

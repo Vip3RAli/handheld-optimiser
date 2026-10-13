@@ -1,48 +1,62 @@
 <UserControl x:Class="HandheldOptimiser.Views.Pages.StartupPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:vm="clr-namespace:HandheldOptimiser.ViewModels"
+             xmlns:views="clr-namespace:HandheldOptimiser.Views">
+
+    <UserControl.Resources>
+        <!-- A startup program's tile: its name and whether it starts with Windows. -->
+        <DataTemplate DataType="{x:Type vm:StartupRowViewModel}">
+            <Button Style="{StaticResource Tile}"
+                    AutomationProperties.Name="{Binding Name}"
+                    Command="{Binding DataContext.Cells.ToggleCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                    CommandParameter="{Binding}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="14.5" FontWeight="SemiBold"
+                               FontFamily="{StaticResource AppDisplayFont}" TextWrapping="Wrap"
+                               VerticalAlignment="Center" Margin="0,0,10,0" />
+
+                    <ui:ToggleSwitch Grid.Column="1"
+                                     IsChecked="{Binding IsEnabled, Mode=TwoWay}"
+                                     Click="OnToggleClicked"
+                                     VerticalAlignment="Center"
+                                     MinWidth="48" />
+                </Grid>
+            </Button>
+        </DataTemplate>
+
+        <!-- Whose startup list it is in, and exactly what it runs. -->
+        <DataTemplate DataType="{x:Type vm:TileDetail}">
+            <Border Style="{StaticResource TileDetail}" DataContext="{Binding Tile}">
+                <StackPanel>
+                    <ui:Badge Content="{Binding ScopeLabel}" FontSize="10" HorizontalAlignment="Left" />
+                    <TextBlock Text="{Binding Command}" FontFamily="Consolas" FontSize="12" Opacity="0.8"
+                               Margin="0,8,0,0" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
 
     <StackPanel>
-        <StackPanel Margin="0,0,0,12">
-            <ui:Button Content="Re-scan" Command="{Binding ScanCommand}" HorizontalAlignment="Left" />
-
-            <TextBlock Text="{Binding SummaryText}" Opacity="0.7" FontSize="12" Margin="0,10,0,0" />
+        <StackPanel Margin="2,0,2,10">
+            <TextBlock Text="{Binding SummaryText}" Opacity="0.7" FontSize="12" />
             <TextBlock Margin="0,4,0,0" FontSize="11.5" Opacity="0.55" TextWrapping="Wrap"
                        Text="Disabling uses the same mechanism as Task Manager, so entries stay visible there and can be re-enabled from either place." />
         </StackPanel>
 
-        <ItemsControl ItemsSource="{Binding Entries}">
-            <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                    <Border Style="{StaticResource Panel}" Padding="12,10" Margin="0,0,0,6">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-
-                            <StackPanel Grid.Column="0" Margin="0,0,12,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
-                                               VerticalAlignment="Center" TextWrapping="Wrap" />
-                                    <ui:Badge Content="{Binding ScopeLabel}" FontSize="9" Margin="8,0,0,0"
-                                              VerticalAlignment="Center" />
-                                </StackPanel>
-
-                                <TextBlock Text="{Binding Command}" FontFamily="Consolas" FontSize="10.5"
-                                           Opacity="0.45" Margin="0,4,0,0" TextTrimming="CharacterEllipsis" />
-                            </StackPanel>
-
-                            <ui:ToggleSwitch Grid.Column="1"
-                                             IsChecked="{Binding IsEnabled, Mode=TwoWay}"
-                                             Click="OnToggleClicked"
-                                             VerticalAlignment="Center"
-                                             MinWidth="48" />
-                        </Grid>
-                    </Border>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
+        <!-- The programs as tiles three across, with the open one's detail under its row. -->
+        <ItemsControl ItemsSource="{Binding Cells.Cells}" Focusable="False">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <views:TileGrid Columns="{Binding Cells.Columns}" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
         </ItemsControl>
     </StackPanel>
 </UserControl>

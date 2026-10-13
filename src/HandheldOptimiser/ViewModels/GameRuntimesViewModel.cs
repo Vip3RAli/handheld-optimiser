@@ -72,7 +72,6 @@ public sealed partial class GameRuntimesViewModel : SectionViewModel
     private bool _hasScanned;
     private bool _isScanning;
 
-
     /// <summary>The scan asks winget what is installed and what is newer, which goes to the internet.</summary>
     public override bool LoadsFromInternet => true;
 

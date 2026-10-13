@@ -143,7 +143,6 @@ public sealed partial class UpdatesViewModel : SectionViewModel
         ? CardStatus.Checking
         : CardStatus.ForUpdates(AllRows.Count(r => r.State != UpdateRowState.Done));
 
-
     public override bool LoadsFromInternet => true;
 
     public UpdateSectionViewModel WindowsSection { get; }

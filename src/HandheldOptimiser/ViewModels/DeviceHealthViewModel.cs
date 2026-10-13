@@ -21,7 +21,6 @@ public sealed partial class DeviceHealthViewModel(SystemStateService systemState
     private readonly SystemStateService _systemState = systemState;
     private readonly LogService _log = log;
 
-
     /// <summary>The rows marked yellow or red, lifted to the top of the page with their explanation.</summary>
     public ObservableCollection<HealthRowViewModel> Attention { get; } = [];
 

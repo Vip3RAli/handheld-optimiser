@@ -7,12 +7,16 @@ using HandheldOptimiser.TweakDefinitions;
 
 namespace HandheldOptimiser.ViewModels;
 
-public sealed partial class AppxRowViewModel(AppxPresence presence) : ObservableObject
+public sealed partial class AppxRowViewModel(AppxPresence presence) : ObservableObject, ITile
 {
     public AppxPresence Presence { get; } = presence;
 
     [ObservableProperty]
     private bool _isSelected;
+
+    /// <summary>Whether this tile's detail (its package id, where it is installed) is showing under its row.</summary>
+    [ObservableProperty]
+    private bool _isOpen;
 
     public string FriendlyName => Presence.Target.FriendlyName;
     public string IdentityName => Presence.Target.IdentityName;
@@ -33,6 +37,9 @@ public sealed class AppxGroupViewModel
 {
     public required string Header { get; init; }
     public required ObservableCollection<AppxRowViewModel> Items { get; init; }
+
+    /// <summary>The group's apps as the page draws them, four across, with the open one's detail under its row.</summary>
+    public required TileCells Cells { get; init; }
 }
 
 /// <summary>
@@ -44,7 +51,8 @@ public sealed partial class BloatwareViewModel(
     RestorePointService restorePoints,
     TweakJournalService journal,
     LogService log,
-    IShell shell)
+    IShell shell,
+    OpenTile open)
     : SectionViewModel(shell)
 {
     private readonly AppxService _appxService = appxService;
@@ -55,11 +63,14 @@ public sealed partial class BloatwareViewModel(
     private bool _hasScanned;
     private bool _isScanning;
 
-
     public ObservableCollection<AppxGroupViewModel> Groups { get; } = [];
 
     [ObservableProperty]
     private string _summaryText = "Not scanned yet.";
+
+    /// <summary>How many apps are ticked, said beside the buttons that tick and clear them.</summary>
+    [ObservableProperty]
+    private string _selectedText = "0 selected";
 
     private IEnumerable<AppxRowViewModel> AllRows => Groups.SelectMany(g => g.Items);
 
@@ -103,10 +114,15 @@ public sealed partial class BloatwareViewModel(
 
         foreach (var group in found.GroupBy(f => f.Target.Group).OrderBy(g => g.Key))
         {
+            ObservableCollection<AppxRowViewModel> items = [.. group.Select(p => new AppxRowViewModel(p))];
+            var cells = new TileCells(columns: 4, open);
+            cells.Reset(items);
+
             Groups.Add(new AppxGroupViewModel
             {
                 Header = AppxCatalog.GroupHeader(group.Key),
-                Items = [.. group.Select(p => new AppxRowViewModel(p))]
+                Items = items,
+                Cells = cells
             });
         }
 
@@ -121,7 +137,8 @@ public sealed partial class BloatwareViewModel(
 
         SummaryText = total == 0
             ? "No catalog bloatware found on this machine. It is already clean."
-            : $"{total} removable app(s) found, {selected} selected.";
+            : $"{total} removable app(s) found.";
+        SelectedText = $"{selected} selected";
     }
 
     [RelayCommand]
@@ -160,11 +177,9 @@ public sealed partial class BloatwareViewModel(
             return;
         }
 
-        var list = string.Join("\n", selected.Take(15).Select(r => $"  • {r.FriendlyName}  ({r.IdentityName})"));
-        if (selected.Count > 15)
-        {
-            list += $"\n  … and {selected.Count - 15} more";
-        }
+        // Every one of them, with its package id: the id is no longer on show on each tile, so this
+        // is where nothing gets removed unseen. A long list scrolls inside the dialog.
+        var list = string.Join("\n", selected.Select(r => $"  • {r.FriendlyName}  ({r.IdentityName})"));
 
         var confirmed = await Shell.ConfirmAsync(
             $"Remove {selected.Count} app(s)?",
