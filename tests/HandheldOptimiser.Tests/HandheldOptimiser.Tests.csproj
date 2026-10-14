@@ -25,4 +25,12 @@
     <ProjectReference Include="..\..\src\HandheldOptimiser.HomeLauncher\HandheldOptimiser.HomeLauncher.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!--
+      The Auto TDP controller is pure logic, so it is built in here rather than the service referenced:
+      the service and the launcher share the protocol's types, which would then be in two references.
+    -->
+    <Compile Include="..\..\src\HandheldOptimiser.PowerService\AutoTdpController.cs" Link="AutoTdpController.cs" />
+  </ItemGroup>
+
 </Project>

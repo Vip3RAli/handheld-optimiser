@@ -1,8 +1,9 @@
 namespace HandheldOptimiser.HomeLauncher.Library;
 
 /// <summary>
-/// The game being played: timed for its play time, and once it closes, its profile undone, the programs
-/// closed for it started again, and its store's app closed if the player asked for that.
+/// The game being played: timed for its play time, held at its frame rate by Auto TDP, and once it
+/// closes, its profile undone, the programs closed for it started again, and its store's app closed if
+/// the player asked for that.
 /// </summary>
 public partial class LibraryWindow
 {
@@ -16,12 +17,16 @@ public partial class LibraryWindow
     private GameSession? _session;
     private bool _sessionStoreWasOpen;
 
+    // The game Auto TDP is holding, or null.
+    private Game? _autoTdpGame;
+
     // Programs closed for the game being played, to start again once it closes.
     private List<ClosedApp> _closedApps = [];
 
     private SortOrder _sort = LibrarySettings.Sort;
 
-    private void StartSession(Game game, bool storeWasOpen, bool closeApps)
+    /// <param name="autoTdpFps">The frame rate Auto TDP holds the game at, or 0 for off.</param>
+    private void StartSession(Game game, bool storeWasOpen, bool closeApps, int autoTdpFps)
     {
         var session = new GameSession(game);
         _session = session;
@@ -32,9 +37,47 @@ public partial class LibraryWindow
             _ = CloseAppsForAsync(session);
         }
 
+        // Without a folder there is no telling when the game closes, and so when to stop.
+        if (autoTdpFps > 0 && session.CanFollow)
+        {
+            _autoTdpGame = game;
+            _ = StartAutoTdpAsync(game, autoTdpFps);
+        }
+
         if (session.CanFollow)
         {
             _ = FollowAsync(session);
+        }
+    }
+
+    private async Task StartAutoTdpAsync(Game game, int fps)
+    {
+        if (await AutoTdp.StartAsync(game, fps) is { } problem)
+        {
+            Notice = problem;
+            if (ReferenceEquals(_autoTdpGame, game))
+            {
+                _autoTdpGame = null;
+            }
+        }
+    }
+
+    /// <summary>Hands the power limit back to Armoury Crate's operating mode, for the game closing.</summary>
+    private void StopAutoTdp()
+    {
+        if (_autoTdpGame is { } game)
+        {
+            _autoTdpGame = null;
+            _ = AutoTdp.StopAsync(game);
+        }
+    }
+
+    /// <summary>What Auto TDP is doing, as the library comes back in front of a game it is holding.</summary>
+    private async Task ShowAutoTdpAsync()
+    {
+        if (_autoTdpGame is not null && await AutoTdp.DescribeAsync() is { } line && _autoTdpGame is not null)
+        {
+            Notice = line;
         }
     }
 
@@ -78,6 +121,7 @@ public partial class LibraryWindow
         ResumeGame(session);
         session.Stop();
         RecordPlaytime(session);
+        StopAutoTdp();
     }
 
     /// <summary>Puts everything back, for the library closing in the middle of a game.</summary>
@@ -97,6 +141,7 @@ public partial class LibraryWindow
         // Ended while paused, from Task Manager say: lets go of its processes.
         ResumeGame(session);
         RecordPlaytime(session);
+        StopAutoTdp();
         RestoreProfileSettings();
         ReopenClosedApps();
         _ = CloseStoreAppLaterAsync(session.Game.Store, _sessionStoreWasOpen);

@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Auto TDP. Counting a game's frames needs administrator, which the game library must never ask for,
+    so this small service does it. It is registered by the installer to start on demand: the library
+    starts it as a game starts with Auto TDP on, and it ends itself once the game closes.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- The trace and ACPI structures are filled in by hand. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <AssemblyName>HandheldOptimiser.PowerService</AssemblyName>
+    <RootNamespace>HandheldOptimiser.PowerService</RootNamespace>
+    <Product>Handheld Optimiser</Product>
+    <Version>1.1.0</Version>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="System.GC.ConserveMemory" Value="7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.12" />
+  </ItemGroup>
+
+</Project>
