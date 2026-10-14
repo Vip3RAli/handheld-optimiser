@@ -1,7 +1,7 @@
 namespace HandheldOptimiser.HomeLauncher.Library;
 
 /// <summary>
-/// The game being played: timed for its play time, held at its frame rate by Auto TDP, and once it
+/// The game being played: timed for its play time, held at its frame rate by TDP Engine, and once it
 /// closes, its profile undone, the programs closed for it started again, and its store's app closed if
 /// the player asked for that.
 /// </summary>
@@ -17,7 +17,7 @@ public partial class LibraryWindow
     private GameSession? _session;
     private bool _sessionStoreWasOpen;
 
-    // The game Auto TDP is holding, or null.
+    // The game TDP Engine is holding, or null.
     private Game? _autoTdpGame;
 
     // Programs closed for the game being played, to start again once it closes.
@@ -25,7 +25,7 @@ public partial class LibraryWindow
 
     private SortOrder _sort = LibrarySettings.Sort;
 
-    /// <param name="autoTdpFps">The frame rate Auto TDP holds the game at, or 0 for off.</param>
+    /// <param name="autoTdpFps">The frame rate TDP Engine holds the game at, or 0 for off.</param>
     private void StartSession(Game game, bool storeWasOpen, bool closeApps, int autoTdpFps)
     {
         var session = new GameSession(game);
@@ -72,7 +72,7 @@ public partial class LibraryWindow
         }
     }
 
-    /// <summary>What Auto TDP is doing, as the library comes back in front of a game it is holding.</summary>
+    /// <summary>What TDP Engine is doing, as the library comes back in front of a game it is holding.</summary>
     private async Task ShowAutoTdpAsync()
     {
         if (_autoTdpGame is not null && await AutoTdp.DescribeAsync() is { } line && _autoTdpGame is not null)

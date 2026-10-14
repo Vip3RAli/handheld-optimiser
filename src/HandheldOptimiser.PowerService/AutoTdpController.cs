@@ -1,6 +1,6 @@
 namespace HandheldOptimiser.PowerService;
 
-/// <summary>What the player asked Auto TDP for.</summary>
+/// <summary>What the player asked TDP Engine for.</summary>
 /// <param name="TargetFps">The frame rate to hold.</param>
 /// <param name="MinWatts">The lowest power limit it may go to.</param>
 /// <param name="MaxWatts">The highest power limit it may go to.</param>

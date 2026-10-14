@@ -67,7 +67,7 @@ Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#AppName}}"; F
 Filename: "{app}\{#AppExeName}"; Flags: nowait; Check: IsInAppUpdate
 
 [UninstallRun]
-; The Auto TDP service goes first, so its exe is free to delete. Stopping it puts Armoury Crate's
+; The TDP Engine service goes first, so its exe is free to delete. Stopping it puts Armoury Crate's
 ; operating mode back if a game was being held.
 Filename: "{sys}\sc.exe"; Parameters: "stop {#ServiceName}"; Flags: runhidden; RunOnceId: "StopAutoTdp"
 Filename: "{sys}\sc.exe"; Parameters: "delete {#ServiceName}"; Flags: runhidden; RunOnceId: "DeleteAutoTdp"
@@ -79,7 +79,7 @@ Filename: "{sys}\sc.exe"; Parameters: "delete {#ServiceName}"; Flags: runhidden;
 Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""$env:PSModulePath = $PSHOME + '\Modules'; Get-AppxPackage -Name 'HandheldOptimiser.HomeApp' | Remove-AppxPackage; $k = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\GamingConfiguration'; if ((Get-ItemProperty $k -ErrorAction SilentlyContinue).GamingHomeApp -in 'HandheldOptimiser.HomeApp_pgc7cpy78bqbw!HomeApp','HandheldOptimiser.HomeApp_n7ggsqt1rt3jm!HomeApp') {{ Remove-ItemProperty $k -Name GamingHomeApp }"""; Flags: runhidden; RunOnceId: "RemoveHomeApp"
 
 [Code]
-// The Auto TDP service's exe is replaced by an update, so a running one is stopped first.
+// The TDP Engine service's exe is replaced by an update, so a running one is stopped first.
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   Code: Integer;
@@ -88,9 +88,9 @@ begin
   Result := '';
 end;
 
-// Registers the Auto TDP service, which counts a game's frames (that needs administrator, which the
+// Registers the TDP Engine service, which counts a game's frames (that needs administrator, which the
 // game library never has) and sets the power limit. It only starts on demand: the library starts it
-// when a game starts with Auto TDP on, and it ends itself once the game closes.
+// when a game starts with TDP Engine on, and it ends itself once the game closes.
 //
 // Its permissions are Windows' defaults for a service plus one: the signed-in player (IU) may start
 // it (RP). They cannot stop, change or delete it. The exe path is quoted because it has spaces.
@@ -102,10 +102,10 @@ begin
   Sc := ExpandConstant('{sys}\sc.exe');
   Path := ExpandConstant('{app}\{#ServiceExeName}');
 
-  if not Exec(Sc, 'create {#ServiceName} binPath= "\"' + Path + '\"" start= demand DisplayName= "Handheld Optimiser Auto TDP"',
+  if not Exec(Sc, 'create {#ServiceName} binPath= "\"' + Path + '\"" start= demand DisplayName= "Handheld Optimiser TDP Engine"',
     '', SW_HIDE, ewWaitUntilTerminated, Code) or (Code <> 0) then
     // Already there from an earlier version: brought up to date instead.
-    Exec(Sc, 'config {#ServiceName} binPath= "\"' + Path + '\"" start= demand DisplayName= "Handheld Optimiser Auto TDP"',
+    Exec(Sc, 'config {#ServiceName} binPath= "\"' + Path + '\"" start= demand DisplayName= "Handheld Optimiser TDP Engine"',
       '', SW_HIDE, ewWaitUntilTerminated, Code);
 
   Exec(Sc, 'description {#ServiceName} "Holds a game at the frame rate chosen in the Handheld Optimiser game library with the lowest power limit. Runs only during games."',

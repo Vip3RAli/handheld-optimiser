@@ -8,7 +8,7 @@ using System.ServiceProcess;
 namespace HandheldOptimiser.PowerService;
 
 /// <summary>
-/// The Auto TDP service. The game library starts it when a game starts with Auto TDP on, and stops it
+/// The TDP Engine service. The game library starts it when a game starts with TDP Engine on, and stops it
 /// when the game closes; it never runs otherwise. Each second it counts the game's frames, reads the
 /// processor's temperature, and sets the power limit the controller asks for. Whatever happens, it puts
 /// Armoury Crate's operating mode back as it ends, which brings back that mode's own power limits.
@@ -75,7 +75,7 @@ internal sealed partial class AutoTdpService : ServiceBase
     {
         _console = true;
         OnStart([]);
-        Console.WriteLine("Auto TDP is running. Press Enter to stop.");
+        Console.WriteLine("TDP Engine is running. Press Enter to stop.");
         Console.ReadLine();
         Shutdown();
     }
@@ -107,7 +107,7 @@ internal sealed partial class AutoTdpService : ServiceBase
         _acpi = AsusAcpi.Open();
         if (_acpi is null || !_acpi.CanSetPowerLimits)
         {
-            _error = "This device's power limit cannot be set. Auto TDP works on the ROG Ally with ASUS's drivers installed.";
+            _error = "This device's power limit cannot be set. TDP Engine works on the ROG Ally with ASUS's drivers installed.";
             Log.Write(_error);
         }
         else
@@ -118,7 +118,7 @@ internal sealed partial class AutoTdpService : ServiceBase
             }
             catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or DllNotFoundException or EntryPointNotFoundException)
             {
-                _error = "Windows would not let Auto TDP count frames.";
+                _error = "Windows would not let TDP Engine count frames.";
                 Log.Write($"{_error} {ex.Message}");
             }
         }

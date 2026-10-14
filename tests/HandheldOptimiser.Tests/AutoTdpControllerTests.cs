@@ -4,7 +4,7 @@ using Xunit;
 namespace HandheldOptimiser.Tests;
 
 /// <summary>
-/// The Auto TDP controller against simple pretend games: each second the game's frame rate comes from
+/// The TDP Engine controller against simple pretend games: each second the game's frame rate comes from
 /// the power limit the controller last set.
 /// </summary>
 public class AutoTdpControllerTests

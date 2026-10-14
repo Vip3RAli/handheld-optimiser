@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace HandheldOptimiser.PowerService;
 
 /// <summary>
-/// How the game library talks to the Auto TDP service: one JSON request a connection over a named pipe,
+/// How the game library talks to the TDP Engine service: one JSON request a connection over a named pipe,
 /// answered with the status. Built into both, so they always agree.
 /// </summary>
 internal static class AutoTdpProtocol
@@ -56,7 +56,7 @@ internal sealed record AutoTdpRequest(string Command, int TargetFps = 0, int Min
 internal sealed record AutoTdpStatus(bool Running, double? Fps = null, int? Watts = null, int? Temperature = null,
     string? State = null, string? Error = null);
 
-/// <summary>What Auto TDP is doing, for the library to show.</summary>
+/// <summary>What TDP Engine is doing, for the library to show.</summary>
 internal enum AutoTdpState
 {
     /// <summary>Not enough readings yet, or waiting for the last change to take effect.</summary>

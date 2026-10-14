@@ -144,7 +144,7 @@ public partial class LibraryWindow : Window
         // Back from a game the library cannot follow: whatever was changed for it is put back now.
         CheckUnfollowedSession();
 
-        // Back in front of a game Auto TDP is holding: what it is doing, for a moment.
+        // Back in front of a game TDP Engine is holding: what it is doing, for a moment.
         _ = ShowAutoTdpAsync();
     }
 

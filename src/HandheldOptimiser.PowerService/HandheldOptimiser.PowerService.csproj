@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Auto TDP. Counting a game's frames needs administrator, which the game library must never ask for,
+    TDP Engine. Counting a game's frames needs administrator, which the game library must never ask for,
     so this small service does it. It is registered by the installer to start on demand: the library
-    starts it as a game starts with Auto TDP on, and it ends itself once the game closes.
+    starts it as a game starts with TDP Engine on, and it ends itself once the game closes.
   -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>

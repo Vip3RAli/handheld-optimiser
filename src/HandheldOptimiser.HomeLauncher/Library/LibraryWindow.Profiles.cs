@@ -6,7 +6,7 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 /// <summary>
 /// Per-game profiles: a power mode, resolution, refresh rate and brightness a game is switched to when it starts
 /// from the library, with the player's own settings put back once it has closed (see
-/// LibraryWindow.Session), whether background programs are closed for it, and the frame rate Auto TDP
+/// LibraryWindow.Session), whether background programs are closed for it, and the frame rate TDP Engine
 /// holds it at.
 /// </summary>
 public partial class LibraryWindow

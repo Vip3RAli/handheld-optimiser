@@ -7,7 +7,7 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 
 /// <summary>
 /// The While playing and Maintenance settings: background programs closed around games, the stores' own
-/// apps, Auto TDP, clean-ups and the startup apps, so none of it needs the desktop.
+/// apps, TDP Engine, clean-ups and the startup apps, so none of it needs the desktop.
 /// </summary>
 public partial class LibraryWindow
 {
@@ -83,7 +83,7 @@ public partial class LibraryWindow
         AutoTdpWattsSetting.Tag = $"{LibrarySettings.AutoTdpMaxWatts} W";
     }
 
-    // ----- Auto TDP -----
+    // ----- TDP Engine -----
 
     private void OnStepAutoTdp(object sender, RoutedEventArgs e) => StepAutoTdp(1);
 

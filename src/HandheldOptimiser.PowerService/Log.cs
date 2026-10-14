@@ -1,7 +1,7 @@
 namespace HandheldOptimiser.PowerService;
 
 /// <summary>
-/// What Auto TDP did, in ProgramData\HandheldOptimiser\logs\auto-tdp.log, where every change of power
+/// What TDP Engine did, in ProgramData\HandheldOptimiser\logs\auto-tdp.log, where every change of power
 /// limit is written with the frame rate and temperature that led to it.
 /// </summary>
 internal static class Log
@@ -32,7 +32,7 @@ internal static class Log
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                // Logging must never stop Auto TDP.
+                // Logging must never stop TDP Engine.
             }
         }
     }

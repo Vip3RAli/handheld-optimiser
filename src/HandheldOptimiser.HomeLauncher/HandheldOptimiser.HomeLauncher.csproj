@@ -53,7 +53,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- How the library talks to the Auto TDP service, shared with it so the two always agree. -->
+    <!-- How the library talks to the TDP Engine service, shared with it so the two always agree. -->
     <Compile Include="..\HandheldOptimiser.PowerService\AutoTdpProtocol.cs" Link="Library\AutoTdpProtocol.cs" />
   </ItemGroup>
 

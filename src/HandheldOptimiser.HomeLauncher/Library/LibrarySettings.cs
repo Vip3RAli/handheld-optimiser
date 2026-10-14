@@ -323,21 +323,21 @@ internal static class LibrarySettings
         set => WriteSwitch(WishlistDealsValue, value);
     }
 
-    /// <summary>The frame rate Auto TDP holds games at, one of <see cref="AutoTdp.FrameRates"/>, or 0, the default, for off.</summary>
+    /// <summary>The frame rate TDP Engine holds games at, one of <see cref="AutoTdp.FrameRates"/>, or 0, the default, for off.</summary>
     public static int AutoTdpFps
     {
         get => ReadChoice(AutoTdpFpsValue, AutoTdp.FrameRates, 0);
         set => Write(AutoTdpFpsValue, value.ToString(System.Globalization.CultureInfo.InvariantCulture));
     }
 
-    /// <summary>The temperature Auto TDP lowers the power limit at, whatever the frame rate.</summary>
+    /// <summary>The temperature TDP Engine lowers the power limit at, whatever the frame rate.</summary>
     public static int AutoTdpTemperature
     {
         get => ReadChoice(AutoTdpTemperatureValue, AutoTdp.TemperatureLimits, 80);
         set => Write(AutoTdpTemperatureValue, value.ToString(System.Globalization.CultureInfo.InvariantCulture));
     }
 
-    /// <summary>The highest power limit Auto TDP may set, in watts.</summary>
+    /// <summary>The highest power limit TDP Engine may set, in watts.</summary>
     public static int AutoTdpMaxWatts
     {
         get => ReadChoice(AutoTdpWattsValue, AutoTdp.MostWatts, 25);

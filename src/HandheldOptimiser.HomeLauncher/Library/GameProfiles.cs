@@ -10,7 +10,7 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 /// <param name="CloseApps">Whether to close the background programs for this game, whatever the library's
 /// own setting. Null follows that setting.</param>
 /// <param name="Resolution">The screen size to play at, such as 1280 x 720 to stretch the battery.</param>
-/// <param name="AutoTdpFps">The frame rate Auto TDP holds this game at, whatever the library's own setting:
+/// <param name="AutoTdpFps">The frame rate TDP Engine holds this game at, whatever the library's own setting:
 /// 0 for off. Null follows that setting.</param>
 internal sealed record GameProfile(PowerMode? PowerMode, int? RefreshRate, int? Brightness, bool? CloseApps = null,
     Resolution? Resolution = null, int? AutoTdpFps = null)
@@ -51,7 +51,7 @@ internal sealed record GameProfile(PowerMode? PowerMode, int? RefreshRate, int? 
 
         if (AutoTdpFps is { } fps)
         {
-            parts.Add(fps > 0 ? $"Auto TDP at {fps} fps" : "Auto TDP off");
+            parts.Add(fps > 0 ? $"TDP Engine at {fps} fps" : "TDP Engine off");
         }
 
         return parts.Count == 0 ? "Not set. Plays with your current settings" : string.Join(", ", parts);

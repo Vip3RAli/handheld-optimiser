@@ -8,8 +8,8 @@ using Microsoft.Win32;
 namespace HandheldOptimiser.HomeLauncher.Library;
 
 /// <summary>
-/// Auto TDP from the library's side. Counting a game's frames needs administrator, which the library
-/// never has, so the work is done by the Auto TDP service the installer registers; the library starts it
+/// TDP Engine from the library's side. Counting a game's frames needs administrator, which the library
+/// never has, so the work is done by the TDP Engine service the installer registers; the library starts it
 /// as a game starts and tells it which game and what to hold. The player's account may start that
 /// service, and talk to it, but nothing more. Requests go one at a time, in the order they were made.
 /// </summary>
@@ -45,10 +45,10 @@ internal static partial class AutoTdp
         var status = Send(request);
         if (status is null)
         {
-            return Task.FromResult<string?>("Auto TDP did not answer.");
+            return Task.FromResult<string?>("TDP Engine did not answer.");
         }
 
-        Program.Log($"Auto TDP for {game.Key}: {targetFps} fps from {status.Watts} W{(status.Error is { } error ? $" ({error})" : "")}");
+        Program.Log($"TDP Engine for {game.Key}: {targetFps} fps from {status.Watts} W{(status.Error is { } error ? $" ({error})" : "")}");
         return Task.FromResult(status.Error);
     });
 
@@ -77,7 +77,7 @@ internal static partial class AutoTdp
             return Task.FromResult<string?>(null);
         }
 
-        var parts = new List<string> { $"Auto TDP {status.Watts} W" };
+        var parts = new List<string> { $"TDP Engine {status.Watts} W" };
         if (status.Fps is { } fps)
         {
             parts.Add($"{fps:0} fps");
@@ -127,7 +127,7 @@ internal static partial class AutoTdp
         }
         catch (Exception ex) when (ex is IOException or TimeoutException or UnauthorizedAccessException)
         {
-            Program.Log($"Auto TDP {request.Command} failed: {ex.Message}");
+            Program.Log($"TDP Engine {request.Command} failed: {ex.Message}");
             return null;
         }
     }
@@ -156,7 +156,7 @@ internal static partial class AutoTdp
         }
         catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
         {
-            Program.Log($"Could not remember Auto TDP's watts for {game.Key}: {ex.Message}");
+            Program.Log($"Could not remember TDP Engine's watts for {game.Key}: {ex.Message}");
         }
     }
 
@@ -176,7 +176,7 @@ internal static partial class AutoTdp
         var manager = OpenSCManager(null, null, ScManagerConnect);
         if (manager == 0)
         {
-            return "Windows would not start Auto TDP.";
+            return "Windows would not start TDP Engine.";
         }
 
         try
@@ -186,9 +186,9 @@ internal static partial class AutoTdp
             {
                 return Marshal.GetLastPInvokeError() switch
                 {
-                    ErrorDoesNotExist => "Auto TDP is not installed. Install the latest Handheld Optimiser to add it.",
-                    ErrorAccessDenied => "Windows would not let the library start Auto TDP. Installing Handheld Optimiser again fixes this.",
-                    var code => $"Windows would not start Auto TDP ({new Win32Exception(code).Message})."
+                    ErrorDoesNotExist => "TDP Engine is not installed. Install the latest Handheld Optimiser to add it.",
+                    ErrorAccessDenied => "Windows would not let the library start TDP Engine. Installing Handheld Optimiser again fixes this.",
+                    var code => $"Windows would not start TDP Engine ({new Win32Exception(code).Message})."
                 };
             }
 
@@ -196,7 +196,7 @@ internal static partial class AutoTdp
             {
                 if (!StartServiceW(service, 0, 0) && Marshal.GetLastPInvokeError() is var code and not ErrorAlreadyRunning)
                 {
-                    return $"Windows would not start Auto TDP ({new Win32Exception(code).Message}).";
+                    return $"Windows would not start TDP Engine ({new Win32Exception(code).Message}).";
                 }
 
                 return null;

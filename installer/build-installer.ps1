@@ -56,14 +56,14 @@ dotnet publish $launcherProject `
     -o $publishDir
 if ($LASTEXITCODE -ne 0) { throw "Launcher publish failed ($LASTEXITCODE)" }
 
-# The Auto TDP service, which the library starts during games. Same folder and runtime again.
+# The TDP Engine service, which the library starts during games. Same folder and runtime again.
 dotnet publish $serviceProject `
     -c Release `
     -r win-x64 `
     --self-contained true `
     -p:PublishReadyToRun=true `
     -o $publishDir
-if ($LASTEXITCODE -ne 0) { throw "Auto TDP service publish failed ($LASTEXITCODE)" }
+if ($LASTEXITCODE -ne 0) { throw "TDP Engine service publish failed ($LASTEXITCODE)" }
 
 # Registration-only package for the full screen home app list. See installer\HomeApp\AppxManifest.xml.
 $makeAppx = Get-ChildItem (Join-Path $toolsDir "sdkbt.$buildToolsVersion") -Recurse -Filter makeappx.exe -ErrorAction SilentlyContinue |
