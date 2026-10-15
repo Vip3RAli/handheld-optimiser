@@ -33,13 +33,14 @@ internal static partial class AutoTdp
     public const string AllyFans = "default";
 
     /// <summary>The fan curves on offer, the Ally's own first.</summary>
-    public static readonly string[] FanChoices = [AllyFans, .. AutoTdpProtocol.FanCurves];
+    public static readonly string[] FanChoices = [AllyFans, .. AutoTdpProtocol.FanModes];
 
     public static string FanName(string fans) => fans switch
     {
         AutoTdpProtocol.QuietFans => "Quiet",
         AutoTdpProtocol.CoolFans => "Cool",
         AutoTdpProtocol.FullFans => "Full speed",
+        AutoTdpProtocol.DynamicFans => "Dynamic",
         _ => "Ally default"
     };
 

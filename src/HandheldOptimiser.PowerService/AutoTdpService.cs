@@ -173,9 +173,16 @@ internal sealed partial class AutoTdpService : ServiceBase
             return;
         }
 
-        var fps = frames is null ? 0 : GameFps(frames, control.GameFolder);
+        var (fps, program) = frames is null ? (0, null) : GameFps(frames, control.GameFolder ?? control.FoundFolder);
         var temperature = _acpi.Temperature();
         var now = DateTime.UtcNow;
+
+        if (control.Lock?.Observe(now, program, fps) is { } found)
+        {
+            control.FoundFolder = found;
+            control.Lock = null;
+            Log.Write($"Following {found}, which held {fps:0} fps");
+        }
 
         if (fps >= GameFrames)
         {
@@ -200,6 +207,18 @@ internal sealed partial class AutoTdpService : ServiceBase
             }
         }
 
+        if (control.Dynamic is { } dynamic && control.Curve is not null)
+        {
+            var pick = dynamic.Pick(now, temperature, control.Controller?.Watts, control.Settings?.MaxWatts ?? 0, TemperatureLimit(control));
+            if (pick != control.DynamicPick)
+            {
+                control.DynamicPick = pick;
+                control.Curve = FanCurves.For(pick);
+                ApplyFans(control);
+                Log.Write($"Dynamic fans: {pick}, {temperature?.ToString() ?? "?"} °C{(control.Controller is { } held ? $", {held.Watts} W" : "")}");
+            }
+        }
+
         if (control.Curve is not null && now - control.LastFans >= Reassert)
         {
             ApplyFans(control);
@@ -207,6 +226,31 @@ internal sealed partial class AutoTdpService : ServiceBase
 
         _last = Status(control, fps, temperature);
     }
+
+    /// <summary>
+    /// Sets which fans a game runs with. Dynamic picks its first curve straight away, and keeps the one it
+    /// has when the widget changes only the frame rate, so its 30 second hold is not lost.
+    /// </summary>
+    private static void ChooseFans(Control control, string? fans, int? temperature)
+    {
+        control.FanCurve = fans;
+        if (fans != AutoTdpProtocol.DynamicFans)
+        {
+            control.Dynamic = null;
+            control.DynamicPick = null;
+            control.Curve = FanCurves.For(fans);
+            return;
+        }
+
+        control.Dynamic ??= new DynamicFans();
+        control.DynamicPick = control.Dynamic.Pick(DateTime.UtcNow, temperature, control.Controller?.Watts,
+            control.Settings?.MaxWatts ?? 0, TemperatureLimit(control));
+        control.Curve = FanCurves.For(control.DynamicPick);
+    }
+
+    // With fans only there are no settings, so Dynamic measures from the default limit.
+    private static int TemperatureLimit(Control control) =>
+        control.Settings?.TemperatureLimit ?? AutoTdpProtocol.DefaultTemperature;
 
     private void Apply(Control control, int watts)
     {
@@ -229,6 +273,7 @@ internal sealed partial class AutoTdpService : ServiceBase
         // Not asked again: a model without custom fan curves refuses every time.
         Log.Write($"The firmware refused the {control.FanCurve} fan curve, so the fans are left as they were");
         control.Curve = null;
+        control.Dynamic = null;
     }
 
     private static AutoTdpStatus Status(Control control, double? fps, int? temperature) =>
@@ -239,9 +284,10 @@ internal sealed partial class AutoTdpService : ServiceBase
     /// The game's frames a second: the busiest program running from its folder. Without a folder, the
     /// busiest program of all but Windows' own compositor, whose frames are every window's.
     /// </summary>
-    private static double GameFps(Dictionary<int, double> frames, string? folder)
+    private static (double Fps, string? Program) GameFps(Dictionary<int, double> frames, string? folder)
     {
         var best = 0.0;
+        string? program = null;
         foreach (var (processId, fps) in frames)
         {
             if (fps <= best)
@@ -262,10 +308,11 @@ internal sealed partial class AutoTdpService : ServiceBase
             if (counts)
             {
                 best = fps;
+                program = path;
             }
         }
 
-        return best;
+        return (best, program);
     }
 
     // ----- Requests from the library -----
@@ -361,10 +408,10 @@ internal sealed partial class AutoTdpService : ServiceBase
         _control?.ClientProcess?.Dispose();
         _control = new Control(settings, controller, folder, fromWidget ? null : ClientHandle(client), restoreMode, fromWidget)
         {
-            FanCurve = fans,
-            Curve = FanCurves.For(fans),
+            Lock = folder is null ? new GameLock() : null,
             LastFrames = DateTime.UtcNow
         };
+        ChooseFans(_control, fans, _acpi.Temperature());
 
         Set(_control);
         Log.Write($"{Describe(_control)}, for {folder ?? "the busiest program"}{(fromWidget ? ", from Game Bar" : "")}");
@@ -406,8 +453,7 @@ internal sealed partial class AutoTdpService : ServiceBase
             : new AutoTdpController(settings!, old.Controller?.Watts ?? (settings!.MinWatts + settings.MaxWatts + 1) / 2);
 
         _control = old with { Settings = settings, Controller = controller };
-        _control.FanCurve = fans;
-        _control.Curve = FanCurves.For(fans);
+        ChooseFans(_control, fans, _acpi.Temperature());
         _control.LastFrames = old.LastFrames;
 
         // Letting go of the power limit or the fans means setting the mode again, which puts back its own of
@@ -455,7 +501,7 @@ internal sealed partial class AutoTdpService : ServiceBase
                 AutoTdpProtocol.LowestTemperature, AutoTdpProtocol.HighestTemperature));
     }
 
-    private static string? FanCurve(string? name) => AutoTdpProtocol.FanCurves.Contains(name) ? name : null;
+    private static string? FanCurve(string? name) => AutoTdpProtocol.FanModes.Contains(name) ? name : null;
 
     private static string Describe(Control control)
     {
@@ -465,7 +511,11 @@ internal sealed partial class AutoTdpService : ServiceBase
             parts.Add($"Holding {settings.TargetFps} fps between {settings.MinWatts} and {settings.MaxWatts} W, under {settings.TemperatureLimit} °C, from {control.Controller!.Watts} W");
         }
 
-        if (control.FanCurve is { } fans)
+        if (control.DynamicPick is { } pick)
+        {
+            parts.Add($"dynamic fans, starting on {pick}");
+        }
+        else if (control.FanCurve is { } fans)
         {
             parts.Add($"{fans} fan curve");
         }
@@ -613,6 +663,18 @@ internal sealed partial class AutoTdpService : ServiceBase
 
         /// <summary>The curve to set, or null for the Ally's own or when the firmware refused it.</summary>
         public byte[]? Curve { get; set; }
+
+        /// <summary>Looks for the game while there is no folder to follow, as when started from Game Bar.</summary>
+        public GameLock? Lock { get; set; }
+
+        /// <summary>The game's folder once <see cref="Lock"/> found it; followed from then on, as GameFolder is.</summary>
+        public string? FoundFolder { get; set; }
+
+        /// <summary>What picks the curve while the fans are on Dynamic, or null for a fixed curve.</summary>
+        public DynamicFans? Dynamic { get; set; }
+
+        /// <summary>The fixed curve Dynamic is on now, so a change can be written and logged once.</summary>
+        public string? DynamicPick { get; set; }
 
         public DateTime LastSet { get; set; }
         public DateTime LastFans { get; set; }
