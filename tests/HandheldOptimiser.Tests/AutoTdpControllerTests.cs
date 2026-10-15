@@ -116,6 +116,24 @@ public class AutoTdpControllerTests
     }
 
     [Fact]
+    public void Hitches_and_spikes_do_not_push_the_limit_up()
+    {
+        // Like Overcooked 2 on the Ally: a light game that holds 60 from 12 W, but some seconds drop to a
+        // handful of frames (level changes, stutters) and others jump to hundreds (uncapped menus).
+        var random = new Random(11);
+        var controller = new AutoTdpController(Sixty, startWatts: 19);
+        var watts = Run(controller, 600, (_, w) => random.Next(100) switch
+        {
+            < 15 => random.Next(9, 16),
+            < 25 => random.Next(170, 303),
+            _ => Math.Min(60, 5.0 * w) + random.Next(-1, 2)
+        });
+
+        Assert.True(watts.TakeLast(300).Max() <= 15, $"Went to {watts.TakeLast(300).Max()} W");
+        Assert.InRange(watts[^1], 11, 15);
+    }
+
+    [Fact]
     public void Loading_screens_change_nothing()
     {
         var controller = new AutoTdpController(Sixty, startWatts: 15);

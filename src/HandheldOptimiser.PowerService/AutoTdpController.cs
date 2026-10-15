@@ -12,8 +12,11 @@ internal sealed record AutoTdpSettings(int TargetFps, int MinWatts, int MaxWatts
 /// answers with a new power limit when one is due. No hardware here, so it can be tested on its own.
 ///
 /// Controllers like this tend to go wrong in a few known ways, and each has its own guard:
-/// - Chasing noise. Decisions use three seconds of readings, a change waits for its effect before the
-///   next one, and there is a band just under the target where nothing changes.
+/// - Chasing noise. Decisions use the middle of three seconds of readings, a change waits for its effect
+///   before the next one, and there is a band just under the target where nothing changes.
+/// - Chasing hitches and spikes. Some games jump between a few frames and hundreds from one second to
+///   the next (level changes, uncapped menus, stutters). A second that far from the others is not
+///   something power fixes, so nothing changes until the readings agree again.
 /// - Sawing at an edge. A game capped at the target sits there at any power limit above the edge, so
 ///   stepping down eventually costs frames, and a noisy frame rate near the target does the same. Each
 ///   raise becomes a floor that is not stepped below for 30 seconds, doubling up to 4 minutes when the
@@ -28,6 +31,9 @@ internal sealed class AutoTdpController
 {
     private const int Window = 3;
     private const double MinFrames = 5;
+
+    // Readings this far from the middle one, below or above, make the window too unsteady to act on.
+    private const double Unsteady = 2;
 
     // Below this share of the target the power goes up; at or above Comfortable it may come down.
     private const double Below = 0.97;
@@ -124,16 +130,25 @@ internal sealed class AutoTdpController
             return null;
         }
 
-        var average = _readings.Average();
-        var low = _readings.Min();
+        var sorted = _readings.Order().ToArray();
+        var middle = sorted[sorted.Length / 2];
+        var low = sorted[0];
         var target = (double)_settings.TargetFps;
 
-        if (Judge(now, average) is { } takenBack)
+        if (low * Unsteady < middle || sorted[^1] > middle * Unsteady)
+        {
+            // A hitch or a spike: whatever was being judged is lost in it too.
+            _judging = null;
+            State = AutoTdpState.Settling;
+            return null;
+        }
+
+        if (Judge(now, middle) is { } takenBack)
         {
             return takenBack;
         }
 
-        if (average < target * Below)
+        if (middle < target * Below)
         {
             var ceiling = Ceiling(now);
             if (Watts >= ceiling)
@@ -142,7 +157,7 @@ internal sealed class AutoTdpController
                 return null;
             }
 
-            var shortBy = (target - average) / target;
+            var shortBy = (target - middle) / target;
             var step = shortBy > 0.25 ? 3 : shortBy > 0.12 ? 2 : 1;
             var raised = Math.Min(Watts + step, ceiling);
 
@@ -155,11 +170,11 @@ internal sealed class AutoTdpController
             _floorUntil = now + _floorHold;
 
             State = AutoTdpState.Raising;
-            _judging = (true, Watts, average);
+            _judging = (true, Watts, middle);
             return Change(now, raised, SettleAfterRaise);
         }
 
-        if (average >= target * Comfortable && low >= target * SteadyLow)
+        if (middle >= target * Comfortable && low >= target * SteadyLow)
         {
             var floor = now < _floorUntil ? Math.Max(_floor, _settings.MinWatts) : _settings.MinWatts;
             if (Watts <= floor)
@@ -168,10 +183,10 @@ internal sealed class AutoTdpController
                 return null;
             }
 
-            var spare = (average - target) / target;
+            var spare = (middle - target) / target;
             var step = spare > 0.25 ? 2 : 1;
             State = AutoTdpState.Lowering;
-            _judging = (false, Watts, average);
+            _judging = (false, Watts, middle);
             _lastLowered = now;
             return Change(now, Math.Max(Watts - step, floor), SettleAfterLower);
         }
@@ -224,7 +239,7 @@ internal sealed class AutoTdpController
     }
 
     /// <summary>Weighs the last change now it has had time to work. Returns a limit when a change is taken back.</summary>
-    private int? Judge(DateTime now, double average)
+    private int? Judge(DateTime now, double fps)
     {
         if (_judging is not { } last)
         {
@@ -234,7 +249,7 @@ internal sealed class AutoTdpController
         _judging = null;
         if (last.Raise)
         {
-            if (average >= last.FpsBefore * Gain)
+            if (fps >= last.FpsBefore * Gain)
             {
                 _wasted = 0;
                 return null;
