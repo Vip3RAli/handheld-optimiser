@@ -134,8 +134,23 @@ $msbuild = if (Test-Path $vswhere) {
 if ($msbuild) {
     Write-Host 'Building the Game Bar widget' -ForegroundColor Cyan
     if (Test-Path $gameBarDir) { Remove-Item $gameBarDir -Recurse -Force }
-    & $msbuild $gameBarProject /restore /p:Configuration=Release /p:Platform=x64 /v:minimal /nologo
-    if ($LASTEXITCODE -ne 0) { throw "Game Bar widget build failed ($LASTEXITCODE)" }
+
+    # Each build gets a higher version, so setup can upgrade the widget in place. Windows refuses the same
+    # version again, and removing the package first makes Game Bar forget the widget. The version is the
+    # day and minute of the build (UTC, so it never goes back), written in for the build and then put back.
+    $manifest = Join-Path (Split-Path $gameBarProject -Parent) 'Package.appxmanifest'
+    $original = [IO.File]::ReadAllText($manifest)
+    $now = [DateTime]::UtcNow
+    $widgetVersion = '1.{0}.{1}.0' -f ($now.Date - [DateTime]'2026-01-01').Days, [int]$now.TimeOfDay.TotalMinutes
+    try {
+        [IO.File]::WriteAllText($manifest, ($original -replace '(<Identity[^>]*?\sVersion=")[^"]*', "`${1}$widgetVersion"))
+        & $msbuild $gameBarProject /restore /p:Configuration=Release /p:Platform=x64 /v:minimal /nologo
+        if ($LASTEXITCODE -ne 0) { throw "Game Bar widget build failed ($LASTEXITCODE)" }
+    }
+    finally {
+        [IO.File]::WriteAllText($manifest, $original)
+    }
+    Write-Host "Game Bar widget $widgetVersion" -ForegroundColor Cyan
 }
 
 $gameBarPackage = Get-ChildItem $gameBarDir -Recurse -Filter 'HandheldOptimiser.GameBar_*_x64.msix' -ErrorAction SilentlyContinue |

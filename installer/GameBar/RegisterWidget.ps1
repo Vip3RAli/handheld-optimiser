@@ -43,11 +43,20 @@ try {
             finally { $store.Close() }
         }
         'Add' {
-            # An older copy goes first: the same version again is refused rather than replaced.
-            Get-AppxPackage -Name 'HandheldOptimiser.GameBar' | Remove-AppxPackage
             $dependencies = @(Get-ChildItem (Join-Path $folder 'Dependencies') -Filter *.appx -ErrorAction SilentlyContinue |
                 ForEach-Object FullName)
-            Add-AppxPackage -Path (Join-Path $folder 'GameBar.msix') -DependencyPath $dependencies -ForceApplicationShutdown
+            $package = Join-Path $folder 'GameBar.msix'
+
+            # An upgrade in place keeps the widget in Game Bar; removing it first makes Game Bar forget it.
+            # Each local build has a higher version (see build-installer.ps1). The same version again or an
+            # older one is refused, and only then does the old copy go first.
+            try {
+                Add-AppxPackage -Path $package -DependencyPath $dependencies -ForceApplicationShutdown
+            }
+            catch {
+                Get-AppxPackage -Name 'HandheldOptimiser.GameBar' | Remove-AppxPackage
+                Add-AppxPackage -Path $package -DependencyPath $dependencies -ForceApplicationShutdown
+            }
             exit 0
         }
         'Untrust' {
