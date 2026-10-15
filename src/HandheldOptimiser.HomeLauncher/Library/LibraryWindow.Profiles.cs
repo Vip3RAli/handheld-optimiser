@@ -6,7 +6,8 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 /// <summary>
 /// Per-game profiles: a power mode, resolution, refresh rate and brightness a game is switched to when it starts
 /// from the library, with the player's own settings put back once it has closed (see
-/// LibraryWindow.Session), and whether background programs are closed for it.
+/// LibraryWindow.Session), whether background programs are closed for it, and the frame rate TDP Engine
+/// holds it at.
 /// </summary>
 public partial class LibraryWindow
 {
@@ -69,6 +70,13 @@ public partial class LibraryWindow
             false => "Left running",
             null => Unchanged
         };
+
+        ProfileAutoTdpSetting.Tag = _profile.AutoTdpFps switch
+        {
+            null => "As in settings",
+            0 => "Off",
+            var fps => $"{fps} fps"
+        };
     }
 
     /// <summary>Left and right on a profile row. Each row's choices start with Don't change.</summary>
@@ -110,6 +118,10 @@ public partial class LibraryWindow
         {
             profile = _profile with { CloseApps = StepChoice(_profile.CloseApps, [true, false], step) };
         }
+        else if (ReferenceEquals(row, ProfileAutoTdpSetting))
+        {
+            profile = _profile with { AutoTdpFps = StepChoice(_profile.AutoTdpFps, [0, .. AutoTdp.FrameRates], step) };
+        }
         else
         {
             return false;
@@ -145,6 +157,8 @@ public partial class LibraryWindow
     private void OnStepProfileBrightness(object sender, RoutedEventArgs e) => StepProfileSetting(ProfileBrightnessSetting, 1);
 
     private void OnStepProfileApps(object sender, RoutedEventArgs e) => StepProfileSetting(ProfileAppsSetting, 1);
+
+    private void OnStepProfileAutoTdp(object sender, RoutedEventArgs e) => StepProfileSetting(ProfileAutoTdpSetting, 1);
 
     /// <summary>Switches to a game's profile as it starts, keeping what it replaces.</summary>
     private void ApplyProfile(Game game, GameProfile profile)

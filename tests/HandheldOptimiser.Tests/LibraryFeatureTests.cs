@@ -154,6 +154,19 @@ public sealed class LibraryFeatureTests : IDisposable
     public void GameProfiles_ReadTheResolution(string text, int? width, int? height) =>
         Assert.Equal(width is null ? null : new Resolution(width.Value, height!.Value), GameProfiles.Parse(text).Resolution);
 
+    [Theory]
+    [InlineData("fps=60", 60)]
+    [InlineData("power=balanced;fps=off", 0)]
+    [InlineData("fps=55", null)]
+    [InlineData("hz=60", null)]
+    public void GameProfiles_ReadTheAutoTdpFrameRate(string text, int? fps)
+    {
+        var profile = GameProfiles.Parse(text);
+
+        Assert.Equal(fps, profile.AutoTdpFps);
+        Assert.Equal(profile, GameProfiles.Parse(GameProfiles.Format(profile)));
+    }
+
     [Fact]
     public void GameProfiles_ResolutionAloneIsNotEmpty() =>
         Assert.False(new GameProfile(null, null, null, Resolution: new Resolution(1280, 720)).IsEmpty);

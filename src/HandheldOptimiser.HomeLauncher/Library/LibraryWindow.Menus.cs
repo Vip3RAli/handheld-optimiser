@@ -89,7 +89,7 @@ public partial class LibraryWindow
 
         // Profiles only change things for games.
         ProfileItem.Visibility = installed && !tile.IsApp ? Visibility.Visible : Visibility.Collapsed;
-        ProfileItem.Tag = GameProfiles.For(game) is { IsEmpty: true, CloseApps: null } ? "Not set" : "Set";
+        ProfileItem.Tag = GameProfiles.For(game) is { IsEmpty: true, CloseApps: null, AutoTdpFps: null } ? "Not set" : "Set";
         RefreshCloseGameItem(tile);
 
         var added = AddedPrograms.IsAdded(game);

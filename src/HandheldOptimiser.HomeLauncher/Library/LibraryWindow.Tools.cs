@@ -7,7 +7,7 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 
 /// <summary>
 /// The While playing and Maintenance settings: background programs closed around games, the stores' own
-/// apps, clean-ups and the startup apps, so none of it needs the desktop.
+/// apps, TDP Engine, clean-ups and the startup apps, so none of it needs the desktop.
 /// </summary>
 public partial class LibraryWindow
 {
@@ -77,6 +77,44 @@ public partial class LibraryWindow
             StoreClosing.Always => "Always",
             _ => "Off"
         };
+
+        AutoTdpSetting.Tag = LibrarySettings.AutoTdpFps is var fps and > 0 ? $"{fps} fps" : "Off";
+        AutoTdpTemperatureSetting.Tag = $"{LibrarySettings.AutoTdpTemperature} °C";
+        AutoTdpWattsSetting.Tag = $"{LibrarySettings.AutoTdpMaxWatts} W";
+    }
+
+    // ----- TDP Engine -----
+
+    private void OnStepAutoTdp(object sender, RoutedEventArgs e) => StepAutoTdp(1);
+
+    private void OnStepAutoTdpTemperature(object sender, RoutedEventArgs e) => StepAutoTdpTemperature(1);
+
+    private void OnStepAutoTdpWatts(object sender, RoutedEventArgs e) => StepAutoTdpWatts(1);
+
+    /// <summary>Off, then each frame rate. Takes effect from the next game started.</summary>
+    private void StepAutoTdp(int step)
+    {
+        LibrarySettings.AutoTdpFps = StepAmong(LibrarySettings.AutoTdpFps, [0, .. AutoTdp.FrameRates], step);
+        RefreshWhilePlaying();
+    }
+
+    private void StepAutoTdpTemperature(int step)
+    {
+        LibrarySettings.AutoTdpTemperature = StepAmong(LibrarySettings.AutoTdpTemperature, AutoTdp.TemperatureLimits, step);
+        RefreshWhilePlaying();
+    }
+
+    private void StepAutoTdpWatts(int step)
+    {
+        LibrarySettings.AutoTdpMaxWatts = StepAmong(LibrarySettings.AutoTdpMaxWatts, AutoTdp.MostWatts, step);
+        RefreshWhilePlaying();
+    }
+
+    /// <summary>The next or previous of a list of numbers, going round at either end.</summary>
+    private static int StepAmong(int value, IReadOnlyList<int> choices, int step)
+    {
+        var index = Math.Max(0, choices.ToList().IndexOf(value));
+        return choices[(index + step + choices.Count) % choices.Count];
     }
 
     private void OnToggleGameMode(object sender, RoutedEventArgs e)
@@ -377,6 +415,24 @@ public partial class LibraryWindow
         if (ReferenceEquals(row, SortSetting))
         {
             StepSort(step);
+            return true;
+        }
+
+        if (ReferenceEquals(row, AutoTdpSetting))
+        {
+            StepAutoTdp(step);
+            return true;
+        }
+
+        if (ReferenceEquals(row, AutoTdpTemperatureSetting))
+        {
+            StepAutoTdpTemperature(step);
+            return true;
+        }
+
+        if (ReferenceEquals(row, AutoTdpWattsSetting))
+        {
+            StepAutoTdpWatts(step);
             return true;
         }
 
