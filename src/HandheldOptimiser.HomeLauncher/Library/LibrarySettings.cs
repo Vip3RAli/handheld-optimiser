@@ -101,6 +101,7 @@ internal static class LibrarySettings
     private const string AutoTdpFpsValue = "AutoTdpFps";
     private const string AutoTdpTemperatureValue = "AutoTdpTemperature";
     private const string AutoTdpWattsValue = "AutoTdpMaxWatts";
+    private const string FanCurveValue = "FanCurve";
 
     /// <summary>The sizes a TV or monitor can show the library at, as percentages. 0 fits it to the screen.</summary>
     public static readonly int[] DockedSizes = [0, 100, 125, 150, 175, 200];
@@ -342,6 +343,13 @@ internal static class LibrarySettings
     {
         get => ReadChoice(AutoTdpWattsValue, AutoTdp.MostWatts, 25);
         set => Write(AutoTdpWattsValue, value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>The fan curve games are played with, one of <see cref="AutoTdp.FanChoices"/>; the Ally's own by default.</summary>
+    public static string FanCurve
+    {
+        get => Read(FanCurveValue) is { } fans && AutoTdp.FanChoices.Contains(fans) ? fans : AutoTdp.AllyFans;
+        set => Write(FanCurveValue, value == AutoTdp.AllyFans ? null : value);
     }
 
     private static int ReadChoice(string name, int[] choices, int fallback) =>

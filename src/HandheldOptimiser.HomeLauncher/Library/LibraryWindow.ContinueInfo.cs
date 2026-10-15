@@ -106,7 +106,7 @@ public partial class LibraryWindow
         }
 
         var profile = GameProfiles.For(card.Game);
-        if (!profile.IsEmpty || profile.CloseApps is not null || profile.AutoTdpFps is not null)
+        if (!profile.IsEmpty || profile.CloseApps is not null || profile.AutoTdpFps is not null || profile.FanCurve is not null)
         {
             rows.Add(new InfoRow("Game profile", Capitalised(profile.Describe())));
         }

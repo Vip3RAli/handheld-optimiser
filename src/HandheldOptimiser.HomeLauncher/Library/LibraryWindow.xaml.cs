@@ -607,6 +607,6 @@ public partial class LibraryWindow : Window
         }
 
         StartSession(tile.Game, storeWasOpen, profile.CloseApps ?? LibrarySettings.GameMode,
-            profile.AutoTdpFps ?? LibrarySettings.AutoTdpFps);
+            profile.AutoTdpFps ?? LibrarySettings.AutoTdpFps, profile.FanCurve ?? LibrarySettings.FanCurve);
     }
 }

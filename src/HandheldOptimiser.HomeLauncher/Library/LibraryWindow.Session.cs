@@ -17,7 +17,7 @@ public partial class LibraryWindow
     private GameSession? _session;
     private bool _sessionStoreWasOpen;
 
-    // The game TDP Engine is holding, or null.
+    // The game TDP Engine is holding, or setting the fans for, or null.
     private Game? _autoTdpGame;
 
     // Programs closed for the game being played, to start again once it closes.
@@ -26,7 +26,8 @@ public partial class LibraryWindow
     private SortOrder _sort = LibrarySettings.Sort;
 
     /// <param name="autoTdpFps">The frame rate TDP Engine holds the game at, or 0 for off.</param>
-    private void StartSession(Game game, bool storeWasOpen, bool closeApps, int autoTdpFps)
+    /// <param name="fanCurve">The fan curve to play with, one of <see cref="AutoTdp.FanChoices"/>.</param>
+    private void StartSession(Game game, bool storeWasOpen, bool closeApps, int autoTdpFps, string fanCurve)
     {
         var session = new GameSession(game);
         _session = session;
@@ -38,10 +39,10 @@ public partial class LibraryWindow
         }
 
         // Without a folder there is no telling when the game closes, and so when to stop.
-        if (autoTdpFps > 0 && session.CanFollow)
+        if ((autoTdpFps > 0 || fanCurve != AutoTdp.AllyFans) && session.CanFollow)
         {
             _autoTdpGame = game;
-            _ = StartAutoTdpAsync(game, autoTdpFps);
+            _ = StartAutoTdpAsync(game, autoTdpFps, fanCurve);
         }
 
         if (session.CanFollow)
@@ -50,9 +51,9 @@ public partial class LibraryWindow
         }
     }
 
-    private async Task StartAutoTdpAsync(Game game, int fps)
+    private async Task StartAutoTdpAsync(Game game, int fps, string fanCurve)
     {
-        if (await AutoTdp.StartAsync(game, fps) is { } problem)
+        if (await AutoTdp.StartAsync(game, fps, fanCurve) is { } problem)
         {
             Notice = problem;
             if (ReferenceEquals(_autoTdpGame, game))
@@ -62,7 +63,7 @@ public partial class LibraryWindow
         }
     }
 
-    /// <summary>Hands the power limit back to Armoury Crate's operating mode, for the game closing.</summary>
+    /// <summary>Hands the power limit and fans back to Armoury Crate's operating mode, for the game closing.</summary>
     private void StopAutoTdp()
     {
         if (_autoTdpGame is { } game)

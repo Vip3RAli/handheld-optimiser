@@ -81,6 +81,7 @@ public partial class LibraryWindow
         AutoTdpSetting.Tag = LibrarySettings.AutoTdpFps is var fps and > 0 ? $"{fps} fps" : "Off";
         AutoTdpTemperatureSetting.Tag = $"{LibrarySettings.AutoTdpTemperature} °C";
         AutoTdpWattsSetting.Tag = $"{LibrarySettings.AutoTdpMaxWatts} W";
+        FanCurveSetting.Tag = AutoTdp.FanName(LibrarySettings.FanCurve);
     }
 
     // ----- TDP Engine -----
@@ -90,6 +91,8 @@ public partial class LibraryWindow
     private void OnStepAutoTdpTemperature(object sender, RoutedEventArgs e) => StepAutoTdpTemperature(1);
 
     private void OnStepAutoTdpWatts(object sender, RoutedEventArgs e) => StepAutoTdpWatts(1);
+
+    private void OnStepFanCurve(object sender, RoutedEventArgs e) => StepFanCurve(1);
 
     /// <summary>Off, then each frame rate. Takes effect from the next game started.</summary>
     private void StepAutoTdp(int step)
@@ -107,6 +110,15 @@ public partial class LibraryWindow
     private void StepAutoTdpWatts(int step)
     {
         LibrarySettings.AutoTdpMaxWatts = StepAmong(LibrarySettings.AutoTdpMaxWatts, AutoTdp.MostWatts, step);
+        RefreshWhilePlaying();
+    }
+
+    /// <summary>The Ally's own, then each of TDP Engine's curves. Takes effect from the next game started.</summary>
+    private void StepFanCurve(int step)
+    {
+        var choices = AutoTdp.FanChoices;
+        var index = Math.Max(0, Array.IndexOf(choices, LibrarySettings.FanCurve));
+        LibrarySettings.FanCurve = choices[(index + step + choices.Length) % choices.Length];
         RefreshWhilePlaying();
     }
 
@@ -433,6 +445,12 @@ public partial class LibraryWindow
         if (ReferenceEquals(row, AutoTdpWattsSetting))
         {
             StepAutoTdpWatts(step);
+            return true;
+        }
+
+        if (ReferenceEquals(row, FanCurveSetting))
+        {
+            StepFanCurve(step);
             return true;
         }
 

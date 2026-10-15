@@ -4,7 +4,8 @@ using Microsoft.Win32.SafeHandles;
 namespace HandheldOptimiser.PowerService;
 
 /// <summary>
-/// ASUS's ACPI interface, the one Armoury Crate and G-Helper use to set the processor's power limits. It
+/// ASUS's ACPI interface, the one Armoury Crate and G-Helper use to set the processor's power limits and
+/// the fan curves. It
 /// is a device ASUS's own driver (ATKACPI) puts there; nothing is installed for it. The method and device
 /// numbers are the ones G-Helper (github.com/seerge/g-helper, app/AsusACPI.cs) uses on the ROG Ally.
 /// </summary>
@@ -29,6 +30,10 @@ internal sealed partial class AsusAcpi : IDisposable
     private const uint OperatingMode = 0x00120075;
 
     public const int PerformanceMode = 0;
+
+    // The fan curves, one for each of the Ally's two fans, each 16 bytes: eight temperatures then eight speeds.
+    private const uint CpuFanCurve = 0x00110024;
+    private const uint GpuFanCurve = 0x00110025;
 
     private const uint GenericRead = 0x80000000;
     private const uint GenericWrite = 0x40000000;
@@ -82,6 +87,23 @@ internal sealed partial class AsusAcpi : IDisposable
     /// <summary>Sets an operating mode, which also puts back that mode's own power limits.</summary>
     public bool SetOperatingMode(int mode) => Set(OperatingMode, mode) == 1;
 
+    /// <summary>
+    /// Sets both fans to a curve, as G-Helper does. It holds until the operating mode is set again, which
+    /// puts back that mode's own curve.
+    /// </summary>
+    /// <returns>False when the firmware refused it, as a model without custom fan curves does.</returns>
+    public bool SetFanCurve(byte[] curve)
+    {
+        if (curve.Length != 16)
+        {
+            return false;
+        }
+
+        var cpu = Set(CpuFanCurve, curve);
+        var gpu = Set(GpuFanCurve, curve);
+        return cpu == 1 && gpu == 1;
+    }
+
     /// <summary>A device's status, or below 0 when this model does not have it.</summary>
     private int Get(uint device)
     {
@@ -96,6 +118,15 @@ internal sealed partial class AsusAcpi : IDisposable
         Span<byte> args = stackalloc byte[8];
         BitConverter.TryWriteBytes(args, device);
         BitConverter.TryWriteBytes(args[4..], value);
+        return Call(Devs, args);
+    }
+
+    /// <returns>1 when the firmware accepted it.</returns>
+    private int Set(uint device, ReadOnlySpan<byte> values)
+    {
+        Span<byte> args = stackalloc byte[4 + values.Length];
+        BitConverter.TryWriteBytes(args, device);
+        values.CopyTo(args[4..]);
         return Call(Devs, args);
     }
 

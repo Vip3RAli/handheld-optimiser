@@ -29,13 +29,28 @@ internal static partial class AutoTdp
 
     public static readonly int[] MostWatts = [15, 18, 20, 25, 30];
 
-    /// <summary>Starts holding a game at its target, from what it settled on last time.</summary>
+    /// <summary>The Ally's own fan curve, which TDP Engine leaves alone.</summary>
+    public const string AllyFans = "default";
+
+    /// <summary>The fan curves on offer, the Ally's own first.</summary>
+    public static readonly string[] FanChoices = [AllyFans, .. AutoTdpProtocol.FanCurves];
+
+    public static string FanName(string fans) => fans switch
+    {
+        AutoTdpProtocol.QuietFans => "Quiet",
+        AutoTdpProtocol.CoolFans => "Cool",
+        AutoTdpProtocol.FullFans => "Full speed",
+        _ => "Ally default"
+    };
+
+    /// <summary>Starts holding a game at its target, from what it settled on last time, and setting its fan curve.</summary>
+    /// <param name="targetFps">The frame rate to hold, or 0 to set only the fans.</param>
     /// <returns>Why it could not start, or null.</returns>
-    public static Task<string?> StartAsync(Game game, int targetFps) => Queue(() =>
+    public static Task<string?> StartAsync(Game game, int targetFps, string fanCurve) => Queue(() =>
     {
         var request = new AutoTdpRequest(AutoTdpProtocol.Start, targetFps, AutoTdpProtocol.LowestWatts,
             LibrarySettings.AutoTdpMaxWatts, LibrarySettings.AutoTdpTemperature, Learned(game),
-            GameSession.ProcessFolder(game));
+            GameSession.ProcessFolder(game), fanCurve == AllyFans ? null : fanCurve);
 
         if (StartService() is { } problem)
         {
@@ -48,7 +63,7 @@ internal static partial class AutoTdp
             return Task.FromResult<string?>("TDP Engine did not answer.");
         }
 
-        Program.Log($"TDP Engine for {game.Key}: {targetFps} fps from {status.Watts} W{(status.Error is { } error ? $" ({error})" : "")}");
+        Program.Log($"TDP Engine for {game.Key}: {targetFps} fps from {status.Watts} W, {fanCurve} fans{(status.Error is { } error ? $" ({error})" : "")}");
         return Task.FromResult(status.Error);
     });
 
@@ -77,10 +92,19 @@ internal static partial class AutoTdp
             return Task.FromResult<string?>(null);
         }
 
-        var parts = new List<string> { $"TDP Engine {status.Watts} W" };
-        if (status.Fps is { } fps)
+        var parts = new List<string>();
+        if (status.Watts is { } watts)
         {
-            parts.Add($"{fps:0} fps");
+            parts.Add($"TDP Engine {watts} W");
+            if (status.Fps is { } fps)
+            {
+                parts.Add($"{fps:0} fps");
+            }
+        }
+
+        if (status.FanCurve is { } fans)
+        {
+            parts.Add($"{FanName(fans)} fans");
         }
 
         if (status.Temperature is { } degrees)
