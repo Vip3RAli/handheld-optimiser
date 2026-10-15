@@ -28,6 +28,12 @@ internal static class AutoTdpProtocol
 
     public static readonly string[] FanCurves = [QuietFans, CoolFans, FullFans];
 
+    /// <summary>Moves between the fixed curves as the temperature and the power limit change. See DynamicFans.</summary>
+    public const string DynamicFans = "dynamic";
+
+    /// <summary>Every fan choice a request may name: the fixed curves, then Dynamic.</summary>
+    public static readonly string[] FanModes = [.. FanCurves, DynamicFans];
+
     // What a request leaves at 0 gets these, as when the widget starts it without the library's settings.
     public const int DefaultMaxWatts = 25;
     public const int DefaultTemperature = 80;

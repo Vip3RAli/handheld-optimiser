@@ -169,6 +169,7 @@ public sealed class LibraryFeatureTests : IDisposable
 
     [Theory]
     [InlineData("fan=quiet", "quiet")]
+    [InlineData("fan=dynamic", "dynamic")]
     [InlineData("fps=60;fan=default", "default")]
     [InlineData("fan=loud", null)]
     [InlineData("power=silent", null)]

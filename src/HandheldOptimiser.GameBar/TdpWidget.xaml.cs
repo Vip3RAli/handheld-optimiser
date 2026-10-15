@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
+using Windows.UI.Xaml.Documents;
 
 namespace HandheldOptimiser.GameBar
 {
@@ -64,7 +65,7 @@ namespace HandheldOptimiser.GameBar
             }
 
             _busy = true;
-            Detail.Text = _status.Running ? "Changing…" : "Starting TDP Engine…";
+            SetState("", _status.Running ? "Changing…" : "Starting TDP Engine…");
             try
             {
                 Show(await Task.Run(() => EngineClient.Update(targetFps, fanCurve)));
@@ -81,32 +82,54 @@ namespace HandheldOptimiser.GameBar
             Check(FrameRates, CurrentFps.ToString());
             Check(Fans, CurrentFans ?? "");
 
+            // The readouts only mean something while the engine runs, so the state line stands alone otherwise.
+            var readouts = status.Running && status.Error == null;
+            Readouts.Visibility = readouts ? Visibility.Visible : Visibility.Collapsed;
+
+            // The divider only separates the line from the readouts, so it goes with them.
+            StateLine.BorderThickness = new Thickness(0, readouts ? 1 : 0, 0, 0);
+            StateLine.Margin = new Thickness(0, readouts ? 10 : 0, 0, 0);
+            StateLine.Padding = new Thickness(0, readouts ? 10 : 0, 0, 0);
+
             if (status.Error != null)
             {
-                Headline.Text = "TDP Engine";
-                Detail.Text = status.Error;
+                SetState("", status.Error);
                 return;
             }
 
             if (!status.Running)
             {
-                Headline.Text = "TDP Engine is off";
-                Detail.Text = "Pick a frame rate or fan curve to start it for the game you're playing.";
+                SetState("Off", ". Pick a frame rate or fan curve to start it for the game you're playing.");
                 return;
             }
 
-            var parts = new[]
-            {
-                status.Watts is int watts ? watts + " W" : null,
-                status.Watts != null && status.Fps is double fps ? Math.Round(fps) + " fps" : null,
-                status.Watts == null && status.FanCurve != null ? FanName(status.FanCurve) + " fans" : null,
-                status.Temperature is int degrees ? degrees + " °C" : null
-            };
+            // With fans only, Armoury Crate keeps the power limit, so there is no wattage of TDP Engine's to show.
+            SetReadout(WattsValue, WattsUnit, "W", status.Watts?.ToString() ?? "Auto", status.Watts != null);
+            SetReadout(FpsValue, FpsUnit, "fps", status.Fps is double fps ? Math.Round(fps).ToString() : "?", status.Fps != null);
+            SetReadout(TemperatureValue, TemperatureUnit, "°C", status.Temperature?.ToString() ?? "?", status.Temperature != null);
 
-            Headline.Text = string.Join(" · ", parts.Where(part => part != null));
-            Detail.Text = status.Watts == null
-                ? "Armoury Crate sets the power limit."
-                : Explain(status.State, status.TargetFps);
+            if (status.Watts == null)
+            {
+                SetState(FanName(status.FanCurve) + " fans", ". Armoury Crate sets the power limit.");
+            }
+            else
+            {
+                Explain(status.State, status.TargetFps);
+            }
+        }
+
+        /// <summary>A readout's number, with its unit hidden when the value is a word such as Auto.</summary>
+        private static void SetReadout(Run value, Run unit, string unitText, string text, bool known)
+        {
+            value.Text = text;
+            unit.Text = known ? unitText : "";
+        }
+
+        /// <summary>The line under the readouts: the state's name in cyan, then the rest of the sentence.</summary>
+        private void SetState(string name, string detail)
+        {
+            StateName.Text = name;
+            StateDetail.Text = detail;
         }
 
         private static void Check(Panel row, string tag)
@@ -124,23 +147,24 @@ namespace HandheldOptimiser.GameBar
                 case "quiet": return "Quiet";
                 case "cool": return "Cool";
                 case "full": return "Full speed";
+                case "dynamic": return "Dynamic";
                 default: return "Ally";
             }
         }
 
         /// <summary>The service's state names, from AutoTdpState in HandheldOptimiser.PowerService.</summary>
-        private static string Explain(string state, int targetFps)
+        private void Explain(string state, int targetFps)
         {
             switch (state)
             {
-                case "Holding": return "Holding " + targetFps + " fps with the least power.";
-                case "Raising": return "Short of " + targetFps + " fps, so raising the power.";
-                case "Lowering": return "Above " + targetFps + " fps, so lowering the power.";
-                case "AtMaximum": return "At its most watts and still short of " + targetFps + " fps.";
-                case "NoGain": return "More power doesn't help this game, so it isn't given any.";
-                case "TooHot": return "At the temperature limit, so cooling down.";
-                case "Waiting": return "Waiting for the game: loading, paused or in a menu.";
-                default: return "Settling after a change.";
+                case "Holding": SetState("Holding", " " + targetFps + " fps with the least power."); break;
+                case "Raising": SetState("Raising", " the power: short of " + targetFps + " fps."); break;
+                case "Lowering": SetState("Lowering", " the power: above " + targetFps + " fps."); break;
+                case "AtMaximum": SetState("At its most watts", " and still short of " + targetFps + " fps."); break;
+                case "NoGain": SetState("No gain", ": more power doesn't help this game, so it isn't given any."); break;
+                case "TooHot": SetState("Too hot", ": at the temperature limit, so cooling down."); break;
+                case "Waiting": SetState("Waiting", " for the game: loading, paused or in a menu."); break;
+                default: SetState("Settling", " after a change."); break;
             }
         }
     }

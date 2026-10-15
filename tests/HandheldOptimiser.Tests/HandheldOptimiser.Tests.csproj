@@ -32,6 +32,8 @@
     -->
     <Compile Include="..\..\src\HandheldOptimiser.PowerService\AutoTdpController.cs" Link="AutoTdpController.cs" />
     <Compile Include="..\..\src\HandheldOptimiser.PowerService\FanCurves.cs" Link="FanCurves.cs" />
+    <Compile Include="..\..\src\HandheldOptimiser.PowerService\DynamicFans.cs" Link="DynamicFans.cs" />
+    <Compile Include="..\..\src\HandheldOptimiser.PowerService\GameLock.cs" Link="GameLock.cs" />
   </ItemGroup>
 
 </Project>
