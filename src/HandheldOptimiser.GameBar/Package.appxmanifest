@@ -10,12 +10,16 @@
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
-  IgnorableNamespaces="uap uap3">
+  xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
+  IgnorableNamespaces="uap uap3 mp">
 
   <Identity
     Name="HandheldOptimiser.GameBar"
     Publisher="CN=Handheld Optimiser"
     Version="1.0.0.0" />
+
+  <!-- Required by Visual Studio's packaging for any UWP app, though it means nothing off a phone. -->
+  <mp:PhoneIdentity PhoneProductId="5f47bab0-77df-4e97-83af-1d0cfa48d0ec" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
 
   <Properties>
     <DisplayName>Handheld Optimiser TDP Engine</DisplayName>

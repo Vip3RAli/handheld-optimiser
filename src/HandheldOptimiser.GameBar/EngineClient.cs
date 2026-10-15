@@ -206,6 +206,8 @@ namespace HandheldOptimiser.GameBar
             }
         }
 
+        // .NET Native only binds calls outside the UWP API set when they are marked ExactSpelling. Starting a
+        // service is one: Store apps may not, but this widget is sideloaded.
         private static readonly IntPtr InvalidHandle = new IntPtr(-1);
         private const uint GenericRead = 0x80000000;
         private const uint GenericWrite = 0x40000000;
@@ -228,16 +230,16 @@ namespace HandheldOptimiser.GameBar
         [DllImport("kernel32.dll")]
         private static extern bool CloseHandle(IntPtr handle);
 
-        [DllImport("advapi32.dll", EntryPoint = "OpenSCManagerW", SetLastError = true, CharSet = CharSet.Unicode)]
+        [DllImport("advapi32.dll", EntryPoint = "OpenSCManagerW", SetLastError = true, CharSet = CharSet.Unicode, ExactSpelling = true)]
         private static extern IntPtr OpenSCManager(string machine, string database, uint access);
 
-        [DllImport("advapi32.dll", EntryPoint = "OpenServiceW", SetLastError = true, CharSet = CharSet.Unicode)]
+        [DllImport("advapi32.dll", EntryPoint = "OpenServiceW", SetLastError = true, CharSet = CharSet.Unicode, ExactSpelling = true)]
         private static extern IntPtr OpenService(IntPtr manager, string name, uint access);
 
-        [DllImport("advapi32.dll", SetLastError = true)]
+        [DllImport("advapi32.dll", SetLastError = true, ExactSpelling = true)]
         private static extern bool StartServiceW(IntPtr service, uint argumentCount, IntPtr arguments);
 
-        [DllImport("advapi32.dll")]
+        [DllImport("advapi32.dll", ExactSpelling = true)]
         private static extern bool CloseServiceHandle(IntPtr handle);
     }
 }
