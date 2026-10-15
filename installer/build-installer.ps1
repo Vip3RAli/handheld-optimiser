@@ -2,6 +2,12 @@
 # Output: artifacts\HandheldOptimiser-Setup-<version>.exe
 #
 # Requires Inno Setup 6: winget install --id JRSoftware.InnoSetup -e --scope user
+#
+# The TDP Engine Game Bar widget is a UWP app, which needs Visual Studio (or its Build Tools) with the
+# Universal Windows Platform workload to build:
+#   winget install --id Microsoft.VisualStudio.2022.BuildTools -e --override "--quiet --add Microsoft.VisualStudio.Workload.UniversalBuildTools --includeRecommended"
+# Without it, the widget package CI builds (the GameBar-widget artifact on a GitHub Actions run) can be
+# unzipped into artifacts\GameBar instead. With neither, the installer is built without the widget.
 
 $ErrorActionPreference = 'Stop'
 
@@ -9,6 +15,8 @@ $root = Split-Path $PSScriptRoot -Parent
 $project = Join-Path $root 'src\HandheldOptimiser\HandheldOptimiser.csproj'
 $launcherProject = Join-Path $root 'src\HandheldOptimiser.HomeLauncher\HandheldOptimiser.HomeLauncher.csproj'
 $serviceProject = Join-Path $root 'src\HandheldOptimiser.PowerService\HandheldOptimiser.PowerService.csproj'
+$gameBarProject = Join-Path $root 'src\HandheldOptimiser.GameBar\HandheldOptimiser.GameBar.csproj'
+$gameBarDir = Join-Path $root 'artifacts\GameBar'
 $homeAppDir = Join-Path $PSScriptRoot 'HomeApp'
 $publishDir = Join-Path $root 'artifacts\publish'
 $toolsDir = Join-Path $root 'artifacts\tools'
@@ -114,6 +122,42 @@ $signTool = Join-Path (Split-Path $makeAppx -Parent) 'signtool.exe'
 & $signTool sign /fd SHA256 /sha1 $signingCert.Thumbprint /s My $homeAppMsix | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "Signing the home app package failed ($LASTEXITCODE)" }
 Export-Certificate -Cert $signingCert -FilePath (Join-Path $publishDir 'HomeApp\HomeApp.cer') | Out-Null
+
+# The Game Bar widget: built here when Visual Studio's UWP tools are installed, otherwise taken from
+# artifacts\GameBar if a CI-built package was put there. Signed with the same certificate as the home app.
+$vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+$msbuild = if (Test-Path $vswhere) {
+    & $vswhere -latest -products * -requiresAny -requires Microsoft.VisualStudio.Workload.Universal Microsoft.VisualStudio.Workload.UniversalBuildTools `
+        -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
+}
+
+if ($msbuild) {
+    Write-Host 'Building the Game Bar widget' -ForegroundColor Cyan
+    if (Test-Path $gameBarDir) { Remove-Item $gameBarDir -Recurse -Force }
+    & $msbuild $gameBarProject /restore /p:Configuration=Release /p:Platform=x64 /v:minimal /nologo
+    if ($LASTEXITCODE -ne 0) { throw "Game Bar widget build failed ($LASTEXITCODE)" }
+}
+
+$gameBarPackage = Get-ChildItem $gameBarDir -Recurse -Filter 'HandheldOptimiser.GameBar_*_x64.msix' -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+
+if ($gameBarPackage) {
+    $widgetDir = Join-Path $publishDir 'GameBar'
+    New-Item -ItemType Directory -Force (Join-Path $widgetDir 'Dependencies') | Out-Null
+    $widgetMsix = Join-Path $widgetDir 'GameBar.msix'
+    Copy-Item $gameBarPackage.FullName $widgetMsix
+
+    # The frameworks the widget runs on (.NET Native and the C++ runtime), added alongside it.
+    Get-ChildItem (Join-Path $gameBarPackage.DirectoryName 'Dependencies\x64') -Filter *.appx |
+        Copy-Item -Destination (Join-Path $widgetDir 'Dependencies')
+    Copy-Item (Join-Path $PSScriptRoot 'GameBar\RegisterWidget.ps1') $widgetDir
+
+    & $signTool sign /fd SHA256 /sha1 $signingCert.Thumbprint /s My $widgetMsix | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Signing the Game Bar widget failed ($LASTEXITCODE)" }
+}
+else {
+    Write-Warning 'No Game Bar widget: Visual Studio''s UWP tools are not installed and artifacts\GameBar has no package. Building the installer without it.'
+}
 
 # Because the package points at the program folder (AllowExternalContent), Windows reads the capability
 # file, the logos and resources.pri from there rather than from inside the package. Without the logos
