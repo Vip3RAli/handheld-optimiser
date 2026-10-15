@@ -77,6 +77,8 @@ public partial class LibraryWindow
             0 => "Off",
             var fps => $"{fps} fps"
         };
+
+        ProfileFanSetting.Tag = _profile.FanCurve is { } fans ? AutoTdp.FanName(fans) : "As in settings";
     }
 
     /// <summary>Left and right on a profile row. Each row's choices start with Don't change.</summary>
@@ -122,6 +124,12 @@ public partial class LibraryWindow
         {
             profile = _profile with { AutoTdpFps = StepChoice(_profile.AutoTdpFps, [0, .. AutoTdp.FrameRates], step) };
         }
+        else if (ReferenceEquals(row, ProfileFanSetting))
+        {
+            string?[] options = [null, .. AutoTdp.FanChoices];
+            var index = Math.Max(0, Array.IndexOf(options, _profile.FanCurve));
+            profile = _profile with { FanCurve = options[(index + step + options.Length) % options.Length] };
+        }
         else
         {
             return false;
@@ -159,6 +167,8 @@ public partial class LibraryWindow
     private void OnStepProfileApps(object sender, RoutedEventArgs e) => StepProfileSetting(ProfileAppsSetting, 1);
 
     private void OnStepProfileAutoTdp(object sender, RoutedEventArgs e) => StepProfileSetting(ProfileAutoTdpSetting, 1);
+
+    private void OnStepProfileFans(object sender, RoutedEventArgs e) => StepProfileSetting(ProfileFanSetting, 1);
 
     /// <summary>Switches to a game's profile as it starts, keeping what it replaces.</summary>
     private void ApplyProfile(Game game, GameProfile profile)

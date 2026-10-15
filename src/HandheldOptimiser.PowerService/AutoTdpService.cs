@@ -1,17 +1,17 @@
 using System.Diagnostics;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
-using System.Security.AccessControl;
 using System.Security.Principal;
 using System.ServiceProcess;
 
 namespace HandheldOptimiser.PowerService;
 
 /// <summary>
-/// The TDP Engine service. The game library starts it when a game starts with TDP Engine on, and stops it
-/// when the game closes; it never runs otherwise. Each second it counts the game's frames, reads the
-/// processor's temperature, and sets the power limit the controller asks for. Whatever happens, it puts
-/// Armoury Crate's operating mode back as it ends, which brings back that mode's own power limits.
+/// The TDP Engine service. The game library starts it when a game starts with TDP Engine or a fan curve
+/// on, and stops it when the game closes; the Game Bar widget can start it too. It never runs otherwise.
+/// Each second it counts the game's frames, reads the processor's temperature, and sets the power limit
+/// the controller asks for, and the fan curve. Whatever happens, it puts Armoury Crate's operating mode
+/// back as it ends, which brings back that mode's own power limits and fan curve.
 /// </summary>
 internal sealed partial class AutoTdpService : ServiceBase
 {
@@ -20,6 +20,10 @@ internal sealed partial class AutoTdpService : ServiceBase
 
     // Armoury Crate can put its own limits back, on a charger being plugged in say, so they are set again this often.
     private static readonly TimeSpan Reassert = TimeSpan.FromSeconds(5);
+
+    // Started from Game Bar, there is no library to say the game closed, so it stops after this long without one.
+    private static readonly TimeSpan NoGameExit = TimeSpan.FromMinutes(1);
+    private const double GameFrames = 5;
 
     private readonly CancellationTokenSource _stop = new();
     private readonly object _gate = new();
@@ -58,6 +62,7 @@ internal sealed partial class AutoTdpService : ServiceBase
                 if (_control is { } control)
                 {
                     control.LastSet = DateTime.MinValue;
+                    control.LastFans = DateTime.MinValue;
                 }
             }
         }
@@ -172,14 +177,32 @@ internal sealed partial class AutoTdpService : ServiceBase
         var temperature = _acpi.Temperature();
         var now = DateTime.UtcNow;
 
-        if (control.Controller.Tick(now, fps, temperature) is { } watts)
+        if (fps >= GameFrames)
         {
-            Apply(control, watts);
-            Log.Write($"{watts} W: {fps:0} fps, {temperature?.ToString() ?? "?"} °C, {control.Controller.State}");
+            control.LastFrames = now;
         }
-        else if (now - control.LastSet >= Reassert)
+        else if (control.FromWidget && now - control.LastFrames > NoGameExit)
         {
-            Apply(control, control.Controller.Watts);
+            Release("no game was running");
+            return;
+        }
+
+        if (control.Controller is { } controller)
+        {
+            if (controller.Tick(now, fps, temperature) is { } watts)
+            {
+                Apply(control, watts);
+                Log.Write($"{watts} W: {fps:0} fps, {temperature?.ToString() ?? "?"} °C, {controller.State}");
+            }
+            else if (now - control.LastSet >= Reassert)
+            {
+                Apply(control, controller.Watts);
+            }
+        }
+
+        if (control.Curve is not null && now - control.LastFans >= Reassert)
+        {
+            ApplyFans(control);
         }
 
         _last = Status(control, fps, temperature);
@@ -195,8 +218,22 @@ internal sealed partial class AutoTdpService : ServiceBase
         control.LastSet = DateTime.UtcNow;
     }
 
+    private void ApplyFans(Control control)
+    {
+        control.LastFans = DateTime.UtcNow;
+        if (_acpi!.SetFanCurve(control.Curve!))
+        {
+            return;
+        }
+
+        // Not asked again: a model without custom fan curves refuses every time.
+        Log.Write($"The firmware refused the {control.FanCurve} fan curve, so the fans are left as they were");
+        control.Curve = null;
+    }
+
     private static AutoTdpStatus Status(Control control, double? fps, int? temperature) =>
-        new(true, fps, control.Controller.Watts, temperature, control.Controller.State.ToString());
+        new(true, fps, control.Controller?.Watts, temperature, control.Controller?.State.ToString(),
+            TargetFps: control.Settings?.TargetFps ?? 0, FanCurve: control.Curve is null ? null : control.FanCurve);
 
     /// <summary>
     /// The game's frames a second: the busiest program running from its folder. Without a folder, the
@@ -241,12 +278,10 @@ internal sealed partial class AutoTdpService : ServiceBase
             NamedPipeServerStream pipe;
             try
             {
-                pipe = NamedPipeServerStreamAcl.Create(AutoTdpProtocol.PipeName, PipeDirection.InOut, 1,
-                    PipeTransmissionMode.Byte, PipeOptions.Asynchronous | (first ? PipeOptions.FirstPipeInstance : 0),
-                    0, 0, PipeAccess());
+                pipe = CreatePipe(first);
                 first = false;
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
             {
                 // Another program holds the name. Nothing can reach this service, so it ends.
                 Log.Write($"Could not open the pipe: {ex.Message}");
@@ -288,6 +323,7 @@ internal sealed partial class AutoTdpService : ServiceBase
             status = request?.Command switch
             {
                 AutoTdpProtocol.Start => Begin(request, client),
+                AutoTdpProtocol.Update => Update(request),
                 AutoTdpProtocol.Stop => End(),
                 _ => _error is not null ? new AutoTdpStatus(false, Error: _error) : _last
             };
@@ -296,32 +332,145 @@ internal sealed partial class AutoTdpService : ServiceBase
         await writer.WriteLineAsync(AutoTdpProtocol.Write(status).AsMemory(), cancel);
     }
 
-    private AutoTdpStatus Begin(AutoTdpRequest request, int client)
+    /// <summary>A game starting from the library, or from the widget when nothing is running.</summary>
+    private AutoTdpStatus Begin(AutoTdpRequest request, int client, bool fromWidget = false)
     {
         if (_error is not null || _acpi is null)
         {
             return new AutoTdpStatus(false, Error: _error);
         }
 
-        var min = Math.Clamp(request.MinWatts, AutoTdpProtocol.LowestWatts, AutoTdpProtocol.HighestWatts);
-        var max = Math.Clamp(request.MaxWatts, min, AutoTdpProtocol.HighestWatts);
-        var settings = new AutoTdpSettings(
-            Math.Clamp(request.TargetFps, AutoTdpProtocol.LowestFps, AutoTdpProtocol.HighestFps),
-            min,
-            max,
-            Math.Clamp(request.TemperatureLimit, AutoTdpProtocol.LowestTemperature, AutoTdpProtocol.HighestTemperature));
+        var settings = Settings(request);
+        var fans = FanCurve(request.FanCurve);
+        if (settings is null && fans is null)
+        {
+            Release("there was nothing to set");
+            return _last;
+        }
 
-        var start = request.StartWatts > 0 ? request.StartWatts : (min + max + 1) / 2;
         var folder = string.IsNullOrWhiteSpace(request.GameFolder) ? null : request.GameFolder;
+        AutoTdpController? controller = null;
+        if (settings is not null)
+        {
+            var start = request.StartWatts > 0 ? request.StartWatts : (settings.MinWatts + settings.MaxWatts + 1) / 2;
+            controller = new AutoTdpController(settings, start);
+        }
 
         // A new game keeps the operating mode saved for the first, which is the player's own.
         var restoreMode = _control?.RestoreMode ?? _acpi.OperatingModeNow();
-        _control = new Control(new AutoTdpController(settings, start), folder, ClientHandle(client), restoreMode);
-        Apply(_control, _control.Controller.Watts);
-        Log.Write($"Holding {settings.TargetFps} fps between {min} and {max} W, under {settings.TemperatureLimit} °C, from {_control.Controller.Watts} W, for {folder ?? "the busiest program"}");
+        _control?.ClientProcess?.Dispose();
+        _control = new Control(settings, controller, folder, fromWidget ? null : ClientHandle(client), restoreMode, fromWidget)
+        {
+            FanCurve = fans,
+            Curve = FanCurves.For(fans),
+            LastFrames = DateTime.UtcNow
+        };
 
+        Set(_control);
+        Log.Write($"{Describe(_control)}, for {folder ?? "the busiest program"}{(fromWidget ? ", from Game Bar" : "")}");
         _last = Status(_control, null, _acpi.Temperature());
         return _last;
+    }
+
+    /// <summary>
+    /// From the Game Bar widget: a new frame rate or fan curve for what is running, keeping its game and the
+    /// operating mode to put back, or a start when nothing is.
+    /// </summary>
+    private AutoTdpStatus Update(AutoTdpRequest request)
+    {
+        if (_error is not null || _acpi is null)
+        {
+            return new AutoTdpStatus(false, Error: _error);
+        }
+
+        if (_control is not { } old)
+        {
+            return Begin(request with { GameFolder = null, StartWatts = 0 }, 0, fromWidget: true);
+        }
+
+        var target = request.TargetFps > 0 ? Math.Clamp(request.TargetFps, AutoTdpProtocol.LowestFps, AutoTdpProtocol.HighestFps) : 0;
+        var fans = FanCurve(request.FanCurve);
+        if (target == 0 && fans is null)
+        {
+            Release("TDP Engine was turned off in Game Bar");
+            return _last;
+        }
+
+        // The limits the library asked for stay; only the frame rate changes.
+        var settings = target == 0 ? null
+            : old.Settings is { } kept ? kept with { TargetFps = target }
+            : Settings(new AutoTdpRequest(AutoTdpProtocol.Update, target));
+
+        var controller = settings is null ? null
+            : old.Controller is { } running && old.Settings!.TargetFps == target ? running
+            : new AutoTdpController(settings!, old.Controller?.Watts ?? (settings!.MinWatts + settings.MaxWatts + 1) / 2);
+
+        _control = old with { Settings = settings, Controller = controller };
+        _control.FanCurve = fans;
+        _control.Curve = FanCurves.For(fans);
+        _control.LastFrames = old.LastFrames;
+
+        // Letting go of the power limit or the fans means setting the mode again, which puts back its own of
+        // both, so whatever is still wanted is set again straight after.
+        if ((old.Controller is not null && controller is null) || (old.Curve is not null && _control.Curve is null))
+        {
+            _acpi.SetOperatingMode(old.RestoreMode ?? AsusAcpi.PerformanceMode);
+        }
+
+        Set(_control);
+        Log.Write($"{Describe(_control)}, changed in Game Bar");
+        _last = Status(_control, null, _acpi.Temperature());
+        return _last;
+    }
+
+    private void Set(Control control)
+    {
+        if (control.Controller is { } controller)
+        {
+            Apply(control, controller.Watts);
+        }
+
+        if (control.Curve is not null)
+        {
+            ApplyFans(control);
+        }
+    }
+
+    private static AutoTdpSettings? Settings(AutoTdpRequest request)
+    {
+        if (request.TargetFps <= 0)
+        {
+            return null;
+        }
+
+        var min = Math.Clamp(request.MinWatts > 0 ? request.MinWatts : AutoTdpProtocol.LowestWatts,
+            AutoTdpProtocol.LowestWatts, AutoTdpProtocol.HighestWatts);
+        var max = Math.Clamp(request.MaxWatts > 0 ? request.MaxWatts : AutoTdpProtocol.DefaultMaxWatts,
+            min, AutoTdpProtocol.HighestWatts);
+        return new AutoTdpSettings(
+            Math.Clamp(request.TargetFps, AutoTdpProtocol.LowestFps, AutoTdpProtocol.HighestFps),
+            min,
+            max,
+            Math.Clamp(request.TemperatureLimit > 0 ? request.TemperatureLimit : AutoTdpProtocol.DefaultTemperature,
+                AutoTdpProtocol.LowestTemperature, AutoTdpProtocol.HighestTemperature));
+    }
+
+    private static string? FanCurve(string? name) => AutoTdpProtocol.FanCurves.Contains(name) ? name : null;
+
+    private static string Describe(Control control)
+    {
+        var parts = new List<string>();
+        if (control.Settings is { } settings)
+        {
+            parts.Add($"Holding {settings.TargetFps} fps between {settings.MinWatts} and {settings.MaxWatts} W, under {settings.TemperatureLimit} °C, from {control.Controller!.Watts} W");
+        }
+
+        if (control.FanCurve is { } fans)
+        {
+            parts.Add($"{fans} fan curve");
+        }
+
+        return string.Join(", ", parts);
     }
 
     private AutoTdpStatus End()
@@ -374,20 +523,63 @@ internal sealed partial class AutoTdpService : ServiceBase
         }
     }
 
-    /// <summary>The system and administrators own the pipe; the signed-in player may only talk to it.</summary>
-    private static PipeSecurity PipeAccess()
+    /// <summary>
+    /// The system and administrators own the pipe; the signed-in player may only talk to it, from the
+    /// library or from the Game Bar widget. The widget runs in an app sandbox, at low integrity, so the pipe
+    /// lets in that one app package (not every app) and is labelled so a low-integrity client may write.
+    /// </summary>
+    private static NamedPipeServerStream CreatePipe(bool first)
     {
-        var security = new PipeSecurity();
-        security.AddAccessRule(new PipeAccessRule(new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),
-            PipeAccessRights.FullControl, AccessControlType.Allow));
-        security.AddAccessRule(new PipeAccessRule(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null),
-            PipeAccessRights.FullControl, AccessControlType.Allow));
+        // A client opening it to read and write is checked for creating an instance as well, which generic
+        // write includes for a pipe.
+        var sddl = "D:(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;IU)";
+        if (WidgetSid() is { } widget)
+        {
+            sddl += $"(A;;GRGW;;;{widget})S:(ML;;NW;;;LW)";
+        }
 
-        // A client opening it to read and write is checked for CreateNewInstance as well, which Windows
-        // counts as part of writing to a pipe.
-        security.AddAccessRule(new PipeAccessRule(new SecurityIdentifier(WellKnownSidType.InteractiveSid, null),
-            PipeAccessRights.ReadWrite | PipeAccessRights.CreateNewInstance, AccessControlType.Allow));
-        return security;
+        if (!ConvertStringSecurityDescriptorToSecurityDescriptor(sddl, 1, out var descriptor, 0))
+        {
+            throw new System.ComponentModel.Win32Exception();
+        }
+
+        try
+        {
+            var attributes = new SecurityAttributes { Length = Marshal.SizeOf<SecurityAttributes>(), Descriptor = descriptor };
+            var handle = CreateNamedPipe(@"\\.\pipe\" + AutoTdpProtocol.PipeName,
+                PipeAccessDuplex | FileFlagOverlapped | (first ? FileFlagFirstPipeInstance : 0),
+                PipeTypeByte | PipeRejectRemoteClients, 1, 0, 0, 0, ref attributes);
+            if (handle.IsInvalid)
+            {
+                var error = Marshal.GetLastPInvokeError();
+                handle.Dispose();
+                throw new IOException($"The pipe could not be created ({new System.ComponentModel.Win32Exception(error).Message})");
+            }
+
+            return new NamedPipeServerStream(PipeDirection.InOut, isAsync: true, isConnected: false, handle);
+        }
+        finally
+        {
+            LocalFree(descriptor);
+        }
+    }
+
+    /// <summary>The Game Bar widget's app package as a security identifier, or null when Windows cannot work it out.</summary>
+    private static string? WidgetSid()
+    {
+        if (DeriveAppContainerSidFromAppContainerName(AutoTdpProtocol.WidgetPackage, out var sid) != 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            return new SecurityIdentifier(sid).Value;
+        }
+        finally
+        {
+            FreeSid(sid);
+        }
     }
 
     private static unsafe string? ProcessPath(int processId)
@@ -411,11 +603,54 @@ internal sealed partial class AutoTdpService : ServiceBase
         }
     }
 
+    /// <param name="Settings">What TDP Engine holds, or null when it only sets the fans.</param>
     /// <param name="RestoreMode">Armoury Crate's operating mode from before, to put back, or null when it could not be read.</param>
-    private sealed record Control(AutoTdpController Controller, string? GameFolder, Process? ClientProcess, int? RestoreMode)
+    /// <param name="FromWidget">Started from Game Bar, with no library to say when the game closes.</param>
+    private sealed record Control(AutoTdpSettings? Settings, AutoTdpController? Controller, string? GameFolder,
+        Process? ClientProcess, int? RestoreMode, bool FromWidget)
     {
+        public string? FanCurve { get; set; }
+
+        /// <summary>The curve to set, or null for the Ally's own or when the firmware refused it.</summary>
+        public byte[]? Curve { get; set; }
+
         public DateTime LastSet { get; set; }
+        public DateTime LastFans { get; set; }
+        public DateTime LastFrames { get; set; }
     }
+
+    private const uint PipeAccessDuplex = 0x00000003;
+    private const uint FileFlagOverlapped = 0x40000000;
+    private const uint FileFlagFirstPipeInstance = 0x00080000;
+    private const uint PipeTypeByte = 0x00000000;
+    private const uint PipeRejectRemoteClients = 0x00000008;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct SecurityAttributes
+    {
+        public int Length;
+        public nint Descriptor;
+        public int InheritHandle;
+    }
+
+    [LibraryImport("kernel32.dll", EntryPoint = "CreateNamedPipeW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+    private static partial Microsoft.Win32.SafeHandles.SafePipeHandle CreateNamedPipe(string name, uint openMode, uint pipeMode,
+        uint maxInstances, uint outBufferSize, uint inBufferSize, uint defaultTimeout, ref SecurityAttributes attributes);
+
+    [LibraryImport("advapi32.dll", EntryPoint = "ConvertStringSecurityDescriptorToSecurityDescriptorW", SetLastError = true,
+        StringMarshalling = StringMarshalling.Utf16)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool ConvertStringSecurityDescriptorToSecurityDescriptor(string sddl, uint revision,
+        out nint descriptor, nint size);
+
+    [LibraryImport("kernel32.dll")]
+    private static partial nint LocalFree(nint memory);
+
+    [LibraryImport("userenv.dll", StringMarshalling = StringMarshalling.Utf16)]
+    private static partial int DeriveAppContainerSidFromAppContainerName(string name, out nint sid);
+
+    [LibraryImport("advapi32.dll")]
+    private static partial nint FreeSid(nint sid);
 
     private const uint QueryLimitedInformation = 0x1000;
 

@@ -1433,6 +1433,8 @@
                                 Click="OnStepProfileApps" />
                         <Button x:Name="ProfileAutoTdpSetting" Style="{StaticResource MenuButton}" Content="TDP Engine"
                                 Click="OnStepProfileAutoTdp" />
+                        <Button x:Name="ProfileFanSetting" Style="{StaticResource MenuButton}" Content="Fan curve"
+                                Click="OnStepProfileFans" />
                         <!-- For touch, which has no B button. -->
                         <Button Style="{StaticResource MenuButton}" Content="Back" Click="OnSettingsBack" />
 
@@ -1485,6 +1487,8 @@
                                 Click="OnStepAutoTdpTemperature" />
                         <Button x:Name="AutoTdpWattsSetting" Style="{StaticResource MenuButton}" Content="TDP Engine most watts"
                                 Click="OnStepAutoTdpWatts" />
+                        <Button x:Name="FanCurveSetting" Style="{StaticResource MenuButton}" Content="Fan curve"
+                                Click="OnStepFanCurve" />
                         <Button x:Name="StoreClosingSetting" Style="{StaticResource MenuButton}" Content="Close store apps after playing"
                                 Click="OnStepStoreClosing" />
                         <Button x:Name="StoreStartupItem" Style="{StaticResource MenuButton}" Content="Store apps at startup" Click="OnOpenStoreStartup" />
