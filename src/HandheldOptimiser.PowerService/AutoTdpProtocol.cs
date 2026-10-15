@@ -19,7 +19,7 @@ internal static class AutoTdpProtocol
     public const string Update = "update";
 
     /// <summary>The Game Bar widget's package family name, which is the only app package let through to the pipe.</summary>
-    public const string WidgetPackage = "HandheldOptimiser.GameBar_v3n3mmbbxe30w";
+    public const string WidgetPackage = "HandheldOptimiser.GameBar_pgc7cpy78bqbw";
 
     /// <summary>The fan curves on offer, besides the Ally's own, which is null.</summary>
     public const string QuietFans = "quiet";
