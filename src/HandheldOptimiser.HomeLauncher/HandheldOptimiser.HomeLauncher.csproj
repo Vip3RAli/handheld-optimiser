@@ -53,6 +53,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- How the library talks to the TDP Engine service, shared with it so the two always agree. -->
+    <Compile Include="..\HandheldOptimiser.PowerService\AutoTdpProtocol.cs" Link="Library\AutoTdpProtocol.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- The screen brightness control in quick settings, which Windows only offers through WMI. -->
     <PackageReference Include="System.Management" Version="10.0.12" />
   </ItemGroup>

@@ -97,7 +97,8 @@ The library finds installed games from **Steam**, **Xbox / PC Game Pass**, **Epi
 | **Tabs** | Games, Favourites, one per store, Apps and Not installed. **LB / RB** move along them and on to the settings and power buttons. |
 | **Artwork** | Wide artwork, covers and icons from SteamGridDB with your own free key, for games outside Steam and for apps such as Chrome. |
 | **Quick actions** (**X**) | Favourite or hide a game, set its game profile, launch arguments or artwork. |
-| **Game profiles** | A power mode, resolution, refresh rate and brightness per game, put back when it closes. |
+| **Game profiles** | A power mode, resolution, refresh rate, brightness and TDP Engine frame rate per game, put back when it closes. |
+| **TDP Engine** | Holds a game at 30, 40, 45 or 60 fps with the lowest power limit that manages it, and lowers the limit whenever the processor reaches your temperature limit. Each game starts from the limit it settled on last time. ROG Ally only. Switch it on under **Settings > Sleep and Tweaks > Play and Sleep**, or per game in its profile. |
 | **Last played** | Your last game as a wide card above the grid, with its play time, size and profile beside it, and its description from Steam's store or Wikipedia if you switch that on. |
 | **Quick Resume** | The home button pauses the game behind the library, and **A** carries on where you left off. Games with anti-cheat are never paused. |
 | **Play and Sleep** | Close background programs and store apps around a game, and go back to your game after sleep. |
@@ -131,6 +132,9 @@ Uninstall from **Settings > Apps > Installed apps**. This removes the app but **
 
 **Why does Windows ask for administrator permission every time?**
 Almost every change the app makes is machine-wide. The game library is separate and never asks.
+
+**What does the TDP Engine service do?**
+Counting a game's frames needs administrator, which the library never asks for, so the installer adds a small Windows service, **Handheld Optimiser TDP Engine**. It only runs while a game started from the library has TDP Engine on, and when the game closes it puts Armoury Crate's operating mode back. Every change it makes is logged in `%ProgramData%\HandheldOptimiser\logs\auto-tdp.log`.
 
 **Why does Windows warn that the installer is unrecognised?**
 The installer is not signed with a paid code-signing certificate yet. Each release lists the installer's SHA-256 hash if you want to verify your download.

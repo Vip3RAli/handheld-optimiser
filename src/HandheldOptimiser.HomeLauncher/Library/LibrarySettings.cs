@@ -98,6 +98,9 @@ internal static class LibrarySettings
     private const string EpicFreeValue = "EpicFreeGames";
     private const string DealsKeyValue = "IsThereAnyDealKey";
     private const string WishlistDealsValue = "WishlistDealsFirst";
+    private const string AutoTdpFpsValue = "AutoTdpFps";
+    private const string AutoTdpTemperatureValue = "AutoTdpTemperature";
+    private const string AutoTdpWattsValue = "AutoTdpMaxWatts";
 
     /// <summary>The sizes a TV or monitor can show the library at, as percentages. 0 fits it to the screen.</summary>
     public static readonly int[] DockedSizes = [0, 100, 125, 150, 175, 200];
@@ -319,6 +322,30 @@ internal static class LibrarySettings
         get => ReadSwitch(WishlistDealsValue);
         set => WriteSwitch(WishlistDealsValue, value);
     }
+
+    /// <summary>The frame rate TDP Engine holds games at, one of <see cref="AutoTdp.FrameRates"/>, or 0, the default, for off.</summary>
+    public static int AutoTdpFps
+    {
+        get => ReadChoice(AutoTdpFpsValue, AutoTdp.FrameRates, 0);
+        set => Write(AutoTdpFpsValue, value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>The temperature TDP Engine lowers the power limit at, whatever the frame rate.</summary>
+    public static int AutoTdpTemperature
+    {
+        get => ReadChoice(AutoTdpTemperatureValue, AutoTdp.TemperatureLimits, 80);
+        set => Write(AutoTdpTemperatureValue, value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>The highest power limit TDP Engine may set, in watts.</summary>
+    public static int AutoTdpMaxWatts
+    {
+        get => ReadChoice(AutoTdpWattsValue, AutoTdp.MostWatts, 25);
+        set => Write(AutoTdpWattsValue, value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    private static int ReadChoice(string name, int[] choices, int fallback) =>
+        int.TryParse(Read(name), out var value) && (choices.Contains(value) || value == 0 && fallback == 0) ? value : fallback;
 
     // Most switches are on until the player switches them off.
     private static bool ReadSwitch(string name, bool on = true) => Read(name)?.ToLowerInvariant() switch
