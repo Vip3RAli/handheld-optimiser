@@ -18,6 +18,13 @@ internal static class AutoTdpProtocol
     /// <summary>From the Game Bar widget: hold this frame rate and fan curve now, starting if need be.</summary>
     public const string Update = "update";
 
+    /// <summary>
+    /// Where the game library saves the folders of its installed games, Apps left out, in the player's own
+    /// settings. A session started from the widget only counts programs inside one of them.
+    /// </summary>
+    public const string LibrarySettingsKey = @"Software\HandheldOptimiser\HomeApp";
+    public const string GameFoldersValue = "GameFolders";
+
     /// <summary>The Game Bar widget's package family name, which is the only app package let through to the pipe.</summary>
     public const string WidgetPackage = "HandheldOptimiser.GameBar_pgc7cpy78bqbw";
 

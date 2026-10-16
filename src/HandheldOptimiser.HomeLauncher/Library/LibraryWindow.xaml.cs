@@ -199,6 +199,7 @@ public partial class LibraryWindow : Window
             var (tiles, stats) = await Task.Run(() =>
             {
                 var games = GameCatalog.Scan(refreshEmulators);
+                GameFolders.Save(games);
                 return (GameTile.ForScan(games, previous), Playtime.Read(GameCatalog.LastLaunched()));
             });
             _lastScan = DateTime.UtcNow;

@@ -3,6 +3,7 @@ using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.ServiceProcess;
+using Microsoft.Win32;
 
 namespace HandheldOptimiser.PowerService;
 
@@ -173,7 +174,7 @@ internal sealed partial class AutoTdpService : ServiceBase
             return;
         }
 
-        var (fps, program) = frames is null ? (0, null) : GameFps(frames, control.GameFolder ?? control.FoundFolder);
+        var (fps, program) = frames is null ? (0, null) : GameFps(frames, control.GameFolder ?? control.FoundFolder, control.LibraryFolders);
         var temperature = _acpi.Temperature();
         var now = DateTime.UtcNow;
 
@@ -284,7 +285,10 @@ internal sealed partial class AutoTdpService : ServiceBase
     /// The game's frames a second: the busiest program running from its folder. Without a folder, the
     /// busiest program of all but Windows' own compositor, whose frames are every window's.
     /// </summary>
-    private static (double Fps, string? Program) GameFps(Dictionary<int, double> frames, string? folder)
+    /// <param name="folder">The game's folder, when it is known.</param>
+    /// <param name="library">Until then, the library's game folders: only programs inside one of them count.
+    /// Null when the library has not saved any, and then the busiest program counts.</param>
+    private static (double Fps, string? Program) GameFps(Dictionary<int, double> frames, string? folder, string[]? library)
     {
         var best = 0.0;
         string? program = null;
@@ -301,8 +305,8 @@ internal sealed partial class AutoTdpService : ServiceBase
                 continue;
             }
 
-            var counts = folder is not null
-                ? path.StartsWith(folder, StringComparison.OrdinalIgnoreCase)
+            var counts = folder is not null ? path.StartsWith(folder, StringComparison.OrdinalIgnoreCase)
+                : library is not null ? GameLock.InFolders(path, library)
                 : !string.Equals(Path.GetFileName(path), "dwm.exe", StringComparison.OrdinalIgnoreCase);
 
             if (counts)
@@ -370,7 +374,7 @@ internal sealed partial class AutoTdpService : ServiceBase
             status = request?.Command switch
             {
                 AutoTdpProtocol.Start => Begin(request, client),
-                AutoTdpProtocol.Update => Update(request),
+                AutoTdpProtocol.Update => Update(request, client),
                 AutoTdpProtocol.Stop => End(),
                 _ => _error is not null ? new AutoTdpStatus(false, Error: _error) : _last
             };
@@ -409,12 +413,15 @@ internal sealed partial class AutoTdpService : ServiceBase
         _control = new Control(settings, controller, folder, fromWidget ? null : ClientHandle(client), restoreMode, fromWidget)
         {
             Lock = folder is null ? new GameLock() : null,
+            LibraryFolders = folder is null && fromWidget ? ClientGameFolders(client) : null,
             LastFrames = DateTime.UtcNow
         };
         ChooseFans(_control, fans, _acpi.Temperature());
 
         Set(_control);
-        Log.Write($"{Describe(_control)}, for {folder ?? "the busiest program"}{(fromWidget ? ", from Game Bar" : "")}");
+        var target = folder
+            ?? (_control.LibraryFolders is { } library ? $"the busiest of the library's {library.Length} games" : "the busiest program");
+        Log.Write($"{Describe(_control)}, for {target}{(fromWidget ? ", from Game Bar" : "")}");
         _last = Status(_control, null, _acpi.Temperature());
         return _last;
     }
@@ -423,7 +430,7 @@ internal sealed partial class AutoTdpService : ServiceBase
     /// From the Game Bar widget: a new frame rate or fan curve for what is running, keeping its game and the
     /// operating mode to put back, or a start when nothing is.
     /// </summary>
-    private AutoTdpStatus Update(AutoTdpRequest request)
+    private AutoTdpStatus Update(AutoTdpRequest request, int client)
     {
         if (_error is not null || _acpi is null)
         {
@@ -432,7 +439,7 @@ internal sealed partial class AutoTdpService : ServiceBase
 
         if (_control is not { } old)
         {
-            return Begin(request with { GameFolder = null, StartWatts = 0 }, 0, fromWidget: true);
+            return Begin(request with { GameFolder = null, StartWatts = 0 }, client, fromWidget: true);
         }
 
         var target = request.TargetFps > 0 ? Math.Clamp(request.TargetFps, AutoTdpProtocol.LowestFps, AutoTdpProtocol.HighestFps) : 0;
@@ -547,6 +554,51 @@ internal sealed partial class AutoTdpService : ServiceBase
         var mode = control.RestoreMode ?? AsusAcpi.PerformanceMode;
         var restored = _acpi!.SetOperatingMode(mode);
         Log.Write($"Stopped, as {why}. Operating mode {mode} {(restored ? "put back" : "was refused")}");
+    }
+
+    /// <summary>
+    /// The library's game folders, read from the settings of the player the widget runs as. Read there
+    /// rather than from a shared file, so no other account can say what counts as a game.
+    /// </summary>
+    /// <returns>The folders, or null when the library has not saved any or they cannot be read.</returns>
+    private static string[]? ClientGameFolders(int processId)
+    {
+        var process = OpenProcess(QueryLimitedInformation, false, (uint)processId);
+        if (process == 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            if (!OpenProcessToken(process, TokenQuery, out var token))
+            {
+                return null;
+            }
+
+            try
+            {
+                // The widget's token is an app container's, but its user is still the player.
+                using var identity = new WindowsIdentity(token);
+                using var key = Registry.Users.OpenSubKey($@"{identity.User}\{AutoTdpProtocol.LibrarySettingsKey}");
+                return key?.GetValue(AutoTdpProtocol.GameFoldersValue) is string[] folders
+                    ? [.. folders.Where(folder => !string.IsNullOrWhiteSpace(folder))]
+                    : null;
+            }
+            finally
+            {
+                CloseHandle(token);
+            }
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException or ArgumentException)
+        {
+            Log.Write($"Could not read the library's game folders: {ex.Message}");
+            return null;
+        }
+        finally
+        {
+            CloseHandle(process);
+        }
     }
 
     private static Process? ClientHandle(int processId)
@@ -667,6 +719,12 @@ internal sealed partial class AutoTdpService : ServiceBase
         /// <summary>Looks for the game while there is no folder to follow, as when started from Game Bar.</summary>
         public GameLock? Lock { get; set; }
 
+        /// <summary>
+        /// For a session started from Game Bar, the folders of the library's installed games, Apps left out.
+        /// Only programs inside one of them count. Null when the library has not saved any.
+        /// </summary>
+        public string[]? LibraryFolders { get; set; }
+
         /// <summary>The game's folder once <see cref="Lock"/> found it; followed from then on, as GameFolder is.</summary>
         public string? FoundFolder { get; set; }
 
@@ -726,6 +784,12 @@ internal sealed partial class AutoTdpService : ServiceBase
     [LibraryImport("kernel32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static partial bool CloseHandle(nint handle);
+
+    private const uint TokenQuery = 0x0008;
+
+    [LibraryImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool OpenProcessToken(nint process, uint access, out nint token);
 
     [LibraryImport("kernel32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
