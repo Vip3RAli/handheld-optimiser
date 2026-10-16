@@ -91,6 +91,57 @@ public class AutoTdpControllerTests
     }
 
     [Fact]
+    public void A_game_idling_at_the_top_limit_is_stepped_down_after_a_minute()
+    {
+        // Like Fortnite left at its menu: 30 fps whatever the limit, from the top limit, short of 60 for good.
+        var controller = new AutoTdpController(Sixty, startWatts: 30);
+        var watts = Run(controller, 300, (_, w) => Math.Min(30, 4.0 * w));
+
+        // Nothing changes in the first minute: a game short of its target at the top may still need it.
+        Assert.All(watts.Take(55), w => Assert.Equal(30, w));
+
+        // Then down near the 8 W that 30 fps needs, and kept there bar a short check once a minute.
+        var low = watts.TakeLast(120).Count(w => w <= 10);
+        Assert.True(low >= 100, $"Only {low} of the last 120 seconds at 10 W or under");
+    }
+
+    [Fact]
+    public void A_game_that_needs_the_top_limit_keeps_it()
+    {
+        // 1.8 fps a watt: 54 fps at the top limit of 30 W, so every watt counts.
+        var controller = new AutoTdpController(Sixty, startWatts: 30);
+        var watts = Run(controller, 400, (_, w) => 1.8 * w);
+
+        Assert.Equal(30, watts[^1]);
+
+        // A step down costs frames, so it is taken back, and the next try waits longer each time.
+        var below = watts.Count(w => w < 30);
+        Assert.True(below <= 25, $"{below} seconds under the top limit");
+    }
+
+    [Fact]
+    public void Going_back_into_a_match_lifts_the_cap_at_once()
+    {
+        // The menu as above for four minutes, then a match that needs 24 W for 60 fps.
+        var controller = new AutoTdpController(Sixty, startWatts: 30);
+        var watts = Run(controller, 280, (second, w) => second < 240 ? Math.Min(30, 4.0 * w) : 2.5 * w);
+
+        Assert.True(watts[239] <= 12, $"Was at {watts[239]} W in the menu");
+        Assert.True(watts[^1] >= 20, $"Only reached {watts[^1]} W 40 seconds into the match");
+    }
+
+    [Fact]
+    public void A_lighter_scene_lifts_the_cap_too()
+    {
+        // The menu, then a light scene that would reach 60 fps from 10 W, more than the menu's 30 at the cap.
+        var controller = new AutoTdpController(Sixty, startWatts: 30);
+        var watts = Run(controller, 260, (second, w) => second < 240 ? Math.Min(30, 4.0 * w) : 6.0 * w);
+
+        Assert.True(watts[239] <= 9, $"Was at {watts[239]} W in the menu");
+        Assert.True(watts[^1] >= 10, $"Stayed at {watts[^1]} W, short of 60 fps");
+    }
+
+    [Fact]
     public void Heat_lowers_the_limit_whatever_the_frame_rate()
     {
         var controller = new AutoTdpController(Sixty, startWatts: 25);
