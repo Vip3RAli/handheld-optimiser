@@ -18,6 +18,13 @@ internal sealed class GameLock
     private string? _path;
     private DateTime _since;
 
+    /// <summary>Whether a program runs from inside one of the library's game folders.</summary>
+    public static bool InFolders(string path, IEnumerable<string> folders) =>
+        folders.Any(folder => path.StartsWith(
+            // A folder without its separator would also match a sibling that only starts with the same name.
+            folder.EndsWith(Path.DirectorySeparatorChar) ? folder : folder + Path.DirectorySeparatorChar,
+            StringComparison.OrdinalIgnoreCase));
+
     /// <summary>The busiest program this tick.</summary>
     /// <param name="path">Its exe, or null when nothing drew.</param>
     /// <returns>The game's folder, ending in a separator, once found; null until then.</returns>
