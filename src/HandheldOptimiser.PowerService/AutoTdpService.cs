@@ -555,7 +555,7 @@ internal sealed partial class AutoTdpService : ServiceBase
 
         if (control.DynamicPick is { } pick)
         {
-            parts.Add($"dynamic fans, starting on {pick}");
+            parts.Add($"dynamic fans, on {pick}");
         }
         else if (control.FanCurve is { } fans)
         {
