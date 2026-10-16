@@ -47,16 +47,21 @@ namespace HandheldOptimiser.GameBar
         }
 
         private void OnFrameRate(object sender, RoutedEventArgs e) =>
-            Change(int.Parse((string)((FrameworkElement)sender).Tag), CurrentFans);
+            Change(int.Parse((string)((FrameworkElement)sender).Tag), CurrentPower, CurrentFans);
+
+        private void OnPowerLimit(object sender, RoutedEventArgs e) =>
+            Change(CurrentFps, int.Parse((string)((FrameworkElement)sender).Tag), CurrentFans);
 
         private void OnFans(object sender, RoutedEventArgs e) =>
-            Change(CurrentFps, (string)((FrameworkElement)sender).Tag);
+            Change(CurrentFps, CurrentPower, (string)((FrameworkElement)sender).Tag);
 
         private int CurrentFps => _status.Running ? _status.TargetFps : 0;
 
+        private int CurrentPower => _status.Running ? _status.PowerLimit : 0;
+
         private string CurrentFans => _status.Running ? _status.FanCurve : null;
 
-        private async void Change(int targetFps, string fanCurve)
+        private async void Change(int targetFps, int powerLimit, string fanCurve)
         {
             if (_busy)
             {
@@ -68,7 +73,7 @@ namespace HandheldOptimiser.GameBar
             SetState("", _status.Running ? "Changing…" : "Starting TDP Engine…");
             try
             {
-                Show(await Task.Run(() => EngineClient.Update(targetFps, fanCurve)));
+                Show(await Task.Run(() => EngineClient.Update(targetFps, powerLimit, fanCurve)));
             }
             finally
             {
@@ -80,6 +85,7 @@ namespace HandheldOptimiser.GameBar
         {
             _status = status;
             Check(FrameRates, CurrentFps.ToString());
+            Check(PowerLimits, CurrentPower.ToString());
             Check(Fans, CurrentFans ?? "");
 
             // The readouts only mean something while the engine runs, so the state line stands alone otherwise.
@@ -99,7 +105,7 @@ namespace HandheldOptimiser.GameBar
 
             if (!status.Running)
             {
-                SetState("Off", ". Pick a frame rate or fan curve to start it for the game you're playing.");
+                SetState("Off", ". Pick a frame rate, power limit or fan curve to start it for the game you're playing.");
                 return;
             }
 
@@ -112,9 +118,19 @@ namespace HandheldOptimiser.GameBar
             {
                 SetState(FanName(status.FanCurve) + " fans", ". Armoury Crate sets the power limit.");
             }
+            else if (status.State == "Fixed")
+            {
+                SetState("Fixed", " at " + status.Watts + " W.");
+            }
             else
             {
                 Explain(status.State, status.TargetFps);
+
+                // The state line is the only place that says the tile is a ceiling here rather than a fixed limit.
+                if (status.PowerLimit > 0)
+                {
+                    StateDetail.Text += " At most " + status.PowerLimit + " W.";
+                }
             }
         }
 

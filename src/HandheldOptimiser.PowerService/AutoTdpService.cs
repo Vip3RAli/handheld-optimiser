@@ -207,16 +207,20 @@ internal sealed partial class AutoTdpService : ServiceBase
                 Apply(control, controller.Watts);
             }
         }
+        else if (control.FixedWatts is { } fixedWatts && now - control.LastSet >= Reassert)
+        {
+            Apply(control, fixedWatts);
+        }
 
         if (control.Dynamic is { } dynamic && control.Curve is not null)
         {
-            var pick = dynamic.Pick(now, temperature, control.Controller?.Watts, control.Settings?.MaxWatts ?? 0, TemperatureLimit(control));
+            var pick = dynamic.Pick(now, temperature, WattsNow(control), TopWatts(control), TemperatureLimit(control));
             if (pick != control.DynamicPick)
             {
                 control.DynamicPick = pick;
                 control.Curve = FanCurves.For(pick);
                 ApplyFans(control);
-                Log.Write($"Dynamic fans: {pick}, {temperature?.ToString() ?? "?"} °C{(control.Controller is { } held ? $", {held.Watts} W" : "")}");
+                Log.Write($"Dynamic fans: {pick}, {temperature?.ToString() ?? "?"} °C{(WattsNow(control) is { } held ? $", {held} W" : "")}");
             }
         }
 
@@ -244,14 +248,21 @@ internal sealed partial class AutoTdpService : ServiceBase
         }
 
         control.Dynamic ??= new DynamicFans();
-        control.DynamicPick = control.Dynamic.Pick(DateTime.UtcNow, temperature, control.Controller?.Watts,
-            control.Settings?.MaxWatts ?? 0, TemperatureLimit(control));
+        control.DynamicPick = control.Dynamic.Pick(DateTime.UtcNow, temperature, WattsNow(control),
+            TopWatts(control), TemperatureLimit(control));
         control.Curve = FanCurves.For(control.DynamicPick);
     }
 
     // With fans only there are no settings, so Dynamic measures from the default limit.
     private static int TemperatureLimit(Control control) =>
         control.Settings?.TemperatureLimit ?? AutoTdpProtocol.DefaultTemperature;
+
+    /// <summary>The power limit set now: TDP Engine's, or a fixed one from the widget. Null when Armoury Crate sets it.</summary>
+    private static int? WattsNow(Control control) => control.Controller?.Watts ?? control.FixedWatts;
+
+    /// <summary>The most it could be: the top of TDP Engine's range, or the highest allowed for a fixed limit. 0 when Armoury Crate sets it.</summary>
+    private static int TopWatts(Control control) =>
+        control.Settings?.MaxWatts ?? (control.FixedWatts is null ? 0 : AutoTdpProtocol.HighestWatts);
 
     private void Apply(Control control, int watts)
     {
@@ -278,8 +289,10 @@ internal sealed partial class AutoTdpService : ServiceBase
     }
 
     private static AutoTdpStatus Status(Control control, double? fps, int? temperature) =>
-        new(true, fps, control.Controller?.Watts, temperature, control.Controller?.State.ToString(),
-            TargetFps: control.Settings?.TargetFps ?? 0, FanCurve: control.Curve is null ? null : control.FanCurve);
+        new(true, fps, WattsNow(control), temperature,
+            control.Controller?.State.ToString() ?? (control.FixedWatts is null ? null : AutoTdpProtocol.FixedState),
+            TargetFps: control.Settings?.TargetFps ?? 0, FanCurve: control.Curve is null ? null : control.FanCurve,
+            PowerLimit: control.PowerLimit);
 
     /// <summary>
     /// The game's frames a second: the busiest program running from its folder. Without a folder, the
@@ -391,9 +404,12 @@ internal sealed partial class AutoTdpService : ServiceBase
             return new AutoTdpStatus(false, Error: _error);
         }
 
-        var settings = Settings(request);
+        var auto = Settings(request);
+        var power = PowerLimit(request);
+        var settings = auto is null ? null : PowerLimits.WithTop(auto, power);
+        var fixedWatts = PowerLimits.Fixed(request.TargetFps, power);
         var fans = FanCurve(request.FanCurve);
-        if (settings is null && fans is null)
+        if (settings is null && fixedWatts is null && fans is null)
         {
             Release("there was nothing to set");
             return _last;
@@ -412,6 +428,9 @@ internal sealed partial class AutoTdpService : ServiceBase
         _control?.ClientProcess?.Dispose();
         _control = new Control(settings, controller, folder, fromWidget ? null : ClientHandle(client), restoreMode, fromWidget)
         {
+            AutoSettings = auto,
+            PowerLimit = power,
+            FixedWatts = fixedWatts,
             Lock = folder is null ? new GameLock() : null,
             LibraryFolders = folder is null && fromWidget ? ClientGameFolders(client) : null,
             LastFrames = DateTime.UtcNow
@@ -443,29 +462,37 @@ internal sealed partial class AutoTdpService : ServiceBase
         }
 
         var target = request.TargetFps > 0 ? Math.Clamp(request.TargetFps, AutoTdpProtocol.LowestFps, AutoTdpProtocol.HighestFps) : 0;
+        var power = PowerLimit(request);
+        var fixedWatts = PowerLimits.Fixed(target, power);
         var fans = FanCurve(request.FanCurve);
-        if (target == 0 && fans is null)
+        if (target == 0 && fixedWatts is null && fans is null)
         {
             Release("TDP Engine was turned off in Game Bar");
             return _last;
         }
 
-        // The limits the library asked for stay; only the frame rate changes.
-        var settings = target == 0 ? null
-            : old.Settings is { } kept ? kept with { TargetFps = target }
+        // The range the library asked for stays, with the widget's power limit as its top when one is chosen.
+        var auto = target == 0 ? null
+            : old.AutoSettings is { } kept ? kept with { TargetFps = target }
             : Settings(new AutoTdpRequest(AutoTdpProtocol.Update, target));
+        var settings = auto is null ? null : PowerLimits.WithTop(auto, power);
 
+        // A running controller is kept while its settings are the same, so what it has learnt is not lost.
         var controller = settings is null ? null
-            : old.Controller is { } running && old.Settings!.TargetFps == target ? running
-            : new AutoTdpController(settings!, old.Controller?.Watts ?? (settings!.MinWatts + settings.MaxWatts + 1) / 2);
+            : old.Controller is { } running && old.Settings == settings ? running
+            : new AutoTdpController(settings, Math.Clamp(WattsNow(old) ?? (settings.MinWatts + settings.MaxWatts + 1) / 2,
+                settings.MinWatts, settings.MaxWatts));
 
         _control = old with { Settings = settings, Controller = controller };
+        _control.AutoSettings = auto;
+        _control.PowerLimit = power;
+        _control.FixedWatts = fixedWatts;
         ChooseFans(_control, fans, _acpi.Temperature());
         _control.LastFrames = old.LastFrames;
 
         // Letting go of the power limit or the fans means setting the mode again, which puts back its own of
         // both, so whatever is still wanted is set again straight after.
-        if ((old.Controller is not null && controller is null) || (old.Curve is not null && _control.Curve is null))
+        if ((WattsNow(old) is not null && WattsNow(_control) is null) || (old.Curve is not null && _control.Curve is null))
         {
             _acpi.SetOperatingMode(old.RestoreMode ?? AsusAcpi.PerformanceMode);
         }
@@ -478,9 +505,9 @@ internal sealed partial class AutoTdpService : ServiceBase
 
     private void Set(Control control)
     {
-        if (control.Controller is { } controller)
+        if (WattsNow(control) is { } watts)
         {
-            Apply(control, controller.Watts);
+            Apply(control, watts);
         }
 
         if (control.Curve is not null)
@@ -488,6 +515,10 @@ internal sealed partial class AutoTdpService : ServiceBase
             ApplyFans(control);
         }
     }
+
+    /// <summary>The widget's power limit, kept to what the Ally allows, or 0 for Auto.</summary>
+    private static int PowerLimit(AutoTdpRequest request) =>
+        request.PowerLimit > 0 ? Math.Clamp(request.PowerLimit, AutoTdpProtocol.LowestWatts, AutoTdpProtocol.HighestWatts) : 0;
 
     private static AutoTdpSettings? Settings(AutoTdpRequest request)
     {
@@ -516,6 +547,10 @@ internal sealed partial class AutoTdpService : ServiceBase
         if (control.Settings is { } settings)
         {
             parts.Add($"Holding {settings.TargetFps} fps between {settings.MinWatts} and {settings.MaxWatts} W, under {settings.TemperatureLimit} °C, from {control.Controller!.Watts} W");
+        }
+        else if (control.FixedWatts is { } fixedWatts)
+        {
+            parts.Add($"Fixed at {fixedWatts} W");
         }
 
         if (control.DynamicPick is { } pick)
@@ -712,6 +747,15 @@ internal sealed partial class AutoTdpService : ServiceBase
         Process? ClientProcess, int? RestoreMode, bool FromWidget)
     {
         public string? FanCurve { get; set; }
+
+        /// <summary>The range the library or the widget's defaults gave, before the widget's power limit tops it.</summary>
+        public AutoTdpSettings? AutoSettings { get; set; }
+
+        /// <summary>The widget's power limit, or 0 for Auto. With a target it tops the range; without one it is <see cref="FixedWatts"/>.</summary>
+        public int PowerLimit { get; set; }
+
+        /// <summary>A power limit held as it is, with no frame-rate target, or null.</summary>
+        public int? FixedWatts { get; set; }
 
         /// <summary>The curve to set, or null for the Ally's own or when the firmware refused it.</summary>
         public byte[]? Curve { get; set; }

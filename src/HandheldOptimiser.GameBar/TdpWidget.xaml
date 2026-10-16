@@ -256,6 +256,57 @@
                 </StackPanel>
             </Border>
 
+            <!-- With a frame rate, the most TDP Engine may use; with frame rate Off, a limit held as it is. -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource CardTitle}" Text="Power limit" />
+                    <Grid x:Name="PowerLimits" Margin="-3,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <!-- The Tag is the limit sent to the service, 0 for Auto. -->
+                        <ToggleButton Style="{StaticResource Tile}" Tag="0" Click="OnPowerLimit">
+                            <TextBlock Style="{StaticResource TileNumber}" Text="Auto" />
+                        </ToggleButton>
+                        <ToggleButton Grid.Column="1" Style="{StaticResource Tile}" Tag="10" Click="OnPowerLimit">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource TileNumber}" Text="10" />
+                                <TextBlock Style="{StaticResource TileUnit}" Text="W" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton Grid.Column="2" Style="{StaticResource Tile}" Tag="15" Click="OnPowerLimit">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource TileNumber}" Text="15" />
+                                <TextBlock Style="{StaticResource TileUnit}" Text="W" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton Grid.Column="3" Style="{StaticResource Tile}" Tag="20" Click="OnPowerLimit">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource TileNumber}" Text="20" />
+                                <TextBlock Style="{StaticResource TileUnit}" Text="W" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton Grid.Column="4" Style="{StaticResource Tile}" Tag="25" Click="OnPowerLimit">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource TileNumber}" Text="25" />
+                                <TextBlock Style="{StaticResource TileUnit}" Text="W" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton Grid.Column="5" Style="{StaticResource Tile}" Tag="30" Click="OnPowerLimit">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource TileNumber}" Text="30" />
+                                <TextBlock Style="{StaticResource TileUnit}" Text="W" />
+                            </StackPanel>
+                        </ToggleButton>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
             <Border Style="{StaticResource Card}" Margin="0">
                 <StackPanel>
                     <TextBlock Style="{StaticResource CardTitle}" Text="Fans" />
