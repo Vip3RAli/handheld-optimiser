@@ -106,6 +106,26 @@ public class AutoTdpControllerTests
     }
 
     [Fact]
+    public void A_noisy_idle_menu_is_stepped_down_too()
+    {
+        // As Fortnite's menu really was on the Ally: anywhere from 20 to 35 fps from one second to the next,
+        // whatever the limit above the 9 W that needs. Eight runs, as one unlucky run may climb back up for
+        // a minute or two before the next check brings it down again.
+        var low = 0;
+        for (var seed = 1; seed <= 8; seed++)
+        {
+            var random = new Random(seed);
+            var controller = new AutoTdpController(Sixty with { MaxWatts = 25 }, startWatts: 25);
+            var watts = Run(controller, 420, (_, w) => Math.Min(random.Next(20, 36), 4.0 * w));
+
+            Assert.True(watts.Take(300).Min() <= 9, $"Run {seed} never got under {watts.Take(300).Min()} W");
+            low += watts.TakeLast(180).Count(w => w <= 12);
+        }
+
+        Assert.True(low >= 8 * 180 * 3 / 4, $"Only {low} of 1440 seconds at 12 W or under over the last three minutes");
+    }
+
+    [Fact]
     public void A_game_that_needs_the_top_limit_keeps_it()
     {
         // 1.8 fps a watt: 54 fps at the top limit of 30 W, so every watt counts.
