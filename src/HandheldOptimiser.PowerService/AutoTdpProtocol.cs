@@ -25,6 +25,9 @@ internal static class AutoTdpProtocol
     public const string LibrarySettingsKey = @"Software\HandheldOptimiser\HomeApp";
     public const string GameFoldersValue = "GameFolders";
 
+    /// <summary>The state a status gives while a fixed power limit is held, beside the AutoTdpState names.</summary>
+    public const string FixedState = "Fixed";
+
     /// <summary>The Game Bar widget's package family name, which is the only app package let through to the pipe.</summary>
     public const string WidgetPackage = "HandheldOptimiser.GameBar_pgc7cpy78bqbw";
 
@@ -78,9 +81,11 @@ internal static class AutoTdpProtocol
 /// <param name="TargetFps">The frame rate to hold, or 0 to leave the power limit alone and set only the fans.</param>
 /// <param name="GameFolder">The folder the game runs from, to tell its frames from other programs'. Null counts the busiest program.</param>
 /// <param name="StartWatts">Where to begin: what this game settled on last time, or 0 for halfway.</param>
-/// <param name="FanCurve">One of <see cref="AutoTdpProtocol.FanCurves"/>, or null for the Ally's own.</param>
+/// <param name="FanCurve">One of <see cref="AutoTdpProtocol.FanModes"/>, or null for the Ally's own.</param>
+/// <param name="PowerLimit">From the widget: the most watts TDP Engine may use with a target, or a limit
+/// held as it is without one. 0 for Auto.</param>
 internal sealed record AutoTdpRequest(string Command, int TargetFps = 0, int MinWatts = 0, int MaxWatts = 0,
-    int TemperatureLimit = 0, int StartWatts = 0, string? GameFolder = null, string? FanCurve = null);
+    int TemperatureLimit = 0, int StartWatts = 0, string? GameFolder = null, string? FanCurve = null, int PowerLimit = 0);
 
 /// <param name="Running">Whether it is setting the power limit or the fans right now.</param>
 /// <param name="State">One of the AutoTdpState names.</param>
@@ -88,8 +93,9 @@ internal sealed record AutoTdpRequest(string Command, int TargetFps = 0, int Min
 /// <param name="Error">Why it cannot run, for the library to show, or null.</param>
 /// <param name="TargetFps">The frame rate it holds, or 0 when it is only setting the fans.</param>
 /// <param name="FanCurve">The fan curve it set, or null for the Ally's own.</param>
+/// <param name="PowerLimit">The widget's power limit in force, or 0 for Auto.</param>
 internal sealed record AutoTdpStatus(bool Running, double? Fps = null, int? Watts = null, int? Temperature = null,
-    string? State = null, string? Error = null, int TargetFps = 0, string? FanCurve = null);
+    string? State = null, string? Error = null, int TargetFps = 0, string? FanCurve = null, int PowerLimit = 0);
 
 /// <summary>What TDP Engine is doing, for the library to show.</summary>
 internal enum AutoTdpState

@@ -21,6 +21,9 @@ namespace HandheldOptimiser.GameBar
         public int TargetFps;
         public string FanCurve;
 
+        /// <summary>The power limit chosen in the widget, or 0 for Auto.</summary>
+        public int PowerLimit;
+
         public static readonly EngineStatus Off = new EngineStatus();
 
         public static EngineStatus Failed(string error) => new EngineStatus { Error = error };
@@ -43,13 +46,18 @@ namespace HandheldOptimiser.GameBar
             return answer == null ? EngineStatus.Off : Read(answer);
         }
 
-        /// <summary>Holds a frame rate (0 for none) and fan curve (null for the Ally's own), starting the service if need be.</summary>
-        public static EngineStatus Update(int targetFps, string fanCurve)
+        /// <summary>
+        /// Holds a frame rate (0 for none), a power limit (0 for Auto: with a frame rate it tops TDP Engine's
+        /// range, without one it is held as it is) and a fan curve (null for the Ally's own), starting the
+        /// service if need be.
+        /// </summary>
+        public static EngineStatus Update(int targetFps, int powerLimit, string fanCurve)
         {
             var request = new JsonObject
             {
                 ["Command"] = JsonValue.CreateStringValue("update"),
                 ["TargetFps"] = JsonValue.CreateNumberValue(targetFps),
+                ["PowerLimit"] = JsonValue.CreateNumberValue(powerLimit),
                 ["FanCurve"] = string.IsNullOrEmpty(fanCurve) ? JsonValue.CreateNullValue() : JsonValue.CreateStringValue(fanCurve)
             }.Stringify();
 
@@ -57,7 +65,7 @@ namespace HandheldOptimiser.GameBar
             if (answer == null)
             {
                 // Turning off what is not running needs nothing.
-                if (targetFps == 0 && string.IsNullOrEmpty(fanCurve))
+                if (targetFps == 0 && powerLimit == 0 && string.IsNullOrEmpty(fanCurve))
                 {
                     return EngineStatus.Off;
                 }
@@ -96,7 +104,8 @@ namespace HandheldOptimiser.GameBar
                 State = Text(json, "State"),
                 Error = Text(json, "Error"),
                 TargetFps = (int)(Number(json, "TargetFps") ?? 0),
-                FanCurve = Text(json, "FanCurve")
+                FanCurve = Text(json, "FanCurve"),
+                PowerLimit = (int)(Number(json, "PowerLimit") ?? 0)
             };
         }
 
