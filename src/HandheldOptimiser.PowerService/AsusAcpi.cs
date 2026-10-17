@@ -77,6 +77,11 @@ internal sealed partial class AsusAcpi : IDisposable
     public int? Temperature() => Get(CpuTemperature) is var degrees and > 0 and < 120 ? degrees : null;
 
     /// <summary>Armoury Crate's operating mode, or null when it cannot be read.</summary>
+    /// <remarks>
+    /// Anything outside 0 to 2 reads as null, so Performance is put back afterwards. Armoury Crate's Manual
+    /// mode may read as another number, but whether the firmware takes that number back through the same
+    /// call is not known (G-Helper sets Manual's limits itself on top of Performance), so it is not kept.
+    /// </remarks>
     public int? OperatingModeNow() => Get(OperatingMode) is var mode and >= 0 and <= 2 ? mode : null;
 
     /// <summary>Sets an operating mode, which also puts back that mode's own power limits.</summary>

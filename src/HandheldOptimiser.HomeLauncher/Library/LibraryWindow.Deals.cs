@@ -20,6 +20,11 @@ public partial class LibraryWindow
 
     private List<DealTile>? _deals;
     private bool _refreshingDeals;
+
+    // The deals kept on disk are read off the UI thread; this goes up whenever the deals are replaced or
+    // forgotten, so a read that was already on its way does not put back a list that is out of date.
+    private bool _loadingDeals;
+    private int _dealsVersion;
     private string? _dealsError;
 
     // Whether the focus is in the Deals row, and on which deal or card, to put it back there.
@@ -35,13 +40,14 @@ public partial class LibraryWindow
     private static bool DealsWanted =>
         LibrarySettings.ShowDeals && (LibrarySettings.EpicFreeGames || LibrarySettings.DealsKey is not null);
 
-    /// <summary>The deals kept on disk: Epic's free games first, then the sales.</summary>
+    /// <summary>The deals kept on disk: Epic's free games first, then the sales. Reads files: off the UI thread.</summary>
     private static List<Deal> AllDeals()
     {
         var deals = new List<Deal>();
         if (LibrarySettings.EpicFreeGames)
         {
-            deals.AddRange(EpicFreeGames.Cached());
+            // Epic's links are made here rather than read, but are held to the same https-only rule.
+            deals.AddRange(GameDeals.Safe(EpicFreeGames.Cached()));
         }
 
         if (LibrarySettings.DealsKey is not null)
@@ -52,6 +58,51 @@ public partial class LibraryWindow
         return deals;
     }
 
+    /// <summary>Forgets the deals on show, so the next look reads them from disk again.</summary>
+    private void ForgetDeals()
+    {
+        _deals = null;
+        _dealsVersion++;
+    }
+
+    /// <summary>Reads the deals kept on disk on the thread pool, then fills the row with them.</summary>
+    private async Task LoadDealsAsync()
+    {
+        if (_loadingDeals)
+        {
+            return;
+        }
+
+        _loadingDeals = true;
+        var version = _dealsVersion;
+        List<Deal> deals;
+        try
+        {
+            // The files are a few hundred KB of JSON, which held up the first frame back from a game.
+            deals = await Task.Run(AllDeals);
+        }
+        catch (Exception ex)
+        {
+            Program.Log($"Could not read the saved deals: {ex.Message}");
+            return;
+        }
+        finally
+        {
+            _loadingDeals = false;
+        }
+
+        // Replaced or forgotten meanwhile: a newer list is already there, or will be read again below.
+        if (version == _dealsVersion && _deals is null)
+        {
+            _deals = deals.Select(d => new DealTile(d)).ToList();
+        }
+
+        if (DealsWanted)
+        {
+            UpdateDeals();
+        }
+    }
+
     /// <summary>Fills the Deals row, or hides it when it is off or does not apply.</summary>
     private void UpdateDeals()
     {
@@ -59,13 +110,21 @@ public partial class LibraryWindow
         {
             DealsPanel.Visibility = Visibility.Collapsed;
             DealTiles.ItemsSource = null;
-            _deals = null;
+            ForgetDeals();
             _focusInDeals = false;
             RefreshCategories();
             return;
         }
 
-        _deals ??= AllDeals().Select(d => new DealTile(d)).ToList();
+        // Read from disk off the UI thread; the row fills in when they are in, a moment later.
+        if (_deals is null)
+        {
+            _ = LoadDealsAsync();
+            DealsPanel.Visibility = Visibility.Collapsed;
+            _focusInDeals = false;
+            RefreshCategories();
+            return;
+        }
 
         // The Old School layout has a category for the deals, there for as long as there are some.
         RefreshCategories();
@@ -262,9 +321,10 @@ public partial class LibraryWindow
         _refreshingDeals = true;
         try
         {
-            // Epic's free games need no key, and the sales do nothing without one.
-            var freeChanged = LibrarySettings.EpicFreeGames && await EpicFreeGames.RefreshAsync(force);
-            var (changed, error) = await GameDeals.RefreshAsync(force);
+            // Epic's free games need no key, and the sales do nothing without one. Both read and write their
+            // files and parse what comes back, all on the thread pool; only the row is filled in here.
+            var freeChanged = LibrarySettings.EpicFreeGames && await Task.Run(() => EpicFreeGames.RefreshAsync(force));
+            var (changed, error) = await Task.Run(() => GameDeals.RefreshAsync(force));
             _dealsError = error;
             if (error is not null && ReferenceEquals(_menu, DealsItems))
             {
@@ -273,9 +333,10 @@ public partial class LibraryWindow
 
             if (changed || freeChanged || _deals is null || _deals.Count == 0)
             {
-                var deals = AllDeals();
+                var deals = await Task.Run(AllDeals);
                 _ = Task.Run(() => GameDeals.TrimBanners(deals));
                 _deals = deals.Select(d => new DealTile(d)).ToList();
+                _dealsVersion++;
                 UpdateDeals();
             }
         }
@@ -311,6 +372,11 @@ public partial class LibraryWindow
                 {
                     tile.Banner = banner;
                 }
+            }
+            catch (Exception ex)
+            {
+                // async void, so nothing else would catch it: that one card goes without its banner.
+                Program.Log($"Could not load a deal's banner: {ex.Message}");
             }
             finally
             {
@@ -457,6 +523,14 @@ public partial class LibraryWindow
     /// <summary>Opens the deal's store page in the browser: through IsThereAnyDeal's own link for a sale.</summary>
     private void OpenDeal(DealTile tile)
     {
+        // Checked again right before the shell gets it, whatever path the deal came by.
+        if (!GameDeals.IsHttpsUrl(tile.Deal.Url))
+        {
+            Program.Log($"Did not open the deal for {tile.Deal.Title}: its link is not an https address");
+            Notice = "That deal's link could not be opened.";
+            return;
+        }
+
         try
         {
             Process.Start(new ProcessStartInfo(tile.Deal.Url) { UseShellExecute = true })?.Dispose();
@@ -498,7 +572,7 @@ public partial class LibraryWindow
     private void OnToggleEpicFreeGames(object sender, RoutedEventArgs e)
     {
         LibrarySettings.EpicFreeGames = !LibrarySettings.EpicFreeGames;
-        _deals = null;
+        ForgetDeals();
         RefreshDealsSettings();
         UpdateDeals();
         _ = RefreshDealsAsync(force: false);
@@ -529,7 +603,7 @@ public partial class LibraryWindow
     {
         LibrarySettings.DealsKey = text;
         _dealsError = null;
-        _deals = null;
+        ForgetDeals();
         RefreshDealsSettings();
         ShowMenuItems();
         UpdateDeals();

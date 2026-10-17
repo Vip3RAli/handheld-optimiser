@@ -42,6 +42,7 @@ public static class FullScreenTweaks
         Risk = RiskLevel.Moderate,
         IncludeInOneClick = false,
         ScriptRegistryValues = [HomeAppSetting],
+        ScriptDetectIsQuick = true,
         ScriptDetect = (ctx, ct) =>
         {
             if (!HomeAppRegistration.IsFullScreenExperienceAvailable())

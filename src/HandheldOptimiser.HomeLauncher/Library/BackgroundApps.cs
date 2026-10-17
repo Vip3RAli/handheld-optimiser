@@ -269,8 +269,10 @@ internal static class BackgroundApps
 
                 try
                 {
-                    // Chat and sync programs stay in the tray when their window closes.
-                    process.Kill(entireProcessTree: true);
+                    // Chat and sync programs stay in the tray when their window closes. Their helpers go
+                    // with them, but not those of a program the player added: that may be a launcher the
+                    // game itself was started from, and its children would include the game.
+                    process.Kill(entireProcessTree: !app.Custom);
                     closedAny = true;
                 }
                 catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or NotSupportedException)

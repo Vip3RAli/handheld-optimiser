@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.IO;
 using System.Net;
 using System.Net.Http;
@@ -37,18 +36,11 @@ internal static class StoreDetails
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "HandheldOptimiser", "details");
 
-    private static readonly HttpClient Http = NewClient();
-
-    // Wikipedia asks every program to say what it is.
-    private static HttpClient NewClient()
-    {
-        var http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("HandheldOptimiser (https://github.com/Vip3RAli/handheld-optimiser)");
-        return http;
-    }
+    // The shared client says what the library is, which Wikipedia asks every program to do.
+    private static readonly HttpClient Http = HttpClients.Shared;
 
     // Going back to a game whose details are still on their way joins that request.
-    private static readonly ConcurrentDictionary<string, Task<GameDetails?>> Fetches = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly InFlight<GameDetails?> Fetches = new();
 
     /// <summary>The details kept on disk, without asking for anything. Null when none are kept.</summary>
     public static GameDetails? Cached(Game game)
@@ -81,15 +73,7 @@ internal static class StoreDetails
             return null;
         }
 
-        var fetch = Fetches.GetOrAdd(game.Key, _ => FetchAsync(game));
-        try
-        {
-            return await fetch;
-        }
-        finally
-        {
-            Fetches.TryRemove(game.Key, out _);
-        }
+        return await Fetches.RunAsync(game.Key, () => FetchAsync(game));
     }
 
     /// <summary>Forgets what was found for the game, after the title it is looked up by changed.</summary>
@@ -119,9 +103,7 @@ internal static class StoreDetails
                 return null;
             }
 
-            var path = CachePath(game);
-            await File.WriteAllTextAsync(path + ".tmp", JsonSerializer.Serialize(details));
-            File.Move(path + ".tmp", path, overwrite: true);
+            await AtomicFile.WriteAllTextAsync(CachePath(game), JsonSerializer.Serialize(details));
             return details;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException or UnauthorizedAccessException)

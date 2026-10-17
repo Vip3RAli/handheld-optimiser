@@ -131,10 +131,20 @@ internal sealed class GameTile : INotifyPropertyChanged, INoticeHost
     /// <summary>The tile's cover or icon, decoded, and the colours taken from it. Safe off the UI thread.</summary>
     public static (ImageSource? Cover, ImageSource? Icon, (Color From, Color To) Colours) Pictures(Game game)
     {
-        // A cover fetched on an earlier run is on disk already, so the tile opens with it.
-        var cover = (game.CoverPath ?? Artwork.CachedCover(game)) is { } path ? LoadCover(path) : null;
-        var icon = cover is null && game.IconPath is not null ? LoadIcon(game.IconPath) : null;
-        return (cover, icon, Palette.Colours(cover ?? icon) ?? StoreColours(game.Store));
+        try
+        {
+            // A cover fetched on an earlier run is on disk already, so the tile opens with it.
+            var cover = (game.CoverPath ?? Artwork.CachedCover(game)) is { } path ? LoadCover(path) : null;
+            var icon = cover is null && game.IconPath is not null ? LoadIcon(game.IconPath) : null;
+            return (cover, icon, Palette.Colours(cover ?? icon) ?? StoreColours(game.Store));
+        }
+        catch (Exception ex) when (!LibraryApp.IsFatal(ex))
+        {
+            // A game's files are whatever its store left behind. One that cannot be read shows its store's
+            // colours rather than failing the scan, or the batch of tiles loaded with it.
+            Program.Log($"Could not load the pictures for {game.Key}: {ex.Message}");
+            return (null, null, StoreColours(game.Store));
+        }
     }
 
     /// <summary>Shows pictures from <see cref="Pictures"/> on a tile that was made without them. UI thread only.</summary>
@@ -175,7 +185,21 @@ internal sealed class GameTile : INotifyPropertyChanged, INoticeHost
             kept.TryAdd(tile.Game, tile);
         }
 
-        return games.Select(game => kept.TryGetValue(game, out var tile) ? tile : Create(game)).ToList();
+        return games.Select(game => kept.TryGetValue(game, out var tile) ? tile : CreateOrBare(game)).ToList();
+    }
+
+    // One game that cannot be made into a tile must not fail the whole scan: it gets a plain one instead.
+    private static GameTile CreateOrBare(Game game)
+    {
+        try
+        {
+            return Create(game);
+        }
+        catch (Exception ex) when (!LibraryApp.IsFatal(ex))
+        {
+            Program.Log($"Could not make a tile for {game.Key}: {ex.Message}");
+            return new() { Game = game, Background = StoreBrushes[game.Store], BackdropColours = StoreColours(game.Store), IsLoaded = game.Installed };
+        }
     }
 
     /// <summary>
@@ -264,7 +288,10 @@ internal sealed class GameTile : INotifyPropertyChanged, INoticeHost
             image.Freeze();
             return image;
         }
-        catch (Exception ex) when (ex is IOException or NotSupportedException or UnauthorizedAccessException or ArgumentException)
+        // A corrupt or half-written file fails in the decoder as a format, COM or invalid state error
+        // rather than an IO one; the same set as Backdrops.Decode, so one bad picture only costs its tile.
+        catch (Exception ex) when (ex is IOException or NotSupportedException or UnauthorizedAccessException or ArgumentException
+            or FormatException or InvalidOperationException or System.Runtime.InteropServices.COMException)
         {
             return null;
         }
