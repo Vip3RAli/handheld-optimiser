@@ -80,8 +80,11 @@ public sealed class SafeDeleteTests
     public void A_real_file_outside_the_cleanable_folders_is_refused_and_left_in_place()
     {
         // Even when the root it is checked against is its own folder, the handle has to lead inside the
-        // folders SafetyGuard allows, and the temp folder is not one of them.
-        var dir = Path.Combine(Path.GetTempPath(), "HandheldOptimiserTests-" + Guid.NewGuid().ToString("N"));
+        // folders SafetyGuard allows, and this one is not among them. LocalAppData rather than %TEMP%,
+        // which can be a short 8.3 path and would then be refused for not matching the root instead.
+        var dir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "HandheldOptimiserTests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         var file = Path.Combine(dir, "keep.dmp");
         File.WriteAllText(file, "not a cache");

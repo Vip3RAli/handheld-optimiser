@@ -174,8 +174,8 @@ public sealed class TweakStateStore
 
         try
         {
-            // Registry-only checks are quick reads and never wait. Script checks queue for a slot.
-            if (entry.Tweak.ScriptDetect is not null)
+            // Registry-only checks are quick reads and never wait. Checks that start PowerShell queue for a slot.
+            if (entry.Tweak.ScriptDetect is not null && !entry.Tweak.ScriptDetectIsQuick)
             {
                 await _scriptSlots.WaitAsync(ct);
                 holdsSlot = true;

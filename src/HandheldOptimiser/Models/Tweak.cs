@@ -61,6 +61,12 @@ public sealed class Tweak
             string.Equals(spec.ValueName, snapshot.ValueName, StringComparison.OrdinalIgnoreCase));
 
     public Func<TweakContext, CancellationToken, Task<TweakState>>? ScriptDetect { get; init; }
+
+    /// <summary>
+    /// True when <see cref="ScriptDetect"/> only reads the registry or asks Windows directly, starting no
+    /// PowerShell, so it does not have to queue behind the slow checks.
+    /// </summary>
+    public bool ScriptDetectIsQuick { get; init; }
     public Func<TweakContext, TweakJournalEntry, CancellationToken, Task<TweakResult>>? ScriptApply { get; init; }
     public Func<TweakContext, TweakJournalEntry, CancellationToken, Task<TweakResult>>? ScriptRevert { get; init; }
 

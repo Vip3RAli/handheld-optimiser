@@ -570,15 +570,25 @@ internal static class Artwork
     private static async Task<(byte[]? Bytes, Fetched Result)> DownloadAsync(Uri url)
     {
         // No API key here: the images are public, and the key is only for the API.
-        using var response = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        // The client's timeout stops at the headers, so the body has its own deadline.
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var response = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, deadline.Token);
         if (!response.IsSuccessStatusCode)
         {
             return (null, IsTryLater(response.StatusCode) ? Fetched.TryLater : Fetched.NotFound);
         }
 
-        // Too big to be a cover is as good as none.
-        var bytes = await HttpClients.ReadCappedAsync(response.Content, MaxDownloadBytes);
-        return (bytes, bytes is null ? Fetched.NotFound : Fetched.Saved);
+        try
+        {
+            // Too big to be a cover is as good as none.
+            var bytes = await HttpClients.ReadCappedAsync(response.Content, MaxDownloadBytes, deadline.Token);
+            return (bytes, bytes is null ? Fetched.NotFound : Fetched.Saved);
+        }
+        catch (OperationCanceledException) when (deadline.IsCancellationRequested)
+        {
+            // A body that stalled is the server's trouble, not a missing picture: no marker is written.
+            return (null, Fetched.TryLater);
+        }
     }
 
     /// <summary>The most a downloaded picture may be: 20 MB, far more than any cover or banner is.</summary>

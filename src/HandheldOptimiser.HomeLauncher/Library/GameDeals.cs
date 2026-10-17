@@ -264,9 +264,12 @@ internal static class GameDeals
         {
             // Capped and checked as SteamGridDB's pictures are: a banner is whatever a deal's listing names,
             // and an error page or a huge file kept here would be decoded on every visit to the deals.
-            using var response = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+            // The client's timeout stops at the headers, so the body has its own deadline: one stalled
+            // banner would otherwise hold up every card after it.
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+            using var response = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, deadline.Token);
             if (!response.IsSuccessStatusCode
-                || await HttpClients.ReadCappedAsync(response.Content, Artwork.MaxPictureBytes) is not { } bytes
+                || await HttpClients.ReadCappedAsync(response.Content, Artwork.MaxPictureBytes, deadline.Token) is not { } bytes
                 || !Artwork.IsImage(bytes))
             {
                 return null;
@@ -275,7 +278,7 @@ internal static class GameDeals
             await AtomicFile.WriteAllBytesAsync(path, bytes);
             return path;
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or IOException or UnauthorizedAccessException)
         {
             return null;
         }

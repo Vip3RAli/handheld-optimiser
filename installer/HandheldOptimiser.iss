@@ -148,6 +148,24 @@ begin
     '', SW_HIDE, ewWaitUntilTerminated, Code);
 end;
 
+// An install from before the folder page was removed may be outside Program Files, where folders
+// usually let any signed-in user change files. The TDP Engine service runs as SYSTEM from here, so such
+// a folder gets Program Files' kind of access: only Administrators and SYSTEM may change it.
+procedure SecureAppFolderOutsideProgramFiles();
+var
+  App, ProgramFiles: String;
+  Code: Integer;
+begin
+  App := AddBackslash(ExpandConstant('{app}'));
+  ProgramFiles := AddBackslash(ExpandConstant('{autopf}'));
+  if Pos(Lowercase(ProgramFiles), Lowercase(App)) = 1 then
+    exit;
+
+  Exec(ExpandConstant('{sys}\icacls.exe'),
+    '"' + RemoveBackslash(App) + '" /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F *S-1-5-32-545:(OI)(CI)RX /T /L /C',
+    '', SW_HIDE, ewWaitUntilTerminated, Code);
+end;
+
 procedure SecureLogFolder();
 begin
   SecureFolder(ExpandConstant('{commonappdata}\HandheldOptimiser'));
@@ -190,6 +208,7 @@ begin
   if CurStep = ssPostInstall then
   begin
     SecureLogFolder();
+    SecureAppFolderOutsideProgramFiles();
     RegisterAutoTdp();
   end;
 end;
