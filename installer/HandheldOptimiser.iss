@@ -76,6 +76,7 @@ Filename: "{sys}\sc.exe"; Parameters: "delete {#ServiceName}"; Flags: runhidden;
 ; Braces are doubled because Inno reads single braces as constants. The uninstaller runs elevated, so
 ; PowerShell is started by full path and only loads modules from its own folder, never from anywhere
 ; the user can write to.
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""$env:PSModulePath = $PSHOME + '\Modules'; Get-AppxPackage -Name 'HandheldOptimiser.GameBar' | Remove-AppxPackage"""; Flags: runhidden; RunOnceId: "RemoveGameBarWidget"
 Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""$env:PSModulePath = $PSHOME + '\Modules'; Get-AppxPackage -Name 'HandheldOptimiser.HomeApp' | Remove-AppxPackage; $k = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\GamingConfiguration'; if ((Get-ItemProperty $k -ErrorAction SilentlyContinue).GamingHomeApp -in 'HandheldOptimiser.HomeApp_pgc7cpy78bqbw!HomeApp','HandheldOptimiser.HomeApp_n7ggsqt1rt3jm!HomeApp') {{ Remove-ItemProperty $k -Name GamingHomeApp }"""; Flags: runhidden; RunOnceId: "RemoveHomeApp"
 
 [Code]
@@ -93,7 +94,9 @@ end;
 // when a game starts with TDP Engine on, and it ends itself once the game closes.
 //
 // Its permissions are Windows' defaults for a service plus one: the signed-in player (IU) may start
-// it (RP). They cannot stop, change or delete it. The exe path is quoted because it has spaces.
+// it (RP). They cannot stop, change or delete it. The exe path is quoted because it has spaces. App
+// packages (AC) may start it too, for the Game Bar widget, which runs as one; the service itself only
+// takes requests from the widget's own package.
 procedure RegisterAutoTdp();
 var
   Sc, Path: String;
@@ -110,14 +113,46 @@ begin
 
   Exec(Sc, 'description {#ServiceName} "Holds a game at the frame rate chosen in the Handheld Optimiser game library with the lowest power limit. Runs only during games."',
     '', SW_HIDE, ewWaitUntilTerminated, Code);
-  Exec(Sc, 'sdset {#ServiceName} D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWRPLOCRRC;;;IU)',
+  Exec(Sc, 'sdset {#ServiceName} D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWRPLOCRRC;;;IU)(A;;RP;;;AC)',
     '', SW_HIDE, ewWaitUntilTerminated, Code);
+end;
+
+// Adds the TDP Engine widget to the player's Game Bar, when this build has it (it needs Visual Studio's
+// UWP tools to build). See GameBar\RegisterWidget.ps1 for why it takes three steps. A widget that fails
+// to add leaves the rest of the install as it is.
+procedure RegisterGameBarWidget();
+var
+  PowerShell, Params: String;
+  Code: Integer;
+  TrustedHere: Boolean;
+begin
+  if not FileExists(ExpandConstant('{app}\GameBar\GameBar.msix')) then
+    Exit;
+
+  PowerShell := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
+  Params := '-NoProfile -ExecutionPolicy Bypass -File "' + ExpandConstant('{app}\GameBar\RegisterWidget.ps1') + '" -Step ';
+
+  if not Exec(PowerShell, Params + 'Trust', '', SW_HIDE, ewWaitUntilTerminated, Code) or ((Code <> 0) and (Code <> 2)) then
+  begin
+    Log('Could not trust the Game Bar widget''s certificate, so the widget was not added.');
+    Exit;
+  end;
+  TrustedHere := Code = 0;
+
+  if not ExecAsOriginalUser(PowerShell, Params + 'Add', '', SW_HIDE, ewWaitUntilTerminated, Code) or (Code <> 0) then
+    Log('The Game Bar widget could not be added.');
+
+  if TrustedHere then
+    Exec(PowerShell, Params + 'Untrust', '', SW_HIDE, ewWaitUntilTerminated, Code);
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
+  begin
     RegisterAutoTdp();
+    RegisterGameBarWidget();
+  end;
 end;
 
 // Set by the app's updater; see the [Run] entry that reopens the app.

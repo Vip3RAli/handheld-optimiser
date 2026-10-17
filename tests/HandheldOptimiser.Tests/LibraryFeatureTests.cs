@@ -167,6 +167,20 @@ public sealed class LibraryFeatureTests : IDisposable
         Assert.Equal(profile, GameProfiles.Parse(GameProfiles.Format(profile)));
     }
 
+    [Theory]
+    [InlineData("fan=quiet", "quiet")]
+    [InlineData("fan=dynamic", "dynamic")]
+    [InlineData("fps=60;fan=default", "default")]
+    [InlineData("fan=loud", null)]
+    [InlineData("power=silent", null)]
+    public void GameProfiles_ReadTheFanCurve(string text, string? fans)
+    {
+        var profile = GameProfiles.Parse(text);
+
+        Assert.Equal(fans, profile.FanCurve);
+        Assert.Equal(profile, GameProfiles.Parse(GameProfiles.Format(profile)));
+    }
+
     [Fact]
     public void GameProfiles_ResolutionAloneIsNotEmpty() =>
         Assert.False(new GameProfile(null, null, null, Resolution: new Resolution(1280, 720)).IsEmpty);

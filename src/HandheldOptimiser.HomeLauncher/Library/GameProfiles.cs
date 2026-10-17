@@ -12,8 +12,10 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 /// <param name="Resolution">The screen size to play at, such as 1280 x 720 to stretch the battery.</param>
 /// <param name="AutoTdpFps">The frame rate TDP Engine holds this game at, whatever the library's own setting:
 /// 0 for off. Null follows that setting.</param>
+/// <param name="FanCurve">The fan curve for this game, one of <see cref="AutoTdp.FanChoices"/>, whatever the
+/// library's own setting. Null follows that setting.</param>
 internal sealed record GameProfile(PowerMode? PowerMode, int? RefreshRate, int? Brightness, bool? CloseApps = null,
-    Resolution? Resolution = null, int? AutoTdpFps = null)
+    Resolution? Resolution = null, int? AutoTdpFps = null, string? FanCurve = null)
 {
     public static readonly GameProfile None = new(null, null, null);
 
@@ -54,11 +56,16 @@ internal sealed record GameProfile(PowerMode? PowerMode, int? RefreshRate, int? 
             parts.Add(fps > 0 ? $"TDP Engine at {fps} fps" : "TDP Engine off");
         }
 
+        if (FanCurve is { } fans)
+        {
+            parts.Add($"{AutoTdp.FanName(fans)} fans");
+        }
+
         return parts.Count == 0 ? "Not set. Plays with your current settings" : string.Join(", ", parts);
     }
 }
 
-/// <summary>Each game's profile, one value per game key, as "power=performance;res=1280x720;hz=60;brightness=50;fps=60".</summary>
+/// <summary>Each game's profile, one value per game key, as "power=performance;res=1280x720;hz=60;brightness=50;fps=60;fan=quiet".</summary>
 internal static class GameProfiles
 {
     private const string ProfilesKey = Program.SettingsKey + @"\Profiles";
@@ -88,6 +95,7 @@ internal static class GameProfiles
         int? brightness = null;
         bool? closeApps = null;
         int? autoTdp = null;
+        string? fans = null;
 
         foreach (var part in text.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
@@ -115,10 +123,13 @@ internal static class GameProfiles
                 case "fps" when int.TryParse(value, out var parsed) && AutoTdp.FrameRates.Contains(parsed):
                     autoTdp = parsed;
                     break;
+                case "fan" when AutoTdp.FanChoices.Contains(value):
+                    fans = value;
+                    break;
             }
         }
 
-        return new GameProfile(mode, hertz, brightness, closeApps, resolution, autoTdp);
+        return new GameProfile(mode, hertz, brightness, closeApps, resolution, autoTdp, fans);
     }
 
     /// <summary>A profile as stored text, empty when it changes nothing.</summary>
@@ -153,6 +164,11 @@ internal static class GameProfiles
         if (profile.AutoTdpFps is { } fps)
         {
             parts.Add(fps > 0 ? $"fps={fps}" : "fps=off");
+        }
+
+        if (profile.FanCurve is { } fans)
+        {
+            parts.Add($"fan={fans}");
         }
 
         return string.Join(';', parts);
