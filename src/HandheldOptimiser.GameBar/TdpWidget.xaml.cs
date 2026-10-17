@@ -16,6 +16,12 @@ namespace HandheldOptimiser.GameBar
     public sealed partial class TdpWidget : Page
     {
         private readonly DispatcherTimer _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+
+        // The slider's choice is sent once it has stopped moving for this long, not at every step.
+        private readonly DispatcherTimer _sliderPause = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
+        private bool _loaded;
+        private bool _placingSlider;
+        private bool _sliding;
         private EngineStatus _status = EngineStatus.Off;
         private bool _busy;
 
@@ -23,24 +29,34 @@ namespace HandheldOptimiser.GameBar
         {
             InitializeComponent();
             _timer.Tick += (sender, e) => Refresh();
+            _sliderPause.Tick += (sender, e) => SendSlider();
             Loaded += (sender, e) =>
             {
+                _loaded = true;
                 Show(_status);
                 Refresh();
                 _timer.Start();
             };
-            Unloaded += (sender, e) => _timer.Stop();
+            Unloaded += (sender, e) =>
+            {
+                _timer.Stop();
+                if (_sliding)
+                {
+                    _sliderPause.Stop();
+                    SendSlider();
+                }
+            };
         }
 
         private async void Refresh()
         {
-            if (_busy)
+            if (_busy || _sliding)
             {
                 return;
             }
 
             var status = await Task.Run(() => EngineClient.Status());
-            if (!_busy)
+            if (!_busy && !_sliding)
             {
                 Show(status);
             }
@@ -49,8 +65,34 @@ namespace HandheldOptimiser.GameBar
         private void OnFrameRate(object sender, RoutedEventArgs e) =>
             Change(int.Parse((string)((FrameworkElement)sender).Tag), CurrentPower, CurrentFans);
 
-        private void OnPowerLimit(object sender, RoutedEventArgs e) =>
+        private void OnPowerLimit(object sender, RoutedEventArgs e)
+        {
+            _sliderPause.Stop();
+            _sliding = false;
             Change(CurrentFps, int.Parse((string)((FrameworkElement)sender).Tag), CurrentFans);
+        }
+
+        private void OnPowerSlider(object sender, RangeBaseValueChangedEventArgs e)
+        {
+            if (!_loaded || _placingSlider)
+            {
+                return;
+            }
+
+            // Held back until it stops, so a sweep from 7 to 30 W is one change rather than twenty.
+            _sliding = true;
+            AutoPower.IsChecked = false;
+            PowerValue.Text = (int)e.NewValue + " W";
+            _sliderPause.Stop();
+            _sliderPause.Start();
+        }
+
+        private void SendSlider()
+        {
+            _sliderPause.Stop();
+            _sliding = false;
+            Change(CurrentFps, (int)PowerSlider.Value, CurrentFans);
+        }
 
         private void OnFans(object sender, RoutedEventArgs e) =>
             Change(CurrentFps, CurrentPower, (string)((FrameworkElement)sender).Tag);
@@ -85,7 +127,7 @@ namespace HandheldOptimiser.GameBar
         {
             _status = status;
             Check(FrameRates, CurrentFps.ToString());
-            Check(PowerLimits, CurrentPower.ToString());
+            ShowPower(CurrentPower);
             Check(Fans, CurrentFans ?? "");
 
             // The readouts only mean something while the engine runs, so the state line stands alone otherwise.
@@ -131,6 +173,24 @@ namespace HandheldOptimiser.GameBar
                 {
                     StateDetail.Text += " At " + status.PowerLimit + " W Max.";
                 }
+            }
+        }
+
+        /// <summary>Auto lit, or the slider at the limit in force. The slider stays where it was under Auto.</summary>
+        private void ShowPower(int powerLimit)
+        {
+            if (_sliding)
+            {
+                return;
+            }
+
+            AutoPower.IsChecked = powerLimit == 0;
+            PowerValue.Text = powerLimit == 0 ? "Auto" : powerLimit + " W";
+            if (powerLimit > 0 && (int)PowerSlider.Value != powerLimit)
+            {
+                _placingSlider = true;
+                PowerSlider.Value = powerLimit;
+                _placingSlider = false;
             }
         }
 
