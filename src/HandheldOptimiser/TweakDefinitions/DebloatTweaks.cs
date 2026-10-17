@@ -108,13 +108,27 @@ public static class DebloatTweaks
                 ct,
                 echoScript: false);
 
-            foreach (var line in capture.OutputLines.Where(l => l.StartsWith("TASK=", StringComparison.Ordinal)))
+            var captured = capture.OutputLines
+                .Where(l => l.StartsWith("TASK=", StringComparison.Ordinal))
+                .Select(l => l.Split('=', 3))
+                .Where(p => p.Length == 3)
+                .ToList();
+
+            // Only tasks that are about to change are journalled; revert leaves the rest alone either way.
+            var toDisable = captured
+                .Where(p => !p[2].Equals("Disabled", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            foreach (var parts in toDisable)
             {
-                var parts = line.Split('=', 3);
-                if (parts.Length == 3)
-                {
-                    journal.CapturedState[$"task.{parts[1]}"] = parts[2];
-                }
+                journal.CapturedState[$"task.{parts[1]}"] = parts[2];
+            }
+
+            // Every task was found and is already off. If none could be read at all, they are still
+            // disabled below, as before, in case reading their states failed rather than them being absent.
+            if (captured.Count > 0 && toDisable.Count == 0)
+            {
+                return TweakResult.NoChange("debloat.telemetry");
             }
 
             var outcome = await ctx.Runner.RunScriptAsync(

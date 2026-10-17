@@ -70,10 +70,12 @@ public partial class LibraryWindow
                     if (setting.Data == 0)
                     {
                         _displayOff = true;
+                        OnDisplayOff();
                     }
                     else if (setting.Data == 1 && _displayOff)
                     {
                         _displayOff = false;
+                        OnDisplayOn();
                         OnWake();
                     }
                 }
@@ -82,6 +84,30 @@ public partial class LibraryWindow
         }
 
         return 0;
+    }
+
+    /// <summary>
+    /// Nobody can see the library with the screen off, and on a Modern Standby device it stays running
+    /// then: the controller is polled every 16 ms while it is in front, which kept the processor from
+    /// resting the whole time the device was asleep. Polling and the clock stop until the screen is back.
+    /// </summary>
+    private void OnDisplayOff()
+    {
+        _gamepad.Stop();
+        _clock.Stop();
+    }
+
+    /// <summary>Starts again what <see cref="OnDisplayOff"/> stopped, if the library is still in front.</summary>
+    private void OnDisplayOn()
+    {
+        if (!IsActive)
+        {
+            return;
+        }
+
+        _gamepad.Start();
+        _clock.Start();
+        UpdateTopBar();
     }
 
     private async void OnWake()

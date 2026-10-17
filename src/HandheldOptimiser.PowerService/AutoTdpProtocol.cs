@@ -15,6 +15,9 @@ internal static class AutoTdpProtocol
     public const string Status = "status";
     public const string Stop = "stop";
 
+    /// <summary>The error a start gets while the service is on its way out; the library starts it again once it has stopped.</summary>
+    public const string EndingError = "TDP Engine is ending. Try again in a moment.";
+
     // The limits the service holds any request to, whatever the library sends. The Ally's own range in
     // Armoury Crate is 7 to 30 W.
     public const int LowestWatts = 7;

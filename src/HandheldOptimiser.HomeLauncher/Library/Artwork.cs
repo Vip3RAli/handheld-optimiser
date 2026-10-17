@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.IO;
 using System.Net;
 using System.Net.Http;
@@ -49,10 +48,61 @@ internal static class Artwork
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "HandheldOptimiser", "artwork");
 
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(15) };
+    private static readonly HttpClient Http = HttpClients.Shared;
 
     // Going back to a game whose artwork is still downloading joins that download.
-    private static readonly ConcurrentDictionary<string, Task<string?>> Fetches = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly InFlight<string?> Fetches = new();
+    private static readonly InFlight<(string? Path, bool KeyRejected)> TileFetches = new();
+
+    /// <summary>What a try at one kind of picture came to.</summary>
+    internal enum Fetched
+    {
+        /// <summary>A picture was downloaded and saved.</summary>
+        Saved,
+
+        /// <summary>SteamGridDB answered, and has nothing usable: worth a marker so it is not asked again for a while.</summary>
+        NotFound,
+
+        /// <summary>It could not answer just now (a server error, or asked to slow down): no marker, ask again next time.</summary>
+        TryLater
+    }
+
+    /// <summary>
+    /// Whether a failed download was the server's trouble rather than the picture's: a server error, a
+    /// timeout or being asked to slow down. Those are asked again next time; anything else, such as the
+    /// picture being gone, counts as nothing found.
+    /// </summary>
+    internal static bool IsTryLater(HttpStatusCode status) =>
+        status is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests || (int)status >= 500;
+
+    /// <summary>
+    /// Several tries at a picture as one: saved if any was, else try later if any could not be answered,
+    /// else nothing found. A single server error among the candidates is enough to hold off the marker.
+    /// </summary>
+    internal static Fetched Combine(IEnumerable<Fetched> tries)
+    {
+        var result = Fetched.NotFound;
+        foreach (var attempt in tries)
+        {
+            if (attempt == Fetched.Saved)
+            {
+                return Fetched.Saved;
+            }
+
+            if (attempt == Fetched.TryLater)
+            {
+                result = Fetched.TryLater;
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Whether to leave the marker that stops a game being asked for again for a week. Only when the
+    /// service really answered with nothing; an outage would otherwise hide a game's art for a week.
+    /// </summary>
+    internal static bool WritesMarker(Fetched result) => result == Fetched.NotFound;
 
     public static bool HasApiKey => LibrarySettings.ArtworkKey is not null;
 
@@ -136,15 +186,7 @@ internal static class Artwork
             return null;
         }
 
-        var fetch = Fetches.GetOrAdd(game.Key, _ => FetchAsync(game, corrected, apiKey));
-        try
-        {
-            return await fetch;
-        }
-        finally
-        {
-            Fetches.TryRemove(game.Key, out _);
-        }
+        return await Fetches.RunAsync(game.Key, () => FetchAsync(game, corrected, apiKey));
     }
 
     /// <returns>The cached file, or null when there is no artwork or SteamGridDB could not be reached.</returns>
@@ -160,13 +202,18 @@ internal static class Artwork
 
             using var list = await GetAsync(heroes + ArtFilter, apiKey);
             var path = CachePath(game);
-            if (await SaveFirstAsync(list, path))
+            var result = await SaveFirstAsync(list, path);
+            if (result == Fetched.Saved)
             {
                 File.Delete(PreviewPath(game));
                 return path;
             }
 
-            MarkNotFound(NotFoundPath(game));
+            if (WritesMarker(result))
+            {
+                MarkNotFound(NotFoundPath(game));
+            }
+
             return null;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException
@@ -200,6 +247,12 @@ internal static class Artwork
             return (cached, false);
         }
 
+        // The grid asks for every tile's cover as it fills, and again as tiles come into view.
+        return await TileFetches.RunAsync(game.Key + ":cover", () => FetchCoverAsync(game));
+    }
+
+    private static async Task<(string? Path, bool KeyRejected)> FetchCoverAsync(Game game)
+    {
         // A game that is not installed may come with its store's own cover, which needs no key.
         if (await StoreCoverAsync(game) is { } fromStore)
         {
@@ -220,16 +273,24 @@ internal static class Artwork
             }
 
             var path = CoverCachePath(game);
+            var tries = new List<Fetched>();
             foreach (var size in CoverSizes)
             {
                 using var list = await GetAsync($"{grids}{ArtFilter}&dimensions={size}", apiKey);
-                if (await SaveFirstAsync(list, path))
+                var result = await SaveFirstAsync(list, path);
+                if (result == Fetched.Saved)
                 {
                     return (path, false);
                 }
+
+                tries.Add(result);
             }
 
-            MarkNotFound(NoCoverPath(game));
+            if (WritesMarker(Combine(tries)))
+            {
+                MarkNotFound(NoCoverPath(game));
+            }
+
             return (null, false);
         }
         catch (HttpRequestException ex) when (ex.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
@@ -270,19 +331,30 @@ internal static class Artwork
             return (null, false);
         }
 
+        return await TileFetches.RunAsync(game.Key + ":square", () => FetchSquareAsync(game, apiKey));
+    }
+
+    private static async Task<(string? Path, bool KeyRejected)> FetchSquareAsync(Game game, string apiKey)
+    {
         try
         {
+            var result = Fetched.NotFound;
             if (await ArtListAsync(game, "grids", SearchTitle(game), apiKey) is { } grids)
             {
                 using var list = await GetAsync($"{grids}{ArtFilter}&dimensions={SquareSizes}", apiKey);
                 var path = SquareCachePath(game);
-                if (await SaveFirstAsync(list, path))
+                result = await SaveFirstAsync(list, path);
+                if (result == Fetched.Saved)
                 {
                     return (path, false);
                 }
             }
 
-            MarkNotFound(NoSquarePath(game));
+            if (WritesMarker(result))
+            {
+                MarkNotFound(NoSquarePath(game));
+            }
+
             return (null, false);
         }
         catch (HttpRequestException ex) when (ex.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
@@ -317,32 +389,30 @@ internal static class Artwork
         }
 
         // Moving along the cards asks again while the first answer is on its way, which joins it.
-        var fetch = Fetches.GetOrAdd(game.Key + ":capsule", _ => FetchCapsuleAsync(game, apiKey));
-        try
-        {
-            return await fetch;
-        }
-        finally
-        {
-            Fetches.TryRemove(game.Key + ":capsule", out _);
-        }
+        return await Fetches.RunAsync(game.Key + ":capsule", () => FetchCapsuleAsync(game, apiKey));
     }
 
     private static async Task<string?> FetchCapsuleAsync(Game game, string apiKey)
     {
         try
         {
+            var result = Fetched.NotFound;
             if (await ArtListAsync(game, "grids", SearchTitle(game), apiKey) is { } grids)
             {
                 using var list = await GetAsync($"{grids}{ArtFilter}&dimensions={CapsuleSizes}", apiKey);
                 var path = CapsuleCachePath(game);
-                if (await SaveFirstAsync(list, path))
+                result = await SaveFirstAsync(list, path);
+                if (result == Fetched.Saved)
                 {
                     return path;
                 }
             }
 
-            MarkNotFound(NoCapsulePath(game));
+            if (WritesMarker(result))
+            {
+                MarkNotFound(NoCapsulePath(game));
+            }
+
             return null;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException
@@ -370,7 +440,7 @@ internal static class Artwork
 
         try
         {
-            var bytes = await DownloadAsync(url);
+            var (bytes, result) = await DownloadAsync(url);
             if (bytes is not null && IsImage(bytes))
             {
                 var path = CoverCachePath(game);
@@ -378,7 +448,11 @@ internal static class Artwork
                 return path;
             }
 
-            MarkNotFound(NoStoreCoverPath(game));
+            // The store's server having trouble is no reason to stop asking it for a week.
+            if (WritesMarker(result))
+            {
+                MarkNotFound(NoStoreCoverPath(game));
+            }
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException or UnauthorizedAccessException)
         {
@@ -406,31 +480,30 @@ internal static class Artwork
     }
 
     /// <summary>Saves the best listed picture that downloads and really is a picture.</summary>
-    /// <returns>False when none of them did.</returns>
-    private static async Task<bool> SaveFirstAsync(JsonDocument? list, string path)
+    /// <returns>
+    /// Saved; or NotFound when there were none or none of them was a picture; or TryLater when one of
+    /// them could not be downloaded for the server's sake, which may well work next time.
+    /// </returns>
+    private static async Task<Fetched> SaveFirstAsync(JsonDocument? list, string path)
     {
+        var tries = new List<Fetched>();
         foreach (var url in ImageUrls(list).Take(CandidatesToTry * 2))
         {
-            var bytes = await DownloadAsync(url);
+            var (bytes, result) = await DownloadAsync(url);
             if (bytes is null || !IsImage(bytes))
             {
+                tries.Add(bytes is null ? result : Fetched.NotFound);
                 continue;
             }
 
             await SaveAsync(bytes, path);
-            return true;
+            return Fetched.Saved;
         }
 
-        return false;
+        return Combine(tries);
     }
 
-    private static async Task SaveAsync(byte[] bytes, string path)
-    {
-        Directory.CreateDirectory(CacheDir);
-        var temp = path + ".tmp";
-        await File.WriteAllBytesAsync(temp, bytes);
-        File.Move(temp, path, overwrite: true);
-    }
+    private static Task SaveAsync(byte[] bytes, string path) => AtomicFile.WriteAllBytesAsync(path, bytes);
 
     /// <returns>The response, or null when SteamGridDB does not know the game.</returns>
     private static async Task<JsonDocument?> GetAsync(string path, string apiKey)
@@ -493,27 +566,39 @@ internal static class Artwork
             ? data.EnumerateArray().Where(e => e.ValueKind == JsonValueKind.Object)
             : [];
 
-    private static async Task<byte[]?> DownloadAsync(Uri url)
+    /// <returns>The picture's bytes, or null with why: NotFound, or TryLater for the server's trouble.</returns>
+    private static async Task<(byte[]? Bytes, Fetched Result)> DownloadAsync(Uri url)
     {
         // No API key here: the images are public, and the key is only for the API.
         using var response = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
-        if (!response.IsSuccessStatusCode || response.Content.Headers.ContentLength > MaxDownloadBytes)
+        if (!response.IsSuccessStatusCode)
         {
-            return null;
+            return (null, IsTryLater(response.StatusCode) ? Fetched.TryLater : Fetched.NotFound);
         }
 
-        var bytes = await response.Content.ReadAsByteArrayAsync();
-        return bytes.Length <= MaxDownloadBytes ? bytes : null;
+        // Too big to be a cover is as good as none.
+        var bytes = await HttpClients.ReadCappedAsync(response.Content, MaxDownloadBytes);
+        return (bytes, bytes is null ? Fetched.NotFound : Fetched.Saved);
     }
 
-    private static bool IsImage(byte[] bytes)
+    /// <summary>The most a downloaded picture may be: 20 MB, far more than any cover or banner is.</summary>
+    internal const long MaxPictureBytes = MaxDownloadBytes;
+
+    /// <summary>
+    /// Whether the bytes are a picture WPF can show, from its header alone. Nothing is decoded: the
+    /// decoder reads the format and size and stops, where decoding it whole cost tens of MB for a large
+    /// hero image just to throw it away again.
+    /// </summary>
+    internal static bool IsImage(byte[] bytes)
     {
         try
         {
-            using var stream = new MemoryStream(bytes);
-            return BitmapDecoder.Create(stream, BitmapCreateOptions.IgnoreColorProfile, BitmapCacheOption.OnLoad).Frames.Count > 0;
+            using var stream = new MemoryStream(bytes, writable: false);
+            var frame = BitmapDecoder.Create(stream, BitmapCreateOptions.IgnoreColorProfile, BitmapCacheOption.None).Frames[0];
+            return frame.PixelWidth > 0 && frame.PixelHeight > 0;
         }
-        catch (Exception ex) when (ex is NotSupportedException or FormatException or IOException or ArgumentException or COMException)
+        catch (Exception ex) when (ex is NotSupportedException or FormatException or IOException or ArgumentException
+            or InvalidOperationException or COMException)
         {
             return false;
         }

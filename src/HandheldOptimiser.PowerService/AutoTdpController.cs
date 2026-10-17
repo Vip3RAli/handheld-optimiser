@@ -216,7 +216,10 @@ internal sealed class AutoTdpController
         {
             State = AutoTdpState.TooHot;
             _judging = null;
-            if (now >= _nextChange && Watts > _settings.MinWatts)
+
+            // Only at or over the limit does it cut. Between the limit and a few degrees under it, the cut
+            // so far is holding the temperature, so it holds too rather than sliding on down to the minimum.
+            if (degrees >= _settings.TemperatureLimit && now >= _nextChange && Watts > _settings.MinWatts)
             {
                 var cooler = Math.Max(Watts - HeatStep, _settings.MinWatts);
                 _heatCeiling = cooler;

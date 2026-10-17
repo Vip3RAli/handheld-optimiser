@@ -321,6 +321,55 @@ public sealed partial class MainViewModel : ObservableObject, IShell
 
     public void NotifyRebootRequired() => RebootRequired = true;
 
+    private bool _closeNoticeShowing;
+
+    /// <summary>
+    /// Asked as the window is about to close. True while an operation is running, in which case the
+    /// window stays open and says why. Closing mid-run would stop a tweak between its registry writes
+    /// and its script, or a removal or update halfway, and what had been changed by then may not have
+    /// its undo data saved yet.
+    /// </summary>
+    public bool ShouldBlockClose()
+    {
+        if (!IsBusy)
+        {
+            return false;
+        }
+
+        Log.Warning($"Close refused: \"{StatusText}\" is still running.");
+
+        // Pressing close again while the notice is up does not stack a second one behind it.
+        if (!_closeNoticeShowing)
+        {
+            _closeNoticeShowing = true;
+            _ = ShowStillWorkingAsync(StatusText);
+        }
+
+        return true;
+    }
+
+    private async Task ShowStillWorkingAsync(string running)
+    {
+        try
+        {
+            // Shown after the close has been turned down, not from inside the window's Closing event.
+            await Task.Yield();
+            await ConfirmAsync(
+                "Still working",
+                $"{running} is still running. Closing now could leave a change half made, without what is " +
+                "needed to undo it.\n\nThe app can be closed once it has finished.",
+                "OK");
+        }
+        catch (Exception ex)
+        {
+            Log.Warning($"Could not show the still-working notice: {ex.Message}");
+        }
+        finally
+        {
+            _closeNoticeShowing = false;
+        }
+    }
+
     [RelayCommand]
     private void ClearLog() => Log.Clear();
 

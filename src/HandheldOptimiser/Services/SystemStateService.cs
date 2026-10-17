@@ -174,7 +174,7 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
         var storage = StorageHealth.RunAsync(_runner, ct);
 
         var watched = WatchedServices();
-        var serviceNames = string.Join(",", watched.Select(s => $"'{s.ServiceName.Replace("'", "''")}'"));
+        var serviceNames = string.Join(",", watched.Select(s => PsQuote.Literal(s.ServiceName)));
 
         var outcome = await _runner.RunScriptAsync(
             $$"""
@@ -360,7 +360,7 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
     {
         _log.Info("Repairing any disabled vendor / driver / security / update services…");
 
-        var names = string.Join(",", WatchedServices().Select(s => $"'{s.ServiceName.Replace("'", "''")}'"));
+        var names = string.Join(",", WatchedServices().Select(s => PsQuote.Literal(s.ServiceName)));
 
         var outcome = await _runner.RunScriptAsync(
             $$"""

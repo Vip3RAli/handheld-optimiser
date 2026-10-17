@@ -25,6 +25,9 @@ AppVersion={#AppVersion}
 AppVerName={#AppName} {#AppVersion}
 AppPublisher=Zain Ali
 DefaultDirName={autopf}\{#AppName}
+; The TDP Engine service runs as SYSTEM from the program folder, so that folder must be one only
+; administrators can write: always Program Files, never a folder picked by hand.
+DisableDirPage=yes
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\{#AppExeName}
@@ -67,10 +70,8 @@ Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#AppName}}"; F
 Filename: "{app}\{#AppExeName}"; Flags: nowait; Check: IsInAppUpdate
 
 [UninstallRun]
-; The TDP Engine service goes first, so its exe is free to delete. Stopping it puts Armoury Crate's
-; operating mode back if a game was being held.
-Filename: "{sys}\sc.exe"; Parameters: "stop {#ServiceName}"; Flags: runhidden; RunOnceId: "StopAutoTdp"
-Filename: "{sys}\sc.exe"; Parameters: "delete {#ServiceName}"; Flags: runhidden; RunOnceId: "DeleteAutoTdp"
+; The TDP Engine service is stopped and deleted in [Code] (CurUninstallStepChanged) before this runs,
+; as stopping has to be waited for, which these entries cannot do.
 ; Remove the full screen home app registration before its files go, and if it was the selected home
 ; app, clear the setting so Windows falls back to the Xbox app instead of an entry that no longer exists.
 ; Braces are doubled because Inno reads single braces as constants. The uninstaller runs elevated, so
@@ -79,13 +80,78 @@ Filename: "{sys}\sc.exe"; Parameters: "delete {#ServiceName}"; Flags: runhidden;
 Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""$env:PSModulePath = $PSHOME + '\Modules'; Get-AppxPackage -Name 'HandheldOptimiser.HomeApp' | Remove-AppxPackage; $k = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\GamingConfiguration'; if ((Get-ItemProperty $k -ErrorAction SilentlyContinue).GamingHomeApp -in 'HandheldOptimiser.HomeApp_pgc7cpy78bqbw!HomeApp','HandheldOptimiser.HomeApp_n7ggsqt1rt3jm!HomeApp') {{ Remove-ItemProperty $k -Name GamingHomeApp }"""; Flags: runhidden; RunOnceId: "RemoveHomeApp"
 
 [Code]
+// Stops the TDP Engine service and waits, up to about 15 seconds, until Windows reports it STOPPED.
+// sc stop only asks; the exe stays locked until the service has put the operating mode back and ended.
+// sc query exits with 1060 when the service is not installed at all, which counts as stopped.
+procedure StopAutoTdp();
+var
+  Sc, Output: String;
+  Lines: TArrayOfString;
+  Code, I, Tries: Integer;
+  Stopped: Boolean;
+begin
+  Sc := ExpandConstant('{sys}\sc.exe');
+  Output := ExpandConstant('{tmp}\autotdp-state.txt');
+  Exec(Sc, 'stop {#ServiceName}', '', SW_HIDE, ewWaitUntilTerminated, Code);
+
+  for Tries := 1 to 30 do
+  begin
+    Stopped := True;
+    if Exec(ExpandConstant('{cmd}'), '/C ""' + Sc + '" query {#ServiceName} > "' + Output + '""', '', SW_HIDE,
+      ewWaitUntilTerminated, Code) and (Code = 0) and LoadStringsFromFile(Output, Lines) then
+      for I := 0 to GetArrayLength(Lines) - 1 do
+        if (Pos('STATE', Lines[I]) > 0) and (Pos('STOPPED', Lines[I]) = 0) then
+          Stopped := False;
+
+    if Stopped then
+      Exit;
+    Sleep(500);
+  end;
+
+  Log('The TDP Engine service had not stopped after waiting for it.');
+end;
+
 // The TDP Engine service's exe is replaced by an update, so a running one is stopped first.
 function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  StopAutoTdp();
+  Result := '';
+end;
+
+// The TDP Engine service's log folder, ProgramData\HandheldOptimiser\logs. The service writes there as
+// SYSTEM, and ProgramData lets any user make folders, so one already there is not trusted: a link in its
+// place is removed (which removes the link only), and both folders are made Administrators' with access
+// only Administrators and SYSTEM can write and users can read. The service checks the same before writing.
+procedure SecureFolder(Dir: String);
 var
+  Icacls: String;
+  FindRec: TFindRec;
   Code: Integer;
 begin
-  Exec(ExpandConstant('{sys}\sc.exe'), 'stop {#ServiceName}', '', SW_HIDE, ewWaitUntilTerminated, Code);
-  Result := '';
+  if FindFirst(Dir, FindRec) then
+  begin
+    // FILE_ATTRIBUTE_REPARSE_POINT: a junction or symbolic link.
+    if (FindRec.Attributes and $400) <> 0 then
+      RemoveDir(Dir);
+    FindClose(FindRec);
+  end;
+
+  ForceDirectories(Dir);
+
+  // /L works on the folder itself even if it were swapped for a link meanwhile, never on what a link
+  // points at, and nothing recurses (/T), so no folder outside this one can be touched. Owner first, then
+  // any access a user added is cleared (/reset), then only the three entries below are left.
+  Icacls := ExpandConstant('{sys}\icacls.exe');
+  Exec(Icacls, '"' + Dir + '" /setowner *S-1-5-32-544 /L', '', SW_HIDE, ewWaitUntilTerminated, Code);
+  Exec(Icacls, '"' + Dir + '" /reset /L', '', SW_HIDE, ewWaitUntilTerminated, Code);
+  Exec(Icacls, '"' + Dir + '" /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F *S-1-5-32-545:(OI)(CI)RX /L',
+    '', SW_HIDE, ewWaitUntilTerminated, Code);
+end;
+
+procedure SecureLogFolder();
+begin
+  SecureFolder(ExpandConstant('{commonappdata}\HandheldOptimiser'));
+  SecureFolder(ExpandConstant('{commonappdata}\HandheldOptimiser\logs'));
 end;
 
 // Registers the TDP Engine service, which counts a game's frames (that needs administrator, which the
@@ -112,12 +178,35 @@ begin
     '', SW_HIDE, ewWaitUntilTerminated, Code);
   Exec(Sc, 'sdset {#ServiceName} D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWRPLOCRRC;;;IU)',
     '', SW_HIDE, ewWaitUntilTerminated, Code);
+
+  // If it crashes mid-game, Windows starts it again after 5 seconds, and on starting it puts back the
+  // operating mode it saved, so the game's power limit is not left set. The count resets after a day.
+  Exec(Sc, 'failure {#ServiceName} reset= 86400 actions= restart/5000',
+    '', SW_HIDE, ewWaitUntilTerminated, Code);
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
+  begin
+    SecureLogFolder();
     RegisterAutoTdp();
+  end;
+end;
+
+// The TDP Engine service goes first, so its exe is free to delete. Stopping it puts Armoury Crate's
+// operating mode back if a game was being held.
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  Code: Integer;
+begin
+  if CurUninstallStep = usUninstall then
+  begin
+    StopAutoTdp();
+    Exec(ExpandConstant('{sys}\sc.exe'), 'delete {#ServiceName}', '', SW_HIDE, ewWaitUntilTerminated, Code);
+    // Where the service notes the operating mode to put back while a game is held; nothing reads it now.
+    RegDeleteKeyIncludingSubkeys(HKLM64, 'SOFTWARE\HandheldOptimiser\TdpEngine');
+  end;
 end;
 
 // Set by the app's updater; see the [Run] entry that reopens the app.
