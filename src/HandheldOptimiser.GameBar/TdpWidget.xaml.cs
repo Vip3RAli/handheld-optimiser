@@ -105,7 +105,7 @@ namespace HandheldOptimiser.GameBar
 
             if (!status.Running)
             {
-                SetState("Off", ". Pick a frame rate, power limit or fan curve to start it for the game you're playing.");
+                SetState("Off", " Pick your power, FPS and cooling targets to start it for the game.");
                 return;
             }
 
@@ -129,7 +129,7 @@ namespace HandheldOptimiser.GameBar
                 // The state line is the only place that says the tile is a ceiling here rather than a fixed limit.
                 if (status.PowerLimit > 0)
                 {
-                    StateDetail.Text += " At most " + status.PowerLimit + " W.";
+                    StateDetail.Text += " At " + status.PowerLimit + " W Max.";
                 }
             }
         }
@@ -162,9 +162,9 @@ namespace HandheldOptimiser.GameBar
             {
                 case "quiet": return "Quiet";
                 case "cool": return "Cool";
-                case "full": return "Full speed";
+                case "full": return "Max";
                 case "dynamic": return "Dynamic";
-                default: return "Ally";
+                default: return "Default";
             }
         }
 
@@ -173,14 +173,14 @@ namespace HandheldOptimiser.GameBar
         {
             switch (state)
             {
-                case "Holding": SetState("Holding", " " + targetFps + " fps with the least power."); break;
-                case "Raising": SetState("Raising", " the power: short of " + targetFps + " fps."); break;
-                case "Lowering": SetState("Lowering", " the power: above " + targetFps + " fps."); break;
-                case "AtMaximum": SetState("At its most watts", " and still short of " + targetFps + " fps."); break;
-                case "NoGain": SetState("No gain", ": more power doesn't help this game, so it isn't given any."); break;
-                case "TooHot": SetState("Too hot", ": at the temperature limit, so cooling down."); break;
-                case "Waiting": SetState("Waiting", " for the game: loading, paused or in a menu."); break;
-                default: SetState("Settling", " after a change."); break;
+                case "Holding": SetState("Holding", " " + targetFps + " fps with lowest power level possible."); break;
+                case "Raising": SetState("Raising", " power: Not at " + targetFps + " fps."); break;
+                case "Lowering": SetState("Lowering", " power: Above " + targetFps + " fps."); break;
+                case "AtMaximum": SetState("Power target reached", " unable to hit " + targetFps + " fps. Try lowering game settings."); break;
+                case "NoGain": SetState("No gain", ": more power doesn't help this game."); break;
+                case "TooHot": SetState("Too hot", ": at the temperature limit, cooling down."); break;
+                case "Waiting": SetState("Waiting", " for the game."); break;
+                default: SetState("Monitoring", " after a change."); break;
             }
         }
     }

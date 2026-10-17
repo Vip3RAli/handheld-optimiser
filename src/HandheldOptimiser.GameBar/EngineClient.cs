@@ -84,14 +84,14 @@ namespace HandheldOptimiser.GameBar
                 }
             }
 
-            return answer == null ? EngineStatus.Failed("TDP Engine did not answer.") : Read(answer);
+            return answer == null ? EngineStatus.Failed("TDP Engine unresponsive.") : Read(answer);
         }
 
         private static EngineStatus Read(string answer)
         {
             if (!JsonObject.TryParse(answer, out var json))
             {
-                return EngineStatus.Failed("TDP Engine gave an answer this widget does not understand.");
+                return EngineStatus.Failed("TDP Engine invalid response.");
             }
 
             return new EngineStatus
@@ -182,7 +182,7 @@ namespace HandheldOptimiser.GameBar
             var manager = OpenSCManager(null, null, ScManagerConnect);
             if (manager == IntPtr.Zero)
             {
-                return "Windows would not let Game Bar start TDP Engine. Start a game from the game library to use it.";
+                return "Windows would not let Game Bar start TDP Engine. Try launching a game from the game library to restart it.";
             }
 
             try
@@ -191,8 +191,8 @@ namespace HandheldOptimiser.GameBar
                 if (service == IntPtr.Zero)
                 {
                     return Marshal.GetLastWin32Error() == ErrorServiceDoesNotExist
-                        ? "TDP Engine is not installed. Install the latest Handheld Optimiser to add it."
-                        : "Windows would not let Game Bar start TDP Engine. Start a game from the game library to use it.";
+                        ? "TDP Engine is not installed. Install the latest Handheld Optimiser to access it."
+                        : "Windows would not let Game Bar start TDP Engine. Try launching a game from the game library to restart it.";
                 }
 
                 try

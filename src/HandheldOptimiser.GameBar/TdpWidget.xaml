@@ -318,10 +318,10 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <ToggleButton Style="{StaticResource Segment}" Content="Ally" Tag="" Click="OnFans" CornerRadius="6,0,0,6" />
+                        <ToggleButton Style="{StaticResource Segment}" Content="Default" Tag="" Click="OnFans" CornerRadius="6,0,0,6" />
                         <ToggleButton Grid.Column="1" Style="{StaticResource Segment}" Content="Quiet" Tag="quiet" Click="OnFans" BorderThickness="0,1,1,1" />
                         <ToggleButton Grid.Column="2" Style="{StaticResource Segment}" Content="Cool" Tag="cool" Click="OnFans" BorderThickness="0,1,1,1" />
-                        <ToggleButton Grid.Column="3" Style="{StaticResource Segment}" Content="Full" Tag="full" Click="OnFans" BorderThickness="0,1,1,1" />
+                        <ToggleButton Grid.Column="3" Style="{StaticResource Segment}" Content="Max" Tag="full" Click="OnFans" BorderThickness="0,1,1,1" />
                         <ToggleButton Grid.Column="4" Style="{StaticResource Segment}" Content="Dynamic" Tag="dynamic" Click="OnFans" BorderThickness="0,1,1,1" CornerRadius="0,6,6,0" />
                     </Grid>
                 </StackPanel>
