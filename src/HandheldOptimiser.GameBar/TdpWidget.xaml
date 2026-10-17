@@ -259,50 +259,43 @@
             <!-- With a frame rate, the most TDP Engine may use; with frame rate Off, a limit held as it is. -->
             <Border Style="{StaticResource Card}">
                 <StackPanel>
-                    <TextBlock Style="{StaticResource CardTitle}" Text="Power limit" />
-                    <Grid x:Name="PowerLimits" Margin="-3,0">
+                    <Grid>
+                        <TextBlock Style="{StaticResource CardTitle}" Text="Power limit" />
+                        <TextBlock x:Name="PowerValue" HorizontalAlignment="Right" FontSize="15" FontWeight="SemiBold"
+                                   Foreground="{StaticResource Cyan}" Text="Auto" />
+                    </Grid>
+                    <Grid Margin="-3,0,0,0">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="76" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <!-- The Tag is the limit sent to the service, 0 for Auto. -->
-                        <ToggleButton Style="{StaticResource Tile}" Tag="0" Click="OnPowerLimit">
+                        <!-- Auto sends 0: TDP Engine's usual range, or Armoury Crate's own limit. -->
+                        <ToggleButton x:Name="AutoPower" Style="{StaticResource Tile}" Tag="0" Click="OnPowerLimit">
                             <TextBlock Style="{StaticResource TileNumber}" Text="Auto" />
                         </ToggleButton>
-                        <ToggleButton Grid.Column="1" Style="{StaticResource Tile}" Tag="10" Click="OnPowerLimit">
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource TileNumber}" Text="10" />
-                                <TextBlock Style="{StaticResource TileUnit}" Text="W" />
-                            </StackPanel>
-                        </ToggleButton>
-                        <ToggleButton Grid.Column="2" Style="{StaticResource Tile}" Tag="15" Click="OnPowerLimit">
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource TileNumber}" Text="15" />
-                                <TextBlock Style="{StaticResource TileUnit}" Text="W" />
-                            </StackPanel>
-                        </ToggleButton>
-                        <ToggleButton Grid.Column="3" Style="{StaticResource Tile}" Tag="20" Click="OnPowerLimit">
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource TileNumber}" Text="20" />
-                                <TextBlock Style="{StaticResource TileUnit}" Text="W" />
-                            </StackPanel>
-                        </ToggleButton>
-                        <ToggleButton Grid.Column="4" Style="{StaticResource Tile}" Tag="25" Click="OnPowerLimit">
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource TileNumber}" Text="25" />
-                                <TextBlock Style="{StaticResource TileUnit}" Text="W" />
-                            </StackPanel>
-                        </ToggleButton>
-                        <ToggleButton Grid.Column="5" Style="{StaticResource Tile}" Tag="30" Click="OnPowerLimit">
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource TileNumber}" Text="30" />
-                                <TextBlock Style="{StaticResource TileUnit}" Text="W" />
-                            </StackPanel>
-                        </ToggleButton>
+                        <!-- From TDP Engine's lowest limit to the Ally's highest, a watt a step. Left and right on
+                             the D-pad move it once it has focus; the choice is sent when it stops moving. -->
+                        <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                            <Slider x:Name="PowerSlider" Minimum="7" Maximum="30" StepFrequency="1" SmallChange="1" LargeChange="5"
+                                    TickFrequency="5" TickPlacement="None" Value="15" IsThumbToolTipEnabled="False"
+                                    ValueChanged="OnPowerSlider" Foreground="{StaticResource Cyan}" Background="{StaticResource ChoiceEdge}">
+                                <Slider.Resources>
+                                    <SolidColorBrush x:Key="SliderTrackValueFill" Color="#22D3EE" />
+                                    <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="#22D3EE" />
+                                    <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="#22D3EE" />
+                                    <SolidColorBrush x:Key="SliderTrackFill" Color="#454D5E" />
+                                    <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="#454D5E" />
+                                    <SolidColorBrush x:Key="SliderTrackFillPressed" Color="#454D5E" />
+                                    <SolidColorBrush x:Key="SliderThumbBackground" Color="#22D3EE" />
+                                    <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="#67E8F9" />
+                                    <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#F2F3F5" />
+                                </Slider.Resources>
+                            </Slider>
+                            <Grid>
+                                <TextBlock Style="{StaticResource ReadoutName}" Text="7 W" />
+                                <TextBlock Style="{StaticResource ReadoutName}" Text="30 W" HorizontalAlignment="Right" />
+                            </Grid>
+                        </StackPanel>
                     </Grid>
                 </StackPanel>
             </Border>
