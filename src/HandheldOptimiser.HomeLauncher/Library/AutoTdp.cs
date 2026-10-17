@@ -39,9 +39,9 @@ internal static partial class AutoTdp
     {
         AutoTdpProtocol.QuietFans => "Quiet",
         AutoTdpProtocol.CoolFans => "Cool",
-        AutoTdpProtocol.FullFans => "Full speed",
+        AutoTdpProtocol.FullFans => "Max",
         AutoTdpProtocol.DynamicFans => "Dynamic",
-        _ => "Ally default"
+        _ => "Default"
     };
 
     /// <summary>Starts holding a game at its target, from what it settled on last time, and setting its fan curve.</summary>
