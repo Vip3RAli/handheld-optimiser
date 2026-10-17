@@ -112,8 +112,18 @@ public partial class LibraryWindow
         ContinueBack.Background = colours;
         ContinueArt.Source = null;
 
-        var art = await Task.Run(async () =>
-            await Artwork.FindAsync(tile.Game) is { } path ? GameTile.LoadCover(path, ContinueArtWidth) : null);
+        // async void, so nothing would catch a failure here but the dispatcher: the card just keeps its colours.
+        ImageSource? art;
+        try
+        {
+            art = await Task.Run(async () =>
+                await Artwork.FindAsync(tile.Game) is { } path ? GameTile.LoadCover(path, ContinueArtWidth) : null);
+        }
+        catch (Exception ex)
+        {
+            Program.Log($"Could not load the Last played artwork for {tile.Game.Key}: {ex.Message}");
+            return;
+        }
 
         // The card may have moved on to another game, or the library to the background, meanwhile.
         if (_continueArtKey == tile.Game.Key)

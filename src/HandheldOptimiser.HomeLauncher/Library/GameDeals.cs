@@ -49,7 +49,7 @@ internal static class GameDeals
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "HandheldOptimiser", "deals");
 
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(20) };
+    private static readonly HttpClient Http = HttpClients.Shared;
 
     private static readonly JsonSerializerOptions CacheJson = new() { WriteIndented = false };
 
@@ -78,7 +78,7 @@ internal static class GameDeals
             if (File.Exists(path))
             {
                 var deals = JsonSerializer.Deserialize<List<Deal>>(File.ReadAllText(path), CacheJson) ?? [];
-                return (deals, File.GetLastWriteTimeUtc(path));
+                return (Safe(deals), File.GetLastWriteTimeUtc(path));
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
@@ -88,6 +88,23 @@ internal static class GameDeals
 
         return ([], null);
     }
+
+    /// <summary>
+    /// Whether a link from a deal may be opened or downloaded: an absolute https address and nothing else.
+    /// A deal's link is handed to the shell to open, which would just as happily run a file or another
+    /// scheme's handler, so whatever came from the network or a file on disk is checked before that.
+    /// </summary>
+    public static bool IsHttpsUrl(string? url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps;
+
+    /// <summary>
+    /// The deals whose link can be opened, with any banner that is not https dropped. The file on disk is
+    /// read back as it is found, so it is checked the same as an answer from the network.
+    /// </summary>
+    internal static List<Deal> Safe(IEnumerable<Deal> deals) =>
+        deals.Where(d => d is not null && IsHttpsUrl(d.Url))
+            .Select(d => d.Image is null || IsHttpsUrl(d.Image) ? d : d with { Image = null })
+            .ToList();
 
     /// <summary>
     /// Asks IsThereAnyDeal for the deals when the last answer is old, or always when <paramref name="force"/>
@@ -146,9 +163,7 @@ internal static class GameDeals
 
             var json = JsonSerializer.Serialize(deals, CacheJson);
             var before = File.Exists(path) ? await File.ReadAllTextAsync(path) : null;
-            Directory.CreateDirectory(CacheDir);
-            await File.WriteAllTextAsync(path + ".tmp", json);
-            File.Move(path + ".tmp", path, overwrite: true);
+            await AtomicFile.WriteAllTextAsync(path, json);
             return (json != before, wishlistError);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException or UnauthorizedAccessException or JsonException)
@@ -240,12 +255,24 @@ internal static class GameDeals
             return path;
         }
 
+        if (!IsHttpsUrl(url))
+        {
+            return null;
+        }
+
         try
         {
-            var bytes = await Http.GetByteArrayAsync(url);
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            await File.WriteAllBytesAsync(path + ".tmp", bytes);
-            File.Move(path + ".tmp", path, overwrite: true);
+            // Capped and checked as SteamGridDB's pictures are: a banner is whatever a deal's listing names,
+            // and an error page or a huge file kept here would be decoded on every visit to the deals.
+            using var response = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+            if (!response.IsSuccessStatusCode
+                || await HttpClients.ReadCappedAsync(response.Content, Artwork.MaxPictureBytes) is not { } bytes
+                || !Artwork.IsImage(bytes))
+            {
+                return null;
+            }
+
+            await AtomicFile.WriteAllBytesAsync(path, bytes);
             return path;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException or UnauthorizedAccessException)
@@ -483,7 +510,7 @@ internal static class GameDeals
     private static DealPrice? ReadPrice(JsonElement deal)
     {
         if (deal.ValueKind != JsonValueKind.Object || Amount(deal, "price") is not { } price || Currency(deal, "price") is not { } currency
-            || Str(deal, "url") is not { } url)
+            || Str(deal, "url") is not { } url || !IsHttpsUrl(url))
         {
             return null;
         }
@@ -521,7 +548,7 @@ internal static class GameDeals
     // The widest banner that is not too big to decode for a card.
     private static string? Banner(JsonElement item) =>
         item.TryGetProperty("assets", out var assets) && assets.ValueKind == JsonValueKind.Object
-            ? Str(assets, "banner400") ?? Str(assets, "banner300") ?? Str(assets, "banner600") ?? Str(assets, "banner145")
+            ? new[] { "banner400", "banner300", "banner600", "banner145" }.Select(name => Str(assets, name)).FirstOrDefault(IsHttpsUrl)
             : null;
 
     private static string? Str(JsonElement element, string name) =>

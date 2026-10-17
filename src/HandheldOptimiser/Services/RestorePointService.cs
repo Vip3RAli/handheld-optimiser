@@ -49,7 +49,7 @@ public sealed class RestorePointService(LogService log, PowerShellRunner runner,
             _log.Trace($"Latest restore point sequence before: {(before?.ToString() ?? "none")}");
 
             var driveLetter = systemDrive.TrimEnd('\\');
-            var safeDescription = description.Replace("'", "''");
+            var safeDescription = PsQuote.Escape(description);
 
             var script = $$"""
                 $ErrorActionPreference = 'Stop'
@@ -122,21 +122,53 @@ public sealed class RestorePointService(LogService log, PowerShellRunner runner,
         }
     }
 
+    /// <summary>
+    /// Whether System Protection is on for the system drive.
+    ///
+    /// Asking whether the SystemRestore WMI class exists says nothing: it is there whether protection is
+    /// on or off. Windows lists each protected volume in the System Restore client's entry under
+    /// SPP\Clients, as the volume's GUID path followed by its drive letter ("\\?\Volume{...}\:(C%3A)"),
+    /// and a policy can switch System Restore off whatever that list says. If the check itself does not
+    /// run, the answer is "on", as it always was before, rather than a warning that may be wrong.
+    /// </summary>
     public async Task<bool> IsProtectionEnabledAsync(CancellationToken ct = default)
     {
+        var systemDrive = Path.GetPathRoot(Environment.GetFolderPath(Environment.SpecialFolder.Windows)) ?? @"C:\";
+        var driveLetter = systemDrive.TrimEnd('\\');
+
         var outcome = await _runner.RunScriptAsync(
-            """
+            $$"""
             $ErrorActionPreference = 'SilentlyContinue'
-            $d = Get-WmiObject -Namespace 'root\default' -Class 'SystemRestore' -List
-            if ($null -eq $d) { Write-Output 'UNAVAILABLE'; exit 0 }
-            $points = Get-ComputerRestorePoint
-            if ($null -eq $points) { Write-Output 'ENABLED_NO_POINTS' } else { Write-Output 'ENABLED' }
+            $policy = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\SystemRestore'
+            if ($policy -and $policy.DisableSR -eq 1) { Write-Output 'PROTECTION=OFF'; exit 0 }
+            $clients = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SPP\Clients'
+            # No client list at all means no volume has ever been protected.
+            $volumes = @(if ($clients) { $clients.'{09F7EDC5-294E-4180-AF6A-FB0E6A0E9513}' })
+            $device = (Get-CimInstance -ClassName Win32_Volume -Filter "DriveLetter = '{{driveLetter}}'").DeviceID
+            $byLetter = ':(' + '{{driveLetter}}'.Replace(':', '%3A') + ')'
+            $on = @($volumes | Where-Object {
+                $_ -and (($device -and $_.StartsWith($device, [StringComparison]::OrdinalIgnoreCase)) -or
+                         $_.EndsWith($byLetter, [StringComparison]::OrdinalIgnoreCase))
+            }).Count -gt 0
+            if ($on) { Write-Output 'PROTECTION=ON' } else { Write-Output 'PROTECTION=OFF' }
             """,
             "Check System Protection status",
             ct,
             echoScript: false);
 
-        return outcome.StdOut.Contains("ENABLED", StringComparison.Ordinal);
+        var lines = outcome.OutputLines.ToList();
+
+        if (lines.Contains("PROTECTION=OFF"))
+        {
+            return false;
+        }
+
+        if (!lines.Contains("PROTECTION=ON"))
+        {
+            _log.Trace("    Could not tell whether System Protection is on; assuming it is.");
+        }
+
+        return true;
     }
 
     private async Task<long?> GetLatestSequenceNumberAsync(CancellationToken ct)

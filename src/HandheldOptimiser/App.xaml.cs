@@ -17,6 +17,8 @@ public partial class App : Application
         base.OnStartup(e);
 
         DispatcherUnhandledException += OnUnhandledException;
+        TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+        AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
 
         Views.TouchSizing.Apply();
         ApplyBrandAccent();
@@ -78,10 +80,32 @@ public partial class App : Application
 
         // Everything is read once now, so no page has to scan when it is opened. When the app was only
         // opened to install an update, that waits until the update is settled: see StartupOrder.
-        _ = StartupOrder.RunAsync(
-            installUpdate,
-            () => viewModel.CheckForUpdatesOnStartupAsync(installUpdate),
-            viewModel.ScanAtLaunchAsync);
+        _ = RunStartupAsync(
+            log,
+            () => StartupOrder.RunAsync(
+                installUpdate,
+                () => viewModel.CheckForUpdatesOnStartupAsync(installUpdate),
+                viewModel.ScanAtLaunchAsync));
+    }
+
+    /// <summary>
+    /// The start-up checks are not awaited by anything, so a failure in them would otherwise vanish
+    /// without a word, leaving cards that say "Checking…" for good and nothing in the log to say why.
+    /// </summary>
+    private static async Task RunStartupAsync(LogService log, Func<Task> startup)
+    {
+        try
+        {
+            await startup();
+        }
+        catch (OperationCanceledException)
+        {
+            // Closing while something is still being read is not a failure.
+        }
+        catch (Exception ex)
+        {
+            log.Error($"Start-up checks failed: {ex}");
+        }
     }
 
     /// <summary>
@@ -110,6 +134,13 @@ public partial class App : Application
         // log is, so surface the path rather than just the exception.
         _log?.Error($"Unhandled exception: {e.Exception}");
 
+        // Carrying on after these would mean running elevated with the process in a state nothing can
+        // vouch for, so they are logged and then left to end the app as they would have.
+        if (IsFatal(e.Exception) || IsFatal(Innermost(e.Exception)))
+        {
+            return;
+        }
+
         MessageBox.Show(
             $"Something went wrong:\n\n{Innermost(e.Exception).Message}\n\n" +
             "The session log has the detail of what had been executed up to this point.",
@@ -119,6 +150,28 @@ public partial class App : Application
 
         e.Handled = true;
     }
+
+    /// <summary>
+    /// A task that failed with nobody awaiting it, found when it is collected. Fire-and-forget work
+    /// (page loads, background checks) is meant to catch its own failures, so one arriving here is a
+    /// bug worth a line in the log. Marked observed so it never takes the process down.
+    /// </summary>
+    private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+    {
+        _log?.Error($"Unobserved task exception: {e.Exception}");
+        e.SetObserved();
+    }
+
+    /// <summary>
+    /// An exception on a thread other than the UI thread. The process ends whatever is done here, so
+    /// this only makes sure the log says why.
+    /// </summary>
+    private void OnDomainUnhandledException(object sender, UnhandledExceptionEventArgs e) =>
+        _log?.Error($"Unhandled exception{(e.IsTerminating ? " (closing)" : string.Empty)}: {e.ExceptionObject}");
+
+    private static bool IsFatal(Exception ex) =>
+        ex is OutOfMemoryException or InsufficientExecutionStackException or AccessViolationException
+            or System.Runtime.InteropServices.SEHException or InvalidProgramException;
 
     private static Exception Innermost(Exception ex)
     {

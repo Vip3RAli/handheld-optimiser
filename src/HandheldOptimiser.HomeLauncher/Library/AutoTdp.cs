@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.IO;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
+using System.Security.Principal;
 using HandheldOptimiser.PowerService;
 using Microsoft.Win32;
 
@@ -19,6 +20,12 @@ internal static partial class AutoTdp
 
     private static readonly TimeSpan ConnectWait = TimeSpan.FromSeconds(5);
 
+    // The service answers at once; a reply this late means it is stuck, and the library should not be.
+    private static readonly TimeSpan ReplyWait = TimeSpan.FromSeconds(5);
+
+    // How long a service on its way out is given to finish stopping before it is started again.
+    private static readonly TimeSpan StopWait = TimeSpan.FromSeconds(8);
+
     private static readonly object Gate = new();
     private static Task _queue = Task.CompletedTask;
 
@@ -31,50 +38,64 @@ internal static partial class AutoTdp
 
     /// <summary>Starts holding a game at its target, from what it settled on last time.</summary>
     /// <returns>Why it could not start, or null.</returns>
-    public static Task<string?> StartAsync(Game game, int targetFps) => Queue(() =>
+    public static Task<string?> StartAsync(Game game, int targetFps) => Queue(async () =>
     {
         var request = new AutoTdpRequest(AutoTdpProtocol.Start, targetFps, AutoTdpProtocol.LowestWatts,
             LibrarySettings.AutoTdpMaxWatts, LibrarySettings.AutoTdpTemperature, Learned(game),
             GameSession.ProcessFolder(game));
 
-        if (StartService() is { } problem)
+        if (await StartServiceAsync() is { } problem)
         {
-            return Task.FromResult<string?>(problem);
+            return problem;
         }
 
-        var status = Send(request);
+        var status = await SendAsync(request);
+
+        // It had just decided to end, after the last game, as this one started. Once it has stopped it is
+        // started again, rather than the game going without.
+        if (status?.Error == AutoTdpProtocol.EndingError)
+        {
+            await WaitForStoppedAsync();
+            if (await StartServiceAsync() is { } again)
+            {
+                return again;
+            }
+
+            status = await SendAsync(request);
+        }
+
         if (status is null)
         {
-            return Task.FromResult<string?>("TDP Engine did not answer.");
+            return "TDP Engine did not answer.";
         }
 
         Program.Log($"TDP Engine for {game.Key}: {targetFps} fps from {status.Watts} W{(status.Error is { } error ? $" ({error})" : "")}");
-        return Task.FromResult(status.Error);
+        return status.Error;
     });
 
     /// <summary>Stops, remembering where the game settled for next time.</summary>
-    public static Task StopAsync(Game game) => Queue(() =>
+    public static Task StopAsync(Game game) => Queue(async () =>
     {
         // Nothing to stop when the service is not running, and asking would start a wait for nothing.
         if (!ServiceRunning())
         {
-            return Task.FromResult<string?>(null);
+            return null;
         }
 
-        if (Send(new AutoTdpRequest(AutoTdpProtocol.Stop)) is { Watts: { } watts })
+        if (await SendAsync(new AutoTdpRequest(AutoTdpProtocol.Stop)) is { Watts: { } watts })
         {
             Remember(game, watts);
         }
 
-        return Task.FromResult<string?>(null);
+        return null;
     });
 
     /// <summary>A line on what it is doing, or null when it is not running.</summary>
-    public static Task<string?> DescribeAsync() => Queue(() =>
+    public static Task<string?> DescribeAsync() => Queue(async () =>
     {
-        if (!ServiceRunning() || Send(new AutoTdpRequest(AutoTdpProtocol.Status)) is not { Running: true } status)
+        if (!ServiceRunning() || await SendAsync(new AutoTdpRequest(AutoTdpProtocol.Status)) is not { Running: true } status)
         {
-            return Task.FromResult<string?>(null);
+            return null;
         }
 
         var parts = new List<string> { $"TDP Engine {status.Watts} W" };
@@ -93,7 +114,7 @@ internal static partial class AutoTdp
             parts.Add(why);
         }
 
-        return Task.FromResult<string?>(string.Join(", ", parts));
+        return string.Join(", ", parts);
     });
 
     private static string? Explain(string? state) => Enum.TryParse<AutoTdpState>(state, out var parsed) ? parsed switch
@@ -114,16 +135,34 @@ internal static partial class AutoTdp
         }
     }
 
-    private static AutoTdpStatus? Send(AutoTdpRequest request)
+    private static async Task<AutoTdpStatus?> SendAsync(AutoTdpRequest request)
     {
         try
         {
-            using var pipe = new NamedPipeClientStream(".", AutoTdpProtocol.PipeName, PipeDirection.InOut);
-            pipe.Connect(ConnectWait);
+            // Identification only: the service may see who is asking, never act as them.
+            using var pipe = new NamedPipeClientStream(".", AutoTdpProtocol.PipeName, PipeDirection.InOut,
+                PipeOptions.Asynchronous, TokenImpersonationLevel.Identification);
+            await pipe.ConnectAsync((int)ConnectWait.TotalMilliseconds);
+
+            // Any program of the player's could open a pipe of the same name if the service is not holding
+            // it, so the answer only counts from the service's own process.
+            if (!GetNamedPipeServerProcessId(pipe.SafePipeHandle, out var serverId) ||
+                ServiceStatus() is not { ProcessId: > 0 } service || service.ProcessId != serverId)
+            {
+                Program.Log($"TDP Engine {request.Command} refused: the pipe does not belong to the TDP Engine service");
+                return null;
+            }
+
+            using var reply = new CancellationTokenSource(ReplyWait);
             using var reader = new StreamReader(pipe, leaveOpen: true);
-            using var writer = new StreamWriter(pipe, leaveOpen: true) { AutoFlush = true };
-            writer.WriteLine(AutoTdpProtocol.Write(request));
-            return AutoTdpProtocol.Read<AutoTdpStatus>(reader.ReadLine());
+            await using var writer = new StreamWriter(pipe, leaveOpen: true) { AutoFlush = true };
+            await writer.WriteLineAsync(AutoTdpProtocol.Write(request).AsMemory(), reply.Token);
+            return AutoTdpProtocol.Read<AutoTdpStatus>(await reader.ReadLineAsync(reply.Token));
+        }
+        catch (OperationCanceledException)
+        {
+            Program.Log($"TDP Engine {request.Command} failed: no answer within {ReplyWait.TotalSeconds:0} seconds");
+            return null;
         }
         catch (Exception ex) when (ex is IOException or TimeoutException or UnauthorizedAccessException)
         {
@@ -165,14 +204,33 @@ internal static partial class AutoTdp
     private const uint ScManagerConnect = 0x0001;
     private const uint ServiceQueryStatus = 0x0004;
     private const uint ServiceStart = 0x0010;
+    private const int ServiceStoppedState = 1;
+    private const int ServiceStopPendingState = 3;
     private const int ServiceRunningState = 4;
+    private const int ScStatusProcessInfo = 0;
     private const int ErrorAlreadyRunning = 1056;
     private const int ErrorDoesNotExist = 1060;
     private const int ErrorAccessDenied = 5;
 
     /// <returns>Why it could not be started, or null when it is running or starting.</returns>
-    private static string? StartService()
+    private static async Task<string?> StartServiceAsync()
     {
+        var problem = TryStartService(out var stopping);
+
+        // Still on its way out from the last game: Windows will not start it again until it has stopped.
+        if (problem is null && stopping)
+        {
+            await WaitForStoppedAsync();
+            problem = TryStartService(out _);
+        }
+
+        return problem;
+    }
+
+    /// <param name="stopping">Whether Windows said it was running because it was still stopping.</param>
+    private static string? TryStartService(out bool stopping)
+    {
+        stopping = false;
         var manager = OpenSCManager(null, null, ScManagerConnect);
         if (manager == 0)
         {
@@ -194,9 +252,15 @@ internal static partial class AutoTdp
 
             try
             {
-                if (!StartServiceW(service, 0, 0) && Marshal.GetLastPInvokeError() is var code and not ErrorAlreadyRunning)
+                if (!StartServiceW(service, 0, 0))
                 {
-                    return $"Windows would not start TDP Engine ({new Win32Exception(code).Message}).";
+                    var code = Marshal.GetLastPInvokeError();
+                    if (code != ErrorAlreadyRunning)
+                    {
+                        return $"Windows would not start TDP Engine ({new Win32Exception(code).Message}).";
+                    }
+
+                    stopping = Status(service) is { State: ServiceStopPendingState };
                 }
 
                 return null;
@@ -212,12 +276,32 @@ internal static partial class AutoTdp
         }
     }
 
-    private static bool ServiceRunning()
+    /// <summary>Waits a few seconds at most for the service to finish stopping.</summary>
+    private static async Task WaitForStoppedAsync()
+    {
+        var until = DateTime.UtcNow + StopWait;
+        while (DateTime.UtcNow < until)
+        {
+            if (ServiceStatus() is not { State: not ServiceStoppedState })
+            {
+                return;
+            }
+
+            await Task.Delay(200);
+        }
+
+        Program.Log("TDP Engine was still stopping after waiting for it");
+    }
+
+    private static bool ServiceRunning() => ServiceStatus() is { State: ServiceRunningState };
+
+    /// <summary>The service's state and process id, or null when they cannot be read.</summary>
+    private static (int State, int ProcessId)? ServiceStatus()
     {
         var manager = OpenSCManager(null, null, ScManagerConnect);
         if (manager == 0)
         {
-            return false;
+            return null;
         }
 
         try
@@ -225,14 +309,12 @@ internal static partial class AutoTdp
             var service = OpenService(manager, AutoTdpProtocol.ServiceName, ServiceQueryStatus);
             if (service == 0)
             {
-                return false;
+                return null;
             }
 
             try
             {
-                // SERVICE_STATUS: the second of its seven numbers is the state.
-                Span<int> status = stackalloc int[7];
-                return QueryServiceStatus(service, ref MemoryMarshal.GetReference(status)) && status[1] == ServiceRunningState;
+                return Status(service);
             }
             finally
             {
@@ -243,6 +325,15 @@ internal static partial class AutoTdp
         {
             CloseServiceHandle(manager);
         }
+    }
+
+    private static (int State, int ProcessId)? Status(nint service)
+    {
+        // SERVICE_STATUS_PROCESS: of its nine numbers, the second is the state and the eighth the process id.
+        Span<int> status = stackalloc int[9];
+        return QueryServiceStatusEx(service, ScStatusProcessInfo, ref MemoryMarshal.GetReference(status), status.Length * sizeof(int), out _)
+            ? (status[1], status[7])
+            : null;
     }
 
     [LibraryImport("advapi32.dll", EntryPoint = "OpenSCManagerW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
@@ -257,7 +348,11 @@ internal static partial class AutoTdp
 
     [LibraryImport("advapi32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool QueryServiceStatus(nint service, ref int status);
+    private static partial bool QueryServiceStatusEx(nint service, int infoLevel, ref int buffer, int size, out int needed);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool GetNamedPipeServerProcessId(Microsoft.Win32.SafeHandles.SafePipeHandle pipe, out int processId);
 
     [LibraryImport("advapi32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

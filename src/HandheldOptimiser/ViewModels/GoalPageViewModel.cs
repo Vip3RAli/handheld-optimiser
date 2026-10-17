@@ -172,9 +172,9 @@ public sealed partial class GoalPageViewModel : PageViewModelBase
                 Shell.NotifyRebootRequired();
             }
 
-            // Everything is checked again, since one tweak can move another. The dialog only waits for
-            // this page's own.
-            await _states.CheckAllAsync(waitFor: Tweaks, ct);
+            // These are checked again along with any tweak that shares a setting with one of them,
+            // since one tweak can move another. The dialog only waits for this page's own.
+            await _states.CheckRelatedAsync(Tweaks, ct);
         });
     }
 }

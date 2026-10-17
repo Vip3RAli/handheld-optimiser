@@ -1,4 +1,5 @@
 using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -74,6 +75,21 @@ public partial class MainWindow : FluentWindow
         }
 
         return IntPtr.Zero;
+    }
+
+    /// <summary>
+    /// Alt+F4, the title bar's close button and the taskbar's Close window all come through here. While
+    /// something is being applied the window stays open: see <see cref="MainViewModel.ShouldBlockClose"/>.
+    /// </summary>
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        if (DataContext is MainViewModel vm && vm.ShouldBlockClose())
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        base.OnClosing(e);
     }
 
     /// <summary>

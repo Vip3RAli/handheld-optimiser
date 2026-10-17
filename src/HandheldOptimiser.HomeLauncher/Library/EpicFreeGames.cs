@@ -23,7 +23,7 @@ internal static class EpicFreeGames
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "HandheldOptimiser", "deals");
 
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(20) };
+    private static readonly HttpClient Http = HttpClients.Shared;
 
     /// <summary>The free games in the last answer that are still free or still to come. Empty when none is kept.</summary>
     public static List<Deal> Cached()
@@ -58,9 +58,7 @@ internal static class EpicFreeGames
             var country = GameDeals.Country;
             var json = await Http.GetStringAsync($"{Feed}?locale=en-US&country={country}&allowCountries={country}");
             var before = File.Exists(path) ? await File.ReadAllTextAsync(path) : null;
-            Directory.CreateDirectory(CacheDir);
-            await File.WriteAllTextAsync(path + ".tmp", json);
-            File.Move(path + ".tmp", path, overwrite: true);
+            await AtomicFile.WriteAllTextAsync(path, json);
             return json != before;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException or UnauthorizedAccessException)

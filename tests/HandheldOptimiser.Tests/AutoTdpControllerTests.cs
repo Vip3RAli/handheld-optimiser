@@ -116,6 +116,30 @@ public class AutoTdpControllerTests
     }
 
     [Fact]
+    public void Just_under_the_temperature_limit_it_holds_rather_than_cutting_on()
+    {
+        var controller = new AutoTdpController(Sixty, startWatts: 25);
+
+        // Over the 80 °C limit for 10 seconds, then 79 °C: under the limit, but not yet the 3 degrees under
+        // it that counts as cooled. The cuts so far are holding the temperature, so nothing more is cut.
+        var watts = Run(controller, 70, (_, w) => 2.0 * w, (second, _) => second < 10 ? 85 : 79);
+
+        Assert.True(watts[9] < 25, $"Stayed at {watts[9]} W while hot");
+        Assert.All(watts.Skip(10), w => Assert.Equal(watts[9], w));
+        Assert.True(watts[^1] > Sixty.MinWatts, "Cut down to the minimum");
+        Assert.Equal(AutoTdpState.TooHot, controller.State);
+    }
+
+    [Fact]
+    public void Staying_over_the_temperature_limit_keeps_cutting()
+    {
+        var controller = new AutoTdpController(Sixty, startWatts: 25);
+        var watts = Run(controller, 120, (_, w) => 2.0 * w, (_, _) => 85);
+
+        Assert.Equal(Sixty.MinWatts, watts[^1]);
+    }
+
+    [Fact]
     public void Hitches_and_spikes_do_not_push_the_limit_up()
     {
         // Like Overcooked 2 on the Ally: a light game that holds 60 from 12 W, but some seconds drop to a
