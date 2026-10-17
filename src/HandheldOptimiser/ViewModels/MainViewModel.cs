@@ -323,6 +323,10 @@ public sealed partial class MainViewModel : ObservableObject, IShell
 
     private bool _closeNoticeShowing;
 
+    // Set when the player chose Close anyway, for a run that has hung (a stuck DISM or a hidden
+    // installer prompt), so the window can still be closed without Task Manager.
+    private bool _closeAnyway;
+
     /// <summary>
     /// Asked as the window is about to close. True while an operation is running, in which case the
     /// window stays open and says why. Closing mid-run would stop a tweak between its registry writes
@@ -331,7 +335,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
     /// </summary>
     public bool ShouldBlockClose()
     {
-        if (!IsBusy)
+        if (!IsBusy || _closeAnyway)
         {
             return false;
         }
@@ -354,11 +358,18 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         {
             // Shown after the close has been turned down, not from inside the window's Closing event.
             await Task.Yield();
-            await ConfirmAsync(
+            var closeAnyway = await ConfirmAsync(
                 "Still working",
                 $"{running} is still running. Closing now could leave a change half made, without what is " +
-                "needed to undo it.\n\nThe app can be closed once it has finished.",
-                "OK");
+                "needed to undo it.\n\nWait for it to finish, or close anyway if it has stopped responding.",
+                "Close anyway");
+
+            if (closeAnyway)
+            {
+                Log.Warning($"Closed while \"{running}\" was still running, as the player chose.");
+                _closeAnyway = true;
+                System.Windows.Application.Current?.MainWindow?.Close();
+            }
         }
         catch (Exception ex)
         {

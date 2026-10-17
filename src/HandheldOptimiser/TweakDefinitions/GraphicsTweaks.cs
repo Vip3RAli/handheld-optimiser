@@ -68,6 +68,7 @@ public static class GraphicsTweaks
         Risk = RiskLevel.Safe,
         ScriptRegistryValues = [GlobalSettings($"{WindowedSetting}=1;")],
 
+        ScriptDetectIsQuick = true,
         ScriptDetect = (ctx, ct) =>
         {
             if (!HasWindowedGamesSetting)
