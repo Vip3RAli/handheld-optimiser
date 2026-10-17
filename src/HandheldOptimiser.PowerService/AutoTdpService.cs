@@ -113,7 +113,7 @@ internal sealed partial class AutoTdpService : ServiceBase
         _acpi = AsusAcpi.Open();
         if (_acpi is null || !_acpi.CanSetPowerLimits)
         {
-            _error = "This device's power limit cannot be set. TDP Engine works on the ROG Ally with ASUS's drivers installed.";
+            _error = "This device's power limit cannot be set. TDP Engine currently works on the ROG Ally with ASUS's drivers installed.";
             Log.Write(_error);
         }
         else
