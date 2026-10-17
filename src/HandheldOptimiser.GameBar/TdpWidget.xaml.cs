@@ -1,6 +1,8 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Windows.System.Power;
+using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
@@ -15,6 +17,10 @@ namespace HandheldOptimiser.GameBar
     /// </summary>
     public sealed partial class TdpWidget : Page
     {
+        // The Ally's highest power limit: Armoury Crate's Turbo plugged in, and on battery.
+        private const int PluggedInWatts = 30;
+        private const int BatteryWatts = 25;
+
         private readonly DispatcherTimer _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
 
         // The slider's choice is sent once it has stopped moving for this long, not at every step.
@@ -33,12 +39,15 @@ namespace HandheldOptimiser.GameBar
             Loaded += (sender, e) =>
             {
                 _loaded = true;
+                PowerManager.PowerSupplyStatusChanged += OnPowerSupply;
+                ShowPowerSupply();
                 Show(_status);
                 Refresh();
                 _timer.Start();
             };
             Unloaded += (sender, e) =>
             {
+                PowerManager.PowerSupplyStatusChanged -= OnPowerSupply;
                 _timer.Stop();
                 if (_sliding)
                 {
@@ -85,6 +94,37 @@ namespace HandheldOptimiser.GameBar
             PowerValue.Text = (int)e.NewValue + " W";
             _sliderPause.Stop();
             _sliderPause.Start();
+        }
+
+        private async void OnPowerSupply(object sender, object e) =>
+            await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, ShowPowerSupply);
+
+        /// <summary>The slider's top for the charger as it is now; unplugged above the battery's top, the limit comes down to it.</summary>
+        private void ShowPowerSupply()
+        {
+            var top = PowerManager.PowerSupplyStatus == PowerSupplyStatus.NotPresent ? BatteryWatts : PluggedInWatts;
+            if ((int)PowerSlider.Maximum == top)
+            {
+                return;
+            }
+
+            // Lowering the top moves the thumb down with it, which is not the player's choice.
+            _placingSlider = true;
+            PowerSlider.Maximum = top;
+            _placingSlider = false;
+            PowerMax.Text = top + " W";
+
+            if (CurrentPower > top)
+            {
+                _sliderPause.Stop();
+                _sliding = false;
+                Change(CurrentFps, top, CurrentFans);
+            }
+            else if (_sliding)
+            {
+                // Mid-move, the thumb may have come down with the top.
+                PowerValue.Text = (int)PowerSlider.Value + " W";
+            }
         }
 
         private void SendSlider()

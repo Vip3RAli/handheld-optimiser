@@ -273,7 +273,7 @@
                         <ToggleButton x:Name="AutoPower" Style="{StaticResource Tile}" Tag="0" Click="OnPowerLimit">
                             <TextBlock Style="{StaticResource TileNumber}" Text="Auto" />
                         </ToggleButton>
-                        <!-- From TDP Engine's lowest limit to the Ally's highest, a watt a step. Left and right on
+                        <!-- From TDP Engine's lowest limit to the Ally's highest (30 W plugged in, 25 W on battery), a watt a step. Left and right on
                              the D-pad move it once it has focus; the choice is sent when it stops moving. -->
                         <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
                             <Slider x:Name="PowerSlider" Minimum="7" Maximum="30" StepFrequency="1" SmallChange="1" LargeChange="5"
@@ -293,7 +293,7 @@
                             </Slider>
                             <Grid>
                                 <TextBlock Style="{StaticResource ReadoutName}" Text="7 W" />
-                                <TextBlock Style="{StaticResource ReadoutName}" Text="30 W" HorizontalAlignment="Right" />
+                                <TextBlock x:Name="PowerMax" Style="{StaticResource ReadoutName}" Text="30 W" HorizontalAlignment="Right" />
                             </Grid>
                         </StackPanel>
                     </Grid>
