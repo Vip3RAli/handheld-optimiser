@@ -81,6 +81,34 @@ internal static partial class Native
         AllowSetForegroundWindow(AsfwAny);
     }
 
+    /// <summary>
+    /// Puts a window in front even when this process does not own the foreground: the Alt press has to
+    /// come straight before SetForegroundWindow, or Windows has handed the right on by the time it is asked.
+    /// </summary>
+    public static void BringToFront(nint window)
+    {
+        TakeForegroundRights();
+        SetForegroundWindow(window);
+    }
+
+    private const ushort VkLeftWindows = 0x5B;
+    private const ushort VkG = 0x47;
+
+    /// <summary>
+    /// Opens Xbox Game Bar as the player would, with Win+G. Windows does not deliver a synthetic key to an
+    /// elevated window, so this does nothing while the main app is in front.
+    /// </summary>
+    /// <returns>False when Windows would not take the key presses.</returns>
+    public static unsafe bool PressWinG()
+    {
+        var inputs = stackalloc KeyInput[4];
+        inputs[0] = new KeyInput { Type = InputKeyboard, VirtualKey = VkLeftWindows };
+        inputs[1] = new KeyInput { Type = InputKeyboard, VirtualKey = VkG };
+        inputs[2] = new KeyInput { Type = InputKeyboard, VirtualKey = VkG, Flags = KeyEventFKeyUp };
+        inputs[3] = new KeyInput { Type = InputKeyboard, VirtualKey = VkLeftWindows, Flags = KeyEventFKeyUp };
+        return SendInput(4, inputs, sizeof(KeyInput)) == 4;
+    }
+
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static partial bool SetForegroundWindow(nint window);

@@ -110,19 +110,12 @@ internal static class Program
     /// <summary>Whether TDP Engine started this for the Armoury Crate button, with <see cref="FromButtonArgument"/>.</summary>
     internal static bool IsFromButton(string[] args) => args.Contains(FromButtonArgument, StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Opens Xbox Game Bar, which is what the Command Center button shows.</summary>
-    private static void OpenGameBar()
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo("ms-gamebar:") { UseShellExecute = true })?.Dispose();
-            Log("Opened Game Bar");
-        }
-        catch (Win32Exception ex)
-        {
-            Log($"Failed to open Game Bar: {ex.Message}");
-        }
-    }
+    /// <summary>
+    /// Opens Xbox Game Bar, which is what the Command Center button shows. Win+G is pressed for the player:
+    /// the ms-gamebar: link Game Bar registers was tried first, and on the Ally it opens nothing.
+    /// </summary>
+    private static void OpenGameBar() =>
+        Log(Library.Native.PressWinG() ? "Opened Game Bar" : "Could not open Game Bar: Windows would not take Win+G");
 
     private static (string Target, string? CustomPath, string? CustomArgs) ReadSettings()
     {
