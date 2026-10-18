@@ -15,6 +15,7 @@ public static class TweakCatalog
         .. CpuKernelTweaks.All,
         .. NetworkTweaks.All,
         .. ServiceTweaks.All,
+        .. ArmouryCrateTweaks.All,
         .. InterfaceTweaks.All,
         .. StorageTweaks.All,
         .. GraphicsTweaks.All,
