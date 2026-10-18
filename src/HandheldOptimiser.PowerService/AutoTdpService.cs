@@ -208,6 +208,14 @@ internal sealed partial class AutoTdpService : ServiceBase
                     Log.Write($"Could not put the operating mode back: {releaseError.Message}");
                 }
             }
+
+            // While it stands in for Armoury Crate, the Ally's buttons need it running. A clean stop never fires
+            // the service's failure actions, so it ends with an error instead, and the service manager starts it
+            // again (sc.exe failureflag 1, set by Replace Armoury Crate and the installer).
+            if (_controls is not null)
+            {
+                ExitCode = 1;
+            }
         }
 
         // Ended on its own: the service manager is told, which calls OnStop to clean up.
@@ -527,14 +535,16 @@ internal sealed partial class AutoTdpService : ServiceBase
 
     /// <summary>
     /// A new controller mode, from the widget or the library alike: both are the player. Answered with the
-    /// last status, its Error the notice when the mode could not be sent now.
+    /// last status, its Error the notice when the mode could not be sent now, or the service's own error otherwise.
     /// </summary>
     private AutoTdpStatus SetControls(AutoTdpRequest request)
     {
         AutoTdpStatus last;
+        string? error;
         lock (_gate)
         {
             last = _last;
+            error = _error;
         }
 
         if (_controls is not { } controls)
@@ -547,7 +557,9 @@ internal sealed partial class AutoTdpService : ServiceBase
             return last with { Error = "Unknown controller mode." };
         }
 
-        return last with { Error = controls.SetMode(mode) };
+        // The service's own standing error, such as a power limit it cannot set, is kept when the mode went
+        // through, so the widget still shows it.
+        return last with { Error = controls.SetMode(mode) ?? error };
     }
 
     /// <summary>The status with the controller's state, while replacing Armoury Crate. Otherwise as it is.</summary>

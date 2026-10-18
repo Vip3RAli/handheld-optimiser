@@ -223,8 +223,20 @@ begin
 
   // If it crashes mid-game, Windows starts it again after 5 seconds, and on starting it puts back the
   // operating mode it saved, so the game's power limit is not left set. The count resets after a day.
-  Exec(Sc, 'failure {#ServiceName} reset= 86400 actions= restart/5000',
-    '', SW_HIDE, ewWaitUntilTerminated, Code);
+  //
+  // While it replaces Armoury Crate, the actions are the ones Replace Armoury Crate sets, so a reinstall
+  // or an update does not undo them, and failureflag 1 makes Windows start it again when it ends with an
+  // error as well as when it crashes: it ends that way when it fails while running the buttons.
+  if IsReplacingArmouryCrate() then
+  begin
+    Exec(Sc, 'failure {#ServiceName} reset= 86400 actions= restart/5000/restart/5000/restart/30000',
+      '', SW_HIDE, ewWaitUntilTerminated, Code);
+    Exec(Sc, 'failureflag {#ServiceName} 1',
+      '', SW_HIDE, ewWaitUntilTerminated, Code);
+  end
+  else
+    Exec(Sc, 'failure {#ServiceName} reset= 86400 actions= restart/5000',
+      '', SW_HIDE, ewWaitUntilTerminated, Code);
 
   // PrepareToInstall stopped it to replace its exe. While it replaces Armoury Crate, ASUS's services
   // are off and it is what runs the Ally's buttons, so it is started again now rather than at the next
