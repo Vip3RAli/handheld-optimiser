@@ -549,6 +549,48 @@ public sealed class DeviceReportTests
     }
 
     [Theory]
+    [InlineData("Stopped", "Disabled")]
+    [InlineData("Running", "Disabled")]
+    public void An_ASUS_service_off_for_Replace_Armoury_Crate_is_a_fact_with_no_advice(string status, string startType)
+    {
+        var check = SystemStateService.ServiceCheck(
+            "ASUS App Service", "ASUS", status, startType, offForArmouryCrate: true);
+
+        Assert.Equal(HealthStatus.Info, check.Status);
+        Assert.Equal("Off while Handheld Optimiser replaces Armoury Crate", check.Summary);
+        Assert.Null(check.Advice);
+        Assert.Equal("[ASUS] ASUS App Service", check.Name);
+    }
+
+    [Fact]
+    public void A_disabled_ASUS_service_is_still_a_fault_while_Armoury_Crate_is_not_replaced()
+    {
+        var check = SystemStateService.ServiceCheck(
+            "ASUS App Service", "ASUS", "Stopped", "Disabled", offForArmouryCrate: false);
+
+        Assert.Equal(HealthStatus.Bad, check.Status);
+        Assert.Equal("Disabled", check.Summary);
+        Assert.Equal("Stopped, start type Disabled", check.Detail);
+        Assert.Equal(
+            "This service is disabled. Handheld Optimiser never disables it, so another tool likely did. " +
+            "Repair disabled services, at the top of this page, switches it back on.",
+            check.Advice);
+    }
+
+    [Theory]
+    [InlineData("Running", "Automatic", "Running", "Running, start type Automatic")]
+    [InlineData("Stopped", "Manual", "Resting", "Stopped until Windows needs it, start type Manual")]
+    [InlineData("Stopped", "Automatic", "Stopped", "Stopped, though it is set to start by itself")]
+    public void A_service_row_reads_as_before(string status, string startType, string summary, string detail)
+    {
+        var check = SystemStateService.ServiceCheck("Background Transfer (BITS)", "Windows Update", status, startType, offForArmouryCrate: false);
+
+        Assert.Equal(summary, check.Summary);
+        Assert.Equal(detail, check.Detail);
+        Assert.Null(check.Advice);
+    }
+
+    [Theory]
     [InlineData("ms-settings:deviceencryption", true)]
     [InlineData("ms-windows-store://downloadsandupdates", true)]
     [InlineData(@"C:\Windows\System32\cmd.exe", false)]
