@@ -137,6 +137,27 @@ namespace HandheldOptimiser.GameBar
         private void OnFans(object sender, RoutedEventArgs e) =>
             Change(CurrentFps, CurrentPower, (string)((FrameworkElement)sender).Tag);
 
+        private async void OnControllerMode(object sender, RoutedEventArgs e)
+        {
+            var mode = (string)((FrameworkElement)sender).Tag;
+            if (_busy)
+            {
+                Show(_status);
+                return;
+            }
+
+            _busy = true;
+            SetState("", "Changing…");
+            try
+            {
+                Show(await Task.Run(() => EngineClient.SetControllerMode(mode)));
+            }
+            finally
+            {
+                _busy = false;
+            }
+        }
+
         private int CurrentFps => _status.Running ? _status.TargetFps : 0;
 
         private int CurrentPower => _status.Running ? _status.PowerLimit : 0;
@@ -169,6 +190,11 @@ namespace HandheldOptimiser.GameBar
             Check(FrameRates, CurrentFps.ToString());
             ShowPower(CurrentPower);
             Check(Fans, CurrentFans ?? "");
+
+            // The controller is TDP Engine's only while it replaces Armoury Crate. Neither button is lit when
+            // the mode is not known, so the player is not told something that may be wrong.
+            ControllerCard.Visibility = status.Replacing ? Visibility.Visible : Visibility.Collapsed;
+            Check(ControllerModes, status.ControllerMode ?? "");
 
             // The readouts only mean something while the engine runs, so the state line stands alone otherwise.
             var readouts = status.Running && status.Error == null;
