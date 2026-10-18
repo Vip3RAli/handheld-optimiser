@@ -15,8 +15,7 @@ public partial class LibraryWindow
         switch (ButtonPress.Decide(IsActive, game is not null))
         {
             case ButtonAction.ShowLibrary:
-                ShowLibrary();
-                BringToFront();
+                _ = ShowOverGameAsync(game);
                 break;
 
             case ButtonAction.BackToGame:
@@ -27,6 +26,27 @@ public partial class LibraryWindow
                 WindowState = WindowState.Minimized;
                 break;
         }
+    }
+
+    /// <summary>
+    /// Brings the library forward, over the game if one is running. A full screen game such as Fortnite
+    /// keeps its picture on top even after the library takes the focus (seen on the Ally on 2026-10-18),
+    /// so its window is minimised first, as Alt+Tab does. Going back into the game restores it.
+    /// </summary>
+    private async Task ShowOverGameAsync(GameSession? game)
+    {
+        if (game is not null)
+        {
+            // Looking through the running programs takes a moment, so it stays off the UI thread.
+            var window = await Task.Run(game.MainWindow);
+            if (window != 0)
+            {
+                Native.Minimise(window);
+            }
+        }
+
+        ShowLibrary();
+        BringToFront();
     }
 
     /// <summary>Back into the game, or out of the way when it has no window to go back to.</summary>

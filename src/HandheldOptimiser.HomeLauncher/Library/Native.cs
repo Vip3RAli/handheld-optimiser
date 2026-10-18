@@ -91,6 +91,18 @@ internal static partial class Native
         SetForegroundWindow(window);
     }
 
+    private const int SwMinimize = 6;
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool ShowWindowAsync(nint window, int command);
+
+    /// <summary>
+    /// Minimises another program's window without waiting for it to answer, so a game that is busy or
+    /// paused cannot hold the library up.
+    /// </summary>
+    public static void Minimise(nint window) => ShowWindowAsync(window, SwMinimize);
+
     private const ushort VkLeftWindows = 0x5B;
     private const ushort VkG = 0x47;
 
