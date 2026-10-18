@@ -159,6 +159,39 @@ public sealed class ArmouryCrateTweakTests
         Assert.Contains("DeleteValue('ROG Screen Manager', $false)", revert, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// A service that will not stop or start, or a running process that will not close, has to fail the run:
+    /// otherwise apply reads Applied while Armoury Crate still runs beside TDP Engine.
+    /// </summary>
+    [Fact]
+    public void A_service_that_will_not_stop_or_start_is_counted_as_a_failure()
+    {
+        var all = ArmouryCrateTweaks.ServicesInStopOrder.Concat(ArmouryCrateTweaks.UpdateServices).ToList();
+        var apply = Flat(ArmouryCrateTweaks.BuildApplyScript(all, ArmouryCrateTweaks.ServicesInStopOrder, true, true));
+        var revert = Flat(ArmouryCrateTweaks.BuildRevertScript(Journal("2", "0")));
+
+        Assert.Contains(
+            "try { Stop-Service -Name $n -Force -ErrorAction Stop } catch { Write-Output \"  failed: $($_.Exception.Message)\"; $failed = $true }",
+            apply, StringComparison.Ordinal);
+        Assert.Contains("try { Stop-Process -Id $proc.Id -Force -ErrorAction Stop }", apply, StringComparison.Ordinal);
+        Assert.Contains(
+            "if (Get-Process -Id $proc.Id -ErrorAction SilentlyContinue) { Write-Output \"  failed: $($_.Exception.Message)\"; $failed = $true }",
+            apply, StringComparison.Ordinal);
+        Assert.DoesNotContain("ForEach-Object", apply, StringComparison.Ordinal);
+        Assert.DoesNotContain("-ErrorAction Continue", apply, StringComparison.Ordinal);
+        Assert.EndsWith("if ($failed) { exit 1 }", apply, StringComparison.Ordinal);
+
+        Assert.Contains(
+            "try { Start-Service -Name $n -ErrorAction Stop } catch { Write-Output \"  failed: $($_.Exception.Message)\"; $script:failed = $true }",
+            revert, StringComparison.Ordinal);
+        Assert.DoesNotContain("-ErrorAction Continue", revert, StringComparison.Ordinal);
+        Assert.EndsWith("if ($script:failed) { exit 1 }", revert, StringComparison.Ordinal);
+    }
+
+    /// <summary>The script with each line trimmed and joined by one space, so a test does not depend on indentation.</summary>
+    private static string Flat(string script) =>
+        string.Join(" ", script.ReplaceLineEndings("\n").Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0));
+
     /// <summary>A journal with every listed service at one start type, the task Ready and the startup flag on.</summary>
     private static Dictionary<string, string> Journal(string start, string delayed)
     {

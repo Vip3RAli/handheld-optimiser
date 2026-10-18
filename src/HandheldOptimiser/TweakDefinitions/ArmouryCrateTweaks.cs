@@ -265,6 +265,9 @@ public static class ArmouryCrateTweaks
     /// so that nothing (the watchdog or Armoury Crate's app) can start one again while the rest are stopped, then
     /// those in <paramref name="stop"/> are stopped in order. TDP Engine is told it is replacing Armoury Crate
     /// before it is started, since it reads that as it starts, and restarted if it was already running.
+    /// A service that will not stop, or a running process that will not close, is counted as a failure but does not
+    /// end the script, so one stubborn service does not leave the rest half done. Processes are walked with a plain
+    /// foreach rather than ForEach-Object, whose script block would set its own copy of $failed.
     /// </summary>
     public static string BuildApplyScript(
         IReadOnlyList<string> disable,
@@ -303,13 +306,18 @@ public static class ArmouryCrateTweaks
                 $s = Get-Service -Name $n -ErrorAction SilentlyContinue
                 if ($s -and $s.Status -ne 'Stopped') {
                     Write-Output "Stopping $n"
-                    Stop-Service -Name $n -Force -ErrorAction Continue
+                    try { Stop-Service -Name $n -Force -ErrorAction Stop }
+                    catch { Write-Output "  failed: $($_.Exception.Message)"; $failed = $true }
                 }
             }
             foreach ($p in @({{List(ProcessesToClose)}})) {
-                Get-Process -Name $p -ErrorAction SilentlyContinue | ForEach-Object {
-                    Write-Output "Closing $($_.ProcessName) ($($_.Id))"
-                    Stop-Process -Id $_.Id -Force -ErrorAction Continue
+                foreach ($proc in @(Get-Process -Name $p -ErrorAction SilentlyContinue)) {
+                    Write-Output "Closing $($proc.ProcessName) ($($proc.Id))"
+                    try { Stop-Process -Id $proc.Id -Force -ErrorAction Stop }
+                    catch {
+                        if (Get-Process -Id $proc.Id -ErrorAction SilentlyContinue) { Write-Output "  failed: $($_.Exception.Message)"; $failed = $true }
+                        else { Write-Output "  it had already closed" }
+                    }
                 }
             }
             {{task}}
@@ -432,7 +440,8 @@ public static class ArmouryCrateTweaks
             {{run}}
             foreach ($n in @({{List(start)}})) {
                 Write-Output "Starting $n"
-                Start-Service -Name $n -ErrorAction Continue
+                try { Start-Service -Name $n -ErrorAction Stop }
+                catch { Write-Output "  failed: $($_.Exception.Message)"; $script:failed = $true }
             }
             if ($script:failed) { exit 1 }
             """;
