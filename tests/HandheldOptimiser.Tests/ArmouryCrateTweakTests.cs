@@ -237,6 +237,31 @@ public sealed class ArmouryCrateTweakTests
         return journal;
     }
 
+    /// <summary>ASUS's Command Center Game Bar widget can only show an error once Armoury Crate is off, so it goes.</summary>
+    [Fact]
+    public void Apply_removes_the_Command_Center_Game_Bar_widget()
+    {
+        var apply = ArmouryCrateTweaks.BuildApplyScript(["AsusAppService"], ["AsusAppService"], false, false);
+        Assert.Contains("Get-AppxPackage -Name 'B9ECED6F.ASUSCommandCenter'", apply);
+        Assert.Contains("Remove-AppxPackage", apply);
+    }
+
+    [Fact]
+    public void The_guard_lets_through_the_Command_Center_widget_and_no_other_ASUS_package()
+    {
+        Assert.False(SafetyGuard.IsAppxProtected("B9ECED6F.ASUSCommandCenter", out _));
+        Assert.True(SafetyGuard.IsAppxProtected("B9ECED6F.ArmouryCrateSE", out _));
+        Assert.True(SafetyGuard.IsAppxProtected("ASUSAmbientHAL64", out _));
+    }
+
+    [Fact]
+    public void The_tile_says_the_widget_is_removed_and_how_to_get_it_back()
+    {
+        var tweak = ArmouryCrateTweaks.ReplaceArmouryCrate;
+        Assert.Contains("Command Center", tweak.Description);
+        Assert.Contains("Microsoft Store", tweak.Warning);
+    }
+
     [Fact]
     public void The_tweak_is_in_the_catalog() =>
         Assert.Contains(TweakCatalog.All, t => t.Id == "asus.replace-armoury-crate");
