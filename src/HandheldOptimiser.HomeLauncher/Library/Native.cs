@@ -46,6 +46,41 @@ internal static partial class Native
 
     public const int AsfwAny = -1;
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct KeyInput
+    {
+        public uint Type;
+        // On x64 the union that follows starts at offset 8.
+        public uint Alignment;
+        public ushort VirtualKey;
+        public ushort ScanCode;
+        public uint Flags;
+        public uint Time;
+        public nint ExtraInfo;
+        // INPUT is 40 bytes because its largest member (MOUSEINPUT) is longer than KEYBDINPUT; this pads to it.
+        public nint Padding;
+    }
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    private static unsafe partial uint SendInput(uint count, KeyInput* inputs, int size);
+
+    private const uint InputKeyboard = 1;
+    private const ushort VkMenu = 0x12;
+    private const uint KeyEventFKeyUp = 0x0002;
+
+    /// <summary>
+    /// Lets a program that a service started take the foreground. Windows only gives it to a program that
+    /// has just had input, which a service-started one has not, so one Alt press is sent first.
+    /// </summary>
+    public static unsafe void TakeForegroundRights()
+    {
+        var inputs = stackalloc KeyInput[2];
+        inputs[0] = new KeyInput { Type = InputKeyboard, VirtualKey = VkMenu };
+        inputs[1] = new KeyInput { Type = InputKeyboard, VirtualKey = VkMenu, Flags = KeyEventFKeyUp };
+        SendInput(2, inputs, sizeof(KeyInput));
+        AllowSetForegroundWindow(AsfwAny);
+    }
+
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static partial bool SetForegroundWindow(nint window);

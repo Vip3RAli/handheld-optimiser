@@ -10,13 +10,23 @@ internal static class LibraryApp
 {
     private const string ShowEventName = @"Local\HandheldOptimiser.Library.Show";
 
-    public static int Run()
+    /// <param name="startedByService">
+    /// True when started with --library, as the Armoury Crate button's service does. A program started by
+    /// a service does not own the foreground, so it takes it with a synthetic key press. The home button
+    /// path already has the foreground and is left as it was.
+    /// </param>
+    public static int Run(bool startedByService = false)
     {
         using var showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowEventName, out var createdNew);
 
         if (!createdNew)
         {
             // This process got the foreground from the home button press; pass that right on to the library.
+            if (startedByService)
+            {
+                Native.TakeForegroundRights();
+            }
+
             Native.AllowSetForegroundWindow(Native.AsfwAny);
             showEvent.Set();
             return 0;
@@ -57,6 +67,13 @@ internal static class LibraryApp
                 null, Timeout.Infinite, executeOnlyOnce: false);
 
             Program.Log("Game library started");
+
+            // Just before the window is shown, so the library comes to the front rather than flashing.
+            if (startedByService)
+            {
+                Native.TakeForegroundRights();
+            }
+
             return app.Run(window);
         }
         finally

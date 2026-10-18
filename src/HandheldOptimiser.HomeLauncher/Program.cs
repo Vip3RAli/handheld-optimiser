@@ -5,6 +5,14 @@ using Microsoft.Win32;
 
 namespace HandheldOptimiser.HomeLauncher;
 
+/// <summary>What the launcher was asked to open.</summary>
+internal enum LaunchAction
+{
+    Home,
+    Library,
+    GameBar
+}
+
 /// <summary>
 /// Windows starts this as the full screen experience home app: at sign-in when "enter full screen mode
 /// at startup" is on, and whenever the home button is pressed. It opens the app chosen in Handheld
@@ -27,17 +35,28 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        var action = ActionFor(args);
+
+        // Game Bar is opened whatever the home app choice is, and the choice is not read or changed.
+        if (action == LaunchAction.GameBar)
+        {
+            OpenGameBar();
+            return 0;
+        }
+
         var (target, customPath, customArgs) = ReadSettings();
 
-        // Opens the library whatever the saved choice, for a desktop shortcut or for testing.
-        if (args.Contains("--library", StringComparer.OrdinalIgnoreCase))
+        // Opens the library whatever the saved choice, for a desktop shortcut, for testing, or when the
+        // Armoury Crate button is pressed.
+        var fromService = action == LaunchAction.Library;
+        if (fromService)
         {
             target = "library";
         }
 
         var launched = target switch
         {
-            "library" => RunLibrary(),
+            "library" => RunLibrary(fromService),
             "armourycrate" => TryOpen(ArmouryCrateSe),
             "custom" => !string.IsNullOrWhiteSpace(customPath) && TryOpen(customPath, customArgs),
             _ => TryOpen(SteamBigPicture)
@@ -54,17 +73,42 @@ internal static class Program
     }
 
     /// <summary>Runs until the library window closes. A crash falls back to the Xbox app like a failed open.</summary>
-    private static bool RunLibrary()
+    private static bool RunLibrary(bool takeForeground)
     {
         try
         {
-            Library.LibraryApp.Run();
+            Library.LibraryApp.Run(takeForeground);
             return true;
         }
         catch (Exception ex)
         {
             Log($"Game library failed: {ex}");
             return false;
+        }
+    }
+
+    /// <summary>What the command line asks for: --library, --gamebar, or neither (the saved home app).</summary>
+    internal static LaunchAction ActionFor(string[] args)
+    {
+        if (args.Contains("--library", StringComparer.OrdinalIgnoreCase))
+        {
+            return LaunchAction.Library;
+        }
+
+        return args.Contains("--gamebar", StringComparer.OrdinalIgnoreCase) ? LaunchAction.GameBar : LaunchAction.Home;
+    }
+
+    /// <summary>Opens Xbox Game Bar, which is what the Command Center button shows.</summary>
+    private static void OpenGameBar()
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo("ms-gamebar:") { UseShellExecute = true })?.Dispose();
+            Log("Opened Game Bar");
+        }
+        catch (Win32Exception ex)
+        {
+            Log($"Failed to open Game Bar: {ex.Message}");
         }
     }
 
