@@ -19,9 +19,6 @@ internal static class AllyCommands
     /// <summary>The length every report is sent at, with unused bytes zero.</summary>
     public const int FeatureLength = 64;
 
-    private const string Gamepad = "gamepad";
-    private const string Desktop = "desktop";
-
     /// <summary>The report that wakes the controller: the ID, then "ASUS Tech.Inc." in ASCII.</summary>
     public static byte[] Wake()
     {
@@ -46,16 +43,18 @@ internal static class AllyCommands
     /// <summary>The mode a name stands for, or null when it is not one.</summary>
     public static ControllerMode? ParseMode(string? name)
     {
-        if (string.Equals(name, Gamepad, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(name, AutoTdpProtocol.GamepadMode, StringComparison.OrdinalIgnoreCase))
         {
             return ControllerMode.Gamepad;
         }
 
-        return string.Equals(name, Desktop, StringComparison.OrdinalIgnoreCase) ? ControllerMode.Desktop : null;
+        return string.Equals(name, AutoTdpProtocol.DesktopMode, StringComparison.OrdinalIgnoreCase) ? ControllerMode.Desktop : null;
     }
 
     /// <summary>The lower case name of a mode, as a request carries it.</summary>
-    public static string ModeName(ControllerMode mode) => mode == ControllerMode.Desktop ? Desktop : Gamepad;
+    public static string ModeName(ControllerMode mode) => mode == ControllerMode.Desktop
+        ? AutoTdpProtocol.DesktopMode
+        : AutoTdpProtocol.GamepadMode;
 
     /// <summary>How long to wait before looking for the controller again: 2 seconds, doubling, up to 30.</summary>
     public static TimeSpan RetryDelay(int attempt) =>
