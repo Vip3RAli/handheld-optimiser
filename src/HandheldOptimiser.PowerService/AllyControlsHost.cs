@@ -288,7 +288,9 @@ internal sealed class AllyControlsHost : IDisposable
     {
         var (arguments, name, what) = button switch
         {
-            AllyButton.ArmouryCrate => ("--library", "Armoury Crate", "the library"),
+            // --from-button tells the launcher it was started by this service, so it takes the foreground.
+            // The launcher's copy of the word is Program.FromButtonArgument, and the two must be kept in step.
+            AllyButton.ArmouryCrate => ("--library --from-button", "Armoury Crate", "the library"),
             AllyButton.CommandCenter => ("--gamebar", "Command Center", "Game Bar"),
             _ => (null, null, null)
         };

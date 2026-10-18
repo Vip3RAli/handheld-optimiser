@@ -48,15 +48,18 @@ internal static class Program
 
         // Opens the library whatever the saved choice, for a desktop shortcut, for testing, or when the
         // Armoury Crate button is pressed.
-        var fromService = action == LaunchAction.Library;
-        if (fromService)
+        if (action == LaunchAction.Library)
         {
             target = "library";
         }
 
+        // Only TDP Engine's Armoury Crate button says --from-button. A program the service starts does not
+        // own the foreground and has to take it; anything else that opens the library already has it.
+        var takeForeground = action == LaunchAction.Library && IsFromButton(args);
+
         var launched = target switch
         {
-            "library" => RunLibrary(fromService),
+            "library" => RunLibrary(takeForeground),
             "armourycrate" => TryOpen(ArmouryCrateSe),
             "custom" => !string.IsNullOrWhiteSpace(customPath) && TryOpen(customPath, customArgs),
             _ => TryOpen(SteamBigPicture)
@@ -97,6 +100,15 @@ internal static class Program
 
         return args.Contains("--gamebar", StringComparer.OrdinalIgnoreCase) ? LaunchAction.GameBar : LaunchAction.Home;
     }
+
+    /// <summary>
+    /// The argument TDP Engine adds when the Armoury Crate button opens the library. The service's copy is in
+    /// src\HandheldOptimiser.PowerService\AllyControlsHost.cs, and the two must be kept in step.
+    /// </summary>
+    internal const string FromButtonArgument = "--from-button";
+
+    /// <summary>Whether TDP Engine started this for the Armoury Crate button, with <see cref="FromButtonArgument"/>.</summary>
+    internal static bool IsFromButton(string[] args) => args.Contains(FromButtonArgument, StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Opens Xbox Game Bar, which is what the Command Center button shows.</summary>
     private static void OpenGameBar()

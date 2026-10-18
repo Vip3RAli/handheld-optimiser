@@ -11,9 +11,9 @@ internal static class LibraryApp
     private const string ShowEventName = @"Local\HandheldOptimiser.Library.Show";
 
     /// <param name="startedByService">
-    /// True when started with --library, as the Armoury Crate button's service does. A program started by
-    /// a service does not own the foreground, so it takes it with a synthetic key press. The home button
-    /// path already has the foreground and is left as it was.
+    /// True when started with --library --from-button, as the Armoury Crate button's service does. A program
+    /// started by a service does not own the foreground, so it takes it with a synthetic key press. Every other
+    /// start (the home button, a shortcut) already has the foreground and is left as it was.
     /// </param>
     public static int Run(bool startedByService = false)
     {
