@@ -63,6 +63,59 @@ public sealed class TweakEngineRevertTests
         RegistrySnapshots = [.. snapshots]
     };
 
+    /// <summary>
+    /// A script tweak that captures its own originals (Replace Armoury Crate) saves them through the context's
+    /// checkpoint before its script runs, so they are in the journal while the script is still going: a crash
+    /// there would otherwise lose them, since the engine journals the entry only once the tweak returns.
+    /// The real tweak is not run here, since its script changes services.
+    /// </summary>
+    [Fact]
+    public async Task A_script_tweak_checkpoint_reaches_the_journal_before_its_script_runs()
+    {
+        var journalledBeforeScript = false;
+        var tweak = new Tweak
+        {
+            Id = "test.checkpoint",
+            Name = "test.checkpoint",
+            Description = "Test tweak",
+            Category = TweakCategory.Games,
+            ScriptApply = (ctx, journal, _) =>
+            {
+                journal.CapturedState["service.Test.start"] = "2";
+                ctx.SaveCheckpoint(journal);
+
+                // Where the real tweak starts its script.
+                journalledBeforeScript = _journal.Find("test.checkpoint") is { } saved &&
+                                         saved.CapturedState.GetValueOrDefault("service.Test.start") == "2";
+                return Task.FromResult(TweakResult.Ok("test.checkpoint", "done"));
+            }
+        };
+
+        await _engine.ApplyAsync([tweak], "Test", createRestorePoint: false);
+
+        Assert.True(journalledBeforeScript);
+    }
+
+    [Fact]
+    public void A_context_with_no_checkpoint_saves_nothing_and_does_not_throw()
+    {
+        var context = new TweakContext(TestLog.Instance, _registry, new PowerShellRunner(TestLog.Instance));
+        var entry = EntryFor("test.none");
+        entry.CapturedState["a"] = "1";
+
+        context.SaveCheckpoint(entry);
+
+        var calls = 0;
+        var counted = new TweakContext(TestLog.Instance, _registry, new PowerShellRunner(TestLog.Instance))
+        {
+            Checkpoint = _ => calls++
+        };
+        counted.SaveCheckpoint(EntryFor("test.empty"));
+        Assert.Equal(0, calls);
+        counted.SaveCheckpoint(entry);
+        Assert.Equal(1, calls);
+    }
+
     [Fact]
     public async Task Revert_without_undo_data_is_blocked_and_changes_nothing()
     {

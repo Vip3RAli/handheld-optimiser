@@ -45,7 +45,7 @@ public sealed class TweakEngine
         _log = log;
         _restorePoints = restorePoints;
         _journal = journal;
-        _context = new TweakContext(log, registry, runner);
+        _context = new TweakContext(log, registry, runner) { Checkpoint = RecordCheckpoint };
         Device = device;
 
         AllTweaks = TweakCatalog.All;

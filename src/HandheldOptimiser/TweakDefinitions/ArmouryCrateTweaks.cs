@@ -215,6 +215,10 @@ public static class ArmouryCrateTweaks
 
         var stop = ServicesInStopOrder.Where(present.Contains).ToList();
 
+        // Saved before the script starts, since the engine only journals the entry once this returns: if the app
+        // were closed or crashed while the services were being disabled, the originals would otherwise be lost.
+        ctx.SaveCheckpoint(journal);
+
         var outcome = await ctx.Runner.RunScriptAsync(
             BuildApplyScript(present, stop, disableTask: taskState is { Length: > 0 }, turnOffRunEntry),
             $"Replace Armoury Crate: disable {string.Join(", ", present)}",
