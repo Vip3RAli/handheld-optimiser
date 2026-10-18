@@ -28,15 +28,4 @@ public class GameBarControlsTests
     [Fact]
     public void Nothing_changes_when_TDP_Engine_did_not_answer() =>
         Assert.Null(GameBarControls.ModeWhileOpen(null));
-
-    [Theory]
-    [InlineData("desktop", "desktop")]
-    [InlineData("gamepad", "gamepad")]
-    public void Afterwards_the_mode_saved_then_is_put_back(string savedNow, string expected) =>
-        Assert.Equal(expected, GameBarControls.ModeAfterwards(
-            new AutoTdpStatus(true, Replacing: true, ControllerMode: savedNow)));
-
-    [Fact]
-    public void Afterwards_with_no_answer_Desktop_is_put_back() =>
-        Assert.Equal(AutoTdpProtocol.DesktopMode, GameBarControls.ModeAfterwards(null));
 }

@@ -20,12 +20,6 @@ internal static class GameBarControls
     public static string? ModeWhileOpen(AutoTdpStatus? status) =>
         status is { Replacing: true, ControllerMode: AutoTdpProtocol.DesktopMode } ? AutoTdpProtocol.GamepadMode : null;
 
-    /// <summary>
-    /// The mode to put back once Game Bar has closed: the one saved now, which the player may have changed
-    /// in the widget meanwhile. Desktop when TDP Engine does not say, as that is what was held.
-    /// </summary>
-    public static string ModeAfterwards(AutoTdpStatus? status) => status?.ControllerMode ?? AutoTdpProtocol.DesktopMode;
-
     /// <summary>Opens Game Bar with Win+G, holding the controller as a gamepad until it closes when need be.</summary>
     /// <returns>False when Windows would not take Win+G.</returns>
     public static bool Open()
@@ -47,9 +41,9 @@ internal static class GameBarControls
             WaitWhileOpen();
         }
 
-        var back = ModeAfterwards(AutoTdp.StatusAsync().GetAwaiter().GetResult());
-        _ = AutoTdp.SetControllerModeAsync(back, temporary: true).GetAwaiter().GetResult();
-        Program.Log($"Game Bar closed, so the controller is back in {back} mode");
+        // TDP Engine puts back the mode saved now, which the player may have changed in the widget meanwhile.
+        _ = AutoTdp.ReleaseControllerModeAsync().GetAwaiter().GetResult();
+        Program.Log("Game Bar closed, so the controller is back in the mode the player chose");
         return opened;
     }
 

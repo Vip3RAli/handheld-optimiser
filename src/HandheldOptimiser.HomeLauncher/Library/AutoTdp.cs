@@ -116,6 +116,10 @@ internal static partial class AutoTdp
     public static Task<AutoTdpStatus?> SetControllerModeAsync(string mode, bool temporary) =>
         SendAsync(new AutoTdpRequest(AutoTdpProtocol.SetControls, ControllerMode: mode, Temporary: temporary));
 
+    /// <summary>Ends a temporary hold: the controller goes back to the mode the player saved, whatever it is now.</summary>
+    public static Task<AutoTdpStatus?> ReleaseControllerModeAsync() =>
+        SendAsync(new AutoTdpRequest(AutoTdpProtocol.SetControls, Temporary: true));
+
     public static Task<string?> DescribeAsync() => Queue(async () =>
     {
         if (!ServiceRunning() || await SendAsync(new AutoTdpRequest(AutoTdpProtocol.Status)) is not { Running: true } status)

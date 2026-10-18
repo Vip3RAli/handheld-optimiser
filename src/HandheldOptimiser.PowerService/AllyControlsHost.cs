@@ -35,6 +35,9 @@ internal sealed class AllyControlsHost : IDisposable
     private Thread? _thread;
     private AllyHid? _hid;
     private ControllerMode? _mode = AllyControlsStore.SavedMode();
+
+    // The mode held while Game Bar is open, over the saved one, or null. Never saved.
+    private ControllerMode? _hold;
     private DateTime? _resumeAt;
     private bool _disposed;
 
@@ -110,8 +113,9 @@ internal sealed class AllyControlsHost : IDisposable
 
     /// <summary>Saves the mode and sends it to the controller.</summary>
     /// <param name="temporary">
-    /// Sent but not saved, as while Game Bar is open in Desktop mode: the saved mode stays the one shown,
-    /// and the one put back after sleep or when the controller returns.
+    /// Held but not saved, as while Game Bar is open in Desktop mode, until <see cref="Release"/>. A mode saved
+    /// meanwhile, from the widget inside Game Bar, is kept for then: in Desktop mode LB is Tab and RB a click,
+    /// which walk Game Bar's lists and close it. Sleep or the controller coming back also ends the hold.
     /// </param>
     /// <returns>A notice for the player when it could not be sent now, or null when it was.</returns>
     public string? SetMode(ControllerMode mode, bool temporary = false)
@@ -121,18 +125,49 @@ internal sealed class AllyControlsHost : IDisposable
             AllyControlsStore.SaveMode(mode);
         }
 
-        AllyHid? hid;
+        ControllerMode? hold;
         lock (_state)
         {
-            if (!temporary)
+            if (temporary)
+            {
+                _hold = mode;
+            }
+            else
             {
                 _mode = mode;
             }
 
+            hold = _hold;
+        }
+
+        Log.Write(temporary ? $"Controller held in {AllyCommands.ModeName(mode)} mode while Game Bar is open"
+            : hold is { } held && held != mode ? $"Controller mode set to {AllyCommands.ModeName(mode)}, from when Game Bar closes"
+            : $"Controller mode set to {AllyCommands.ModeName(mode)}");
+        return SendCurrent();
+    }
+
+    /// <summary>Game Bar has closed: the hold ends and the saved mode is put back.</summary>
+    /// <returns>A notice for the player when it could not be sent now, or null when it was.</returns>
+    public string? Release()
+    {
+        lock (_state)
+        {
+            _hold = null;
+        }
+
+        Log.Write("Game Bar closed, so the saved controller mode is put back");
+        return SendCurrent();
+    }
+
+    /// <summary>Sends the mode the controller should be in now, the hold or the saved one.</summary>
+    private string? SendCurrent()
+    {
+        AllyHid? hid;
+        lock (_state)
+        {
             hid = _hid;
         }
 
-        Log.Write($"Controller mode set to {AllyCommands.ModeName(mode)}{(temporary ? " for now" : "")}");
         if (hid is null)
         {
             return "The controller is not connected. It will change when it is.";
@@ -141,9 +176,14 @@ internal sealed class AllyControlsHost : IDisposable
         bool sent;
         lock (_send)
         {
-            // Read again under the send lock, so the newest saved mode is the one sent last. A temporary
-            // mode is sent as asked.
-            sent = hid.Send(AllyCommands.Mode(temporary ? mode : Mode ?? mode));
+            // Read again under the send lock, so the newest mode is the one sent last.
+            ControllerMode? mode;
+            lock (_state)
+            {
+                mode = AllyCommands.ModeToSend(_mode, _hold);
+            }
+
+            sent = mode is not { } chosen || hid.Send(AllyCommands.Mode(chosen));
         }
 
         if (sent)
@@ -282,6 +322,12 @@ internal sealed class AllyControlsHost : IDisposable
     /// <summary>Wakes the controller and puts it in the saved mode, if one is saved.</summary>
     private void Apply(AllyHid hid)
     {
+        // After sleep or a reconnect Game Bar is not holding anything, and the saved mode is what counts.
+        lock (_state)
+        {
+            _hold = null;
+        }
+
         if (!hid.Send(AllyCommands.Wake()))
         {
             Log.Write("The controller did not take the wake report");

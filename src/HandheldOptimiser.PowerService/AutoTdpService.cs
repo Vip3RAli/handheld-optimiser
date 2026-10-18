@@ -552,6 +552,12 @@ internal sealed partial class AutoTdpService : ServiceBase
             return last with { Error = "Handheld Optimiser is not replacing Armoury Crate." };
         }
 
+        // Temporary with no mode: Game Bar has closed, so the hold ends and the saved mode comes back.
+        if (request is { Temporary: true, ControllerMode: null })
+        {
+            return last with { Error = controls.Release() ?? error };
+        }
+
         if (AllyCommands.ParseMode(request.ControllerMode) is not { } mode)
         {
             return last with { Error = "Unknown controller mode." };

@@ -50,4 +50,18 @@ public class AllyCommandsTests
     [InlineData(50, 30)]
     public void Looking_for_the_controller_waits_longer_each_time_up_to_30_seconds(int attempt, int seconds) =>
         Assert.Equal(TimeSpan.FromSeconds(seconds), AllyCommands.RetryDelay(attempt));
+
+    /// <summary>
+    /// While Game Bar holds the controller as a gamepad, a mode chosen in the widget is saved but not sent:
+    /// in Desktop mode LB is Tab and RB a click, which walk Game Bar's lists and close it.
+    /// </summary>
+    [Theory]
+    [InlineData(3, 1, 1)]
+    [InlineData(1, 1, 1)]
+    [InlineData(3, null, 3)]
+    [InlineData(1, null, 1)]
+    [InlineData(null, 1, 1)]
+    [InlineData(null, null, null)]
+    public void A_hold_wins_over_the_saved_mode_until_it_is_released(int? saved, int? hold, int? expected) =>
+        Assert.Equal(expected, (int?)AllyCommands.ModeToSend((ControllerMode?)saved, (ControllerMode?)hold));
 }

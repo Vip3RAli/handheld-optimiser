@@ -56,6 +56,12 @@ internal static class AllyCommands
         ? AutoTdpProtocol.DesktopMode
         : AutoTdpProtocol.GamepadMode;
 
+    /// <summary>
+    /// The mode the controller should be in: a hold, while Game Bar is open, wins over the mode the player
+    /// saved, which comes back once the hold is released. Null when neither is set.
+    /// </summary>
+    public static ControllerMode? ModeToSend(ControllerMode? saved, ControllerMode? hold) => hold ?? saved;
+
     /// <summary>How long to wait before looking for the controller again: 2 seconds, doubling, up to 30.</summary>
     public static TimeSpan RetryDelay(int attempt) =>
         TimeSpan.FromSeconds(attempt >= 4 ? 30 : 2 << Math.Max(attempt, 0));

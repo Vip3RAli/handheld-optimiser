@@ -103,7 +103,8 @@ internal static class AutoTdpProtocol
 /// <param name="PowerLimit">From the widget: the most watts TDP Engine may use with a target, or a limit
 /// held as it is without one. 0 for Auto.</param>
 /// <param name="ControllerMode">With set-controls: <see cref="AutoTdpProtocol.GamepadMode"/> or <see cref="AutoTdpProtocol.DesktopMode"/>.</param>
-/// <param name="Temporary">With set-controls: send the mode without saving it, as while Game Bar is open.</param>
+/// <param name="Temporary">With set-controls: hold the mode without saving it, as while Game Bar is open. With no
+/// ControllerMode it ends the hold, and the saved mode is put back.</param>
 internal sealed record AutoTdpRequest(string Command, int TargetFps = 0, int MinWatts = 0, int MaxWatts = 0,
     int TemperatureLimit = 0, int StartWatts = 0, string? GameFolder = null, string? FanCurve = null, int PowerLimit = 0,
     string? ControllerMode = null, bool Temporary = false);
