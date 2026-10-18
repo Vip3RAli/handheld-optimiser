@@ -188,6 +188,33 @@ public sealed class ArmouryCrateTweakTests
         Assert.EndsWith("if ($script:failed) { exit 1 }", revert, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// TDP Engine ends with an error when it fails while running the buttons, and only failureflag 1 makes Windows
+    /// start a service again after that, rather than only after a crash.
+    /// </summary>
+    [Fact]
+    public void Apply_has_Windows_start_TDP_Engine_again_after_it_fails()
+    {
+        var apply = ArmouryCrateTweaks.BuildApplyScript(["AsusAppService"], ["AsusAppService"], false, false);
+
+        Assert.Contains("sc.exe failure HandheldOptimiserAutoTdp reset= 86400 actions= restart/5000/restart/5000/restart/30000", apply, StringComparison.Ordinal);
+        Assert.Contains("sc.exe failureflag HandheldOptimiserAutoTdp 1", apply, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// <see cref="SafetyGuard"/> lets through exactly the services this tweak changes, so a name added to one list
+    /// and not the other fails here rather than on a real Ally.
+    /// </summary>
+    [Fact]
+    public void The_guard_allowlist_is_exactly_the_services_the_tweak_changes()
+    {
+        var changed = ArmouryCrateTweaks.ServicesInStopOrder.Concat(ArmouryCrateTweaks.UpdateServices);
+
+        Assert.True(
+            new HashSet<string>(SafetyGuard.ArmouryCrateReplacement, StringComparer.OrdinalIgnoreCase).SetEquals(changed),
+            "SafetyGuard.ArmouryCrateReplacement and the tweak's lists differ.");
+    }
+
     /// <summary>The script with each line trimmed and joined by one space, so a test does not depend on indentation.</summary>
     private static string Flat(string script) =>
         string.Join(" ", script.ReplaceLineEndings("\n").Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0));

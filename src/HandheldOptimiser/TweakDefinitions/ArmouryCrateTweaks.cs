@@ -336,6 +336,8 @@ public static class ArmouryCrateTweaks
             if ($LASTEXITCODE -ne 0) { Write-Output "sc.exe config failed for {{EngineService}} (exit $LASTEXITCODE)"; $failed = $true }
             & sc.exe failure {{EngineService}} reset= 86400 actions= restart/5000/restart/5000/restart/30000 | Out-Null
             if ($LASTEXITCODE -ne 0) { Write-Output "sc.exe failure failed for {{EngineService}} (exit $LASTEXITCODE)"; $failed = $true }
+            & sc.exe failureflag {{EngineService}} 1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { Write-Output "sc.exe failureflag failed for {{EngineService}} (exit $LASTEXITCODE)"; $failed = $true }
             $e = Get-Service -Name {{Quote(EngineService)}} -ErrorAction SilentlyContinue
             try {
                 if ($e -and $e.Status -eq 'Running') {
