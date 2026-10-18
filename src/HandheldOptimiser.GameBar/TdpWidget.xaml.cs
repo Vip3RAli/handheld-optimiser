@@ -217,14 +217,17 @@ namespace HandheldOptimiser.GameBar
                 return;
             }
 
-            // With fans only, Armoury Crate keeps the power limit, so there is no wattage of TDP Engine's to show.
+            // With fans only, TDP Engine leaves the power limit to the Ally's power mode, which Armoury Crate sets
+            // unless TDP Engine is replacing it, so there is no wattage of TDP Engine's to show.
             SetReadout(WattsValue, WattsUnit, "W", status.Watts?.ToString() ?? "Auto", status.Watts != null);
             SetReadout(FpsValue, FpsUnit, "fps", status.Fps is double fps ? Math.Round(fps).ToString() : "?", status.Fps != null);
             SetReadout(TemperatureValue, TemperatureUnit, "°C", status.Temperature?.ToString() ?? "?", status.Temperature != null);
 
             if (status.Watts == null)
             {
-                SetState(FanName(status.FanCurve) + " fans", ". Armoury Crate sets the power limit.");
+                SetState(FanName(status.FanCurve) + " fans", status.Replacing
+                    ? ". The Ally's own power mode sets the power limit."
+                    : ". Armoury Crate sets the power limit.");
             }
             else if (status.State == "Fixed")
             {
