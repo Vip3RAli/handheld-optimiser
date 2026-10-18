@@ -32,6 +32,7 @@
       would then be in two references. The protocol itself comes from the launcher, which builds it in.
     -->
     <Compile Include="..\..\src\HandheldOptimiser.PowerService\AllyButtons.cs" Link="AllyButtons.cs" />
+    <Compile Include="..\..\src\HandheldOptimiser.PowerService\AllyCommands.cs" Link="AllyCommands.cs" />
     <Compile Include="..\..\src\HandheldOptimiser.PowerService\AutoTdpController.cs" Link="AutoTdpController.cs" />
     <Compile Include="..\..\src\HandheldOptimiser.PowerService\AutoTdpRules.cs" Link="AutoTdpRules.cs" />
     <Compile Include="..\..\src\HandheldOptimiser.PowerService\FanCurves.cs" Link="FanCurves.cs" />
