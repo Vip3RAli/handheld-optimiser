@@ -115,7 +115,7 @@ internal static class Program
     /// the ms-gamebar: link Game Bar registers was tried first, and on the Ally it opens nothing.
     /// </summary>
     private static void OpenGameBar() =>
-        Log(Library.Native.PressWinG() ? "Opened Game Bar" : "Could not open Game Bar: Windows would not take Win+G");
+        Log(Library.GameBarControls.Open() ? "Opened Game Bar" : "Could not open Game Bar: Windows would not take Win+G");
 
     private static (string Target, string? CustomPath, string? CustomArgs) ReadSettings()
     {

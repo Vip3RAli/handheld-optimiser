@@ -559,7 +559,7 @@ internal sealed partial class AutoTdpService : ServiceBase
 
         // The service's own standing error, such as a power limit it cannot set, is kept when the mode went
         // through, so the widget still shows it.
-        return last with { Error = controls.SetMode(mode) ?? error };
+        return last with { Error = controls.SetMode(mode, request.Temporary) ?? error };
     }
 
     /// <summary>The status with the controller's state, while replacing Armoury Crate. Otherwise as it is.</summary>

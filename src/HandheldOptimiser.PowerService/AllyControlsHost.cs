@@ -109,18 +109,30 @@ internal sealed class AllyControlsHost : IDisposable
     }
 
     /// <summary>Saves the mode and sends it to the controller.</summary>
+    /// <param name="temporary">
+    /// Sent but not saved, as while Game Bar is open in Desktop mode: the saved mode stays the one shown,
+    /// and the one put back after sleep or when the controller returns.
+    /// </param>
     /// <returns>A notice for the player when it could not be sent now, or null when it was.</returns>
-    public string? SetMode(ControllerMode mode)
+    public string? SetMode(ControllerMode mode, bool temporary = false)
     {
-        AllyControlsStore.SaveMode(mode);
+        if (!temporary)
+        {
+            AllyControlsStore.SaveMode(mode);
+        }
+
         AllyHid? hid;
         lock (_state)
         {
-            _mode = mode;
+            if (!temporary)
+            {
+                _mode = mode;
+            }
+
             hid = _hid;
         }
 
-        Log.Write($"Controller mode set to {AllyCommands.ModeName(mode)}");
+        Log.Write($"Controller mode set to {AllyCommands.ModeName(mode)}{(temporary ? " for now" : "")}");
         if (hid is null)
         {
             return "The controller is not connected. It will change when it is.";
@@ -129,8 +141,9 @@ internal sealed class AllyControlsHost : IDisposable
         bool sent;
         lock (_send)
         {
-            // Read again under the send lock, so the newest mode is the one sent last.
-            sent = hid.Send(AllyCommands.Mode(Mode ?? mode));
+            // Read again under the send lock, so the newest saved mode is the one sent last. A temporary
+            // mode is sent as asked.
+            sent = hid.Send(AllyCommands.Mode(temporary ? mode : Mode ?? mode));
         }
 
         if (sent)
