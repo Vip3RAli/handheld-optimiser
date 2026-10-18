@@ -12,7 +12,11 @@ public partial class LibraryWindow
     public void OnArmouryCrateButton()
     {
         var game = _session is { StartedAt: not null } session ? session : null;
-        switch (ButtonPress.Decide(IsActive, game is not null))
+        var action = ButtonPress.Decide(IsActive, game is not null);
+
+        // Logged so that a press that goes wrong can be told apart from one that went right.
+        Program.Log($"Armoury Crate button: {action} (library in front: {IsActive}, game: {game?.Game.Key ?? "none"})");
+        switch (action)
         {
             case ButtonAction.ShowLibrary:
                 _ = ShowOverGameAsync(game);
@@ -43,6 +47,10 @@ public partial class LibraryWindow
             {
                 Native.Minimise(window);
             }
+            else
+            {
+                Program.Log($"Armoury Crate button: no window found for {game.Game.Key}, so it was not minimised");
+            }
         }
 
         ShowLibrary();
@@ -58,6 +66,7 @@ public partial class LibraryWindow
             return;
         }
 
+        Program.Log($"Armoury Crate button: could not go back to {session.Game.Key} (library in front: {IsActive}), so the library was minimised");
         WindowState = WindowState.Minimized;
     }
 
