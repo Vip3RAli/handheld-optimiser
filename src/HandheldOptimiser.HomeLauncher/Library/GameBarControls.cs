@@ -11,8 +11,6 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 /// </summary>
 internal static class GameBarControls
 {
-    private const string GameBarProcess = "GameBar";
-
     // How long Game Bar has to come up after Win+G, and the longest it is kept a gamepad for.
     private static readonly TimeSpan OpenWait = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan LongestOpen = TimeSpan.FromMinutes(30);
@@ -55,38 +53,21 @@ internal static class GameBarControls
         return opened;
     }
 
-    /// <summary>Waits for Game Bar to come to the front, then for it to leave it.</summary>
+    /// <summary>
+    /// Waits for Game Bar to open, then for it to close. Game Bar is never the window in front, so this asks
+    /// Windows whether Game Bar has the input (see GameBarState). If Windows will not say, it stops waiting.
+    /// </summary>
     private static void WaitWhileOpen()
     {
         var started = Stopwatch.StartNew();
-        while (!GameBarInFront() && started.Elapsed < OpenWait)
+        while (GameBarState.IsOpen() == false && started.Elapsed < OpenWait)
         {
             Thread.Sleep(Poll);
         }
 
-        while (GameBarInFront() && started.Elapsed < LongestOpen)
+        while (GameBarState.IsOpen() == true && started.Elapsed < LongestOpen)
         {
             Thread.Sleep(Poll);
-        }
-    }
-
-    private static bool GameBarInFront()
-    {
-        var processId = Native.WindowProcess(Native.ForegroundWindow());
-        if (processId == 0)
-        {
-            return false;
-        }
-
-        try
-        {
-            using var process = Process.GetProcessById(processId);
-            return string.Equals(process.ProcessName, GameBarProcess, StringComparison.OrdinalIgnoreCase);
-        }
-        catch (ArgumentException)
-        {
-            // It ended between the two calls.
-            return false;
         }
     }
 }

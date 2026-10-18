@@ -91,12 +91,6 @@ internal static partial class Native
         SetForegroundWindow(window);
     }
 
-    [LibraryImport("user32.dll", EntryPoint = "GetForegroundWindow")]
-    private static partial nint GetForegroundWindowNative();
-
-    /// <summary>The window in front, or 0 while Windows is switching between two.</summary>
-    public static nint ForegroundWindow() => GetForegroundWindowNative();
-
     private const int SwMinimize = 6;
 
     [LibraryImport("user32.dll")]
