@@ -51,7 +51,7 @@ public partial class LibraryWindow
     {
         foreach (var list in new[]
         {
-            GameItems, ProfileItems, SettingsItems, LibraryDisplayItems, GamesAppsItems, SleepTweaksItems,
+            GameItems, ProfileItems, RecommendedItems, SettingsItems, LibraryDisplayItems, GamesAppsItems, SleepTweaksItems,
             BackgroundItems, DisplayItems, AddItems, PowerItems, QuickItems,
             WhilePlayingItems, AppsToCloseItems, RunningAppsItems, MaintenanceItems, StartupItems, EmulatorItems,
             TvItems, OwnedItems, DealsItems
@@ -90,6 +90,10 @@ public partial class LibraryWindow
         // Profiles only change things for games.
         ProfileItem.Visibility = installed && !tile.IsApp ? Visibility.Visible : Visibility.Collapsed;
         ProfileItem.Tag = GameProfiles.For(game) is { IsEmpty: true, CloseApps: null, AutoTdpFps: null } ? "Not set" : "Set";
+
+        var recommendation = installed && !tile.IsApp ? GameSettingsDb.Current.For(game) : null;
+        RecommendedItem.Visibility = recommendation is null ? Visibility.Collapsed : Visibility.Visible;
+        RecommendedItem.Tag = recommendation?.Target;
         RefreshCloseGameItem(tile);
 
         var added = AddedPrograms.IsAdded(game);

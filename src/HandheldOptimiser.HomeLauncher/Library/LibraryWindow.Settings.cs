@@ -86,13 +86,14 @@ public partial class LibraryWindow
     /// </summary>
     private bool BackToSettings()
     {
-        if (ReferenceEquals(_menu, ProfileItems) && _menuTile is { } tile)
+        if ((ReferenceEquals(_menu, ProfileItems) || ReferenceEquals(_menu, RecommendedItems)) && _menuTile is { } tile)
         {
+            var row = ReferenceEquals(_menu, ProfileItems) ? ProfileItem : RecommendedItem;
             HideMenuLists();
             _menu = GameItems;
             MenuStore.Text = GameSubtitle(tile);
             RefreshGameItems(tile);
-            ShowMenuItems(ProfileItem);
+            ShowMenuItems(row);
             return true;
         }
 

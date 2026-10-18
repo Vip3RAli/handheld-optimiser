@@ -1193,6 +1193,9 @@
                         <Button x:Name="FavouriteItem" Style="{StaticResource MenuButton}" Click="OnToggleFavourite" />
                         <Button x:Name="ProfileItem" Style="{StaticResource MenuButton}" Content="Game profile"
                                 Click="OnOpenProfile" />
+                        <!-- Only for a game on the recommended settings list. -->
+                        <Button x:Name="RecommendedItem" Style="{StaticResource MenuButton}" Content="Ally recommended settings"
+                                Visibility="Collapsed" Click="OnOpenRecommended" />
                         <!-- Only for a program the player added: moves it between the games and Apps. -->
                         <Button x:Name="MoveItem" Style="{StaticResource MenuButton}" Click="OnToggleApp" />
                         <Button x:Name="ArgumentsItem" Style="{StaticResource MenuButton}" Content="Launch arguments"
@@ -1445,6 +1448,48 @@
                                 <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                             <TextBlock Text="Change" FontSize="15" VerticalAlignment="Center" />
+                            <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                                <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!--
+                        Recommended Ally settings for one game. The device half can go into its profile with
+                        one press; the in-game half is a list to set in the game's own menu. The text is not
+                        in a StackPanel, which would be taken for the hints row and hidden on a card.
+                    -->
+                    <StackPanel x:Name="RecommendedItems" Visibility="Collapsed">
+                        <TextBlock x:Name="RecommendedNote" Margin="4,0,4,14" FontSize="14.5" TextWrapping="Wrap" Opacity="0.85" />
+                        <Button x:Name="RecommendedApplyItem" Style="{StaticResource MenuButton}" Content="Use the device settings"
+                                Click="OnApplyRecommended" />
+                        <TextBlock x:Name="RecommendedDevice" Margin="4,2,4,16" FontSize="13.5" TextWrapping="Wrap" Opacity="0.6" />
+                        <TextBlock Text="Set these in the game" Margin="4,0,4,8" FontSize="16" FontWeight="SemiBold" />
+                        <ItemsControl x:Name="RecommendedList" Margin="4,0,4,12" Focusable="False">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,3">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Name}" FontSize="14.5" Opacity="0.8" TextWrapping="Wrap" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Value}" Margin="16,0,0,0" FontSize="14.5"
+                                                   FontWeight="SemiBold" TextAlignment="Right" TextWrapping="Wrap" MaxWidth="260" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock x:Name="RecommendedSource" Margin="4,0,4,12" FontSize="13" TextWrapping="Wrap" Opacity="0.55" />
+                        <!-- For touch, which has no B button. -->
+                        <Button x:Name="RecommendedBackItem" Style="{StaticResource MenuButton}" Content="Back" Click="OnSettingsBack" />
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                            <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                                <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Select" FontSize="15" VerticalAlignment="Center" />
                             <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
                                 <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>

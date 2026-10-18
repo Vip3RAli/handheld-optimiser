@@ -53,6 +53,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!--
+      Recommended Ally settings per game, kept at the top of the repository so it is easy to edit. The
+      built-in copy is used until a newer one is fetched from GitHub; see GameSettingsDb.
+    -->
+    <EmbeddedResource Include="..\..\data\game-settings.json" LogicalName="game-settings.json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- How the library talks to the TDP Engine service, shared with it so the two always agree. -->
     <Compile Include="..\HandheldOptimiser.PowerService\AutoTdpProtocol.cs" Link="Library\AutoTdpProtocol.cs" />
   </ItemGroup>
