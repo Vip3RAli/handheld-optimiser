@@ -45,7 +45,7 @@ public partial class LibraryWindow
             .Select(s => new GameSetting(s.Name, s.Value ?? string.Empty))
             .ToList();
 
-        var source = recommendation.Source is { Name.Length: > 0 } from ? from.Name : "Unknown source";
+        var source = recommendation.Source is { Name.Length: > 0 } named ? named.Name : "Unknown source";
         var checkedOn = DateOnly.TryParseExact(recommendation.Checked, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day) ? $", checked {day:d MMM yyyy}" : string.Empty;
         RecommendedSource.Text = recommendation.FromGuide
             ? $"From: {source}{checkedOn}"

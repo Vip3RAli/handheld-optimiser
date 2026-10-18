@@ -88,12 +88,12 @@ public partial class LibraryWindow
     {
         if ((ReferenceEquals(_menu, ProfileItems) || ReferenceEquals(_menu, RecommendedItems)) && _menuTile is { } tile)
         {
-            var row = ReferenceEquals(_menu, ProfileItems) ? ProfileItem : RecommendedItem;
+            var opener = ReferenceEquals(_menu, ProfileItems) ? ProfileItem : RecommendedItem;
             HideMenuLists();
             _menu = GameItems;
             MenuStore.Text = GameSubtitle(tile);
             RefreshGameItems(tile);
-            ShowMenuItems(row);
+            ShowMenuItems(opener);
             return true;
         }
 
