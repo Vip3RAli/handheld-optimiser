@@ -174,12 +174,13 @@ begin
 end;
 
 // True while TDP Engine replaces Armoury Crate: the main app's Replace Armoury Crate tweak sets HKLM
-// SOFTWARE\HandheldOptimiser\AllyControls Replacing to 1. A missing value means it does not.
+// SOFTWARE\HandheldOptimiser\AllyControls Replacing to 1. Any value but 0 counts, as it does for the
+// service (AllyControlsStore.Replacing), so the two never disagree. A missing value means it does not.
 function IsReplacingArmouryCrate(): Boolean;
 var
   Value: Cardinal;
 begin
-  Result := RegQueryDWordValue(HKLM64, 'SOFTWARE\HandheldOptimiser\AllyControls', 'Replacing', Value) and (Value = 1);
+  Result := RegQueryDWordValue(HKLM64, 'SOFTWARE\HandheldOptimiser\AllyControls', 'Replacing', Value) and (Value <> 0);
 end;
 
 // Registers the TDP Engine service, which counts a game's frames (that needs administrator, which the
@@ -224,6 +225,17 @@ begin
   // operating mode it saved, so the game's power limit is not left set. The count resets after a day.
   Exec(Sc, 'failure {#ServiceName} reset= 86400 actions= restart/5000',
     '', SW_HIDE, ewWaitUntilTerminated, Code);
+
+  // PrepareToInstall stopped it to replace its exe. While it replaces Armoury Crate, ASUS's services
+  // are off and it is what runs the Ally's buttons, so it is started again now rather than at the next
+  // restart. 1056 means it was already running.
+  if IsReplacingArmouryCrate() then
+  begin
+    if Exec(Sc, 'start {#ServiceName}', '', SW_HIDE, ewWaitUntilTerminated, Code) and ((Code = 0) or (Code = 1056)) then
+      Log('Started TDP Engine again (exit ' + IntToStr(Code) + ').')
+    else
+      Log('Could not start TDP Engine again (exit ' + IntToStr(Code) + ').');
+  end;
 end;
 
 // Adds the TDP Engine widget to the player's Game Bar, when this build has it (it needs Visual Studio's
