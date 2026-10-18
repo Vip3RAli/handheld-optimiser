@@ -41,6 +41,10 @@ internal sealed partial class AutoTdpService : ServiceBase
     private readonly object _gate = new();
     private Task? _running;
 
+    // The Ally's buttons and controller mode, run only while the app stands in for Armoury Crate. Read once
+    // as it starts: switching that on or off restarts the service.
+    private AllyControlsHost? _controls;
+
     private AsusAcpi? _acpi;
     private FrameCounter? _frames;
     private string? _error;
@@ -80,6 +84,9 @@ internal sealed partial class AutoTdpService : ServiceBase
                     control.LastFans = DateTime.MinValue;
                 }
             }
+
+            // Outside the gate, as it closes the controller's handle.
+            _controls?.Resume();
         }
 
         return true;
@@ -118,6 +125,7 @@ internal sealed partial class AutoTdpService : ServiceBase
             Release("the service stopped");
         }
 
+        _controls?.Dispose();
         _frames?.Dispose();
         _acpi?.Dispose();
     }
@@ -128,6 +136,13 @@ internal sealed partial class AutoTdpService : ServiceBase
         try
         {
             Log.Write("Started");
+            if (AllyControlsStore.Replacing())
+            {
+                Log.Write("Replacing Armoury Crate");
+                _controls = new AllyControlsHost();
+                _controls.Start(cancel);
+            }
+
             _acpi = AsusAcpi.Open();
             if (_acpi is null || !_acpi.CanSetPowerLimits)
             {
@@ -164,7 +179,8 @@ internal sealed partial class AutoTdpService : ServiceBase
                         Log.Write($"A second's work failed: {ex.Message}");
                     }
 
-                    if (_control is null && DateTime.UtcNow - _idleSince > IdleExit)
+                    // While replacing Armoury Crate it runs the controller too, so it stays.
+                    if (_controls is null && _control is null && DateTime.UtcNow - _idleSince > IdleExit)
                     {
                         _ending = true;
                         Log.Write("Nothing to do, so ending");
@@ -487,19 +503,62 @@ internal sealed partial class AutoTdpService : ServiceBase
         var client = GetNamedPipeClientProcessId(pipe.SafePipeHandle, out var id) ? (int)id : 0;
 
         AutoTdpStatus status;
-        lock (_gate)
+        if (request?.Command == AutoTdpProtocol.SetControls)
         {
-            status = request?.Command switch
+            // Not under the gate, as it writes to the controller.
+            status = SetControls(request);
+        }
+        else
+        {
+            lock (_gate)
             {
-                AutoTdpProtocol.Start => Begin(request, client),
-                AutoTdpProtocol.Update => Update(request, client),
-                AutoTdpProtocol.Stop => End(),
-                _ => _error is not null ? new AutoTdpStatus(false, Error: _error) : _last
-            };
+                status = request?.Command switch
+                {
+                    AutoTdpProtocol.Start => Begin(request, client),
+                    AutoTdpProtocol.Update => Update(request, client),
+                    AutoTdpProtocol.Stop => End(),
+                    _ => _error is not null ? new AutoTdpStatus(false, Error: _error) : _last
+                };
+            }
         }
 
-        await writer.WriteLineAsync(AutoTdpProtocol.Write(status).AsMemory(), cancel).ConfigureAwait(false);
+        await writer.WriteLineAsync(AutoTdpProtocol.Write(WithControls(status)).AsMemory(), cancel).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// A new controller mode, from the widget or the library alike: both are the player. Answered with the
+    /// last status, its Error the notice when the mode could not be sent now.
+    /// </summary>
+    private AutoTdpStatus SetControls(AutoTdpRequest request)
+    {
+        AutoTdpStatus last;
+        lock (_gate)
+        {
+            last = _last;
+        }
+
+        if (_controls is not { } controls)
+        {
+            return last with { Error = "Handheld Optimiser is not replacing Armoury Crate." };
+        }
+
+        if (AllyCommands.ParseMode(request.ControllerMode) is not { } mode)
+        {
+            return last with { Error = "Unknown controller mode." };
+        }
+
+        return last with { Error = controls.SetMode(mode) };
+    }
+
+    /// <summary>The status with the controller's state, while replacing Armoury Crate. Otherwise as it is.</summary>
+    private AutoTdpStatus WithControls(AutoTdpStatus status) => _controls is { } controls
+        ? status with
+        {
+            Replacing = true,
+            ControllerConnected = controls.Connected,
+            ControllerMode = controls.Mode is { } mode ? AllyCommands.ModeName(mode) : null
+        }
+        : status;
 
     /// <summary>A game starting from the library, or from the widget when nothing is running.</summary>
     private AutoTdpStatus Begin(AutoTdpRequest request, int client, bool fromWidget = false)
