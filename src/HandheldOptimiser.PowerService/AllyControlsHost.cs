@@ -177,7 +177,7 @@ internal sealed class AllyControlsHost : IDisposable
         {
             try
             {
-                if (!WaitForResume(stop))
+                if (!WaitForResume(stop, ref attempt))
                 {
                     return;
                 }
@@ -197,7 +197,6 @@ internal sealed class AllyControlsHost : IDisposable
                     continue;
                 }
 
-                attempt = 0;
                 lock (_state)
                 {
                     if (_disposed)
@@ -213,6 +212,9 @@ internal sealed class AllyControlsHost : IDisposable
                 Apply(hid);
                 while (hid.Read() is { } report)
                 {
+                    // The back-off starts again only once a read has worked. A controller that opens but
+                    // cannot be read would otherwise be opened again flat out.
+                    attempt = 0;
                     if (_filter.Press(report, DateTime.UtcNow) is { } button)
                     {
                         Act(button);
@@ -225,7 +227,23 @@ internal sealed class AllyControlsHost : IDisposable
                     return;
                 }
 
+                bool resuming;
+                lock (_state)
+                {
+                    resuming = _resumeAt is not null;
+                }
+
+                // A resume closed it on purpose, and its own second is the wait.
+                if (resuming)
+                {
+                    continue;
+                }
+
                 Log.Write("Controller lost, looking again");
+                if (!Wait(AllyCommands.RetryDelay(attempt++), stop))
+                {
+                    return;
+                }
             }
             catch (Exception ex)
             {
@@ -300,14 +318,22 @@ internal sealed class AllyControlsHost : IDisposable
         hid.Dispose();
     }
 
-    /// <summary>After a Resume, waits until its second has passed. False when stopped meanwhile.</summary>
-    private bool WaitForResume(CancellationToken stop)
+    /// <summary>
+    /// After a Resume, waits until its second has passed, and starts the back-off again, as the controller is
+    /// expected back soon after sleep. False when stopped meanwhile.
+    /// </summary>
+    private bool WaitForResume(CancellationToken stop, ref int attempt)
     {
         DateTime? until;
         lock (_state)
         {
             until = _resumeAt;
             _resumeAt = null;
+        }
+
+        if (until is not null)
+        {
+            attempt = 0;
         }
 
         return until is not { } at || at <= DateTime.UtcNow || Wait(at - DateTime.UtcNow, stop, wakeable: false);
