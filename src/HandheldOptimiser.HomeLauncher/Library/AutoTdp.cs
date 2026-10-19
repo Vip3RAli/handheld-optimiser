@@ -47,7 +47,7 @@ internal static partial class AutoTdp
         AutoTdpProtocol.QuietFans => "Quiet",
         AutoTdpProtocol.CoolFans => "Cool",
         AutoTdpProtocol.FullFans => "Max",
-        AutoTdpProtocol.DynamicFans => "Dynamic",
+        AutoTdpProtocol.DynamicFans => "Auto",
         _ => "Default"
     };
 

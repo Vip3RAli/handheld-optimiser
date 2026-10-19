@@ -200,10 +200,8 @@ namespace HandheldOptimiser.GameBar
             var readouts = status.Running && status.Error == null;
             Readouts.Visibility = readouts ? Visibility.Visible : Visibility.Collapsed;
 
-            // The divider only separates the line from the readouts, so it goes with them.
-            StateLine.BorderThickness = new Thickness(0, readouts ? 1 : 0, 0, 0);
-            StateLine.Margin = new Thickness(0, readouts ? 10 : 0, 0, 0);
-            StateLine.Padding = new Thickness(0, readouts ? 10 : 0, 0, 0);
+            // A small gap under the readouts, and none when they are hidden.
+            StateLine.Margin = new Thickness(0, readouts ? 4 : 0, 0, 0);
 
             if (status.Error != null)
             {
@@ -225,9 +223,8 @@ namespace HandheldOptimiser.GameBar
 
             if (status.Watts == null)
             {
-                SetState(FanName(status.FanCurve) + " fans", status.Replacing
-                    ? ". The Ally's power mode sets the power limit."
-                    : ". Armoury Crate is setting the power limit.");
+                SetState(status.FanCurve == "dynamic" ? "Fans controlled automatically" : FanName(status.FanCurve) + " fans",
+                    ". Power controlled automatically.");
             }
             else if (status.State == "Fixed")
             {
@@ -292,7 +289,7 @@ namespace HandheldOptimiser.GameBar
                 case "quiet": return "Quiet";
                 case "cool": return "Cool";
                 case "full": return "Max";
-                case "dynamic": return "Dynamic";
+                case "dynamic": return "Auto";
                 default: return "Default";
             }
         }

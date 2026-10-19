@@ -114,66 +114,12 @@
                 </Setter.Value>
             </Setter>
         </Style>
-
-        <!-- One part of the fan switch, like Control Mode. The parts sit edge to edge, so only the two ends are rounded. -->
-        <Style x:Key="Segment" TargetType="ToggleButton" BasedOn="{StaticResource Tile}">
-            <Setter Property="Height" Value="38" />
-            <Setter Property="Margin" Value="0" />
-            <Setter Property="CornerRadius" Value="0" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ToggleButton">
-                        <Grid x:Name="Root" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-                              BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}">
-                            <VisualStateManager.VisualStateGroups>
-                                <VisualStateGroup x:Name="CommonStates">
-                                    <VisualState x:Name="Normal" />
-                                    <VisualState x:Name="PointerOver">
-                                        <VisualState.Setters>
-                                            <Setter Target="Root.Background" Value="{StaticResource ChoiceFillHover}" />
-                                        </VisualState.Setters>
-                                    </VisualState>
-                                    <VisualState x:Name="Pressed">
-                                        <VisualState.Setters>
-                                            <Setter Target="Root.Background" Value="{StaticResource CyanFill}" />
-                                        </VisualState.Setters>
-                                    </VisualState>
-                                    <VisualState x:Name="Checked">
-                                        <VisualState.Setters>
-                                            <Setter Target="Root.Background" Value="{StaticResource CyanFill}" />
-                                            <Setter Target="Root.BorderBrush" Value="{StaticResource Cyan}" />
-                                            <Setter Target="Root.BorderThickness" Value="2" />
-                                        </VisualState.Setters>
-                                    </VisualState>
-                                    <VisualState x:Name="CheckedPointerOver">
-                                        <VisualState.Setters>
-                                            <Setter Target="Root.Background" Value="{StaticResource CyanFillHover}" />
-                                            <Setter Target="Root.BorderBrush" Value="{StaticResource Cyan}" />
-                                            <Setter Target="Root.BorderThickness" Value="2" />
-                                        </VisualState.Setters>
-                                    </VisualState>
-                                    <VisualState x:Name="CheckedPressed">
-                                        <VisualState.Setters>
-                                            <Setter Target="Root.Background" Value="{StaticResource CyanFill}" />
-                                            <Setter Target="Root.BorderBrush" Value="{StaticResource Cyan}" />
-                                            <Setter Target="Root.BorderThickness" Value="2" />
-                                        </VisualState.Setters>
-                                    </VisualState>
-                                </VisualStateGroup>
-                            </VisualStateManager.VisualStateGroups>
-                            <ContentPresenter Content="{TemplateBinding Content}" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                              Foreground="{TemplateBinding Foreground}" />
-                        </Grid>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
     </Page.Resources>
 
     <!-- Game Bar draws its own frame and title bar, so the page starts with the first group. -->
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Padding="14,0">
-            <Border Style="{StaticResource Card}" BorderThickness="0">
+            <Border Style="{StaticResource Card}" BorderThickness="0" Padding="0,4,0,14">
                 <StackPanel>
                     <TextBlock Style="{StaticResource CardTitle}" Text="Now" />
                     <Grid x:Name="Readouts">
@@ -300,7 +246,8 @@
             <Border Style="{StaticResource Card}">
                 <StackPanel>
                     <TextBlock Style="{StaticResource CardTitle}" Text="Fans" />
-                    <Grid x:Name="Fans">
+                    <!-- Tiles as for the frame rate, with a smaller word so Default fits a fifth of the width. -->
+                    <Grid x:Name="Fans" Margin="-3,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
@@ -308,11 +255,21 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <ToggleButton Style="{StaticResource Segment}" Content="Default" Tag="" Click="OnFans" CornerRadius="6,0,0,6" />
-                        <ToggleButton Grid.Column="1" Style="{StaticResource Segment}" Content="Quiet" Tag="quiet" Click="OnFans" BorderThickness="0,1,1,1" />
-                        <ToggleButton Grid.Column="2" Style="{StaticResource Segment}" Content="Cool" Tag="cool" Click="OnFans" BorderThickness="0,1,1,1" />
-                        <ToggleButton Grid.Column="3" Style="{StaticResource Segment}" Content="Max" Tag="full" Click="OnFans" BorderThickness="0,1,1,1" />
-                        <ToggleButton Grid.Column="4" Style="{StaticResource Segment}" Content="Dynamic" Tag="dynamic" Click="OnFans" BorderThickness="0,1,1,1" CornerRadius="0,6,6,0" />
+                        <ToggleButton Style="{StaticResource Tile}" Tag="" Click="OnFans">
+                            <TextBlock Style="{StaticResource TileNumber}" FontSize="15" Text="Default" />
+                        </ToggleButton>
+                        <ToggleButton Grid.Column="1" Style="{StaticResource Tile}" Tag="quiet" Click="OnFans">
+                            <TextBlock Style="{StaticResource TileNumber}" FontSize="15" Text="Quiet" />
+                        </ToggleButton>
+                        <ToggleButton Grid.Column="2" Style="{StaticResource Tile}" Tag="cool" Click="OnFans">
+                            <TextBlock Style="{StaticResource TileNumber}" FontSize="15" Text="Cool" />
+                        </ToggleButton>
+                        <ToggleButton Grid.Column="3" Style="{StaticResource Tile}" Tag="full" Click="OnFans">
+                            <TextBlock Style="{StaticResource TileNumber}" FontSize="15" Text="Max" />
+                        </ToggleButton>
+                        <ToggleButton Grid.Column="4" Style="{StaticResource Tile}" Tag="dynamic" Click="OnFans">
+                            <TextBlock Style="{StaticResource TileNumber}" FontSize="15" Text="Auto" />
+                        </ToggleButton>
                     </Grid>
                 </StackPanel>
             </Border>
