@@ -15,7 +15,7 @@ namespace HandheldOptimiser.TweakDefinitions;
 public static class ArmouryCrateTweaks
 {
     private const string Id = "asus.replace-armoury-crate";
-    private const string Name = "Replace Armoury Crate";
+    private const string Name = "Replace ASUS Services with Handheld Library and widget";
 
     private const string ServicesKey = @"SYSTEM\CurrentControlSet\Services";
 
@@ -107,8 +107,10 @@ public static class ArmouryCrateTweaks
         Name = Name,
         Description =
             "Turns off Armoury Crate and ASUS's background services. Handheld Optimiser runs the Armoury Crate and " +
-            "Command Center buttons and the controller mode instead.",
-        Category = TweakCategory.Services,
+            "Command Center buttons and the controller mode instead, through the game library and its Game Bar widget. " +
+            "It is much lighter than ASUS's own: one small service in place of about a dozen, using about 16 MB of memory " +
+            "where ASUS's use about 480 MB.",
+        Category = TweakCategory.FullScreen,
         Risk = RiskLevel.Moderate,
         Warning =
             "Armoury Crate stops working while this is on. ASUS BIOS and controller updates come through Armoury " +
@@ -221,7 +223,7 @@ public static class ArmouryCrateTweaks
 
         var outcome = await ctx.Runner.RunScriptAsync(
             BuildApplyScript(present, stop, disableTask: taskState is { Length: > 0 }, turnOffRunEntry),
-            $"Replace Armoury Crate: disable {string.Join(", ", present)}",
+            $"{Name}: disable {string.Join(", ", present)}",
             ct);
 
         return outcome.Succeeded

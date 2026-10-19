@@ -48,7 +48,7 @@ public sealed class ArmouryCrateTweakTests
         Assert.Equal(HandheldDevice.RogAlly, tweak.OnlyFor);
         Assert.False(tweak.IncludeInOneClick);
         Assert.False(string.IsNullOrWhiteSpace(tweak.Warning));
-        Assert.Equal(TweakCategory.Services, tweak.Category);
+        Assert.Equal(TweakCategory.FullScreen, tweak.Category);
     }
 
     [Fact]

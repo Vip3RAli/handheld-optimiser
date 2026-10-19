@@ -28,8 +28,8 @@ public sealed class HubLayoutTests
     [Theory]
     [InlineData("Performance", 11, 8)]
     [InlineData("Battery & Sleep", 6, 0)]
-    [InlineData("Clean Up", 20, 12)]
-    [InlineData("Full Screen", 7, 3)]
+    [InlineData("Clean Up", 19, 12)]
+    [InlineData("Full Screen", 8, 3)]
     [InlineData("Maintenance & Backup", 4, 1)]
     [InlineData("Apps", 0, 0)]
     public void A_goal_holds_the_tweaks_the_map_gives_it(string title, int tweaks, int recommended)
