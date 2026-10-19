@@ -3,14 +3,13 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <!-- Laid out like Armoury Crate's Command Center in Game Bar: a dark card per group, with the chosen
-         button filled. Its red is the brand cyan here, as a deep fill with a bright edge so white text
-         stays readable on it. -->
+    <!-- Laid out like Game Bar's own widgets: one flat panel, its groups split by a thin line, with the
+         chosen button filled. The fill is the brand cyan, deep with a bright edge so white text stays
+         readable on it. -->
     <Page.Resources>
         <SolidColorBrush x:Key="Cyan" Color="#22D3EE" />
         <SolidColorBrush x:Key="CyanFill" Color="#0E4E5C" />
         <SolidColorBrush x:Key="CyanFillHover" Color="#13616F" />
-        <SolidColorBrush x:Key="CardFill" Color="#262B36" />
         <SolidColorBrush x:Key="CardEdge" Color="#3A4150" />
         <SolidColorBrush x:Key="ChoiceFill" Color="#2C3240" />
         <SolidColorBrush x:Key="ChoiceFillHover" Color="#353C4C" />
@@ -18,13 +17,11 @@
         <SolidColorBrush x:Key="Text" Color="#F2F3F5" />
         <SolidColorBrush x:Key="Muted" Color="#A9B0BC" />
 
+        <!-- A group of the panel: a line above it, and none above the first. -->
         <Style x:Key="Card" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource CardFill}" />
             <Setter Property="BorderBrush" Value="{StaticResource CardEdge}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="8" />
-            <Setter Property="Padding" Value="12" />
-            <Setter Property="Margin" Value="0,0,0,10" />
+            <Setter Property="BorderThickness" Value="0,1,0,0" />
+            <Setter Property="Padding" Value="0,14,0,14" />
         </Style>
 
         <Style x:Key="CardTitle" TargetType="TextBlock">
@@ -173,10 +170,10 @@
         </Style>
     </Page.Resources>
 
-    <!-- Game Bar draws its own frame and title bar, so the page starts with the first card. -->
+    <!-- Game Bar draws its own frame and title bar, so the page starts with the first group. -->
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Padding="12">
-            <Border Style="{StaticResource Card}">
+        <StackPanel Padding="14,0">
+            <Border Style="{StaticResource Card}" BorderThickness="0">
                 <StackPanel>
                     <TextBlock Style="{StaticResource CardTitle}" Text="Now" />
                     <Grid x:Name="Readouts">
@@ -204,7 +201,7 @@
                             <TextBlock Style="{StaticResource ReadoutName}" Text="Temperature" />
                         </StackPanel>
                     </Grid>
-                    <Border x:Name="StateLine" BorderBrush="{StaticResource CardEdge}" BorderThickness="0,1,0,0" Margin="0,10,0,0" Padding="0,10,0,0">
+                    <Border x:Name="StateLine" Margin="0,10,0,0">
                         <TextBlock TextWrapping="Wrap" FontSize="13" Foreground="{StaticResource Muted}">
                             <Run x:Name="StateName" Foreground="{StaticResource Cyan}" FontWeight="SemiBold" /><Run x:Name="StateDetail" />
                         </TextBlock>
@@ -264,8 +261,6 @@
                         <TextBlock x:Name="PowerValue" HorizontalAlignment="Right" FontSize="15" FontWeight="SemiBold"
                                    Foreground="{StaticResource Cyan}" Text="Auto" />
                     </Grid>
-                    <TextBlock Style="{StaticResource ReadoutName}" TextWrapping="Wrap" Margin="0,-6,0,10"
-                               Text="Most power the chip may use. Lower is cooler and lasts longer." />
                     <Grid Margin="-3,0,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="76" />
@@ -302,7 +297,7 @@
                 </StackPanel>
             </Border>
 
-            <Border Style="{StaticResource Card}" Margin="0">
+            <Border Style="{StaticResource Card}">
                 <StackPanel>
                     <TextBlock Style="{StaticResource CardTitle}" Text="Fans" />
                     <Grid x:Name="Fans">
@@ -322,13 +317,10 @@
                 </StackPanel>
             </Border>
 
-            <!-- Only while TDP Engine replaces Armoury Crate, which is when it runs the Ally's controller. The fan
-                 card above keeps the last card's zero margin, so this one carries the gap above it instead. -->
-            <Border x:Name="ControllerCard" Style="{StaticResource Card}" Margin="0,10,0,0" Visibility="Collapsed">
+            <!-- Only while TDP Engine replaces Armoury Crate, which is when it runs the Ally's controller. -->
+            <Border x:Name="ControllerCard" Style="{StaticResource Card}" Visibility="Collapsed">
                 <StackPanel>
                     <TextBlock Style="{StaticResource CardTitle}" Text="Controller" />
-                    <TextBlock Style="{StaticResource ReadoutName}" TextWrapping="Wrap" Margin="0,-6,0,10"
-                               Text="Desktop makes the buttons work as a mouse and keyboard." />
                     <Grid x:Name="ControllerModes" Margin="-3,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
