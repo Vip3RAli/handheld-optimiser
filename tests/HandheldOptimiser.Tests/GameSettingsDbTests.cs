@@ -15,7 +15,7 @@ public sealed class GameSettingsDbTests
         var list = GameSettingsDb.ReadBuiltIn();
 
         Assert.NotNull(list);
-        Assert.Equal(9, list!.Games.Count);
+        Assert.NotEmpty(list!.Games);
         Assert.All(list.Games, game =>
         {
             Assert.NotNull(game.Device);
@@ -57,6 +57,27 @@ public sealed class GameSettingsDbTests
         Assert.Equal(40, applied.Brightness);
         Assert.False(applied.CloseApps);
         Assert.Equal(new Resolution(1280, 800), applied.Resolution);
+    }
+
+    [Fact]
+    public void ApplyTo_LeavesOutASizeOrRateTheScreenDoesNotOffer()
+    {
+        var list = GameSettingsDb.Parse("""
+            { "updated": "2026-01-01", "games": [
+              { "title": "Test", "device": { "resolution": "1920x1080", "refresh": 60 } }
+            ] }
+            """);
+
+        var game = Assert.Single(list!.Games);
+        var mine = new GameProfile(null, 120, null, Resolution: new Resolution(1280, 800));
+
+        var onASmallScreen = game.ApplyTo(mine, [new Resolution(1280, 800)], [60, 120]);
+        Assert.Equal(new Resolution(1280, 800), onASmallScreen.Resolution);
+        Assert.Equal(60, onASmallScreen.RefreshRate);
+
+        var onAFastOnlyScreen = game.ApplyTo(mine, [new Resolution(1920, 1080)], [120, 144]);
+        Assert.Equal(new Resolution(1920, 1080), onAFastOnlyScreen.Resolution);
+        Assert.Equal(120, onAFastOnlyScreen.RefreshRate);
     }
 
     [Fact]

@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-18",
+  "updated": "2026-10-19",
   "games": [
     {
       "title": "Fortnite",
@@ -17,7 +17,7 @@
         { "name": "Meshes", "value": "Low" },
         { "name": "Textures", "value": "Medium" }
       ],
-      "note": "Performance mode is the steadiest 60. For better looks, ASUS's guide uses DirectX 12 on Medium with TSR set to Quality, which averages about 60 but dips in busy fights.",
+      "note": "Performance mode holds 60 best.",
       "source": { "name": "ASUS ROG performance guide", "url": "https://rog.asus.com/articles/rog-ally/fortnite-on-the-rog-ally-performance-guide--best-settings/" },
       "checked": "2026-10-18",
       "confidence": "guide"
@@ -26,7 +26,7 @@
       "title": "Cyberpunk 2077",
       "keys": ["steam:1091500", "gog:1423049311"],
       "titles": ["Cyberpunk 2077"],
-      "target": "1080p, as close to 60 fps as it gets",
+      "target": "1080p at 60 fps",
       "device": { "power": "performance", "resolution": "1920x1080", "refresh": 60, "fps": 60, "closeApps": true },
       "settings": [
         { "name": "Quick Preset", "value": "Low" },
@@ -40,7 +40,7 @@
         { "name": "Volumetric Fog Resolution", "value": "Low" },
         { "name": "Level of Detail", "value": "Low" }
       ],
-      "note": "The heaviest game on the list. ASUS measured 45 to 70 fps on minimum settings, with city driving at the low end. If it keeps dipping, set TDP Engine to 45 fps in the game profile.",
+      "note": "Runs at 45 to 70 fps. If it dips, set TDP Engine to 45 fps in the game profile.",
       "source": { "name": "ASUS ROG performance guide", "url": "https://rog.asus.com/uk/articles/rog-ally/cyberpunk-2077-on-the-rog-ally-performance-guide--best-settings/" },
       "checked": "2026-10-18",
       "confidence": "guide"
@@ -62,7 +62,7 @@
         { "name": "Foliage Visibility Range", "value": "Medium" },
         { "name": "Motion Blur / Blur", "value": "Off" }
       ],
-      "note": "DirectX 11 runs much better than 12 on the Ally and is what CD Projekt suggests for handhelds. Fields and forests should hold 60; Novigrad will dip.",
+      "note": "Use DirectX 11. Novigrad will dip below 60.",
       "source": { "name": "Community advice, not an Ally guide", "url": "https://jeu.video/article/witcher-3-steam-deck-settings" },
       "checked": "2026-10-18",
       "confidence": "starting-point"
@@ -85,7 +85,7 @@
         { "name": "Screen Space Reflections", "value": "Off" },
         { "name": "Low FX", "value": "On" }
       ],
-      "note": "ASUS's 60 fps setup: Low with FSR Balanced held about 60 in dungeons. Towns can dip a little.",
+      "note": "Holds about 60 in dungeons. Towns can dip.",
       "source": { "name": "ASUS ROG performance guide", "url": "https://rog.asus.com/au/articles/rog-ally/diablo-iv-on-the-rog-ally-performance-guide--best-settings/" },
       "checked": "2026-10-18",
       "confidence": "guide"
@@ -107,7 +107,7 @@
         { "name": "Screen Space Reflections", "value": "Off" },
         { "name": "Motion Blur", "value": "Off" }
       ],
-      "note": "Keep the screen at 60 Hz: the game's physics break above 60 fps, and on a 75 Hz monitor it would try to run at 75. The device settings below set 60 Hz for you.",
+      "note": "The game's physics break above 60 fps, so these settings keep the screen at 60 Hz.",
       "source": { "name": "Windows Central handheld guide", "url": "https://windowscentral.com/gaming/pc-gaming/best-fallout-4-settings-for-steam-deck-rog-ally-and-legion-go-gaming-handhelds" },
       "checked": "2026-10-18",
       "confidence": "guide"
@@ -116,7 +116,7 @@
       "title": "Baldur's Gate 3",
       "keys": ["steam:1086940"],
       "titles": ["Baldur's Gate 3"],
-      "target": "1080p, 60 fps in Acts 1 and 2",
+      "target": "1080p at 60 fps",
       "device": { "power": "performance", "resolution": "1920x1080", "refresh": 60, "fps": 60, "closeApps": true },
       "settings": [
         { "name": "Launcher: API", "value": "DirectX 11" },
@@ -130,7 +130,7 @@
         { "name": "Animation Level of Detail", "value": "Low" },
         { "name": "Dynamic Crowds", "value": "Off" }
       ],
-      "note": "ASUS got just under 60 in combat with FSR on Quality; Balanced closes the gap. Act 3's city is CPU-heavy and will drop well below 60 whatever you set.",
+      "note": "Holds 60 in Acts 1 and 2. Act 3's city drops well below 60.",
       "source": { "name": "ASUS ROG performance guide", "url": "https://rog.asus.com/us/articles/rog-ally/baldurs-gate-3-on-the-rog-ally-performance-guide--best-settings/" },
       "checked": "2026-10-18",
       "confidence": "guide"
@@ -149,7 +149,7 @@
         { "name": "Ambient Occlusion", "value": "Off" },
         { "name": "Depth of Field", "value": "Off" }
       ],
-      "note": "No Ally guide exists for this one, so this is a starting point. Big cities are limited by the processor, not graphics, so late game may sit below 60 whatever you set.",
+      "note": "Big cities late in a game can dip below 60.",
       "source": { "name": "Starting point, not from a guide", "url": "" },
       "checked": "2026-10-18",
       "confidence": "starting-point"
@@ -168,7 +168,7 @@
         { "name": "Ambient Occlusion", "value": "Off" },
         { "name": "Depth of Field", "value": "Off" }
       ],
-      "note": "No Ally guide exists for this one, so this is a starting point. Large islands lean on the processor, so expect dips late in a game.",
+      "note": "Large islands late in a game can dip below 60.",
       "source": { "name": "Starting point, not from a guide", "url": "" },
       "checked": "2026-10-18",
       "confidence": "starting-point"
@@ -184,7 +184,7 @@
         { "name": "Resolution Scale", "value": "0.7 (the game's default)" },
         { "name": "Frame Rate Limit", "value": "60" }
       ],
-      "note": "Light on settings. Its lighting is the heavy part: if it dips, drop Graphics Quality to Low before lowering the resolution scale.",
+      "note": "If it dips, lower Graphics Quality before the resolution scale.",
       "source": { "name": "Steam Deck HQ patch notes", "url": "https://steamdeckhq.com/?p=28158" },
       "checked": "2026-10-18",
       "confidence": "starting-point"

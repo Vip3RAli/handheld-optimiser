@@ -98,6 +98,7 @@ The library finds installed games from **Steam**, **Xbox / PC Game Pass**, **Epi
 | **Artwork** | Wide artwork, covers and icons from SteamGridDB with your own free key, for games outside Steam and for apps such as Chrome. |
 | **Quick actions** (**X**) | Favourite or hide a game, set its game profile, launch arguments or artwork. |
 | **Game profiles** | A power mode, resolution, refresh rate, brightness and TDP Engine frame rate per game, put back when it closes. |
+| **Optimised settings** | For games on the list in `data/game-settings.json`: the settings to choose in the game for 1080p at 60 fps, and **Apply optimised settings**, which puts the matching power mode, resolution, refresh rate and TDP Engine frame rate into the game profile. |
 | **TDP Engine** | Holds a game at 30, 40, 45 or 60 fps with the lowest power limit that manages it, and lowers the limit whenever the processor reaches your temperature limit. Each game starts from the limit it settled on last time. ROG Ally only. Switch it on under **Settings > Sleep and Tweaks > Play and Sleep**, or per game in its profile. |
 | **Last played** | Your last game as a wide card above the grid, with its play time, size and profile beside it, and its description from Steam's store or Wikipedia if you switch that on. |
 | **Quick Resume** | The home button pauses the game behind the library, and **A** carries on where you left off. Games with anti-cheat are never paused. |
@@ -116,7 +117,7 @@ Everything works with the controller or by touch. **Menu** opens the settings, a
 | Steam Big Picture, open | about 1.4 GB |
 | Library, while a game runs | about 25 MB |
 
-**Privacy.** The library only uses the internet to check for a newer release, and for the features you switch on: artwork from [SteamGridDB](https://www.steamgriddb.com), which is sent the names of your apps and of games outside Steam, your Steam game list and wishlist, store covers for games you have not installed, deals from [IsThereAnyDeal](https://isthereanydeal.com), the Epic Games Store's free games, and your last game's details from Steam's store or [Wikipedia](https://www.wikipedia.org). Most of these use your own keys, which stay on your device.
+**Privacy.** The library only uses the internet to check for a newer release and a newer list of optimised game settings (once a day, from this repository), and for the features you switch on: artwork from [SteamGridDB](https://www.steamgriddb.com), which is sent the names of your apps and of games outside Steam, your Steam game list and wishlist, store covers for games you have not installed, deals from [IsThereAnyDeal](https://isthereanydeal.com), the Epic Games Store's free games, and your last game's details from Steam's store or [Wikipedia](https://www.wikipedia.org). Most of these use your own keys, which stay on your device.
 
 **Controller tips.** Keep the controller in **Gamepad** mode. If the home button opens Steam, turn off Steam's guide button setting under **Steam > Settings > Controller**.
 

@@ -17,7 +17,7 @@ internal sealed record SettingsSource(string Name, string Url);
 /// </summary>
 internal sealed record DeviceSettings(string? Power, string? Resolution, int? Refresh, int? Fps, bool? CloseApps);
 
-/// <summary>Recommended Ally settings for one game, from data/game-settings.json in the repository.</summary>
+/// <summary>Optimised settings for one game, from data/game-settings.json in the repository.</summary>
 /// <param name="Keys">The library keys it is for, such as "steam:292030".</param>
 /// <param name="Titles">Names it can also be matched by, for a store whose key is not listed.</param>
 /// <param name="Confidence">"guide" when it comes from a published Ally guide, "starting-point" otherwise.</param>
@@ -37,9 +37,12 @@ internal sealed record GameRecommendation(
 
     /// <summary>
     /// The game's profile with the device half laid over it. Rows the recommendation leaves out keep
-    /// what the player chose; brightness is never touched.
+    /// what the player chose; brightness is never touched. A resolution or refresh rate this screen
+    /// does not offer is left out too, since the list is written for the Ally's screen.
     /// </summary>
-    public GameProfile ApplyTo(GameProfile profile)
+    /// <param name="sizes">The screen's resolutions, or null to take any.</param>
+    /// <param name="rates">The screen's refresh rates, or null to take any.</param>
+    public GameProfile ApplyTo(GameProfile profile, IReadOnlyCollection<Resolution>? sizes = null, IReadOnlyCollection<int>? rates = null)
     {
         if (Device is not { } device)
         {
@@ -48,8 +51,10 @@ internal sealed record GameRecommendation(
 
         var power = device.Power is { } name && Enum.TryParse<PowerMode>(name, ignoreCase: true, out var mode) && Enum.IsDefined(mode)
             ? mode : profile.PowerMode;
-        var size = device.Resolution is { } text ? Resolution.Parse(text) ?? profile.Resolution : profile.Resolution;
-        var hertz = device.Refresh is > 1 ? device.Refresh : profile.RefreshRate;
+        var size = device.Resolution is { } text && Resolution.Parse(text) is { } parsed && (sizes is null || sizes.Contains(parsed))
+            ? parsed : profile.Resolution;
+        var hertz = device.Refresh is > 1 and var wanted && (rates is null || rates.Contains(wanted))
+            ? wanted : profile.RefreshRate;
         var fps = device.Fps is { } rate && AutoTdp.FrameRates.Contains(rate) ? rate : profile.AutoTdpFps;
 
         return profile with
@@ -93,7 +98,7 @@ internal sealed record GameSettingsList(string Updated, IReadOnlyList<GameRecomm
 }
 
 /// <summary>
-/// Recommended Ally settings for the player's games. A copy is built into the app; a newer one is
+/// Optimised settings for the player's games. A copy is built into the app; a newer one is
 /// fetched from the repository at most once a day, so games can be added without a new release. The
 /// list is only read: nothing is changed until the player picks a game's recommendation.
 /// </summary>
@@ -143,7 +148,8 @@ internal static class GameSettingsDb
             Directory.CreateDirectory(Path.GetDirectoryName(CachePath)!);
             await File.WriteAllTextAsync(CachePath, text);
 
-            var newer = string.CompareOrdinal(list.Updated, Current.Updated) > 0;
+            // The same date counts as newer, so an edit made on the day the list was last changed still arrives.
+            var newer = string.CompareOrdinal(list.Updated, Current.Updated) >= 0;
             if (newer)
             {
                 _current = list;
@@ -175,8 +181,9 @@ internal static class GameSettingsDb
             Program.Log($"Could not read the saved game settings list: {ex.Message}");
         }
 
-        // An app update can carry a newer list than one downloaded before it.
-        return saved is not null && string.CompareOrdinal(saved.Updated, builtIn.Updated) > 0 ? saved : builtIn;
+        // An app update can carry a newer list than one downloaded before it. On the same date the
+        // downloaded one wins, since it came from the repository after the release was built.
+        return saved is not null && string.CompareOrdinal(saved.Updated, builtIn.Updated) >= 0 ? saved : builtIn;
     }
 
     /// <summary>The list built into the app, or null if it is missing or broken.</summary>

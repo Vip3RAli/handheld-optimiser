@@ -1194,7 +1194,7 @@
                         <Button x:Name="ProfileItem" Style="{StaticResource MenuButton}" Content="Game profile"
                                 Click="OnOpenProfile" />
                         <!-- Only for a game on the recommended settings list. -->
-                        <Button x:Name="RecommendedItem" Style="{StaticResource MenuButton}" Content="Ally recommended settings"
+                        <Button x:Name="RecommendedItem" Style="{StaticResource MenuButton}" Content="Optimised settings"
                                 Visibility="Collapsed" Click="OnOpenRecommended" />
                         <!-- Only for a program the player added: moves it between the games and Apps. -->
                         <Button x:Name="MoveItem" Style="{StaticResource MenuButton}" Click="OnToggleApp" />
@@ -1456,13 +1456,13 @@
                     </StackPanel>
 
                     <!--
-                        Recommended Ally settings for one game. The device half can go into its profile with
+                        Optimised settings for one game. The device half can go into its profile with
                         one press; the in-game half is a list to set in the game's own menu. The text is not
                         in a StackPanel, which would be taken for the hints row and hidden on a card.
                     -->
                     <StackPanel x:Name="RecommendedItems" Visibility="Collapsed">
                         <TextBlock x:Name="RecommendedNote" Margin="4,0,4,14" FontSize="14.5" TextWrapping="Wrap" Opacity="0.85" />
-                        <Button x:Name="RecommendedApplyItem" Style="{StaticResource MenuButton}" Content="Use the device settings"
+                        <Button x:Name="RecommendedApplyItem" Style="{StaticResource MenuButton}" Content="Apply optimised settings"
                                 Click="OnApplyRecommended" />
                         <TextBlock x:Name="RecommendedDevice" Margin="4,2,4,16" FontSize="13.5" TextWrapping="Wrap" Opacity="0.6" />
                         <TextBlock Text="Set these in the game" Margin="4,0,4,8" FontSize="16" FontWeight="SemiBold" />

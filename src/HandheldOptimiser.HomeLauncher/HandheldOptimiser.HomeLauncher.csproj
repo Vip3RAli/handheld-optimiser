@@ -54,7 +54,7 @@
 
   <ItemGroup>
     <!--
-      Recommended Ally settings per game, kept at the top of the repository so it is easy to edit. The
+      Optimised settings per game, kept at the top of the repository so it is easy to edit. The
       built-in copy is used until a newer one is fetched from GitHub; see GameSettingsDb.
     -->
     <EmbeddedResource Include="..\..\data\game-settings.json" LogicalName="game-settings.json" />
