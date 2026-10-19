@@ -103,6 +103,26 @@ internal static partial class Native
     /// </summary>
     public static void Minimise(nint window) => ShowWindowAsync(window, SwMinimize);
 
+    [LibraryImport("api-ms-win-gaming-experience-l1-1-0.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool IsGamingFullScreenExperienceActive();
+
+    /// <summary>
+    /// Whether Windows is in its full screen experience (Xbox mode) right now. False on a build of Windows
+    /// that does not have it, which is the same API set the main app checks for it.
+    /// </summary>
+    public static bool IsFullScreenExperience()
+    {
+        try
+        {
+            return IsGamingFullScreenExperienceActive();
+        }
+        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
+        {
+            return false;
+        }
+    }
+
     private const ushort VkLeftWindows = 0x5B;
     private const ushort VkG = 0x47;
 

@@ -12,10 +12,11 @@ public partial class LibraryWindow
     public void OnArmouryCrateButton()
     {
         var game = _session is { StartedAt: not null } session ? session : null;
-        var action = ButtonPress.Decide(IsActive, game is not null);
+        var fullScreen = Native.IsFullScreenExperience();
+        var action = ButtonPress.Decide(IsActive, game is not null, fullScreen);
 
         // Logged so that a press that goes wrong can be told apart from one that went right.
-        Program.Log($"Armoury Crate button: {action} (library in front: {IsActive}, game: {game?.Game.Key ?? "none"})");
+        Program.Log($"Armoury Crate button: {action} (library in front: {IsActive}, game: {game?.Game.Key ?? "none"}, Xbox mode: {fullScreen})");
         switch (action)
         {
             case ButtonAction.ShowLibrary:
@@ -28,6 +29,9 @@ public partial class LibraryWindow
 
             case ButtonAction.Minimise:
                 WindowState = WindowState.Minimized;
+                break;
+
+            case ButtonAction.Stay:
                 break;
         }
     }
@@ -63,6 +67,13 @@ public partial class LibraryWindow
         if (await ReturnToGameAsync(session))
         {
             Program.Log($"Back to {session.Game.Key} from the Armoury Crate button");
+            return;
+        }
+
+        // In Xbox mode there is no desktop behind the library, so it stays rather than leave a blank screen.
+        if (ButtonPress.WhenGameWillNotReturn(Native.IsFullScreenExperience()) == ButtonAction.Stay)
+        {
+            Program.Log($"Armoury Crate button: could not go back to {session.Game.Key} in Xbox mode, so the library stayed");
             return;
         }
 
