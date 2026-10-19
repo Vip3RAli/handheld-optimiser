@@ -237,29 +237,18 @@ public sealed class ArmouryCrateTweakTests
         return journal;
     }
 
-    /// <summary>ASUS's Command Center Game Bar widget can only show an error once Armoury Crate is off, so it goes.</summary>
+    /// <summary>
+    /// The player asked for no ASUS app to be removed: turning the switch off could not bring one back, and
+    /// Armoury Crate had to be found on ASUS's site.
+    /// </summary>
     [Fact]
-    public void Apply_removes_the_Command_Center_Game_Bar_widget()
+    public void No_app_package_is_removed()
     {
-        var apply = ArmouryCrateTweaks.BuildApplyScript(["AsusAppService"], ["AsusAppService"], false, false);
-        Assert.Contains("Get-AppxPackage -Name 'B9ECED6F.ASUSCommandCenter'", apply);
-        Assert.Contains("Remove-AppxPackage", apply);
-    }
+        var all = ArmouryCrateTweaks.ServicesInStopOrder.Concat(ArmouryCrateTweaks.UpdateServices).ToArray();
+        var apply = ArmouryCrateTweaks.BuildApplyScript(all, ArmouryCrateTweaks.ServicesInStopOrder, true, true);
 
-    [Fact]
-    public void The_guard_lets_through_the_Command_Center_widget_and_no_other_ASUS_package()
-    {
-        Assert.False(SafetyGuard.IsAppxProtected("B9ECED6F.ASUSCommandCenter", out _));
-        Assert.True(SafetyGuard.IsAppxProtected("B9ECED6F.ArmouryCrateSE", out _));
-        Assert.True(SafetyGuard.IsAppxProtected("ASUSAmbientHAL64", out _));
-    }
-
-    [Fact]
-    public void The_tile_says_the_widget_is_removed_and_how_to_get_it_back()
-    {
-        var tweak = ArmouryCrateTweaks.ReplaceArmouryCrate;
-        Assert.Contains("Command Center", tweak.Description);
-        Assert.Contains("Microsoft Store", tweak.Warning);
+        Assert.DoesNotContain("Remove-AppxPackage", apply, StringComparison.OrdinalIgnoreCase);
+        Assert.True(SafetyGuard.IsAppxProtected("B9ECED6F.ASUSCommandCenter", out _));
     }
 
     [Fact]

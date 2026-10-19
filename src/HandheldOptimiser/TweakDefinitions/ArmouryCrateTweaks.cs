@@ -107,14 +107,12 @@ public static class ArmouryCrateTweaks
         Name = Name,
         Description =
             "Turns off Armoury Crate and ASUS's background services. Handheld Optimiser runs the Armoury Crate and " +
-            "Command Center buttons and the controller mode instead. ASUS's Command Center widget is removed from " +
-            "Game Bar, as it only shows an error without Armoury Crate.",
+            "Command Center buttons and the controller mode instead.",
         Category = TweakCategory.Services,
         Risk = RiskLevel.Moderate,
         Warning =
             "Armoury Crate stops working while this is on. ASUS BIOS and controller updates come through Armoury " +
-            "Crate, so turn this off to update. Turning it off does not bring the Command Center widget back: " +
-            "install ASUS Command Center from the Microsoft Store for that.",
+            "Crate, so turn this off to update.",
         OnlyFor = HandheldDevice.RogAlly,
         IncludeInOneClick = false,
 
@@ -328,13 +326,6 @@ public static class ArmouryCrateTweaks
             }
             {{task}}
             {{run}}
-            $widget = Get-AppxPackage -Name {{Quote(SafetyGuard.CommandCenterAppx)}} -ErrorAction SilentlyContinue
-            if ($widget) {
-                # Not counted as a failure: Armoury Crate is off either way, and the widget only shows an error.
-                Write-Output "Removing ASUS Command Center from Game Bar"
-                try { $widget | Remove-AppxPackage -ErrorAction Stop }
-                catch { Write-Output "  could not remove it: $($_.Exception.Message)" }
-            }
             Write-Output "Telling TDP Engine to replace Armoury Crate"
             try {
                 $k = [Microsoft.Win32.Registry]::LocalMachine.CreateSubKey({{Quote(ControlsKey)}})

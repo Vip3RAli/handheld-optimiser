@@ -371,23 +371,9 @@ public static class SafetyGuard
     /// </summary>
     private const string WidgetsAppx = "MicrosoftWindows.Client.WebExperience";
 
-    /// <summary>
-    /// ASUS's Command Center, a Game Bar widget and nothing else. The only ASUS package that may be removed,
-    /// by Replace Armoury Crate (see ArmouryCrateTweaks). It can be installed again from the Microsoft Store.
-    /// </summary>
-    public const string CommandCenterAppx = "B9ECED6F.ASUSCommandCenter";
-
     public static bool IsAppxProtected(string packageIdentityName, out string? reason)
     {
         if (string.Equals(packageIdentityName, WidgetsAppx, StringComparison.OrdinalIgnoreCase))
-        {
-            reason = null;
-            return false;
-        }
-
-        // ASUS's Command Center Game Bar widget, which Replace Armoury Crate removes because it can only show
-        // an error once Armoury Crate's services are off. Every other ASUS package stays protected.
-        if (string.Equals(packageIdentityName, CommandCenterAppx, StringComparison.OrdinalIgnoreCase))
         {
             reason = null;
             return false;
