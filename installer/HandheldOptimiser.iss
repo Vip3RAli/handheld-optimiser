@@ -16,6 +16,9 @@
 #define ServiceExeName "HandheldOptimiser.PowerService.exe"
 ; Must match AutoTdpProtocol.ServiceName.
 #define ServiceName "HandheldOptimiserAutoTdp"
+; The home app package's app ID, which the launcher runs under however it starts. Must match
+; HomeAppRegistration.AppUserModelId.
+#define LibraryAppId "HandheldOptimiser.HomeApp_pgc7cpy78bqbw!HomeApp"
 
 [Setup]
 ; Never change AppId: upgrades find the existing install by it.
@@ -43,6 +46,9 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0.19041
 CloseApplications=yes
+; Tells Windows to reload icons after installing, so a changed app icon shows on the taskbar and in
+; shortcuts at once instead of the old one from its icon cache.
+ChangesAssociations=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -60,8 +66,10 @@ Type: files; Name: "{group}\Game Library.lnk"
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
 ; Opens the game library directly, whatever the chosen full screen home app. The launcher carries the
-; library's own icon, and does not need administrator, so this starts without a UAC prompt.
-Name: "{group}\{#LibraryName}"; Filename: "{app}\{#LauncherExeName}"; Parameters: "--library"; Comment: "Open the Handheld Optimiser game library"
+; library's own icon, and does not need administrator, so this starts without a UAC prompt. It carries
+; the package's app ID, as the running library does, so a pinned copy and the open library share one
+; taskbar button however the library was started.
+Name: "{group}\{#LibraryName}"; Filename: "{app}\{#LauncherExeName}"; Parameters: "--library"; Comment: "Open the Handheld Optimiser game library"; AppUserModelID: "{#LibraryAppId}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
 
 [Run]
