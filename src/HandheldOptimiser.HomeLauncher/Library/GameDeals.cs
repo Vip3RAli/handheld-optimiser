@@ -152,7 +152,7 @@ internal static class GameDeals
 
             if (response.StatusCode == HttpStatusCode.TooManyRequests)
             {
-                return (false, "IsThereAnyDeal asked to wait a while. The last deals are kept.");
+                return (false, "IsThereAnyDeal is busy. Showing the last deals.");
             }
 
             response.EnsureSuccessStatusCode();
@@ -181,7 +181,7 @@ internal static class GameDeals
     {
         if (OwnedGames.SteamAccount() is not { } steamId)
         {
-            return ([], "Sign in to Steam once, so your wishlist can be found.");
+            return ([], "Sign in to Steam once, so the library knows which account to use.");
         }
 
         var wishlistUrl = $"https://api.steampowered.com/IWishlistService/GetWishlist/v1/?key={Uri.EscapeDataString(steamKey)}&steamid={steamId}";

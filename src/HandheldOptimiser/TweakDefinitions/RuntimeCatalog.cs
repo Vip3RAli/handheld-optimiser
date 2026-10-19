@@ -49,8 +49,8 @@ public static class RuntimeCatalog
         },
 
         .. DotNet("6", "Out of support since November 2024, but still worth updating for apps that need it."),
-        .. DotNet("8", "Current long-term support release."),
-        .. DotNet("9", "Current standard-support release."),
+        .. DotNet("8", "Long-term support release. Support ends in November 2026."),
+        .. DotNet("9", "Support ends in November 2026."),
 
         new()
         {

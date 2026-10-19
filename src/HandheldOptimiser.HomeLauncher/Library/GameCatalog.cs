@@ -136,8 +136,8 @@ internal static class GameCatalog
         {
             Program.Log($"Failed to launch {game.Key} ({game.LaunchTarget}): {ex.Message}");
             return game.Installed
-                ? $"{game.Title} could not be started: {ex.Message}"
-                : $"{game.StoreName} could not be opened to install {game.Title}: {ex.Message}";
+                ? $"{game.Title} could not be started."
+                : $"{game.StoreName} could not be opened to install {game.Title}.";
         }
 
         if (!game.Installed)

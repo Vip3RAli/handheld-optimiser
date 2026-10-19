@@ -127,7 +127,7 @@ public static class HealthLayout
         ("Sleep", "Sleep"),
         ("Power plan", "Power plan"),
         ("Storage", "Storage"),
-        ("Performance", "Gaming performance")
+        ("Performance", "Performance")
     ];
 
     public static HealthPage Build(IReadOnlyList<HealthCheck> checks, string protectionNote)

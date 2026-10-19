@@ -360,8 +360,8 @@ public sealed partial class MainViewModel : ObservableObject, IShell
             await Task.Yield();
             var closeAnyway = await ConfirmAsync(
                 "Still working",
-                $"{running} is still running. Closing now could leave a change half made, without what is " +
-                "needed to undo it.\n\nWait for it to finish, or close anyway if it has stopped responding.",
+                $"{running} is still running. Closing now could leave a change half done, with no way to " +
+                "undo it.\n\nWait for it to finish, or close anyway if it has stopped responding.",
                 "Close anyway");
 
             if (closeAnyway)
@@ -486,7 +486,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
 
         if (offer is null)
         {
-            await ConfirmAsync("You're up to date", $"Handheld Optimiser {UpdateService.Display(_updates.CurrentVersion)} is the latest version.", "OK");
+            await ConfirmAsync("Up to date", $"Handheld Optimiser {UpdateService.Display(_updates.CurrentVersion)} is the latest version.", "OK");
             return;
         }
 

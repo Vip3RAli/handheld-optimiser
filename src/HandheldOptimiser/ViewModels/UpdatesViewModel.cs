@@ -323,7 +323,7 @@ public sealed partial class UpdatesViewModel : SectionViewModel
         var total = AllRows.Count();
         SummaryText = total == 0
             ? $"Everything is up to date. Checked at {DateTime.Now:t}."
-            : $"{total} update(s) available. Checked at {DateTime.Now:t}.";
+            : $"{Plural.Count(total, "update")} available. Checked at {DateTime.Now:t}.";
     }
 
     /// <summary>Takes rows out of a section that is already showing, keeping what is ticked on the rest.</summary>
@@ -455,12 +455,12 @@ public sealed partial class UpdatesViewModel : SectionViewModel
         var apps = rows.Where(r => r.Item.Source == UpdateSource.Winget).ToList();
 
         var lines = new List<string>();
-        if (apps.Count > 0) lines.Add($"  • {apps.Count} app(s) through winget");
-        if (store.Count > 0) lines.Add($"  • {store.Count} Microsoft Store app(s)");
-        if (windows.Count > 0) lines.Add($"  • {windows.Count} Windows update(s)");
+        if (apps.Count > 0) lines.Add($"  • {Plural.Count(apps.Count, "app")} through winget (Microsoft's app installer)");
+        if (store.Count > 0) lines.Add($"  • {Plural.Count(store.Count, "Microsoft Store app")}");
+        if (windows.Count > 0) lines.Add($"  • {Plural.Count(windows.Count, "Windows update")}");
 
         var message =
-            $"{rows.Count} update(s) will be installed:\n\n{string.Join("\n", lines)}\n\n" +
+            $"{Plural.Count(rows.Count, "update")} will be installed:\n\n{string.Join("\n", lines)}\n\n" +
             "Close any apps being updated first, and keep the handheld plugged in." +
             (apps.Count > 0 ? " A System Restore point is made before the winget apps." : string.Empty);
 

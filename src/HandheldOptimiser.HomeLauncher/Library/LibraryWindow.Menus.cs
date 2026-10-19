@@ -65,11 +65,11 @@ public partial class LibraryWindow
     private string GameSubtitle(GameTile tile) =>
         IsPausedGame(tile) ? $"{tile.StoreName}   Paused where you left off"
         : tile.IsApp ? _stats.GetValueOrDefault(tile.Game.Key).LastPlayed is { } opened
-                ? $"App   Last opened from the library {PlayStats.Ago(DateTimeOffset.UtcNow - opened)}"
+                ? $"App   Last opened {PlayStats.Ago(DateTimeOffset.UtcNow - opened)}"
                 : "App"
         : _stats.GetValueOrDefault(tile.Game.Key).Describe(DateTimeOffset.UtcNow) is { } played
             ? $"{tile.StoreName}   {played}"
-            : tile.IsInstalled ? $"{tile.StoreName}   Not played from the library yet"
+            : tile.IsInstalled ? $"{tile.StoreName}   Not played yet"
             : $"{tile.StoreName}   Not installed";
 
     /// <summary>What each quick action will do for this game, on the rows' detail lines.</summary>
@@ -94,7 +94,7 @@ public partial class LibraryWindow
 
         var added = AddedPrograms.IsAdded(game);
         MoveItem.Visibility = added ? Visibility.Visible : Visibility.Collapsed;
-        MoveItem.Content = tile.IsApp ? "Move to games" : "Move to Apps";
+        MoveItem.Content = tile.IsApp ? "Move to Games" : "Move to Apps";
         HideItem.Content = added ? "Remove from library" : tile.IsHidden ? "Show in library" : "Hide from library";
 
         var takesArguments = GameCatalog.SupportsCustomArguments(game);
@@ -199,7 +199,7 @@ public partial class LibraryWindow
         if (_menuTile is { } tile)
         {
             BeginEdit(MenuEditor.Arguments, "Launch arguments",
-                "Added to the end of the command that starts this game. Leave empty for none.",
+                "Added to the end of the command that starts this game.",
                 GameCatalog.CustomArguments(tile.Game));
         }
     }
@@ -209,7 +209,7 @@ public partial class LibraryWindow
         if (_menuTile is { } tile)
         {
             BeginEdit(MenuEditor.ArtworkTitle, "Artwork",
-                "The name to look this up by on SteamGridDB, for when its artwork is the wrong one, or there is none. Leave empty to go back to its own name.",
+                "The name to search SteamGridDB for. Use it when the artwork is wrong or missing. Leave empty to use the game's own name.",
                 Artwork.SearchTitle(tile.Game));
         }
     }
@@ -344,7 +344,8 @@ public partial class LibraryWindow
         }
         catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
         {
-            Notice = $"The install folder could not be opened: {ex.Message}";
+            Program.Log($"The install folder could not be opened: {ex.Message}");
+            Notice = "The install folder could not be opened.";
         }
     }
 

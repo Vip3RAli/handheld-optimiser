@@ -54,7 +54,7 @@ public static class DebloatTweaks
     public static Tweak Telemetry => new()
     {
         Id = "debloat.telemetry",
-        Name = "Disable telemetry & data collection",
+        Name = "Turn off telemetry and data collection",
         Description =
             "Cuts telemetry to the minimum Windows allows and turns off the advertising ID. Windows " +
             "Update and Defender are unaffected.",
@@ -138,7 +138,7 @@ public static class DebloatTweaks
 
             return outcome.Succeeded
                 ? TweakResult.Ok("debloat.telemetry", "Telemetry tasks disabled.", rebootRequired: true)
-                : TweakResult.Fail("debloat.telemetry", "One or more telemetry tasks could not be disabled. See log.");
+                : TweakResult.Fail("debloat.telemetry", "One or more telemetry tasks could not be disabled. The console has the detail.");
         },
         ScriptRevert = async (ctx, journal, ct) =>
         {
@@ -163,17 +163,17 @@ public static class DebloatTweaks
 
             return outcome.Succeeded
                 ? TweakResult.Ok("debloat.telemetry", "Telemetry tasks restored.")
-                : TweakResult.Fail("debloat.telemetry", "Some telemetry tasks could not be re-enabled. See log.");
+                : TweakResult.Fail("debloat.telemetry", "Some telemetry tasks could not be turned back on. The console has the detail.");
         }
     };
 
     public static Tweak WebSearch => new()
     {
         Id = "debloat.websearch",
-        Name = "Disable web search in Start menu",
+        Name = "Turn off web search in the Start menu",
         Description =
-            "Start menu search returns local results only, so it is instant and never hangs on flaky " +
-            "Wi-Fi.",
+            "Start menu search returns local results only, so results appear straight away, even on " +
+            "poor Wi-Fi.",
         Category = TweakCategory.AdsAndAssistants,
         Risk = RiskLevel.Safe,
         RegistryValues =
@@ -189,7 +189,7 @@ public static class DebloatTweaks
     public static Tweak CortanaAndCopilot => new()
     {
         Id = "debloat.cortana_copilot",
-        Name = "Disable Cortana & Copilot",
+        Name = "Turn off Cortana and Copilot",
         Description =
             "Turns off Cortana and Copilot and removes the Copilot taskbar button.",
         Category = TweakCategory.AdsAndAssistants,
@@ -266,7 +266,7 @@ public static class DebloatTweaks
 
             return outcome.Succeeded
                 ? TweakResult.Ok("debloat.windows_ai", "The Windows AI service starts on demand now.")
-                : TweakResult.Fail("debloat.windows_ai", "The Windows AI service could not be changed. See log.");
+                : TweakResult.Fail("debloat.windows_ai", "The Windows AI service could not be changed. The console has the detail.");
         },
         ScriptRevert = async (ctx, journal, ct) =>
         {
@@ -285,7 +285,7 @@ public static class DebloatTweaks
 
             return outcome.Succeeded
                 ? TweakResult.Ok("debloat.windows_ai", "The Windows AI service starts by itself again.")
-                : TweakResult.Fail("debloat.windows_ai", "The Windows AI service could not be restored. See log.");
+                : TweakResult.Fail("debloat.windows_ai", "The Windows AI service could not be restored. The console has the detail.");
         }
     };
 
@@ -311,7 +311,7 @@ public static class DebloatTweaks
     public static Tweak ConsumerFeatures => new()
     {
         Id = "debloat.consumer_features",
-        Name = "Stop app suggestions & silent reinstalls",
+        Name = "Stop app suggestions and silent reinstalls",
         Description =
             "Stops Windows installing promoted apps, showing suggestions in Start and re-adding " +
             "bloatware you remove. Apply before removing bloatware.",
@@ -386,8 +386,8 @@ public static class DebloatTweaks
         Id = "debloat.widgets",
         Name = "Turn off Widgets",
         Description =
-            "Removes the Widgets board and its taskbar button, freeing 100 to 200 MB of memory. " +
-            "Reverting puts it back, from the Microsoft Store if Windows has not kept a copy.",
+            "Removes the Widgets board and its taskbar button, so it no longer runs in the background. " +
+            "Undoing this puts it back, from the Microsoft Store if Windows has not kept a copy.",
         Category = TweakCategory.AdsAndAssistants,
         Risk = RiskLevel.Safe,
         // Nothing is written here any more. The policy stays listed so that undo data from a version
@@ -440,7 +440,7 @@ public static class DebloatTweaks
 
             if (!outcome.Succeeded)
             {
-                return TweakResult.Fail("debloat.widgets", "The Widgets app could not be removed. See log.");
+                return TweakResult.Fail("debloat.widgets", "The Widgets app could not be removed. The console has the detail.");
             }
 
             if (!outcome.OutputLines.Contains("RESULT=REMOVED"))
@@ -534,7 +534,7 @@ public static class DebloatTweaks
     public static Tweak ActivityHistory => new()
     {
         Id = "debloat.activity_history",
-        Name = "Turn off activity history & tailored experiences",
+        Name = "Turn off activity history and tailored experiences",
         Description =
             "Stops Windows recording which apps and files you open, and using diagnostic data to " +
             "personalise tips and offers.",
@@ -591,9 +591,9 @@ public static class DebloatTweaks
         Risk = RiskLevel.Moderate,
         IncludeInOneClick = false,
         Warning =
-            "Cloud-only files cannot be opened until you revert. If Desktop or Documents are backed up " +
-            "to OneDrive, set them to \"Always keep on this device\" first. After reverting, OneDrive " +
-            "starts at your next sign-in.",
+            "Cloud-only files cannot be opened until you undo this tweak. If Desktop or Documents are " +
+            "backed up to OneDrive, set them to \"Always keep on this device\" first. After you undo it, " +
+            "OneDrive starts at your next sign-in.",
         RegistryValues =
         [
             new(RegistryRoot.LocalMachine, @"SOFTWARE\Policies\Microsoft\Windows\OneDrive",
@@ -622,14 +622,14 @@ public static class DebloatTweaks
     public static Tweak BackgroundApps => new()
     {
         Id = "debloat.background_apps",
-        Name = "Disable Store app background activity",
+        Name = "Turn off Store app background activity",
         Description =
             "Stops Store apps running in the background, freeing memory and CPU. Desktop programs, " +
             "Armoury Crate and services are unaffected.",
         Category = TweakCategory.BackgroundActivity,
         Risk = RiskLevel.Moderate,
         Warning =
-            "Store apps stop sending notifications until reverted. Leave this off if you rely on them.",
+            "Store apps stop sending notifications until you undo this tweak. Leave this off if you rely on them.",
         RegistryValues =
         [
             new(RegistryRoot.CurrentUser,
@@ -644,7 +644,7 @@ public static class DebloatTweaks
     /// <summary>
     /// Asks Task Scheduler directly, through its COM object, for each task's state. Get-ScheduledTask
     /// gives the same answer but takes about half a second a task: four seconds for this list on a ROG
-    /// Ally against a third of a second this way, on a check the Dashboard and Clean Up both run.
+    /// Ally against a third of a second this way, on a check the Dashboard and Clean up both run.
     /// The states are printed under the names Get-ScheduledTask uses, which is what undo data from
     /// earlier versions holds. A task that does not exist prints nothing, as before.
     /// </summary>

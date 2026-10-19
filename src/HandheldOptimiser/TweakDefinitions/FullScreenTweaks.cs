@@ -34,7 +34,7 @@ public static class FullScreenTweaks
     public static Tweak UseAsHomeApp => new()
     {
         Id = HomeAppId,
-        Name = "Use Handheld Optimiser as the full screen home app",
+        Name = "Open your chosen app in full screen mode",
         Description =
             "Full screen mode opens the app you choose above instead of the Xbox app, at sign-in and " +
             "when you press the home button.",
@@ -70,7 +70,7 @@ public static class FullScreenTweaks
             {
                 if (!await HomeAppRegistration.RegisterAsync(ctx, ct))
                 {
-                    return TweakResult.Fail(HomeAppId, "Could not register the home app. See log.");
+                    return TweakResult.Fail(HomeAppId, "Could not register the home app. The console has the detail.");
                 }
 
                 journal.CapturedState[RegisteredByUs] = "1";
@@ -81,7 +81,7 @@ public static class FullScreenTweaks
                 var snapshot = ctx.Registry.WriteValue(HomeAppSetting);
                 if (snapshot is null)
                 {
-                    return TweakResult.Fail(HomeAppId, "Registered, but could not set it as the home app. See log.");
+                    return TweakResult.Fail(HomeAppId, "Registered, but could not set it as the home app. The console has the detail.");
                 }
 
                 journal.RegistrySnapshots.Add(snapshot);
@@ -100,7 +100,7 @@ public static class FullScreenTweaks
 
             return await HomeAppRegistration.UnregisterAsync(ctx, ct)
                 ? TweakResult.Ok(HomeAppId, "Removed from the home app list.")
-                : TweakResult.Fail(HomeAppId, "Could not remove the home app registration. See log.");
+                : TweakResult.Fail(HomeAppId, "Could not remove the home app registration. The console has the detail.");
         }
     };
 

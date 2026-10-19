@@ -30,7 +30,7 @@ public static class NetworkTweaks
         IncludeInOneClick = false,
         Warning =
             "Settings > Windows Update > Delivery Optimization shows \"Some settings are managed by your " +
-            "organization\" and its sharing switch is greyed out until you switch this back off.",
+            "organization\" and its sharing switch is greyed out until you undo this tweak.",
         RegistryValues =
         [
             new(RegistryRoot.LocalMachine, @"SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization",
@@ -45,7 +45,7 @@ public static class NetworkTweaks
     public static Tweak NetworkThrottling => new()
     {
         Id = "network.throttling",
-        Name = "Disable network throttling",
+        Name = "Turn off network throttling",
         Description =
             "Removes the cap Windows puts on network traffic while audio is playing, which is always the " +
             "case in a game. Can smooth out ping spikes.",
@@ -66,10 +66,9 @@ public static class NetworkTweaks
     public static Tweak Ndu => new()
     {
         Id = "network.ndu",
-        Name = "Disable Network Data Usage monitor (Ndu)",
+        Name = "Turn off network data usage counting",
         Description =
-            "Stops the driver that counts per-app network usage, a known cause of memory growth over " +
-            "long sessions.",
+            "Stops the Network Data Usage (Ndu) driver, which counts how much data each app uses.",
         Category = TweakCategory.Network,
         Risk = RiskLevel.Moderate,
         RequiresReboot = true,

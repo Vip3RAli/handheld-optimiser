@@ -147,7 +147,7 @@ namespace HandheldOptimiser.GameBar
             }
 
             _busy = true;
-            SetState("", "Changing…");
+            SetState("", "Applying…");
             try
             {
                 Show(await Task.Run(() => EngineClient.SetControllerMode(mode)));
@@ -173,7 +173,7 @@ namespace HandheldOptimiser.GameBar
             }
 
             _busy = true;
-            SetState("", _status.Running ? "Changing…" : "Starting TDP Engine…");
+            SetState("", _status.Running ? "Applying…" : "Starting TDP Engine…");
             try
             {
                 Show(await Task.Run(() => EngineClient.Update(targetFps, powerLimit, fanCurve)));
@@ -213,7 +213,7 @@ namespace HandheldOptimiser.GameBar
 
             if (!status.Running)
             {
-                SetState("Off", " Pick your power, FPS and cooling targets to start it for the game.");
+                SetState("Off", ". Choose a frame rate, power limit or fan setting to start it.");
                 return;
             }
 
@@ -226,12 +226,12 @@ namespace HandheldOptimiser.GameBar
             if (status.Watts == null)
             {
                 SetState(FanName(status.FanCurve) + " fans", status.Replacing
-                    ? ". The Ally's own power mode sets the power limit."
-                    : ". Armoury Crate sets the power limit.");
+                    ? ". The Ally's power mode sets the power limit."
+                    : ". Armoury Crate is setting the power limit.");
             }
             else if (status.State == "Fixed")
             {
-                SetState("Fixed", " at " + status.Watts + " W.");
+                SetState("Fixed power", ". Held at " + status.Watts + " W.");
             }
             else
             {
@@ -240,7 +240,7 @@ namespace HandheldOptimiser.GameBar
                 // The state line is the only place that says the tile is a ceiling here rather than a fixed limit.
                 if (status.PowerLimit > 0)
                 {
-                    StateDetail.Text += " At " + status.PowerLimit + " W Max.";
+                    StateDetail.Text += " Using up to " + status.PowerLimit + " W.";
                 }
             }
         }
@@ -302,14 +302,14 @@ namespace HandheldOptimiser.GameBar
         {
             switch (state)
             {
-                case "Holding": SetState("Holding", " " + targetFps + " fps with lowest power level possible."); break;
-                case "Raising": SetState("Raising", " power: Not at " + targetFps + " fps."); break;
-                case "Lowering": SetState("Lowering", " power: Above " + targetFps + " fps."); break;
-                case "AtMaximum": SetState("Power target reached", " unable to hit " + targetFps + " fps. Try lowering game settings."); break;
-                case "NoGain": SetState("No gain", ": more power doesn't help this game."); break;
-                case "TooHot": SetState("Too hot", ": at the temperature limit, cooling down."); break;
-                case "Waiting": SetState("Waiting", " for the game."); break;
-                default: SetState("Monitoring", " after a change."); break;
+                case "Holding": SetState("Holding", ". " + targetFps + " fps at the lowest power it can."); break;
+                case "Raising": SetState("Raising power", ". Below " + targetFps + " fps."); break;
+                case "Lowering": SetState("Lowering power", ". Above " + targetFps + " fps, so it can use less."); break;
+                case "AtMaximum": SetState("At the power limit", ". Cannot reach " + targetFps + " fps. Try lower game settings."); break;
+                case "NoGain": SetState("No gain from more power", ". It would not raise the frame rate."); break;
+                case "TooHot": SetState("Too hot", ". At the temperature limit, so power is lowered."); break;
+                case "Waiting": SetState("Waiting", ". Waiting for the game."); break;
+                default: SetState("Checking", ". Watching the result of the change."); break;
             }
         }
     }

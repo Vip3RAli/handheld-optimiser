@@ -136,7 +136,7 @@ public partial class LibraryWindow
         // Who the row's deals are from, beside its heading.
         var free = _deals.Any(d => d.Deal.Note is not null);
         var sales = _deals.Any(d => d.Deal.Note is null);
-        DealsSource.Text = free && sales ? "Free games from the Epic Games Store, prices from IsThereAnyDeal"
+        DealsSource.Text = free && sales ? "Epic free games, prices from IsThereAnyDeal"
             : free ? "Free games from the Epic Games Store"
             : "Prices from IsThereAnyDeal";
         if (!show)
@@ -566,7 +566,7 @@ public partial class LibraryWindow
 
     private void OnEditDealsKey(object sender, RoutedEventArgs e) =>
         BeginEdit(MenuEditor.DealsKey, "IsThereAnyDeal API key",
-            "Free at isthereanydeal.com/apps/my once signed in: register an app and copy its API key. Only sent to IsThereAnyDeal, with your wishlist's games when that is on. Leave empty to remove the key.",
+            "Free at isthereanydeal.com/apps/my: register an app and copy its API key. Only sent to IsThereAnyDeal, with your wishlist if that is on. Leave empty to remove it.",
             LibrarySettings.DealsKey);
 
     private void OnToggleEpicFreeGames(object sender, RoutedEventArgs e)
@@ -586,15 +586,15 @@ public partial class LibraryWindow
         // What it needs to work was under the row's name, and is said once as it is switched on.
         if (LibrarySettings.WishlistDeals)
         {
-            Notice = LibrarySettings.SteamKey is null ? "Wishlist deals need the Steam Web API key, under Games not installed."
-                : "Your Steam wishlist must be public for this.";
+            Notice = LibrarySettings.SteamKey is null ? "Wishlist deals need a Steam Web API key. Add it under Games and apps, Games not installed."
+                : "Your Steam wishlist must be public for this to work.";
         }
         _ = RefreshDealsAsync(force: true);
     }
 
     private void OnRefreshDeals(object sender, RoutedEventArgs e)
     {
-        DealsRefreshItem.Tag = "Looking...";
+        DealsRefreshItem.Tag = "Checking...";
         _ = RefreshDealsAsync(force: true);
     }
 
@@ -609,7 +609,7 @@ public partial class LibraryWindow
         UpdateDeals();
         if (text.Length > 0)
         {
-            DealsKeySetting.Tag = "Asking...";
+            DealsKeySetting.Tag = "Checking...";
             _ = RefreshDealsAsync(force: true);
         }
     }
@@ -703,7 +703,7 @@ internal sealed class DealSourceTile(string key, string title, string detail, Li
         {
             var best = sales.Max(d => d.Deal.Cut);
             sources.Add(new DealSourceTile("source:sales", "Game deals",
-                $"{sales.Count} on sale, up to {best}% off. Prices from IsThereAnyDeal", sales));
+                $"{sales.Count} on sale, up to {best}% off", sales));
         }
 
         foreach (var source in sources)

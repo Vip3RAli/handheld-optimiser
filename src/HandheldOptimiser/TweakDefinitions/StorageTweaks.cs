@@ -35,7 +35,7 @@ public static class StorageTweaks
         RequiresReboot = true,
         IncludeInOneClick = false,
         Warning =
-            "A small crash file holds less for tracking down a faulty driver. Revert this if someone " +
+            "A small crash file holds less for tracking down a faulty driver. Undo this tweak if someone " +
             "helping you asks for a full memory dump.",
         RegistryValues =
         [
@@ -85,10 +85,9 @@ public static class StorageTweaks
     public static Tweak DisableLastAccess => new()
     {
         Id = "storage.lastaccess",
-        Name = "Disable last access timestamps",
+        Name = "Turn off last access timestamps",
         Description =
-            "Stops NTFS writing a timestamp every time a file is read, removing thousands of small SSD " +
-            "writes on each game launch.",
+            "Stops Windows writing to the SSD each time a file is read, to record when it was last opened.",
         Category = TweakCategory.Storage,
         Risk = RiskLevel.Safe,
         RequiresReboot = true,
@@ -102,7 +101,7 @@ public static class StorageTweaks
     public static Tweak Disable8dot3Names => new()
     {
         Id = "storage.8dot3",
-        Name = "Disable 8.3 short file names",
+        Name = "Turn off short DOS-style file names",
         Description =
             "Stops NTFS creating a DOS-style short name (PROGRA~1) for every new file. Speeds up " +
             "creating files in large folders such as game installs.",
@@ -154,7 +153,7 @@ public static class StorageTweaks
 
             if (state != "Enabled")
             {
-                return TweakResult.Fail("storage.reserved", "Could not read the reserved storage setting. See log.");
+                return TweakResult.Fail("storage.reserved", "Could not read the reserved storage setting. The console has the detail.");
             }
 
             journal.CapturedState["reserved.state"] = state;
@@ -162,7 +161,7 @@ public static class StorageTweaks
             var outcome = await ctx.Runner.RunScriptAsync(SetReservedStateScript(enabled: false), "Turn off reserved storage", ct);
             return outcome.Succeeded
                 ? TweakResult.Ok("storage.reserved", "Reserved storage turned off.")
-                : TweakResult.Fail("storage.reserved", "Windows would not turn off reserved storage. See log.");
+                : TweakResult.Fail("storage.reserved", "Windows would not turn off reserved storage. The console has the detail.");
         },
 
         ScriptRevert = async (ctx, journal, ct) =>
@@ -175,7 +174,7 @@ public static class StorageTweaks
             var outcome = await ctx.Runner.RunScriptAsync(SetReservedStateScript(enabled: true), "Turn reserved storage back on", ct);
             return outcome.Succeeded
                 ? TweakResult.Ok("storage.reserved", "Reserved storage turned back on.")
-                : TweakResult.Fail("storage.reserved", "Windows would not turn reserved storage back on. See log.");
+                : TweakResult.Fail("storage.reserved", "Windows would not turn reserved storage back on. The console has the detail.");
         }
     };
 }

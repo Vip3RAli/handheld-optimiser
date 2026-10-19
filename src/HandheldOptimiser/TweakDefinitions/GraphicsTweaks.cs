@@ -102,7 +102,7 @@ public static class GraphicsTweaks
             }
 
             return Task.FromResult(ctx.Registry.WriteValue(GlobalSettings(WithSetting(raw, WindowedSetting, "1"))) is null
-                ? TweakResult.Fail("graphics.windowedgames", "Could not switch on optimisations for windowed games. See log.")
+                ? TweakResult.Fail("graphics.windowedgames", "Could not switch on optimisations for windowed games. The console has the detail.")
                 : TweakResult.Ok("graphics.windowedgames", "Optimisations for windowed games are on."));
         },
 
@@ -131,7 +131,7 @@ public static class GraphicsTweaks
 
             return Task.FromResult(ok
                 ? TweakResult.Ok("graphics.windowedgames", "Optimisations for windowed games are back as they were.")
-                : TweakResult.Fail("graphics.windowedgames", "Could not put the windowed games setting back. See log."));
+                : TweakResult.Fail("graphics.windowedgames", "Could not put the windowed games setting back. The console has the detail."));
         }
     };
 
@@ -158,16 +158,16 @@ public static class GraphicsTweaks
     public static Tweak HardwareScheduling => new()
     {
         Id = "graphics.hags",
-        Name = "Enable hardware-accelerated GPU scheduling",
+        Name = "Turn on hardware-accelerated GPU scheduling",
         Description =
-            "Lets the GPU manage its own memory and work queue. Lowers input latency slightly, and some " +
+            "Lets the GPU manage its own memory and work queue. Can lower input latency, and some " +
             "games need it for frame generation.",
         Category = TweakCategory.Games,
         Risk = RiskLevel.Moderate,
         RequiresReboot = true,
         IncludeInOneClick = false,
         Warning =
-            "Results vary by game and driver. If you notice new stutter after restarting, switch this back off.",
+            "If a game stutters after the restart, undo this tweak.",
         RegistryValues =
         [
             new(RegistryRoot.LocalMachine, @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers", "HwSchMode", 2, RegistryValueKind.DWord)

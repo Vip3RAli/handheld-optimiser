@@ -224,7 +224,7 @@ public sealed class Tweak
         }
 
         return anyFailed
-            ? TweakResult.Fail(Id, $"\"{Name}\" did not fully apply. See log.")
+            ? TweakResult.Fail(Id, $"\"{Name}\" did not fully apply. The console has the detail.")
             : anyChanged
                 ? TweakResult.Ok(Id, $"\"{Name}\" applied.", RequiresReboot)
                 : TweakResult.NoChange(Id, $"\"{Name}\" was already applied.");
@@ -277,7 +277,7 @@ public sealed class Tweak
         }
 
         return anyFailed
-            ? TweakResult.Fail(Id, $"\"{Name}\" did not fully revert. See log.")
-            : TweakResult.Ok(Id, $"\"{Name}\" reverted.", RequiresReboot);
+            ? TweakResult.Fail(Id, $"\"{Name}\" did not fully undo. The console has the detail.")
+            : TweakResult.Ok(Id, $"\"{Name}\" undone.", RequiresReboot);
     }
 }

@@ -146,7 +146,7 @@ internal sealed partial class AutoTdpService : ServiceBase
             _acpi = AsusAcpi.Open();
             if (_acpi is null || !_acpi.CanSetPowerLimits)
             {
-                _error = "This device's power limit cannot be set. TDP Engine currently works on the ROG Ally with ASUS's drivers installed.";
+                _error = "TDP Engine cannot set the power limit on this device. It works on the ROG Ally with ASUS's drivers installed.";
                 Log.Write(_error);
             }
             else
@@ -158,7 +158,7 @@ internal sealed partial class AutoTdpService : ServiceBase
                 }
                 catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or DllNotFoundException or EntryPointNotFoundException)
                 {
-                    _error = "Windows would not let TDP Engine count frames.";
+                    _error = "Windows did not let TDP Engine read the frame rate. Restart the handheld and try again.";
                     Log.Write($"{_error} {ex.Message}");
                 }
             }
@@ -549,7 +549,7 @@ internal sealed partial class AutoTdpService : ServiceBase
 
         if (_controls is not { } controls)
         {
-            return last with { Error = "Handheld Optimiser is not replacing Armoury Crate." };
+            return last with { Error = "Turn on Replace ASUS Services with Handheld Library and widget in Handheld Optimiser to use these buttons." };
         }
 
         // Temporary with no mode: Game Bar has closed, so the hold ends and the saved mode comes back.
@@ -560,7 +560,7 @@ internal sealed partial class AutoTdpService : ServiceBase
 
         if (AllyCommands.ParseMode(request.ControllerMode) is not { } mode)
         {
-            return last with { Error = "Unknown controller mode." };
+            return last with { Error = "That controller mode is not supported." };
         }
 
         // The service's own standing error, such as a power limit it cannot set, is kept when the mode went

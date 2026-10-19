@@ -72,7 +72,8 @@ internal static class MainApp
         catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
         {
             // Declining the administrator prompt lands here too.
-            return ex.Message;
+            Program.Log($"Could not start the main app: {ex.Message}");
+            return "Windows did not start it. The administrator prompt may have been declined.";
         }
     }
 }

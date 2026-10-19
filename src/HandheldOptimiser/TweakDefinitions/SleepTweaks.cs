@@ -54,7 +54,7 @@ public static class SleepTweaks
         id: "sleep.hibernateafter",
         name: "Hibernate after 15 minutes of sleep",
         description:
-            "On battery, hibernates after 15 minutes of sleep so it uses no power at all. Sleep alone " +
+            "On battery, hibernates after 15 minutes of sleep so it uses almost no power. Sleep alone " +
             "drains a few percent of battery an hour.",
         warning:
             "After 15 minutes asleep, waking takes 10 to 20 seconds instead of being instant. Your game " +
@@ -74,7 +74,7 @@ public static class SleepTweaks
         name: "Power button hibernates on battery",
         description:
             "On battery, pressing the power button hibernates the handheld, so it uses no power in a " +
-            "bag. Plugged in, it still sleeps. ASUS recommends this for the ROG Ally.",
+            "bag. Plugged in, it still sleeps.",
         warning:
             "Waking takes 10 to 20 seconds instead of being instant. Most games carry on where you left " +
             "them, but some have to be restarted and online games lose their connection.",
@@ -86,9 +86,9 @@ public static class SleepTweaks
 
     public static Tweak DisconnectInStandby => PowerSetting(
         id: "sleep.disconnected",
-        name: "Turn Wi-Fi off during sleep",
+        name: "Disconnect from the network during sleep",
         description:
-            "Disconnects the network during sleep to save battery. It reconnects as soon as you wake it.",
+            "Disconnects the network during sleep to save battery. It reconnects when the handheld wakes.",
         warning:
             "Downloads and updates pause while the handheld is asleep.",
         subgroup: NoSubgroup,
@@ -137,13 +137,13 @@ public static class SleepTweaks
         {
             if (needsHibernate && !await EnsureHibernateAsync(ctx, journal, id, ct))
             {
-                return TweakResult.Fail(id, "Hibernate could not be switched on, so this would leave the device asleep. See log.");
+                return TweakResult.Fail(id, "Hibernate could not be switched on, so this would leave the device asleep. The console has the detail.");
             }
 
             var plans = await ReadPlansAsync(ctx, subgroup, setting, ct);
             if (plans.Count == 0)
             {
-                return TweakResult.Fail(id, "Could not read the power plans. See log.");
+                return TweakResult.Fail(id, "Could not read the power plans. The console has the detail.");
             }
 
             var commands = new List<string>();
@@ -171,7 +171,7 @@ public static class SleepTweaks
 
             return await WriteAsync(ctx, subgroup, setting, commands, $"Apply \"{name}\" to every power plan", ct)
                 ? TweakResult.Ok(id, $"\"{name}\" applied.")
-                : TweakResult.Fail(id, "One or more power plans could not be changed. See log.");
+                : TweakResult.Fail(id, "One or more power plans could not be changed. The console has the detail.");
         },
 
         ScriptRevert = async (ctx, journal, ct) =>
@@ -207,7 +207,7 @@ public static class SleepTweaks
                     // Written down here as well, so undo data from before the shared record existed
                     // still lets the other setting's revert turn hibernate off.
                     RecordHibernateWasOff(ctx);
-                    ctx.Log.Info("Hibernate is left on: another Battery & Sleep setting still uses it.");
+                    ctx.Log.Info("Hibernate is left on: another Battery & sleep setting still uses it.");
                 }
                 else
                 {
@@ -222,8 +222,8 @@ public static class SleepTweaks
             }
 
             return ok
-                ? TweakResult.Ok(id, $"\"{name}\" reverted.")
-                : TweakResult.Fail(id, "One or more power plans could not be restored. See log.");
+                ? TweakResult.Ok(id, $"\"{name}\" undone.")
+                : TweakResult.Fail(id, "One or more power plans could not be restored. The console has the detail.");
         }
     };
 
@@ -318,8 +318,8 @@ public static class SleepTweaks
         Id = "sleep.faststartup",
         Name = "Turn off Fast Startup",
         Description =
-            "Makes Shut down a full shut down. Fast Startup is a common cause of controllers, Wi-Fi or " +
-            "power limits misbehaving until you restart.",
+            "Shut down fully powers off, instead of saving a hibernation file to start faster. Fast " +
+            "Startup is a common cause of controllers, Wi-Fi or power limits misbehaving until you restart.",
         Category = TweakCategory.Sleep,
         Risk = RiskLevel.Safe,
         IncludeInOneClick = false,
@@ -458,12 +458,12 @@ public static class SleepTweaks
 
             var outcome = await ctx.Runner.RunScriptAsync(
                 WakeScript("/devicedisablewake", devices),
-                $"Stop {devices.Count} device(s) waking the handheld",
+                $"Stop {devices.Count} {(devices.Count == 1 ? "device" : "devices")} waking the handheld",
                 ct);
 
             return outcome.Succeeded
                 ? TweakResult.Ok("sleep.wakedevices", "Only the power button wakes the handheld now.")
-                : TweakResult.Fail("sleep.wakedevices", "One or more devices could not be changed. See log.");
+                : TweakResult.Fail("sleep.wakedevices", "One or more devices could not be changed. The console has the detail.");
         },
 
         ScriptRevert = async (ctx, journal, ct) =>
@@ -484,7 +484,7 @@ public static class SleepTweaks
             // A device that has since been unplugged cannot be re-armed; that is not a failed revert.
             await ctx.Runner.RunScriptAsync(
                 WakeScript("/deviceenablewake", devices),
-                $"Let {devices.Count} device(s) wake the handheld again",
+                $"Let {devices.Count} {(devices.Count == 1 ? "device" : "devices")} wake the handheld again",
                 ct);
 
             return TweakResult.Ok("sleep.wakedevices", "Devices can wake the handheld again.");
@@ -516,7 +516,7 @@ public static class SleepTweaks
         IncludeInOneClick = false,
         OnlyFor = HandheldDevice.RogAlly,
         Warning =
-            "SD cards stop working until you switch this back off.",
+            "SD cards stop working while this is on. Turn it off to use a card again.",
 
         ScriptDetect = async (ctx, ct) =>
         {
@@ -556,7 +556,7 @@ public static class SleepTweaks
 
             return outcome.Succeeded
                 ? TweakResult.Ok("sleep.sdreader", "The SD card reader is off.")
-                : TweakResult.Fail("sleep.sdreader", "The SD card reader could not be turned off. See log.");
+                : TweakResult.Fail("sleep.sdreader", "The SD card reader could not be turned off. The console has the detail.");
         },
 
         ScriptRevert = async (ctx, journal, ct) =>
@@ -584,7 +584,7 @@ public static class SleepTweaks
 
             return outcome.Succeeded
                 ? TweakResult.Ok("sleep.sdreader", "The SD card reader is back on.")
-                : TweakResult.Fail("sleep.sdreader", "The SD card reader could not be turned back on. See log.");
+                : TweakResult.Fail("sleep.sdreader", "The SD card reader could not be turned back on. The console has the detail.");
         }
     };
 

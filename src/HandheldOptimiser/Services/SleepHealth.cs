@@ -127,7 +127,7 @@ public static partial class SleepHealth
         }
 
         // Whether the network stays on in Modern Standby is a power plan setting, not something the
-        // device can or cannot do, and Turn Wi-Fi off during sleep on the Battery & Sleep page shows it.
+        // device can or cannot do, and Turn Wi-Fi off during sleep on the Battery & sleep page shows it.
         // The short answer names the states. The sentence under it says what that means for the battery,
         // so the two never repeat each other.
         var meaning = states.ModernStandby && states.HibernateFile
@@ -152,8 +152,8 @@ public static partial class SleepHealth
             Summary = summary,
             Status = exposed ? HealthStatus.Warning : HealthStatus.Info,
             Advice = exposed
-                ? "Sleep is the only rest this handheld gets, and it keeps using the battery. Hibernate " +
-                  "after 15 minutes of sleep, on the Battery & Sleep page, switches hibernate on."
+                ? "Sleep is the only rest this handheld gets, and it keeps using the battery. Turn on " +
+                  "\"Hibernate after 15 minutes of sleep\" on the Battery & sleep page."
                 : null
         };
     }
@@ -244,8 +244,8 @@ public static partial class SleepHealth
             Summary = string.Create(CultureInfo.InvariantCulture, $"{rate:0.0}% an hour, over {hours:0.#} hours asleep"),
             Status = high ? HealthStatus.Warning : HealthStatus.Good,
             Advice = high
-                ? "That is a lot for a device that is asleep. The two hibernate settings on the Battery & " +
-                  "Sleep page stop it, and the rows below show what was keeping it busy."
+                ? "That is a lot for a device that is asleep. The two hibernate tweaks on the Battery & sleep " +
+                  "page stop this, and the rows below show what was keeping it busy."
                 : null
         };
     }
@@ -309,7 +309,7 @@ public static partial class SleepHealth
 
         if (requests.Count == 0)
         {
-            return new HealthCheck { Name = name, Detail = "Nothing", Status = HealthStatus.Good };
+            return new HealthCheck { Name = name, Detail = "Nothing is keeping it awake", Status = HealthStatus.Good };
         }
 
         return new HealthCheck
@@ -370,14 +370,14 @@ public static partial class SleepHealth
 
         if (timers.Count == 0)
         {
-            return new HealthCheck { Name = name, Detail = "None", Status = HealthStatus.Good };
+            return new HealthCheck { Name = name, Detail = "No wake timers", Status = HealthStatus.Good };
         }
 
         return new HealthCheck
         {
             Name = name,
             Detail = string.Join("\n", timers),
-            Summary = timers.Count == 1 ? "1 timer" : $"{timers.Count} timers",
+            Summary = Plural.Count(timers.Count, "timer"),
             Status = HealthStatus.Warning,
             Advice = "A wake timer switches the handheld on by itself at that time, in a bag as well."
         };
@@ -402,11 +402,11 @@ public static partial class SleepHealth
         {
             Name = name,
             Detail = string.Join(", ", devices),
-            Summary = devices.Count == 1 ? "1 device besides the power button" : $"{devices.Count} devices besides the power button",
+            Summary = Plural.Count(devices.Count, "device") + " besides the power button",
             Status = HealthStatus.Warning,
             Advice =
-                "A bump on any of these wakes the handheld in a bag. Only the power button wakes the " +
-                "handheld, on the Battery & Sleep page, stops them."
+                "A bump on any of these wakes the handheld in a bag. Turn on \"Only the power button wakes " +
+                "the handheld\" on the Battery & sleep page to stop this."
         };
     }
 

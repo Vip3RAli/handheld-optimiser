@@ -220,7 +220,7 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
                     Summary = "Not installed",
                     Status = absentStatus,
                     Advice = absentStatus == HealthStatus.Bad
-                        ? "This service should exist on Windows 11. Investigate before applying tweaks."
+                        ? "Windows 11 should have this service. Find out why it is missing before applying tweaks."
                         : null
                 });
                 continue;
@@ -302,7 +302,7 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
             Status = health,
             Advice = disabled
                 ? "This service is disabled. Handheld Optimiser never disables it, so another tool likely did. " +
-                  "Repair disabled services, at the top of this page, switches it back on."
+                  "Use Repair disabled services at the top of this page to switch it back on."
                 : null
         };
     }
@@ -340,11 +340,11 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
 
         checks.Add(new HealthCheck
         {
-            Name = "[Performance] Memory Integrity (HVCI)",
-            Detail = hvciOn ? "Enabled (costing frame rate)" : "Disabled (optimised for gaming)",
+            Name = "[Performance] Memory Integrity",
+            Detail = hvciOn ? "On, which lowers frame rates" : "Off",
             Summary = hvciOn ? "On" : "Off",
             Status = hvciOn ? HealthStatus.Warning : HealthStatus.Good,
-            Advice = hvciOn ? "Disable this on the Performance page for the largest single FPS gain." : null
+            Advice = hvciOn ? "Switch on the \"Turn off Memory Integrity\" tweak on the Performance page. This can raise frame rates." : null
         });
 
         var outcome = await _runner.RunScriptAsync(
@@ -367,12 +367,20 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
         checks.Add(new HealthCheck
         {
             Name = "[Performance] Virtual Machine Platform",
-            Detail = vmp,
-            Status = vmp.Equals("Disabled", StringComparison.OrdinalIgnoreCase) ? HealthStatus.Good : HealthStatus.Warning
+            Detail = VmpText(vmp),
+            Status = VmpText(vmp) == "Off" ? HealthStatus.Good : HealthStatus.Warning
         });
 
         return checks;
     }
+
+    /// <summary>Windows' optional feature state in plain words: On, Off, or that Windows did not say.</summary>
+    public static string VmpText(string state) => state.Trim() switch
+    {
+        "Enabled" or "EnablePending" => "On",
+        "Disabled" or "DisabledWithPayloadRemoved" or "DisablePending" => "Off",
+        _ => "Windows did not say"
+    };
 
     /// <summary>
     /// Whether VBS is running, from the status Windows itself reports for this boot: 0 is off, 1 is
@@ -381,10 +389,10 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
     /// </summary>
     public static HealthCheck VbsCheck(string? status)
     {
-        const string name = "[Performance] Virtualisation-based security (VBS)";
+        const string name = "[Performance] Virtualisation-based security";
         const string advice =
-            "VBS adds overhead to every process. Disable Virtual Machine Platform & VBS on the Performance " +
-            "page turns it off, then restart.";
+            "VBS slows every process down. Switch on the \"Turn off Virtual Machine Platform and VBS\" tweak on the " +
+            "Performance page, then restart.";
 
         return status?.Trim() switch
         {

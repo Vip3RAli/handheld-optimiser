@@ -8,7 +8,7 @@ internal readonly record struct CleanResult(int Files, long Bytes, int Skipped)
 {
     public string Describe() =>
         Files == 0 ? "Nothing to clear"
-        : $"{Size(Bytes)} cleared" + (Skipped > 0 ? $". {Skipped} files in use were left" : string.Empty);
+        : $"{Size(Bytes)} cleared" + (Skipped > 0 ? $". {Skipped} {(Skipped == 1 ? "file" : "files")} in use {(Skipped == 1 ? "was" : "were")} left" : string.Empty);
 
     public static string Size(long bytes) =>
         bytes >= 1L << 30 ? $"{bytes / (double)(1L << 30):0.0} GB"

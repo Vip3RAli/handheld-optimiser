@@ -144,7 +144,7 @@ public sealed partial class GoalPageViewModel : PageViewModelBase
         // are a press away on each tile, and this list is what stops Apply all being pressed blind.
         var warned = TweakPrompts.WarnedNames(pending);
 
-        var message = $"{pending.Count} tweak(s) will be applied after a System Restore point is created." + skippedNote;
+        var message = Plural.Count(pending.Count, "tweak") + " will be applied after a System Restore point is created." + skippedNote;
 
         if (warned.Count > 0)
         {

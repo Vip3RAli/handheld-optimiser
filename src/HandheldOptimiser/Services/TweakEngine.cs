@@ -102,8 +102,7 @@ public sealed class TweakEngine
                 summary.Aborted = true;
                 summary.AbortReason =
                     $"No System Restore point could be created ({rp.Message}). Nothing was changed. " +
-                    "Enable System Protection in Windows settings, or re-run and explicitly choose to " +
-                    "continue without a restore point.";
+                    "Turn on System Protection for the C: drive, then try again.";
 
                 _log.Error("ABORTED before making any change: no restore point.");
                 return summary;

@@ -158,8 +158,8 @@ internal static partial class AutoTdp
     private static string? Explain(string? state) => Enum.TryParse<AutoTdpState>(state, out var parsed) ? parsed switch
     {
         AutoTdpState.TooHot => "cooling down",
-        AutoTdpState.AtMaximum => "at its most watts",
-        AutoTdpState.NoGain => "more power does not help this game",
+        AutoTdpState.AtMaximum => "at its power limit",
+        AutoTdpState.NoGain => "more power would not help here",
         _ => null
     } : null;
 
@@ -265,6 +265,13 @@ internal static partial class AutoTdp
         return problem;
     }
 
+    private static string LogStartFailure(int code)
+    {
+        // Windows' own wording goes to the log. The player gets a plain sentence.
+        Program.Log($"Windows would not start TDP Engine: {new Win32Exception(code).Message}");
+        return "Windows could not start TDP Engine.";
+    }
+
     /// <param name="stopping">Whether Windows said it was running because it was still stopping.</param>
     private static string? TryStartService(out bool stopping)
     {
@@ -282,9 +289,9 @@ internal static partial class AutoTdp
             {
                 return Marshal.GetLastPInvokeError() switch
                 {
-                    ErrorDoesNotExist => "TDP Engine is not installed. Install the latest Handheld Optimiser to add it.",
-                    ErrorAccessDenied => "Windows would not let the library start TDP Engine. Installing Handheld Optimiser again fixes this.",
-                    var code => $"Windows would not start TDP Engine ({new Win32Exception(code).Message})."
+                    ErrorDoesNotExist => "TDP Engine is not installed. Reinstall Handheld Optimiser to add it.",
+                    ErrorAccessDenied => "Windows could not start TDP Engine. Reinstall Handheld Optimiser to fix it.",
+                    var code => LogStartFailure(code)
                 };
             }
 
@@ -295,7 +302,8 @@ internal static partial class AutoTdp
                     var code = Marshal.GetLastPInvokeError();
                     if (code != ErrorAlreadyRunning)
                     {
-                        return $"Windows would not start TDP Engine ({new Win32Exception(code).Message}).";
+                        Program.Log($"Windows would not start TDP Engine: {new Win32Exception(code).Message}");
+                        return "Windows could not start TDP Engine.";
                     }
 
                     stopping = Status(service) is { State: ServiceStopPendingState };

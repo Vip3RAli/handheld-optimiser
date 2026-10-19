@@ -108,8 +108,7 @@ public static class ArmouryCrateTweaks
         Description =
             "Turns off Armoury Crate and ASUS's background services. Handheld Optimiser runs the Armoury Crate and " +
             "Command Center buttons and the controller mode instead, through the game library and its Game Bar widget. " +
-            "It is much lighter than ASUS's own: one small service in place of about a dozen, using about 16 MB of memory " +
-            "where ASUS's use about 480 MB.",
+            "This replaces about a dozen ASUS services with one small one, using about 16 MB of memory instead of about 480 MB.",
         Category = TweakCategory.FullScreen,
         Risk = RiskLevel.Moderate,
         Warning =
@@ -160,7 +159,7 @@ public static class ArmouryCrateTweaks
         var check = await ctx.Runner.RunScriptAsync(BuildCheckScript(), "Check for the ROG Ally controller and TDP Engine", ct);
         if (!check.Succeeded)
         {
-            return TweakResult.Fail(Id, "Could not check for the ROG Ally controller and TDP Engine. See log.");
+            return TweakResult.Fail(Id, "Could not check for the ROG Ally controller and TDP Engine. The console has the detail.");
         }
 
         var lines = check.OutputLines.ToList();
@@ -228,7 +227,7 @@ public static class ArmouryCrateTweaks
 
         return outcome.Succeeded
             ? TweakResult.Ok(Id, $"\"{Name}\" applied.")
-            : TweakResult.Fail(Id, "Armoury Crate could not be fully replaced. See log.");
+            : TweakResult.Fail(Id, "Armoury Crate could not be fully replaced. The console has the detail.");
     }
 
     private static async Task<TweakResult> RevertAsync(TweakContext ctx, TweakJournalEntry journal, CancellationToken ct)
@@ -249,8 +248,8 @@ public static class ArmouryCrateTweaks
             ct);
 
         return outcome.Succeeded
-            ? TweakResult.Ok(Id, $"\"{Name}\" reverted.")
-            : TweakResult.Fail(Id, "Armoury Crate could not be fully restored. See log.");
+            ? TweakResult.Ok(Id, $"\"{Name}\" undone.")
+            : TweakResult.Fail(Id, "Armoury Crate could not be fully restored. The console has the detail.");
     }
 
     /// <summary>

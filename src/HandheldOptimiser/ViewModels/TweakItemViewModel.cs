@@ -202,7 +202,7 @@ public sealed partial class TweakItemViewModel : ObservableObject, ITile
 
                         if (result.Status == ResultStatus.Blocked)
                         {
-                            await _shell.ConfirmAsync("Cannot revert", result.Message ?? "No undo data.", "OK");
+                            await _shell.ConfirmAsync("Cannot undo", result.Message ?? "No undo data.", "OK");
                         }
 
                         if (result.RebootRequired && !result.IsFailure)

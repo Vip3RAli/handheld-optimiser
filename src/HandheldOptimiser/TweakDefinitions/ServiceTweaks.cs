@@ -27,7 +27,7 @@ public static class ServiceTweaks
 
     public static Tweak CompatibilityAssistant => DisableServices(
         id: "services.pcasvc",
-        name: "Disable Program Compatibility Assistant",
+        name: "Turn off Program Compatibility Assistant",
         description:
             "Stops the service that checks every program launch for compatibility problems. Games do not " +
             "need it.",
@@ -38,7 +38,7 @@ public static class ServiceTweaks
 
     public static Tweak LinkTracking => DisableServices(
         id: "services.trkwks",
-        name: "Disable Distributed Link Tracking",
+        name: "Turn off Distributed Link Tracking",
         description:
             "Stops the service that repairs shortcuts when their target moves to another drive or " +
             "network share. A single-drive handheld does not need it.",
@@ -54,9 +54,9 @@ public static class ServiceTweaks
     /// </summary>
     public static Tweak UnusedHandheldServices => DisableServices(
         id: "services.unused",
-        name: "Disable unused handheld services",
+        name: "Turn off unused handheld services",
         description:
-            "Disables Retail Demo, Wallet, Payments & NFC, Phone Service, Downloaded Maps Manager, " +
+            "Turns off Retail Demo, Wallet, Payments and NFC, Phone Service, Downloaded Maps Manager, " +
             "Internet Connection Sharing, Mobile Hotspot, Windows Insider, Parental Controls, Media " +
             "Player Network Sharing and the ActiveX Installer. They normally sit stopped, so this is " +
             "tidying, not a performance gain.",
@@ -83,7 +83,7 @@ public static class ServiceTweaks
 
     public static Tweak SysMain => DisableServices(
         id: "services.sysmain",
-        name: "Disable SysMain (SuperFetch)",
+        name: "Turn off SysMain (SuperFetch)",
         description:
             "Stops Windows preloading frequently used apps into RAM, leaving that memory free for the " +
             "game and the iGPU.",
@@ -94,7 +94,7 @@ public static class ServiceTweaks
 
     public static Tweak SearchIndexer => DisableServices(
         id: "services.wsearch",
-        name: "Disable Search Indexer",
+        name: "Turn off Search Indexer",
         description:
             "Stops Windows indexing files in the background, removing a steady source of SSD reads and " +
             "CPU wake-ups.",
@@ -108,14 +108,13 @@ public static class ServiceTweaks
 
     public static Tweak PrintAndFax => DisableServices(
         id: "services.printfax",
-        name: "Disable Print Spooler & Fax",
+        name: "Turn off printing and fax",
         description:
-            "Stops the print and fax services. Also closes off the PrintNightmare family of " +
-            "vulnerabilities.",
+            "Stops the Print Spooler and Fax services. Also closes a set of known printing security holes.",
         risk: RiskLevel.Moderate,
         warning:
-            "Nothing can print while this is on, including \"Microsoft Print to PDF\". Revert it before " +
-            "printing or adding a printer.",
+            "Nothing can print while this is on, including \"Microsoft Print to PDF\". Undo this tweak " +
+            "before printing or adding a printer.",
         includeInOneClick: false,
         services: ["Spooler", "Fax"]);
 
@@ -250,7 +249,7 @@ public static class ServiceTweaks
 
             return outcome.Succeeded
                 ? TweakResult.Ok(id, $"\"{name}\" applied.")
-                : TweakResult.Fail(id, "One or more services could not be disabled. See log.");
+                : TweakResult.Fail(id, "One or more services could not be disabled. The console has the detail.");
         },
 
         ScriptRevert = async (ctx, journal, ct) =>
@@ -314,8 +313,8 @@ public static class ServiceTweaks
                 ct);
 
             return outcome.Succeeded
-                ? TweakResult.Ok(id, $"\"{name}\" reverted.")
-                : TweakResult.Fail(id, "One or more services could not be restored. See log.");
+                ? TweakResult.Ok(id, $"\"{name}\" undone.")
+                : TweakResult.Fail(id, "One or more services could not be restored. The console has the detail.");
         }
     };
 }

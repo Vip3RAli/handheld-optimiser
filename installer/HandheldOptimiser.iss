@@ -11,7 +11,7 @@
 
 #define AppName "Handheld Optimiser"
 #define AppExeName "HandheldOptimiser.exe"
-#define LibraryName "Game Library"
+#define LibraryName "Handheld Optimiser Game Library"
 #define LauncherExeName "HandheldOptimiser.HomeLauncher.exe"
 #define ServiceExeName "HandheldOptimiser.PowerService.exe"
 ; Must match AutoTdpProtocol.ServiceName.
@@ -52,6 +52,10 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+; Versions up to 1.1.0 named the library's shortcut "Game Library". An upgrade would keep it next to the new one.
+[InstallDelete]
+Type: files; Name: "{group}\Game Library.lnk"
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
@@ -216,7 +220,7 @@ begin
     Exec(Sc, 'config {#ServiceName} binPath= "\"' + Path + '\"" start= ' + Start + ' DisplayName= "Handheld Optimiser TDP Engine"',
       '', SW_HIDE, ewWaitUntilTerminated, Code);
 
-  Exec(Sc, 'description {#ServiceName} "Holds a game at the frame rate chosen in the Handheld Optimiser game library with the lowest power limit, and runs the ROG Ally''s buttons and controller mode when it replaces Armoury Crate."',
+  Exec(Sc, 'description {#ServiceName} "Holds a game at the frame rate chosen in the Handheld Optimiser game library, using the lowest power it can. When it replaces Armoury Crate, it also runs the ROG Ally''s buttons and controller mode."',
     '', SW_HIDE, ewWaitUntilTerminated, Code);
   Exec(Sc, 'sdset {#ServiceName} D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWRPLOCRRC;;;IU)(A;;RP;;;AC)',
     '', SW_HIDE, ewWaitUntilTerminated, Code);
@@ -418,9 +422,9 @@ begin
 
   if not UninstallSilent then
     Result := MsgBox(
-      'Uninstalling does not undo any tweaks this app applied.' + Gap +
-      'To put Windows back first, cancel now, open Handheld Optimiser and use "Undo all changes" ' +
-      'on the Dashboard. Your undo data is kept either way, so reinstalling later can still revert them.' + Gap +
+      'Uninstalling does not undo the tweaks Handheld Optimiser applied.' + Gap +
+      'To put Windows back first, choose No, open Handheld Optimiser and use "Undo all changes" ' +
+      'on the Maintenance & backup page. Your undo data is kept, so you can still undo them if you reinstall.' + Gap +
       'Continue uninstalling?',
       mbConfirmation, MB_YESNO) = IDYES;
 end;

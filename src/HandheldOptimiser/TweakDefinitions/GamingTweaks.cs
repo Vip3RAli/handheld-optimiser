@@ -35,10 +35,10 @@ public static class GamingTweaks
     public static Tweak MemoryIntegrity => new()
     {
         Id = "gaming.hvci",
-        Name = "Disable Memory Integrity (Core Isolation / HVCI)",
+        Name = "Turn off Memory Integrity",
         Description =
-            "Turns off hypervisor-enforced integrity checks on drivers. Usually the largest single frame " +
-            "rate gain in CPU-heavy games.",
+            "Turns off Memory Integrity (also called Core Isolation or HVCI), which checks drivers for " +
+            "tampering. Can raise frame rates in CPU-heavy games.",
         Category = TweakCategory.Games,
         Risk = RiskLevel.SecurityTradeoff,
         RequiresReboot = true,
@@ -65,11 +65,11 @@ public static class GamingTweaks
     public static Tweak VirtualisationPlatform => new()
     {
         Id = "gaming.vmp",
-        Name = "Disable Virtual Machine Platform & VBS",
+        Name = "Turn off Virtual Machine Platform and VBS",
         Description =
-            "Turns off virtualisation-based security, with Virtual Machine Platform, the Windows " +
-            "Hypervisor Platform and Windows Hello's protected sign-in, which keep it running. Removes " +
-            "virtualisation overhead from every process.",
+            "Turns off virtualisation-based security (VBS). Virtual Machine Platform, Windows " +
+            "Hypervisor Platform and Windows Hello's protected sign-in can keep VBS running, so this " +
+            "turns those off too. Removes the VBS overhead from every process.",
         Category = TweakCategory.Games,
         Risk = RiskLevel.Breaking,
         RequiresReboot = true,
@@ -79,7 +79,7 @@ public static class GamingTweaks
             "If Windows Hello is protected by it, your PIN has to be reset at the next sign-in, which " +
             "needs your account password, and your fingerprint or face set up again without that " +
             "protection. WSL, Windows Sandbox, the Windows Subsystem for Android, Hyper-V and Credential " +
-            "Guard stop working until reverted. Some anti-cheat (notably Vanguard and Faceit) needs " +
+            "Guard stop working until you undo this tweak. Some anti-cheat (notably Vanguard and Faceit) needs " +
             "virtualisation and will refuse to launch.",
         RegistryValues =
         [
@@ -173,7 +173,7 @@ public static class GamingTweaks
 
             return outcome.Succeeded
                 ? TweakResult.Ok("gaming.vmp", "Virtualisation platform disabled.", rebootRequired: true)
-                : TweakResult.Fail("gaming.vmp", "DISM or bcdedit reported a failure. See log.");
+                : TweakResult.Fail("gaming.vmp", "DISM or bcdedit reported a failure. The console has the detail.");
         },
         ScriptRevert = async (ctx, journal, ct) =>
         {
@@ -212,7 +212,7 @@ public static class GamingTweaks
 
             return outcome.Succeeded
                 ? TweakResult.Ok("gaming.vmp", "Virtualisation platform restored.", rebootRequired: true)
-                : TweakResult.Fail("gaming.vmp", "Could not fully restore virtualisation platform. See log.");
+                : TweakResult.Fail("gaming.vmp", "Could not fully restore virtualisation platform. The console has the detail.");
         }
     };
 
@@ -223,7 +223,7 @@ public static class GamingTweaks
     public static Tweak GameDvr => new()
     {
         Id = "gaming.gamedvr",
-        Name = "Disable Game DVR & background recording",
+        Name = "Turn off background game recording",
         Description =
             "Stops the Game Bar recording gameplay in the background. The Xbox app, Game Pass, cloud " +
             "saves and the overlay keep working.",

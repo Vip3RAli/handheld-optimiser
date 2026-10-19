@@ -17,7 +17,7 @@
                 <RadioButton GroupName="HomeApp" IsChecked="{Binding IsLibrary, Mode=TwoWay}" MinHeight="40">
                     <StackPanel>
                         <TextBlock Text="Handheld Optimiser library" FontWeight="SemiBold" />
-                        <TextBlock Text="A lightweight game library for Steam, Xbox, Epic Games, Battle.net, GOG, EA App and Ubisoft Connect games." FontSize="11.5" Opacity="0.6" TextWrapping="Wrap" />
+                        <TextBlock Text="A game library for your Steam, Xbox, Epic, Battle.net, GOG, EA and Ubisoft games." FontSize="11.5" Opacity="0.6" TextWrapping="Wrap" />
                     </StackPanel>
                 </RadioButton>
 

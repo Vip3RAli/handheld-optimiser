@@ -141,7 +141,7 @@ internal static class AddedPrograms
         }
         catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
         {
-            Program.Log($"Could not move {game.Key} to {(app ? "Apps" : "the games")}: {ex.Message}");
+            Program.Log($"Could not move {game.Key} to {(app ? "Apps" : "Games")}: {ex.Message}");
             return null;
         }
     }

@@ -20,9 +20,10 @@ public static class CpuKernelTweaks
     public static Tweak PrioritySeparation => new()
     {
         Id = "cpu.priorityseparation",
-        Name = "Maximise foreground priority (Win32PrioritySeparation)",
+        Name = "Give the game priority over background apps",
         Description =
-            "Gives the game in the foreground the CPU ahead of background work. Takes effect immediately.",
+            "Gives the game in the foreground the CPU ahead of background work. Sets the " +
+            "Win32PrioritySeparation value. Takes effect immediately.",
         Category = TweakCategory.System,
         Risk = RiskLevel.Safe,
         RegistryValues =

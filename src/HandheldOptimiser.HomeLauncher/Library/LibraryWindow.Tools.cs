@@ -55,7 +55,7 @@ public partial class LibraryWindow
     {
         HideMenuLists();
         _menu = WhilePlayingItems;
-        MenuTitle.Text = "Play and Sleep";
+        MenuTitle.Text = "Play and sleep";
         MenuStore.Text = SleepTweaks;
         RefreshWhilePlaying();
         ShowMenuItems(focus);
@@ -158,7 +158,7 @@ public partial class LibraryWindow
         HideMenuLists();
         _menu = AppsToCloseItems;
         MenuTitle.Text = "Programs to close";
-        MenuStore.Text = "Only programs running as you. Windows itself is never touched";
+        MenuStore.Text = "Only your own programs are listed. Windows is never touched";
 
         ClearRows(AppsToCloseItems);
         foreach (var (app, close) in BackgroundApps.Choices())
@@ -201,7 +201,7 @@ public partial class LibraryWindow
             return;
         }
 
-        MenuStore.Text = running.Count == 0 ? "No other programs are running" : "Closed whenever a game starts, from the next game on";
+        MenuStore.Text = running.Count == 0 ? "No other programs are running" : "These close when a game starts, from the next game on.";
         foreach (var (title, exe) in running)
         {
             AddRow(RunningAppsItems, RunningAppsBackItem, title, null, () =>
@@ -220,7 +220,7 @@ public partial class LibraryWindow
     {
         var count = BackgroundApps.Choices().Count(c => c.Close);
         CloseAppsNowItem.IsEnabled = count > 0;
-        CloseAppsNowItem.Tag = count == 0 ? "None chosen" : count.ToString();
+        CloseAppsNowItem.Tag = count == 0 ? "None" : count.ToString();
     }
 
     private async void OnCloseAppsNow(object sender, RoutedEventArgs e)
@@ -260,7 +260,7 @@ public partial class LibraryWindow
         HideMenuLists();
         _menu = MaintenanceItems;
         _confirming = null;
-        MenuTitle.Text = "Quick Tweaks";
+        MenuTitle.Text = "Clean up";
         MenuStore.Text = StorageSummary();
 
         TempItem.Tag = ShaderItem.Tag = RecycleItem.Tag = "Measuring...";
