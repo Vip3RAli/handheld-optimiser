@@ -59,7 +59,7 @@ internal static class OwnedGames
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "HandheldOptimiser", "owned");
 
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(20) };
+    private static readonly HttpClient Http = HttpClients.Shared;
 
     // Each source's games, kept until its file changes: the library scans every couple of minutes.
     private static readonly Dictionary<string, (DateTime Written, List<Game> Games)> Cache = new(StringComparer.OrdinalIgnoreCase);
@@ -171,9 +171,7 @@ internal static class OwnedGames
                 return (false, null);
             }
 
-            Directory.CreateDirectory(CacheDir);
-            await File.WriteAllTextAsync(path + ".tmp", json);
-            File.Move(path + ".tmp", path, overwrite: true);
+            await AtomicFile.WriteAllTextAsync(path, json);
             return (true, null);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException or UnauthorizedAccessException)

@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using System.ServiceProcess;
+using Microsoft.Win32;
 
 namespace HandheldOptimiser.PowerService;
 
@@ -21,6 +22,17 @@ internal sealed partial class AutoTdpService : ServiceBase
     // Armoury Crate can put its own limits back, on a charger being plugged in say, so they are set again this often.
     private static readonly TimeSpan Reassert = TimeSpan.FromSeconds(5);
 
+    // A request has this long to arrive and be answered. The library sends one line straight away.
+    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(2);
+
+    // Pipe instances, so one client that connects and says nothing does not keep the library out.
+    private const int PipeInstances = 4;
+
+    // While a game is held, the operating mode to put back is kept here too, so that if the service dies
+    // without putting it back, its next start does. HKLM, which only administrators and the system can write.
+    private const string HoldingKey = @"SOFTWARE\HandheldOptimiser\TdpEngine";
+    private const string HoldingValue = "RestoreMode";
+
     private readonly CancellationTokenSource _stop = new();
     private readonly object _gate = new();
     private Task? _running;
@@ -33,6 +45,9 @@ internal sealed partial class AutoTdpService : ServiceBase
     private Control? _control;
     private DateTime _idleSince = DateTime.UtcNow;
     private AutoTdpStatus _last = new(false);
+
+    // Set once it has decided to end, so a start that arrives meanwhile is turned away rather than lost.
+    private bool _ending;
 
     public AutoTdpService()
     {
@@ -94,6 +109,7 @@ internal sealed partial class AutoTdpService : ServiceBase
 
         lock (_gate)
         {
+            _ending = true;
             Release("the service stopped");
         }
 
@@ -103,37 +119,49 @@ internal sealed partial class AutoTdpService : ServiceBase
 
     private async Task RunAsync(CancellationToken cancel)
     {
-        Log.Write("Started");
-        _acpi = AsusAcpi.Open();
-        if (_acpi is null || !_acpi.CanSetPowerLimits)
-        {
-            _error = "This device's power limit cannot be set. TDP Engine works on the ROG Ally with ASUS's drivers installed.";
-            Log.Write(_error);
-        }
-        else
-        {
-            try
-            {
-                _frames = FrameCounter.Start();
-            }
-            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or DllNotFoundException or EntryPointNotFoundException)
-            {
-                _error = "Windows would not let TDP Engine count frames.";
-                Log.Write($"{_error} {ex.Message}");
-            }
-        }
-
-        var serving = ServeAsync(cancel);
+        Task? serving = null;
         try
         {
+            Log.Write("Started");
+            _acpi = AsusAcpi.Open();
+            if (_acpi is null || !_acpi.CanSetPowerLimits)
+            {
+                _error = "This device's power limit cannot be set. TDP Engine works on the ROG Ally with ASUS's drivers installed.";
+                Log.Write(_error);
+            }
+            else
+            {
+                RestoreAfterCrash();
+                try
+                {
+                    _frames = FrameCounter.Start();
+                }
+                catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or DllNotFoundException or EntryPointNotFoundException)
+                {
+                    _error = "Windows would not let TDP Engine count frames.";
+                    Log.Write($"{_error} {ex.Message}");
+                }
+            }
+
+            serving = ServeAsync(cancel);
             using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
             while (await timer.WaitForNextTickAsync(cancel))
             {
                 lock (_gate)
                 {
-                    Tick();
+                    try
+                    {
+                        Tick();
+                    }
+                    catch (Exception ex)
+                    {
+                        // One bad second is not a reason to stop; the next tick tries again.
+                        Log.Write($"A second's work failed: {ex.Message}");
+                    }
+
                     if (_control is null && DateTime.UtcNow - _idleSince > IdleExit)
                     {
+                        _ending = true;
                         Log.Write("Nothing to do, so ending");
                         break;
                     }
@@ -143,6 +171,23 @@ internal sealed partial class AutoTdpService : ServiceBase
         catch (OperationCanceledException)
         {
         }
+        catch (Exception ex)
+        {
+            // Something the service cannot carry on from: the operating mode goes back, and it ends.
+            Log.Write($"TDP Engine failed: {ex}");
+            lock (_gate)
+            {
+                _ending = true;
+                try
+                {
+                    Release("TDP Engine failed");
+                }
+                catch (Exception releaseError)
+                {
+                    Log.Write($"Could not put the operating mode back: {releaseError.Message}");
+                }
+            }
+        }
 
         // Ended on its own: the service manager is told, which calls OnStop to clean up.
         if (!cancel.IsCancellationRequested)
@@ -150,7 +195,62 @@ internal sealed partial class AutoTdpService : ServiceBase
             _ = Task.Run(EndSelf);
         }
 
-        await serving.ConfigureAwait(false);
+        if (serving is not null)
+        {
+            await serving.ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// When the service last ended without putting the operating mode back (it crashed, or was killed), the
+    /// game's power limit would otherwise stay set until Armoury Crate changes it. So the mode saved as it
+    /// began is put back now.
+    /// </summary>
+    private void RestoreAfterCrash()
+    {
+        if (HeldMode() is not { } mode)
+        {
+            return;
+        }
+
+        var restored = _acpi!.SetOperatingMode(mode);
+        Log.Write($"The last run ended while holding a game. Operating mode {mode} {(restored ? "put back" : "was refused")}");
+        MarkHolding(null);
+    }
+
+    private static int? HeldMode()
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(HoldingKey);
+            return key?.GetValue(HoldingValue) is int mode ? mode : null;
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Saves the operating mode to put back while a game is held, or with null, clears it.</summary>
+    private static void MarkHolding(int? mode)
+    {
+        try
+        {
+            if (mode is { } value)
+            {
+                using var key = Registry.LocalMachine.CreateSubKey(HoldingKey);
+                key.SetValue(HoldingValue, value, RegistryValueKind.DWord);
+            }
+            else
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(HoldingKey, writable: true);
+                key?.DeleteValue(HoldingValue, throwOnMissingValue: false);
+            }
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+        {
+            Log.Write($"Could not {(mode is null ? "clear" : "save")} the operating mode to put back: {ex.Message}");
+        }
     }
 
     /// <summary>One second: the game's frame rate and the temperature to the controller, and its answer to the firmware.</summary>
@@ -202,84 +302,97 @@ internal sealed partial class AutoTdpService : ServiceBase
     /// The game's frames a second: the busiest program running from its folder. Without a folder, the
     /// busiest program of all but Windows' own compositor, whose frames are every window's.
     /// </summary>
-    private static double GameFps(Dictionary<int, double> frames, string? folder)
-    {
-        var best = 0.0;
-        foreach (var (processId, fps) in frames)
-        {
-            if (fps <= best)
-            {
-                continue;
-            }
-
-            var path = ProcessPath(processId);
-            if (path is null)
-            {
-                continue;
-            }
-
-            var counts = folder is not null
-                ? path.StartsWith(folder, StringComparison.OrdinalIgnoreCase)
-                : !string.Equals(Path.GetFileName(path), "dwm.exe", StringComparison.OrdinalIgnoreCase);
-
-            if (counts)
-            {
-                best = fps;
-            }
-        }
-
-        return best;
-    }
+    private static double GameFps(Dictionary<int, double> frames, string? folder) =>
+        AutoTdpRules.GameFps(frames, folder, ProcessPath);
 
     // ----- Requests from the library -----
 
     private async Task ServeAsync(CancellationToken cancel)
     {
-        var first = true;
+        // The first instance claims the name, so a program that took it first cannot pose as this service.
+        NamedPipeServerStream claimed;
+        try
+        {
+            claimed = CreatePipe(first: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Another program holds the name. Nothing can reach this service, so it ends.
+            Log.Write($"Could not open the pipe: {ex.Message}");
+            _ = Task.Run(EndSelf);
+            return;
+        }
+
+        var listeners = new List<Task> { ListenAsync(claimed, cancel) };
+        for (var i = 1; i < PipeInstances; i++)
+        {
+            listeners.Add(ListenAsync(null, cancel));
+        }
+
+        await Task.WhenAll(listeners).ConfigureAwait(false);
+    }
+
+    /// <summary>Answers one connection after another on one pipe instance, until the service ends. Never throws.</summary>
+    private async Task ListenAsync(NamedPipeServerStream? pipe, CancellationToken cancel)
+    {
         while (!cancel.IsCancellationRequested)
         {
-            NamedPipeServerStream pipe;
+            NamedPipeServerStream current;
             try
             {
-                pipe = NamedPipeServerStreamAcl.Create(AutoTdpProtocol.PipeName, PipeDirection.InOut, 1,
-                    PipeTransmissionMode.Byte, PipeOptions.Asynchronous | (first ? PipeOptions.FirstPipeInstance : 0),
-                    0, 0, PipeAccess());
-                first = false;
+                current = pipe ?? CreatePipe(first: false);
+                pipe = null;
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            catch (Exception ex)
             {
-                // Another program holds the name. Nothing can reach this service, so it ends.
-                Log.Write($"Could not open the pipe: {ex.Message}");
-                _ = Task.Run(EndSelf);
-                return;
-            }
-
-            await using (pipe)
-            {
+                Log.Write($"Could not open another pipe instance: {ex.Message}");
                 try
                 {
-                    await pipe.WaitForConnectionAsync(cancel);
-                    using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancel);
-                    timeout.CancelAfter(TimeSpan.FromSeconds(5));
-                    await AnswerAsync(pipe, timeout.Token);
+                    await Task.Delay(TimeSpan.FromSeconds(1), cancel).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {
+                    return;
                 }
-                catch (IOException)
+
+                continue;
+            }
+
+            try
+            {
+                await using (current)
                 {
-                    // The library went away mid-request.
+                    await current.WaitForConnectionAsync(cancel).ConfigureAwait(false);
+                    using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancel);
+                    timeout.CancelAfter(RequestTimeout);
+                    await AnswerAsync(current, timeout.Token).ConfigureAwait(false);
                 }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (IOException)
+            {
+                // The library went away mid-request.
+            }
+            catch (Exception ex)
+            {
+                // Whatever one client did, the pipe stays open for the next.
+                Log.Write($"A request failed: {ex.Message}");
             }
         }
     }
 
+    private static NamedPipeServerStream CreatePipe(bool first) =>
+        NamedPipeServerStreamAcl.Create(AutoTdpProtocol.PipeName, PipeDirection.InOut, PipeInstances,
+            PipeTransmissionMode.Byte, PipeOptions.Asynchronous | (first ? PipeOptions.FirstPipeInstance : 0),
+            0, 0, PipeAccess());
+
     private async Task AnswerAsync(NamedPipeServerStream pipe, CancellationToken cancel)
     {
-        using var reader = new StreamReader(pipe, leaveOpen: true);
         await using var writer = new StreamWriter(pipe, leaveOpen: true) { AutoFlush = true };
 
-        var request = AutoTdpProtocol.Read<AutoTdpRequest>(await reader.ReadLineAsync(cancel));
+        var request = AutoTdpProtocol.Read<AutoTdpRequest>(await AutoTdpRules.ReadLineAsync(pipe, cancel).ConfigureAwait(false));
         var client = GetNamedPipeClientProcessId(pipe.SafePipeHandle, out var id) ? (int)id : 0;
 
         AutoTdpStatus status;
@@ -293,7 +406,7 @@ internal sealed partial class AutoTdpService : ServiceBase
             };
         }
 
-        await writer.WriteLineAsync(AutoTdpProtocol.Write(status).AsMemory(), cancel);
+        await writer.WriteLineAsync(AutoTdpProtocol.Write(status).AsMemory(), cancel).ConfigureAwait(false);
     }
 
     private AutoTdpStatus Begin(AutoTdpRequest request, int client)
@@ -303,22 +416,30 @@ internal sealed partial class AutoTdpService : ServiceBase
             return new AutoTdpStatus(false, Error: _error);
         }
 
-        var min = Math.Clamp(request.MinWatts, AutoTdpProtocol.LowestWatts, AutoTdpProtocol.HighestWatts);
-        var max = Math.Clamp(request.MaxWatts, min, AutoTdpProtocol.HighestWatts);
-        var settings = new AutoTdpSettings(
-            Math.Clamp(request.TargetFps, AutoTdpProtocol.LowestFps, AutoTdpProtocol.HighestFps),
-            min,
-            max,
-            Math.Clamp(request.TemperatureLimit, AutoTdpProtocol.LowestTemperature, AutoTdpProtocol.HighestTemperature));
+        // On its way out: the library waits for it to stop and starts it again.
+        if (_ending)
+        {
+            return new AutoTdpStatus(false, Error: AutoTdpProtocol.EndingError);
+        }
 
-        var start = request.StartWatts > 0 ? request.StartWatts : (min + max + 1) / 2;
-        var folder = string.IsNullOrWhiteSpace(request.GameFolder) ? null : request.GameFolder;
+        // Without the library's process there is no telling when it goes away, and the power limit would
+        // stay set until the service is stopped by hand.
+        if (ClientHandle(client) is not { } clientProcess)
+        {
+            return new AutoTdpStatus(false, Error: "TDP Engine could not tell which program asked for it.");
+        }
+
+        var (settings, start, folder) = AutoTdpRules.FromRequest(request);
 
         // A new game keeps the operating mode saved for the first, which is the player's own.
         var restoreMode = _control?.RestoreMode ?? _acpi.OperatingModeNow();
-        _control = new Control(new AutoTdpController(settings, start), folder, ClientHandle(client), restoreMode);
+        _control?.ClientProcess?.Dispose();
+        _control = new Control(new AutoTdpController(settings, start), folder, clientProcess, restoreMode);
+
+        // Saved before the limit is first set, so a crash from here on still gets the mode put back.
+        MarkHolding(restoreMode ?? AsusAcpi.PerformanceMode);
         Apply(_control, _control.Controller.Watts);
-        Log.Write($"Holding {settings.TargetFps} fps between {min} and {max} W, under {settings.TemperatureLimit} °C, from {_control.Controller.Watts} W, for {folder ?? "the busiest program"}");
+        Log.Write($"Holding {settings.TargetFps} fps between {settings.MinWatts} and {settings.MaxWatts} W, under {settings.TemperatureLimit} °C, from {_control.Controller.Watts} W, for {(folder is null ? "the busiest program" : AutoTdpRules.Printable(folder))}");
 
         _last = Status(_control, null, _acpi.Temperature());
         return _last;
@@ -347,6 +468,7 @@ internal sealed partial class AutoTdpService : ServiceBase
         // Armoury Crate's own default, is put back instead.
         var mode = control.RestoreMode ?? AsusAcpi.PerformanceMode;
         var restored = _acpi!.SetOperatingMode(mode);
+        MarkHolding(null);
         Log.Write($"Stopped, as {why}. Operating mode {mode} {(restored ? "put back" : "was refused")}");
     }
 
@@ -384,7 +506,9 @@ internal sealed partial class AutoTdpService : ServiceBase
             PipeAccessRights.FullControl, AccessControlType.Allow));
 
         // A client opening it to read and write is checked for CreateNewInstance as well, which Windows
-        // counts as part of writing to a pipe.
+        // counts as part of writing to a pipe. With several instances allowed, that also lets the player's
+        // programs add an instance of their own while one is free, so the library checks that the end it
+        // reached belongs to this service's process before it trusts an answer.
         security.AddAccessRule(new PipeAccessRule(new SecurityIdentifier(WellKnownSidType.InteractiveSid, null),
             PipeAccessRights.ReadWrite | PipeAccessRights.CreateNewInstance, AccessControlType.Allow));
         return security;

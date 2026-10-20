@@ -65,16 +65,12 @@ internal static class Updates
         return null;
     }
 
+    // A client of its own rather than the shared one: GitHub's answers are asked for in its own format,
+    // and a release's description is never more than a few KB, so a much smaller limit than the rest.
+    // The shared user agent says what is asking, which GitHub's API refuses requests without.
     private static HttpClient CreateClient()
     {
-        var http = new HttpClient
-        {
-            Timeout = TimeSpan.FromSeconds(20),
-            MaxResponseContentBufferSize = 1024 * 1024
-        };
-
-        // GitHub's API refuses requests with no user agent.
-        http.DefaultRequestHeaders.UserAgent.ParseAdd($"HandheldOptimiser/{Current}");
+        var http = HttpClients.Create(TimeSpan.FromSeconds(20), maxResponseBytes: 1024 * 1024);
         http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
         return http;
     }

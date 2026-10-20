@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO;
 using Microsoft.Win32;
 using HandheldOptimiser.Models;
@@ -86,7 +87,8 @@ public sealed class RegistryHelper(LogService log) : IRegistryStore
 
             snapshot.KeyExisted = true;
 
-            var existing = key.GetValue(valueName);
+            // Unexpanded, so a REG_EXPAND_SZ is put back with its %VARIABLES% rather than this user's paths.
+            var existing = key.GetValue(valueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
             if (existing is null)
             {
                 snapshot.ValueExisted = false;
@@ -106,21 +108,41 @@ public sealed class RegistryHelper(LogService log) : IRegistryStore
         return snapshot;
     }
 
-    private static string SerialiseValue(object value, RegistryValueKind kind) => kind switch
+    /// <summary>
+    /// The snapshot's text form of a value. Numbers are written in the invariant culture: the journal is
+    /// read back on a later run, possibly under another culture, and some (Swedish, for one) write a
+    /// negative number with U+2212 rather than a hyphen, which the invariant parser refuses.
+    /// </summary>
+    public static string SerialiseValue(object value, RegistryValueKind kind) => kind switch
     {
         RegistryValueKind.Binary => Convert.ToBase64String((byte[])value),
         RegistryValueKind.MultiString => string.Join("\u0000", (string[])value),
-        _ => value.ToString() ?? string.Empty
+        _ => Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty
     };
 
-    private static object DeserialiseValue(string value, RegistryValueKind kind) => kind switch
+    /// <summary>
+    /// The value a snapshot's text stands for. Also reads numbers journalled by earlier versions, which
+    /// used the culture of the day and so may have a U+2212 minus sign.
+    ///
+    /// An empty multi-string comes back as no strings at all. Its text is empty either way, and an
+    /// empty REG_MULTI_SZ is far more common than one holding a single empty string.
+    /// </summary>
+    public static object DeserialiseValue(string value, RegistryValueKind kind) => kind switch
     {
-        RegistryValueKind.DWord => unchecked((int)long.Parse(value)),
-        RegistryValueKind.QWord => long.Parse(value),
+        RegistryValueKind.DWord => unchecked((int)ParseInteger(value)),
+        RegistryValueKind.QWord => ParseInteger(value),
         RegistryValueKind.Binary => Convert.FromBase64String(value),
-        RegistryValueKind.MultiString => value.Split('\u0000', StringSplitOptions.None),
+        RegistryValueKind.MultiString => value.Length == 0 ? Array.Empty<string>() : value.Split('\u0000', StringSplitOptions.None),
         _ => value
     };
+
+    // Some cultures (Hebrew and Arabic among them) also put a direction mark before the sign.
+    private static long ParseInteger(string value) =>
+        long.Parse(
+            value.Replace("\u200E", string.Empty).Replace("\u200F", string.Empty).Replace("\u061C", string.Empty)
+                .Trim().Replace('\u2212', '-'),
+            NumberStyles.AllowLeadingSign,
+            CultureInfo.InvariantCulture);
 
     /// <summary>
     /// Writes a value, first capturing what was there. Returns null if the write was refused or failed;

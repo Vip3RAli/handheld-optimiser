@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Win32;
 using HandheldOptimiser.Models;
+using HandheldOptimiser.TweakDefinitions;
 
 namespace HandheldOptimiser.Services;
 
@@ -50,6 +51,29 @@ public sealed class TweakJournalService(LogService log) : ITweakJournal
     /// reinstalled. They are not undo data: no tweak has these IDs and nothing can revert them.
     /// </summary>
     public const string RemovalRecordPrefix = "appx.removal.";
+
+    /// <summary>
+    /// Undo data keys whose value is a list, one item per line, rather than a single original value.
+    /// A re-apply adds the items it changed to the list instead of being ignored, or revert would only
+    /// put back what the first run changed.
+    /// </summary>
+    private static readonly HashSet<string> ListStateKeys = new(StringComparer.Ordinal)
+    {
+        SleepTweaks.WakeDevices,
+        SleepTweaks.CardReaders
+    };
+
+    /// <summary>
+    /// Undo data keys that are not imported from the old per-user file. Their values are device names
+    /// that revert pastes into an elevated script and cannot check against a fixed list, so one
+    /// planted there could make revert act on whatever it names. Every other key's value is checked
+    /// at revert time against what its tweak could have written (a GUID, a number, a known name).
+    /// </summary>
+    private static readonly string[] UntrustedLegacyStateKeys =
+    [
+        SleepTweaks.WakeDevices,
+        SleepTweaks.CardReaders
+    ];
 
     public TweakJournal Load()
     {
@@ -119,6 +143,8 @@ public sealed class TweakJournalService(LogService log) : ITweakJournal
     /// That file could have been edited by anything running as the user, so it is not taken on trust:
     /// entries for IDs this build does not know are dropped, and every registry snapshot is checked
     /// again at revert time against the values its tweak actually owns (<see cref="Tweak.OwnsRegistryValue"/>).
+    /// Captured state that revert cannot check the same way, device names, is left behind
+    /// (<see cref="DropUntrustedLegacyState"/>).
     /// </summary>
     public void ImportLegacyFile(Func<string, bool> isKnownTweakId)
     {
@@ -161,6 +187,12 @@ public sealed class TweakJournalService(LogService log) : ITweakJournal
                 entry.RegistrySnapshots.Clear();
             }
 
+            foreach (var key in DropUntrustedLegacyState(entry))
+            {
+                _log.Warning($"Not importing \"{key}\" for \"{entry.TweakId}\": it names devices that cannot be " +
+                             "checked. Reverting this item will not put those devices back.");
+            }
+
             if (journal.Entries.All(e => e.TweakId != entry.TweakId))
             {
                 journal.Entries.Add(entry);
@@ -175,23 +207,81 @@ public sealed class TweakJournalService(LogService log) : ITweakJournal
         _log.Success($"Imported undo data for {journal.Entries.Count} item(s).");
 
         // Deleted as administrator in a folder the user controls, so not through a link, or it could
-        // be made to delete a journal.json somewhere else.
+        // be made to delete a journal.json somewhere else. The check here catches a link that is
+        // already there; deleting through a handle whose real path is checked closes the gap between
+        // that check and the delete.
         if (SafetyGuard.FindLinkOnPath(_legacyPath) is { } link)
         {
             _log.Warning($"Left the old journal file in place: {link} is a junction or symbolic link.");
             return;
         }
 
-        try
-        {
-            File.Delete(_legacyPath);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        if (!LinkSafeDelete.TryDelete(_legacyPath, out var problem))
         {
             // Harmless: once the registry value exists the file is never read again.
-            _log.Trace($"    Could not delete the old journal file: {ex.Message}");
+            _log.Trace($"    Could not delete the old journal file: {problem}");
         }
     }
+
+    /// <summary>
+    /// Removes the captured state an imported entry may not bring with it, and returns the keys removed.
+    /// Public so the rule can be tested without the registry.
+    /// </summary>
+    public static IReadOnlyList<string> DropUntrustedLegacyState(TweakJournalEntry entry)
+    {
+        var dropped = new List<string>();
+
+        foreach (var key in UntrustedLegacyStateKeys)
+        {
+            if (entry.CapturedState.Remove(key))
+            {
+                dropped.Add(key);
+            }
+        }
+
+        return dropped;
+    }
+
+    /// <summary>
+    /// Adds a re-apply's captured state to what is already journalled and returns how many items were
+    /// added. A single value keeps the first one captured, which is the original; a list gains the
+    /// items it did not have yet. Public so it can be tested without the registry.
+    /// </summary>
+    public static int MergeCapturedState(Dictionary<string, string> existing, IReadOnlyDictionary<string, string> incoming)
+    {
+        var added = 0;
+
+        foreach (var (key, value) in incoming)
+        {
+            if (existing.TryAdd(key, value))
+            {
+                added++;
+                continue;
+            }
+
+            if (!ListStateKeys.Contains(key))
+            {
+                continue;
+            }
+
+            var items = SplitList(existing[key]);
+            var newItems = SplitList(value)
+                .Where(item => !items.Contains(item, StringComparer.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (newItems.Count > 0)
+            {
+                existing[key] = string.Join(SleepTweaks.DeviceSeparator, items.Concat(newItems));
+                added += newItems.Count;
+            }
+        }
+
+        return added;
+    }
+
+    private static List<string> SplitList(string value) =>
+        [.. value.Split(SleepTweaks.DeviceSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
 
     public void Record(TweakJournalEntry entry)
     {
@@ -226,13 +316,7 @@ public sealed class TweakJournalService(LogService log) : ITweakJournal
             }
         }
 
-        foreach (var (key, value) in entry.CapturedState)
-        {
-            if (existing.CapturedState.TryAdd(key, value))
-            {
-                added++;
-            }
-        }
+        added += MergeCapturedState(existing.CapturedState, entry.CapturedState);
 
         if (added == 0)
         {
