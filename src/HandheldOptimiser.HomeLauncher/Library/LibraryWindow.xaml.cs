@@ -54,6 +54,7 @@ public partial class LibraryWindow : Window
         // Scan on load, not only on activation: Windows can start the home app without giving it focus.
         Loaded += (_, _) => _ = ScanAsync();
         Loaded += (_, _) => _ = CheckForUpdateAsync();
+        Loaded += (_, _) => _ = RefreshGameSettingsAsync();
         Loaded += (_, _) => WatchScreens();
         SourceInitialized += (_, _) => WatchWake();
         Activated += OnActivated;

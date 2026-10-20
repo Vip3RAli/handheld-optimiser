@@ -98,6 +98,7 @@ The library finds installed games from **Steam**, **Xbox / PC Game Pass**, **Epi
 | **Artwork** | Wide artwork, covers and icons from SteamGridDB with your own free key, for games outside Steam and for apps such as Chrome. |
 | **Quick actions** (**X**) | Favourite or hide a game, set its game profile, launch arguments or artwork. |
 | **Game profiles** | A power mode, resolution, refresh rate, brightness, TDP Engine frame rate and fan curve per game, put back when it closes. |
+| **Optimised settings** | For games on the list in `data/game-settings.json`: the settings to choose in the game for 1080p at 60 fps, and **Apply optimised settings**, which puts the matching power mode, resolution, refresh rate and TDP Engine frame rate into the game profile. |
 | **TDP Engine** | Holds a game at 30, 40, 45 or 60 fps on the lowest power limit that manages it, and lowers the limit when the processor reaches your temperature limit. Each game starts from the limit it settled on last time. Switch it on under **Settings > Sleep and clean-up > Play and sleep**, or per game in its profile. |
 | **Fan curves** | Quiet, Cool or Max fans while a game runs, with or without TDP Engine, and the Ally's own curve back when it closes. Every curve reaches full speed by 90 °C. Auto moves between the three, stepping up early when the power jumps and waiting 30 seconds before stepping down. Set it next to TDP Engine, or per game. |
 | **Game Bar widget** | TDP Engine in Xbox Game Bar (Win + G): see the watts, frame rate and temperature, and change the frame rate or fan curve mid-game. Started from Game Bar with nothing running, it follows the game you're playing and stops a minute after it closes. |
@@ -119,7 +120,7 @@ The library uses about 25 MB of memory while a game runs. Steam Big Picture uses
 
 ### Privacy
 
-The library only uses the internet to check for a newer release, and for the features you switch on:
+The library only uses the internet to check for a newer release and a newer list of optimised game settings (once a day, from this repository), and for the features you switch on:
 
 - artwork from [SteamGridDB](https://www.steamgriddb.com), which is sent the names of your apps and of games outside Steam
 - your Steam game list and wishlist, and store covers for games you have not installed
