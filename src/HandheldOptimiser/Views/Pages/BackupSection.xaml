@@ -13,7 +13,7 @@
             <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
                 <TextBlock Text="{Binding RevertSummary}" FontSize="13" TextWrapping="Wrap" />
                 <TextBlock Margin="0,4,0,0" TextWrapping="Wrap" FontSize="11.5" Opacity="0.55"
-                           Text="Undo all changes puts every setting back as it was. Removed bloatware is not restored." />
+                           Text="Removed preinstalled apps are not restored." />
             </StackPanel>
 
             <!-- Sized for a thumb on a 7" touchscreen. -->

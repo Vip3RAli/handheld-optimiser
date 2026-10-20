@@ -22,9 +22,9 @@ public static class InterfaceTweaks
     public static Tweak MenuShowDelay => new()
     {
         Id = "ux.menushowdelay",
-        Name = "Instant menus (zero menu show delay)",
+        Name = "Open menus instantly",
         Description =
-            "Removes the 400 ms pause before submenus open.",
+            "Removes the short pause (400 ms) before submenus open.",
         Category = TweakCategory.TouchAndDesktop,
         Risk = RiskLevel.Safe,
         RequiresReboot = true,
@@ -38,16 +38,16 @@ public static class InterfaceTweaks
     public static Tweak EdgeSwipe => new()
     {
         Id = "ux.edgeswipe",
-        Name = "Disable edge swipe gestures",
+        Name = "Turn off edge swipe gestures",
         Description =
-            "Stops swipes from the screen edges opening Widgets, Notifications or Task View, which is " +
-            "easy to do by accident in touch-heavy games.",
+            "Stops swipes from the screen edges opening Widgets, Notifications or Task View. These are " +
+            "easy to trigger by accident in touch-heavy games.",
         Category = TweakCategory.TouchAndDesktop,
         Risk = RiskLevel.Moderate,
         RequiresReboot = true,
         IncludeInOneClick = false,
         Warning =
-            "Open Notifications and Widgets from the taskbar or Armoury Crate instead. Applies to every " +
+            "Open Notifications and Widgets from the taskbar instead. Applies to every " +
             "user account.",
         RegistryValues =
         [
@@ -63,7 +63,7 @@ public static class InterfaceTweaks
     public static Tweak VisualEffects => new()
     {
         Id = VisualEffectsId,
-        Name = "Disable transparency & window animations",
+        Name = "Turn off transparency and window animations",
         Description =
             "Turns off transparency and window animations. Less work for the iGPU and a snappier " +
             "desktop. Games are unaffected.",

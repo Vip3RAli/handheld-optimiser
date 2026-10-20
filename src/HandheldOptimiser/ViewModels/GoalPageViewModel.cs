@@ -144,7 +144,7 @@ public sealed partial class GoalPageViewModel : PageViewModelBase
         // are a press away on each tile, and this list is what stops Apply all being pressed blind.
         var warned = TweakPrompts.WarnedNames(pending);
 
-        var message = $"{pending.Count} tweak(s) will be applied after a System Restore point is created." + skippedNote;
+        var message = Plural.Count(pending.Count, "tweak") + " will be applied after a System Restore point is created." + skippedNote;
 
         if (warned.Count > 0)
         {
@@ -172,9 +172,9 @@ public sealed partial class GoalPageViewModel : PageViewModelBase
                 Shell.NotifyRebootRequired();
             }
 
-            // Everything is checked again, since one tweak can move another. The dialog only waits for
-            // this page's own.
-            await _states.CheckAllAsync(waitFor: Tweaks, ct);
+            // These are checked again along with any tweak that shares a setting with one of them,
+            // since one tweak can move another. The dialog only waits for this page's own.
+            await _states.CheckRelatedAsync(Tweaks, ct);
         });
     }
 }

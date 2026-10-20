@@ -13,7 +13,7 @@ public sealed class HubLayoutTests
 {
     [Fact]
     public void The_goals_are_the_eight_cards_in_order() => Assert.Equal(
-        ["Performance", "Battery & Sleep", "Clean Up", "Apps", "Full Screen", "Maintenance & Backup", "Health", "Updates"],
+        ["Performance", "Battery & sleep", "Clean up", "Apps", "Full screen", "Maintenance & backup", "Health", "Updates"],
         HubLayout.Goals.Select(g => g.Title));
 
     [Fact]
@@ -27,10 +27,10 @@ public sealed class HubLayoutTests
 
     [Theory]
     [InlineData("Performance", 11, 8)]
-    [InlineData("Battery & Sleep", 6, 0)]
-    [InlineData("Clean Up", 19, 12)]
-    [InlineData("Full Screen", 7, 3)]
-    [InlineData("Maintenance & Backup", 4, 1)]
+    [InlineData("Battery & sleep", 6, 0)]
+    [InlineData("Clean up", 19, 12)]
+    [InlineData("Full screen", 8, 3)]
+    [InlineData("Maintenance & backup", 4, 1)]
     [InlineData("Apps", 0, 0)]
     public void A_goal_holds_the_tweaks_the_map_gives_it(string title, int tweaks, int recommended)
     {
@@ -41,11 +41,11 @@ public sealed class HubLayoutTests
     }
 
     [Theory]
-    [InlineData("Disable power throttling", TweakCategory.System)]
+    [InlineData("Turn off power throttling", TweakCategory.System)]
     [InlineData("Remove Windows startup delay", TweakCategory.System)]
-    [InlineData("Enable hardware-accelerated GPU scheduling", TweakCategory.Games)]
+    [InlineData("Turn on hardware-accelerated GPU scheduling", TweakCategory.Games)]
     [InlineData("Turn off update sharing with other PCs", TweakCategory.BackgroundActivity)]
-    [InlineData("Disable Sticky Keys shortcut", TweakCategory.TouchAndDesktop)]
+    [InlineData("Turn off the Sticky Keys shortcut", TweakCategory.TouchAndDesktop)]
     [InlineData("Turn off Widgets", TweakCategory.AdsAndAssistants)]
     [InlineData("Turn off Windows Error Reporting", TweakCategory.Privacy)]
     [InlineData("Turn off reserved storage", TweakCategory.Storage)]
@@ -53,6 +53,6 @@ public sealed class HubLayoutTests
         Assert.Equal(category, TweakCatalog.All.Single(t => t.Name == name).Category);
 
     [Fact]
-    public void The_catalog_holds_all_47_tweaks_once() =>
-        Assert.Equal(47, TweakCatalog.All.Select(t => t.Id).Distinct().Count());
+    public void The_catalog_holds_all_48_tweaks_once() =>
+        Assert.Equal(48, TweakCatalog.All.Select(t => t.Id).Distinct().Count());
 }

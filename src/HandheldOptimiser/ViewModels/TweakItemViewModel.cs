@@ -202,7 +202,7 @@ public sealed partial class TweakItemViewModel : ObservableObject, ITile
 
                         if (result.Status == ResultStatus.Blocked)
                         {
-                            await _shell.ConfirmAsync("Cannot revert", result.Message ?? "No undo data.", "OK");
+                            await _shell.ConfirmAsync("Cannot undo", result.Message ?? "No undo data.", "OK");
                         }
 
                         if (result.RebootRequired && !result.IsFailure)
@@ -211,9 +211,9 @@ public sealed partial class TweakItemViewModel : ObservableObject, ITile
                         }
                     }
 
-                    // One tweak can move another (two that share a setting), so all are checked again.
-                    // Only this one is waited for; the rest answer in the background.
-                    await _states.CheckAllAsync(waitFor: [Tweak], ct);
+                    // One tweak can move another (two that share a setting), so those are checked
+                    // again with it. Only this one is waited for; the rest answer in the background.
+                    await _states.CheckRelatedAsync([Tweak], ct);
                 }
                 finally
                 {

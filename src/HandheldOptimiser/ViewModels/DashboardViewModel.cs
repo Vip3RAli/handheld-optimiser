@@ -6,7 +6,7 @@ using HandheldOptimiser.Services;
 namespace HandheldOptimiser.ViewModels;
 
 /// <summary>
-/// The one-click page. "Apply Optimised Tweaks" applies every tweak marked for it, after a restore point and after
+/// The one-click page. "Apply recommended tweaks" applies every tweak marked for it, after a restore point and after
 /// an explicit confirmation listing exactly what carries a warning.
 /// </summary>
 public sealed partial class DashboardViewModel : PageViewModelBase
@@ -125,7 +125,7 @@ public sealed partial class DashboardViewModel : PageViewModelBase
         StartBatteryUpdates();
         await LoadAsync();
 
-        // Create restore point, on the Maintenance & Backup page, turns System Protection on. The
+        // Create restore point, on the Maintenance & backup page, turns System Protection on. The
         // warning about it being off is asked about again on coming back, so it clears.
         if (_deviceRead && !ProtectionEnabled)
         {
@@ -283,9 +283,9 @@ public sealed partial class DashboardViewModel : PageViewModelBase
         AppliedCount = summary.Applied;
 
         OptimisationStatus = !summary.IsComplete ? "Checking…"
-            : summary.Applied == 0 ? "Stock Windows: nothing optimised yet"
-            : summary.Applied == summary.Total ? "Fully optimised"
-            : $"Partially optimised: {summary.Total - summary.Applied} tweak(s) still available";
+            : summary.Applied == 0 ? "No recommended tweaks are on yet"
+            : summary.Applied == summary.Total ? "All recommended tweaks are on"
+            : $"{Plural.Count(summary.Total - summary.Applied, "recommended tweak")} still off";
     }
 
     [RelayCommand]
@@ -300,21 +300,21 @@ public sealed partial class DashboardViewModel : PageViewModelBase
 
         if (risky.Count > 0)
         {
-            message += "These carry real trade-offs:\n" +
+            message += "These have downsides:\n" +
                        string.Join("\n\n", risky.Select(t => $"  • {t.Name}\n    {t.Warning}")) +
                        "\n\n";
         }
 
-        message += "Each tweak can be individually reverted afterwards from its page.";
+        message += "You can undo any of them later from its page.";
 
-        if (!await Shell.ConfirmAsync("Apply Optimised Tweaks", message, "Create restore point & apply"))
+        if (!await Shell.ConfirmAsync("Apply recommended tweaks", message, "Create restore point & apply"))
         {
             return;
         }
 
-        await Shell.RunExclusiveAsync("Apply Optimised Tweaks", async (progress, ct) =>
+        await Shell.RunExclusiveAsync("Apply recommended tweaks", async (progress, ct) =>
         {
-            var summary = await _engine.ApplyAsync(pending, "Apply Optimised Tweaks", createRestorePoint: true, progress, ct);
+            var summary = await _engine.ApplyAsync(pending, "Apply recommended tweaks", createRestorePoint: true, progress, ct);
 
             if (summary.Aborted)
             {
@@ -331,12 +331,12 @@ public sealed partial class DashboardViewModel : PageViewModelBase
             await _states.CheckAllAsync(ct: ct);
 
             await Shell.ConfirmAsync(
-                "Optimisation complete",
-                $"{summary.Applied} tweak(s) applied.\n" +
+                "Recommended tweaks applied",
+                Plural.Count(summary.Applied, "tweak") + " applied.\n" +
                 $"{summary.AlreadyDone} were already set.\n" +
-                (summary.Failures > 0 ? $"{summary.Failures} failed. Check the log.\n" : string.Empty) +
+                (summary.Failures > 0 ? $"{summary.Failures} failed. The console has the detail.\n" : string.Empty) +
                 (summary.RebootRequired ? "\nRestart required for some changes to take effect." : string.Empty) +
-                "\n\nBloatware removal is deliberately separate. Review it on the Apps page.",
+                "\n\nPreinstalled apps are removed from their own page, under Apps.",
                 "OK");
         });
     }

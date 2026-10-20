@@ -24,7 +24,7 @@
 
   <Identity Name="HandheldOptimiser.HomeApp"
             Publisher="CN=Handheld Optimiser"
-            Version="0.2.2.0"
+            Version="0.2.3.0"
             ProcessorArchitecture="x64" />
 
   <Properties>
@@ -51,7 +51,7 @@
       <!-- AppListEntry none: kept out of Start, where it would sit beside the main app's own shortcut
            under the same name. Full screen mode still lists and opens it by its app ID. -->
       <uap:VisualElements DisplayName="Handheld Optimiser"
-                          Description="Opens your chosen app as the full screen experience home"
+                          Description="Opens the app you chose as the full screen home"
                           BackgroundColor="transparent"
                           Square150x150Logo="Assets\Square150x150Logo.png"
                           Square44x44Logo="Assets\Square44x44Logo.png"
@@ -62,7 +62,7 @@
           <uap3:AppExtension Name="windows.gamingApp"
                              Id="HomeApp"
                              DisplayName="Handheld Optimiser"
-                             Description="Opens your chosen app as the full screen experience home"
+                             Description="Opens the app you chose as the full screen home"
                              PublicFolder="Public" />
         </uap3:Extension>
       </Extensions>

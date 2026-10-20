@@ -45,7 +45,7 @@ public sealed class TweakEngine
         _log = log;
         _restorePoints = restorePoints;
         _journal = journal;
-        _context = new TweakContext(log, registry, runner);
+        _context = new TweakContext(log, registry, runner) { Checkpoint = RecordCheckpoint };
         Device = device;
 
         AllTweaks = TweakCatalog.All;
@@ -102,8 +102,7 @@ public sealed class TweakEngine
                 summary.Aborted = true;
                 summary.AbortReason =
                     $"No System Restore point could be created ({rp.Message}). Nothing was changed. " +
-                    "Enable System Protection in Windows settings, or re-run and explicitly choose to " +
-                    "continue without a restore point.";
+                    "Turn on System Protection for the C: drive, then try again.";
 
                 _log.Error("ABORTED before making any change: no restore point.");
                 return summary;
@@ -120,18 +119,29 @@ public sealed class TweakEngine
 
             progress?.Report(tweak.Name);
 
-            var (result, journalEntry) = await tweak.ApplyAsync(_context, ct);
-            summary.Results.Add(result);
+            var journalEntry = tweak.NewJournalEntry();
+            TweakResult result;
 
-            // Journalled whenever the tweak captured undo data, whatever its result. A tweak that fails
-            // partway has usually already changed something (the first registry values, some of its
-            // services, the home app registration), and without this entry those changes could not be
-            // reverted. Values that were already optimised are never snapshotted, so a no-op run
-            // records nothing here.
-            if (journalEntry.RegistrySnapshots.Count > 0 || journalEntry.CapturedState.Count > 0)
+            try
             {
-                _journal.Record(journalEntry);
+                // The registry originals are saved before the script half runs, so a crash, a forced
+                // close or a hang in PowerShell cannot leave registry changes with no undo data.
+                result = await tweak.ApplyAsync(_context, journalEntry, RecordCheckpoint, ct);
             }
+            finally
+            {
+                // Journalled whenever the tweak captured undo data, whatever its result, and also when
+                // it was cancelled or threw. A tweak that stops partway has usually already changed
+                // something (the first registry values, some of its services, the home app
+                // registration), and without this entry those changes could not be reverted. Values
+                // that were already optimised are never snapshotted, so a no-op run records nothing.
+                if (journalEntry.RegistrySnapshots.Count > 0 || journalEntry.CapturedState.Count > 0)
+                {
+                    _journal.Record(journalEntry);
+                }
+            }
+
+            summary.Results.Add(result);
 
             switch (result.Status)
             {
@@ -157,6 +167,22 @@ public sealed class TweakEngine
 
         return summary;
     }
+
+    /// <summary>
+    /// Saves what a tweak has captured so far. A copy is recorded rather than the entry itself: the
+    /// journal keeps the object it is first given, and it only saves again when a later record adds
+    /// something it does not already hold, so recording the same object twice would never save what
+    /// the script half added to it.
+    /// </summary>
+    private void RecordCheckpoint(TweakJournalEntry entry) =>
+        _journal.Record(new TweakJournalEntry
+        {
+            TweakId = entry.TweakId,
+            TweakName = entry.TweakName,
+            AppliedAtUtc = entry.AppliedAtUtc,
+            RegistrySnapshots = [.. entry.RegistrySnapshots],
+            CapturedState = new Dictionary<string, string>(entry.CapturedState)
+        });
 
     /// <summary>
     /// Reverts a tweak using the snapshot recorded when it was applied. A tweak with no journal entry

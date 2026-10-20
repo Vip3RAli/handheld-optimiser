@@ -31,7 +31,7 @@ public static partial class ProcessorPowerReport
 
     private const string GuidPattern ="[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}";
 
-    // Plans and values are found by shape, as the Battery & Sleep tweaks do it: powercfg's labels are
+    // Plans and values are found by shape, as the Battery & sleep tweaks do it: powercfg's labels are
     // translated, its GUIDs and trailing hex values are not. /qh also shows the settings Windows hides.
     private static readonly string Script =
         $$"""

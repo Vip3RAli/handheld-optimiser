@@ -1,4 +1,6 @@
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Win32;
 
 namespace HandheldOptimiser.HomeLauncher.Library;
@@ -101,6 +103,7 @@ internal static class LibrarySettings
     private const string AutoTdpFpsValue = "AutoTdpFps";
     private const string AutoTdpTemperatureValue = "AutoTdpTemperature";
     private const string AutoTdpWattsValue = "AutoTdpMaxWatts";
+    private const string FanCurveValue = "FanCurve";
 
     /// <summary>The sizes a TV or monitor can show the library at, as percentages. 0 fits it to the screen.</summary>
     public static readonly int[] DockedSizes = [0, 100, 125, 150, 175, 200];
@@ -291,8 +294,8 @@ internal static class LibrarySettings
     /// <summary>The player's Steam Web API key, which lists the Steam games they own. Null when none is set.</summary>
     public static string? SteamKey
     {
-        get => Read(SteamKeyValue)?.Trim() is { Length: > 0 } key ? key : null;
-        set => Write(SteamKeyValue, value);
+        get => ReadSecret(Store, SteamKeyValue);
+        set => WriteSecret(Store, SteamKeyValue, value);
     }
 
     /// <summary>The Deals row below the library. Off until switched on.</summary>
@@ -312,8 +315,8 @@ internal static class LibrarySettings
     /// <summary>The player's IsThereAnyDeal API key, for the sales in the Deals row. Null when none is set.</summary>
     public static string? DealsKey
     {
-        get => Read(DealsKeyValue)?.Trim() is { Length: > 0 } key ? key : null;
-        set => Write(DealsKeyValue, value);
+        get => ReadSecret(Store, DealsKeyValue);
+        set => WriteSecret(Store, DealsKeyValue, value);
     }
 
     /// <summary>Deals on the games on the player's Steam wishlist first, which needs the Steam key too.</summary>
@@ -344,6 +347,13 @@ internal static class LibrarySettings
         set => Write(AutoTdpWattsValue, value.ToString(System.Globalization.CultureInfo.InvariantCulture));
     }
 
+    /// <summary>The fan curve games are played with, one of <see cref="AutoTdp.FanChoices"/>; the Ally's own by default.</summary>
+    public static string FanCurve
+    {
+        get => Read(FanCurveValue) is { } fans && AutoTdp.FanChoices.Contains(fans) ? fans : AutoTdp.AllyFans;
+        set => Write(FanCurveValue, value == AutoTdp.AllyFans ? null : value);
+    }
+
     private static int ReadChoice(string name, int[] choices, int fallback) =>
         int.TryParse(Read(name), out var value) && (choices.Contains(value) || value == 0 && fallback == 0) ? value : fallback;
 
@@ -360,16 +370,190 @@ internal static class LibrarySettings
     /// <summary>The player's SteamGridDB API key, or null when none is set.</summary>
     public static string? ArtworkKey
     {
-        get => Read(ArtworkKeyValue)?.Trim() is { Length: > 0 } key ? key : null;
-        set => Write(ArtworkKeyValue, value);
+        get => ReadSecret(Store, ArtworkKeyValue);
+        set => WriteSecret(Store, ArtworkKeyValue, value);
     }
 
-    private static string? Read(string name)
+    // ----- Reading the key once -----
+
+    // The values read by ReadOnce on this thread, while its scope is open. Thread static, so a scan on the
+    // thread pool never sees the UI thread's copy, which may be a moment out of date by then.
+    [ThreadStatic]
+    private static Dictionary<string, object?>? _snapshot;
+
+    /// <summary>
+    /// Reads every value of the key at once, and has the properties answer from that copy until the scope
+    /// is disposed, on this thread only. The library reads about fifteen settings each time it comes to the
+    /// front, which was the key opened and closed fifteen times; with this it is opened once. Writes made
+    /// meanwhile go to the registry and to the copy alike. A scope inside another is a no-op.
+    /// </summary>
+    public static IDisposable ReadOnce()
     {
+        if (_snapshot is not null)
+        {
+            return Scope.Nested;
+        }
+
+        var values = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         try
         {
             using var key = Registry.CurrentUser.OpenSubKey(Program.SettingsKey);
-            return key?.GetValue(name) as string;
+            foreach (var name in key?.GetValueNames() ?? [])
+            {
+                values[name] = key!.GetValue(name);
+            }
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+        {
+            // Each setting falls back to its default, as a failed read of one does.
+        }
+
+        _snapshot = values;
+        return Scope.Outer;
+    }
+
+    private sealed class Scope(bool outer) : IDisposable
+    {
+        public static readonly Scope Outer = new(true);
+        public static readonly Scope Nested = new(false);
+
+        public void Dispose()
+        {
+            if (outer)
+            {
+                _snapshot = null;
+            }
+        }
+    }
+
+    // ----- The API keys -----
+
+    // The keys are kept encrypted for this Windows account under the same name with this after it, as
+    // binary. They used to be kept as plain text under the name alone, which any program, backup or
+    // registry export could read; one found there is moved over the first time it is read.
+    private const string ProtectedSuffix = "Protected";
+
+    // Ties the encrypted keys to this use, so another program's DPAPI blob is not mistaken for one of ours.
+    private static readonly byte[] SecretEntropy = Encoding.UTF8.GetBytes("HandheldOptimiser.Library.ApiKey");
+
+    /// <summary>Where the API keys are read from and written to: the registry, or a dictionary in the tests.</summary>
+    internal interface ISecretStore
+    {
+        object? Get(string name);
+
+        /// <returns>Whether the value was saved.</returns>
+        bool SetBinary(string name, byte[] value);
+
+        void Delete(string name);
+    }
+
+    private static readonly ISecretStore Store = new RegistryStore();
+
+    private sealed class RegistryStore : ISecretStore
+    {
+        public object? Get(string name) => ReadRaw(name);
+        public bool SetBinary(string name, byte[] value) => WriteValue(name, value, RegistryValueKind.Binary);
+        public void Delete(string name) => WriteValue(name, null, RegistryValueKind.String);
+    }
+
+    /// <summary>
+    /// An API key, decrypted, or null when none is set or it cannot be decrypted (the profile was copied
+    /// to another account, say). A plain text key from before is encrypted, saved and its plain copy deleted.
+    /// </summary>
+    internal static string? ReadSecret(ISecretStore store, string name)
+    {
+        var protectedName = name + ProtectedSuffix;
+        if (store.Get(protectedName) is byte[] sealedKey)
+        {
+            // A plain copy left by a move that could not delete it goes now.
+            if (store.Get(name) is not null)
+            {
+                store.Delete(name);
+            }
+
+            return Unprotect(sealedKey)?.Trim() is { Length: > 0 } key ? key : null;
+        }
+
+        if (store.Get(name) is not string plain || plain.Trim() is not { Length: > 0 } found)
+        {
+            return null;
+        }
+
+        // Only deleted once the encrypted copy is safely saved, so a failed move loses nothing.
+        if (Protect(found) is { } sealedFound && store.SetBinary(protectedName, sealedFound))
+        {
+            store.Delete(name);
+            Program.Log($"Moved the {name} setting to encrypted storage");
+        }
+
+        return found;
+    }
+
+    /// <summary>Saves an API key encrypted, or with null or blank removes it, plain copy and all.</summary>
+    internal static void WriteSecret(ISecretStore store, string name, string? value)
+    {
+        var protectedName = name + ProtectedSuffix;
+        if (value?.Trim() is not { Length: > 0 } key)
+        {
+            store.Delete(protectedName);
+            store.Delete(name);
+            return;
+        }
+
+        if (Protect(key) is { } sealedKey && store.SetBinary(protectedName, sealedKey))
+        {
+            store.Delete(name);
+        }
+        else
+        {
+            // Never written as plain text instead: the player is asked for it again next time.
+            Program.Log($"Could not save the {name} setting encrypted");
+        }
+    }
+
+    /// <summary>The text encrypted for this Windows account, or null when Windows will not.</summary>
+    internal static byte[]? Protect(string text)
+    {
+        try
+        {
+            return ProtectedData.Protect(Encoding.UTF8.GetBytes(text), SecretEntropy, DataProtectionScope.CurrentUser);
+        }
+        catch (CryptographicException ex)
+        {
+            Program.Log($"Could not encrypt a setting: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>Text from <see cref="Protect"/>, or null when it was not encrypted by this account.</summary>
+    internal static string? Unprotect(byte[] sealedText)
+    {
+        try
+        {
+            return Encoding.UTF8.GetString(ProtectedData.Unprotect(sealedText, SecretEntropy, DataProtectionScope.CurrentUser));
+        }
+        catch (CryptographicException ex)
+        {
+            Program.Log($"Could not decrypt a setting: {ex.Message}");
+            return null;
+        }
+    }
+
+    // ----- The registry -----
+
+    private static string? Read(string name) => ReadRaw(name) as string;
+
+    private static object? ReadRaw(string name)
+    {
+        if (_snapshot is { } snapshot)
+        {
+            return snapshot.GetValueOrDefault(name);
+        }
+
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(Program.SettingsKey);
+            return key?.GetValue(name);
         }
         catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
         {
@@ -377,24 +561,46 @@ internal static class LibrarySettings
         }
     }
 
-    private static void Write(string name, string? value)
+    private static void Write(string name, string? value) => WriteValue(name, value, RegistryValueKind.String);
+
+    /// <summary>Saves a value, or with null or an empty string deletes it.</summary>
+    /// <returns>Whether it was saved.</returns>
+    private static bool WriteValue(string name, object? value, RegistryValueKind kind)
     {
+        var delete = value is null || value is string { Length: 0 };
+
+        // The copy read once is kept in step, so a read later in the same scope sees the change.
+        if (_snapshot is { } snapshot)
+        {
+            if (delete)
+            {
+                snapshot.Remove(name);
+            }
+            else
+            {
+                snapshot[name] = value;
+            }
+        }
+
         try
         {
             using var key = Registry.CurrentUser.CreateSubKey(Program.SettingsKey);
-            if (string.IsNullOrEmpty(value))
+            if (delete)
             {
                 key.DeleteValue(name, throwOnMissingValue: false);
             }
             else
             {
-                key.SetValue(name, value, RegistryValueKind.String);
+                key.SetValue(name, value!, kind);
             }
+
+            return true;
         }
         catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
         {
             // The setting still applies until the library closes; it is just not remembered.
             Program.Log($"Could not save the {name} setting: {ex.Message}");
+            return false;
         }
     }
 }

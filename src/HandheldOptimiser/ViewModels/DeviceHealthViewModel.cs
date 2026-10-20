@@ -114,8 +114,8 @@ public sealed partial class DeviceHealthViewModel(SystemStateService systemState
 
     private static string ProtectionNoteFor((string Vendor, string App)? vendor) =>
         (vendor is var (name, app) ? $"{app}, {name} services, " : string.Empty) +
-        "AMD and Intel drivers, Realtek audio, Defender, Windows Update and Game Pass. This app cannot " +
-        "change any of them; this only checks that nothing else has.";
+        "AMD and Intel drivers, Realtek audio, Defender, Windows Update and Game Pass. This page only checks " +
+        "that nothing has disabled them, and Repair disabled services switches any of them back on.";
 
     [RelayCommand]
     private async Task RepairAsync()
@@ -123,7 +123,7 @@ public sealed partial class DeviceHealthViewModel(SystemStateService systemState
         var vendor = _systemState.GetVendorSoftware() is var (name, _) ? $"{name}, " : string.Empty;
 
         var confirmed = await Shell.ConfirmAsync(
-            "Repair protected services",
+            "Repair disabled services",
             $"Any {vendor}AMD, Realtek, Defender, Windows Update or Game Pass service currently set to " +
             "Disabled will be set back to Automatic and started.\n\nThis only ever re-enables services; " +
             "it cannot disable anything.",
@@ -134,7 +134,7 @@ public sealed partial class DeviceHealthViewModel(SystemStateService systemState
             return;
         }
 
-        await Shell.RunExclusiveAsync("Repairing protected services…", async (progress, ct) =>
+        await Shell.RunExclusiveAsync("Repairing disabled services…", async (progress, ct) =>
         {
             await _systemState.RepairProtectedServicesAsync(ct);
             await LoadChecksAsync(ct);

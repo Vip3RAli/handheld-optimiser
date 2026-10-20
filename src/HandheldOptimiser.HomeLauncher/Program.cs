@@ -5,6 +5,14 @@ using Microsoft.Win32;
 
 namespace HandheldOptimiser.HomeLauncher;
 
+/// <summary>What the launcher was asked to open.</summary>
+internal enum LaunchAction
+{
+    Home,
+    Library,
+    GameBar
+}
+
 /// <summary>
 /// Windows starts this as the full screen experience home app: at sign-in when "enter full screen mode
 /// at startup" is on, and whenever the home button is pressed. It opens the app chosen in Handheld
@@ -27,17 +35,31 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        var action = ActionFor(args);
+
+        // Game Bar is opened whatever the home app choice is, and the choice is not read or changed.
+        if (action == LaunchAction.GameBar)
+        {
+            OpenGameBar();
+            return 0;
+        }
+
         var (target, customPath, customArgs) = ReadSettings();
 
-        // Opens the library whatever the saved choice, for a desktop shortcut or for testing.
-        if (args.Contains("--library", StringComparer.OrdinalIgnoreCase))
+        // Opens the library whatever the saved choice, for a desktop shortcut, for testing, or when the
+        // Armoury Crate button is pressed.
+        if (action == LaunchAction.Library)
         {
             target = "library";
         }
 
+        // Only TDP Engine's Armoury Crate button says --from-button. A program the service starts does not
+        // own the foreground and has to take it; anything else that opens the library already has it.
+        var takeForeground = action == LaunchAction.Library && IsFromButton(args);
+
         var launched = target switch
         {
-            "library" => RunLibrary(),
+            "library" => RunLibrary(takeForeground),
             "armourycrate" => TryOpen(ArmouryCrateSe),
             "custom" => !string.IsNullOrWhiteSpace(customPath) && TryOpen(customPath, customArgs),
             _ => TryOpen(SteamBigPicture)
@@ -54,11 +76,11 @@ internal static class Program
     }
 
     /// <summary>Runs until the library window closes. A crash falls back to the Xbox app like a failed open.</summary>
-    private static bool RunLibrary()
+    private static bool RunLibrary(bool takeForeground)
     {
         try
         {
-            Library.LibraryApp.Run();
+            Library.LibraryApp.Run(takeForeground);
             return true;
         }
         catch (Exception ex)
@@ -67,6 +89,33 @@ internal static class Program
             return false;
         }
     }
+
+    /// <summary>What the command line asks for: --library, --gamebar, or neither (the saved home app).</summary>
+    internal static LaunchAction ActionFor(string[] args)
+    {
+        if (args.Contains("--library", StringComparer.OrdinalIgnoreCase))
+        {
+            return LaunchAction.Library;
+        }
+
+        return args.Contains("--gamebar", StringComparer.OrdinalIgnoreCase) ? LaunchAction.GameBar : LaunchAction.Home;
+    }
+
+    /// <summary>
+    /// The argument TDP Engine adds when the Armoury Crate button opens the library. The service's copy is in
+    /// src\HandheldOptimiser.PowerService\AllyControlsHost.cs, and the two must be kept in step.
+    /// </summary>
+    internal const string FromButtonArgument = "--from-button";
+
+    /// <summary>Whether TDP Engine started this for the Armoury Crate button, with <see cref="FromButtonArgument"/>.</summary>
+    internal static bool IsFromButton(string[] args) => args.Contains(FromButtonArgument, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Opens Xbox Game Bar, which is what the Command Center button shows. Win+G is pressed for the player:
+    /// the ms-gamebar: link Game Bar registers was tried first, and on the Ally it opens nothing.
+    /// </summary>
+    private static void OpenGameBar() =>
+        Log(Library.GameBarControls.Open() ? "Opened Game Bar" : "Could not open Game Bar: Windows would not take Win+G");
 
     private static (string Target, string? CustomPath, string? CustomArgs) ReadSettings()
     {

@@ -166,7 +166,7 @@ public sealed partial class GameRuntimesViewModel : SectionViewModel
     internal async Task InstallAsync(IReadOnlyList<RuntimeRowViewModel> rows, string title)
     {
         var message =
-            $"{rows.Count} runtime(s) will be downloaded and installed silently after a System Restore point " +
+            Plural.Count(rows.Count, "runtime") + " will be downloaded and installed silently after a System Restore point " +
             "is created:\n\n" +
             string.Join("\n", rows.Select(r => $"  • {r.Name}")) +
             "\n\nClose any running games first. Runtimes can be removed later from Settings > Apps.";
@@ -198,7 +198,7 @@ public sealed partial class GameRuntimesViewModel : SectionViewModel
                 $"{title} finished",
                 $"{summary.Applied} installed or updated.\n" +
                 (summary.AlreadyDone > 0 ? $"{summary.AlreadyDone} already current.\n" : string.Empty) +
-                (summary.Failures > 0 ? $"{summary.Failures} failed. Check the log.\n" : string.Empty) +
+                (summary.Failures > 0 ? $"{summary.Failures} failed. The console has the detail.\n" : string.Empty) +
                 (summary.RebootRequired ? "\nRestart to finish installing." : string.Empty),
                 "OK");
         });
@@ -218,6 +218,6 @@ public sealed partial class GameRuntimesViewModel : SectionViewModel
         var missing = EssentialRows.Count(r => r.Status == RuntimeStatus.Missing && r.Package.InstallIfMissing);
         var current = all.Count(r => r.Status == RuntimeStatus.UpToDate);
 
-        SummaryText = $"{current} up to date, {updates} update(s) available, {missing} essential(s) not installed.";
+        SummaryText = $"{current} up to date, {Plural.Count(updates, "update")} available, {Plural.Count(missing, "essential runtime")} not installed.";
     }
 }

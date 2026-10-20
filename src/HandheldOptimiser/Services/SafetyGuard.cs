@@ -56,6 +56,7 @@ public static class SafetyGuard
         "armourycrate",
         "rog live service",
         "lightingservice",
+        "\\services\\atkwmiacpiio",   // ASUS's ACPI driver, which TDP Engine needs. Its name has no "asus" in it.
 
         // --- Lenovo / Legion Space ---
         "lenovo",
@@ -214,11 +215,42 @@ public static class SafetyGuard
     }
 
     /// <summary>
+    /// The ASUS services let through for <c>ArmouryCrateTweaks.ReplaceArmouryCrate</c>, which stops and
+    /// disables them while the app's own TDP Engine service runs the Ally's buttons and controller mode
+    /// instead, and puts them back from the undo journal when switched off. Matched by exact name, so no
+    /// other ASUS service comes with them, and only here: the drivers TDP Engine needs (ATKWMIACPIIO,
+    /// AsusSAIO) and every ASUS registry path stay protected. Kept in step with
+    /// <c>ArmouryCrateTweaks.ServicesInStopOrder</c> and <c>ArmouryCrateTweaks.UpdateServices</c>.
+    /// </summary>
+    public static IReadOnlyList<string> ArmouryCrateReplacement { get; } =
+    [
+        "AsusAppService",
+        "ASUSOptimization",
+        "ASUSSoftwareManager",
+        "ASUSSwitch",
+        "ASUSSystemAnalysis",
+        "ASUSSystemDiagnosis",
+        "ArmouryCrateControlInterface",
+        "ROG Live Service",
+        "GameSDK Service",
+        "LightingService",
+        "ArmouryCrateSEService",
+        "asus",
+        "asusm"
+    ];
+
+    /// <summary>
     /// Service start-type and stop operations go through the same fragments as the registry, since a
     /// service's configuration is its Services\&lt;name&gt; key. One list means one place to protect a service.
     /// </summary>
     public static bool IsServiceProtected(string serviceName, out string? reason)
     {
+        if (ArmouryCrateReplacement.Contains(serviceName, StringComparer.OrdinalIgnoreCase))
+        {
+            reason = null;
+            return false;
+        }
+
         if (IsRegistryPathProtected(
                 RegistryRoot.LocalMachine, $@"SYSTEM\CurrentControlSet\Services\{serviceName}", "Start", out var inner))
         {

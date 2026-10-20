@@ -70,7 +70,7 @@ public sealed class DeviceReportTests
 
         Assert.Equal(HealthStatus.Warning, check.Status);
         Assert.Contains("(4.0% an hour)", check.Detail);
-        Assert.Contains("Battery & Sleep", check.Advice);
+        Assert.Contains("Battery & sleep", check.Advice);
     }
 
     [Fact]
@@ -154,7 +154,7 @@ public sealed class DeviceReportTests
         var timers = SleepHealth.ParseWakeTimers(["There are no active wake timers in the system."]);
 
         Assert.Empty(timers);
-        Assert.Equal("None", SleepHealth.WakeTimersCheck(timers).Detail);
+        Assert.Equal("No wake timers", SleepHealth.WakeTimersCheck(timers).Detail);
     }
 
     [Fact]
@@ -364,7 +364,7 @@ public sealed class DeviceReportTests
         Check("[ASUS] Armoury Crate Service", HealthStatus.Unknown, "Not installed"),
         Check("[Security] Windows Firewall", HealthStatus.Good, "Running"),
         Check("[Windows Update] Background Transfer (BITS)", HealthStatus.Good, "Resting"),
-        Check("[Performance] Virtualisation-based security (VBS)", HealthStatus.Good, detail: "Off"),
+        Check("[Performance] Virtualisation-based security", HealthStatus.Good, detail: "Off"),
         Check("[Sleep] Wake timers", HealthStatus.Good, detail: "None"),
         Check("[Sleep] Sleeps by", HealthStatus.Info, "Modern Standby, hibernate ready"),
         new()
@@ -398,7 +398,7 @@ public sealed class DeviceReportTests
         var page = HealthLayout.Build(PageChecks, "note");
 
         Assert.Equal(
-            ["Sleep", "Power plan", "Storage", "Gaming performance", "Protected components"],
+            ["Sleep", "Power plan", "Storage", "Performance", "Protected components"],
             page.Sections.Select(s => s.Title));
         Assert.Empty(HealthLayout.Build([], "note").Sections);
     }
@@ -546,6 +546,48 @@ public sealed class DeviceReportTests
     public void A_service_that_starts_on_demand_is_healthy_while_stopped(string status, string startType, HealthStatus expected)
     {
         Assert.Equal(expected, SystemStateService.ServiceStatus(status, startType));
+    }
+
+    [Theory]
+    [InlineData("Stopped", "Disabled")]
+    [InlineData("Running", "Disabled")]
+    public void An_ASUS_service_off_for_Replace_Armoury_Crate_is_a_fact_with_no_advice(string status, string startType)
+    {
+        var check = SystemStateService.ServiceCheck(
+            "ASUS App Service", "ASUS", status, startType, offForArmouryCrate: true);
+
+        Assert.Equal(HealthStatus.Info, check.Status);
+        Assert.Equal("Off while Handheld Optimiser replaces Armoury Crate", check.Summary);
+        Assert.Null(check.Advice);
+        Assert.Equal("[ASUS] ASUS App Service", check.Name);
+    }
+
+    [Fact]
+    public void A_disabled_ASUS_service_is_still_a_fault_while_Armoury_Crate_is_not_replaced()
+    {
+        var check = SystemStateService.ServiceCheck(
+            "ASUS App Service", "ASUS", "Stopped", "Disabled", offForArmouryCrate: false);
+
+        Assert.Equal(HealthStatus.Bad, check.Status);
+        Assert.Equal("Disabled", check.Summary);
+        Assert.Equal("Stopped, start type Disabled", check.Detail);
+        Assert.Equal(
+            "This service is disabled. Handheld Optimiser never disables it, so another tool likely did. " +
+            "Use Repair disabled services at the top of this page to switch it back on.",
+            check.Advice);
+    }
+
+    [Theory]
+    [InlineData("Running", "Automatic", "Running", "Running, start type Automatic")]
+    [InlineData("Stopped", "Manual", "Resting", "Stopped until Windows needs it, start type Manual")]
+    [InlineData("Stopped", "Automatic", "Stopped", "Stopped, though it is set to start by itself")]
+    public void A_service_row_reads_as_before(string status, string startType, string summary, string detail)
+    {
+        var check = SystemStateService.ServiceCheck("Background Transfer (BITS)", "Windows Update", status, startType, offForArmouryCrate: false);
+
+        Assert.Equal(summary, check.Summary);
+        Assert.Equal(detail, check.Detail);
+        Assert.Null(check.Advice);
     }
 
     [Theory]

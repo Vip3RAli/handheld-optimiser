@@ -191,7 +191,7 @@ public partial class LibraryWindow
 
     private void OnEditSteamKey(object sender, RoutedEventArgs e) =>
         BeginEdit(MenuEditor.SteamKey, "Steam Web API key",
-            "Free at steamcommunity.com/dev/apikey, signed in to your Steam account. Lists the Steam games you own, and is only sent to Steam. Leave empty to remove the key.",
+            "Free at steamcommunity.com/dev/apikey. Used to list the Steam games you own, and only sent to Steam. Leave empty to remove it.",
             LibrarySettings.SteamKey);
 
     private void OnRefreshOwned(object sender, RoutedEventArgs e)

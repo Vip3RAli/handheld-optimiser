@@ -135,6 +135,21 @@ public sealed class LibraryFeatureTests : IDisposable
         Assert.Equal("Last played yesterday", new PlayStats(TimeSpan.Zero, now - TimeSpan.FromHours(30)).Describe(now));
     }
 
+    [Theory]
+    [InlineData(2, "just now")]
+    [InlineData(5, "5 minutes ago")]
+    [InlineData(50, "50 minutes ago")]
+    [InlineData(120, "today")]
+    public void PlayStats_AgoSaysHowManyMinutesForUnderAnHour(int minutes, string expected) =>
+        Assert.Equal(expected, PlayStats.Ago(TimeSpan.FromMinutes(minutes)));
+
+    [Fact]
+    public void CleanResult_UsesTheRightNumberForFilesLeftBehind()
+    {
+        Assert.EndsWith("1 file in use was left", new CleanResult(5, 1024, 1).Describe());
+        Assert.EndsWith("2 files in use were left", new CleanResult(5, 1024, 2).Describe());
+    }
+
     [Fact]
     public void GameProfiles_KeepTheResolution()
     {
@@ -164,6 +179,20 @@ public sealed class LibraryFeatureTests : IDisposable
         var profile = GameProfiles.Parse(text);
 
         Assert.Equal(fps, profile.AutoTdpFps);
+        Assert.Equal(profile, GameProfiles.Parse(GameProfiles.Format(profile)));
+    }
+
+    [Theory]
+    [InlineData("fan=quiet", "quiet")]
+    [InlineData("fan=dynamic", "dynamic")]
+    [InlineData("fps=60;fan=default", "default")]
+    [InlineData("fan=loud", null)]
+    [InlineData("power=silent", null)]
+    public void GameProfiles_ReadTheFanCurve(string text, string? fans)
+    {
+        var profile = GameProfiles.Parse(text);
+
+        Assert.Equal(fans, profile.FanCurve);
         Assert.Equal(profile, GameProfiles.Parse(GameProfiles.Format(profile)));
     }
 

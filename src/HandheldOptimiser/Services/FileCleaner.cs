@@ -18,7 +18,7 @@ public sealed class CleanTally
     }
 
     public string Describe() =>
-        $"{FilesDeleted} file(s), {BytesFreed / (1024.0 * 1024.0):0.0} MB freed" +
+        Plural.Count(FilesDeleted, "file") + $", {BytesFreed / (1024.0 * 1024.0):0.0} MB freed" +
         (Skipped > 0 ? $", {Skipped} in use or locked and skipped" : string.Empty);
 }
 
@@ -31,6 +31,11 @@ public sealed class CleanTally
 /// which any unelevated process running as the user can write to, and this app runs elevated. Swapping
 /// %LOCALAPPDATA%\CrashDumps for a junction to a system folder would otherwise turn a cache clean
 /// into an administrator deleting that folder's contents.
+///
+/// The path checks only narrow that window, since a folder can be swapped after it was checked. So
+/// every delete goes through <see cref="SafeDelete"/>, which opens the file without following links,
+/// reads back where the handle really is, and deletes through that handle only if it is still inside
+/// the folder being cleaned.
 /// </summary>
 public static class FileCleaner
 {
@@ -59,7 +64,16 @@ public static class FileCleaner
             return tally;
         }
 
-        CleanDirectory(root, log, tally, ct);
+        var fullRoot = Path.GetFullPath(root);
+
+        if (!SafeDelete.IsVerifiedDirectory(fullRoot, fullRoot, out var problem))
+        {
+            log.Error($"BLOCKED cleanup of {root}: {problem}");
+            tally.Blocked = true;
+            return tally;
+        }
+
+        CleanDirectory(fullRoot, fullRoot, log, tally, ct);
         log.Trace($"    {root}: {tally.Describe()}");
         return tally;
     }
@@ -88,12 +102,15 @@ public static class FileCleaner
             return tally;
         }
 
-        TryDeleteFile(path, tally);
+        // The file is its own root: its handle has to lead to exactly this path.
+        var full = Path.GetFullPath(path);
+        TryDeleteFile(full, full, log, tally);
         log.Trace($"    {path}: {tally.Describe()}");
         return tally;
     }
 
-    private static void CleanDirectory(string dir, LogService log, CleanTally tally, CancellationToken ct)
+    /// <param name="root">The folder being cleaned. Nothing outside it is deleted, whatever a path leads to.</param>
+    private static void CleanDirectory(string root, string dir, LogService log, CleanTally tally, CancellationToken ct)
     {
         IEnumerable<string> files;
         IEnumerable<string> subdirectories;
@@ -114,19 +131,25 @@ public static class FileCleaner
         {
             ct.ThrowIfCancellationRequested();
 
-            // Re-checked per file: cheap, and it keeps holding if the enumeration ever changes.
+            // A first filter by path. The check that holds is made on the handle, in SafeDelete.
             if (!SafetyGuard.IsDeletionAllowed(file, out _))
             {
                 tally.Skipped++;
                 continue;
             }
 
-            TryDeleteFile(file, tally);
+            TryDeleteFile(file, root, log, tally);
         }
 
         foreach (var sub in subdirectories)
         {
             ct.ThrowIfCancellationRequested();
+
+            if (!SafetyGuard.IsDeletionAllowed(sub, out _))
+            {
+                tally.Skipped++;
+                continue;
+            }
 
             try
             {
@@ -143,40 +166,48 @@ public static class FileCleaner
                 continue;
             }
 
-            CleanDirectory(sub, log, tally, ct);
-
-            try
+            // Checked by handle too, so a folder swapped for a junction since it was listed is not
+            // walked. Every delete inside would be refused anyway; this saves going through them all.
+            if (!SafeDelete.IsVerifiedDirectory(sub, root, out var problem))
             {
-                // Non-recursive: only succeeds once everything inside has gone.
-                Directory.Delete(sub, recursive: false);
+                log.Warning($"    Skipping {sub}: {problem}");
+                tally.Skipped++;
+                continue;
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+
+            CleanDirectory(root, sub, log, tally, ct);
+
+            // Only succeeds once everything inside has gone. Not empty means it still holds a locked
+            // file, and it is left in place.
+            if (SafeDelete.DeleteEmptyDirectory(sub, root, out problem) == SafeDeleteOutcome.Refused)
             {
-                // Still holds a locked file; left in place.
+                log.Error($"BLOCKED removal of {sub}: {problem}");
             }
         }
     }
 
-    private static void TryDeleteFile(string path, CleanTally tally)
+    private static void TryDeleteFile(string path, string root, LogService log, CleanTally tally)
     {
-        try
+        switch (SafeDelete.DeleteFile(path, root, out var length, out var problem))
         {
-            var info = new FileInfo(path);
-            var length = info.Length;
+            case SafeDeleteOutcome.Deleted:
+                tally.FilesDeleted++;
+                tally.BytesFreed += length;
+                break;
 
-            if (info.IsReadOnly)
-            {
-                info.IsReadOnly = false;
-            }
+            case SafeDeleteOutcome.Missing:
+                // Gone since it was listed, which is what was wanted.
+                break;
 
-            info.Delete();
-            tally.FilesDeleted++;
-            tally.BytesFreed += length;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // In use by a running game or the driver. Expected; counted, not logged per file.
-            tally.Skipped++;
+            case SafeDeleteOutcome.Refused:
+                log.Error($"BLOCKED deletion of {path}: {problem}");
+                tally.Skipped++;
+                break;
+
+            default:
+                // In use by a running game or the driver. Expected; counted, not logged per file.
+                tally.Skipped++;
+                break;
         }
     }
 }

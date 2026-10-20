@@ -29,13 +29,13 @@ public static class PowerActions
         Id = "action.compact_os",
         Name = "Compact OS (save several GB)",
         Description =
-            "Compresses the Windows system files to free 2 to 5 GB for games. Everything keeps working " +
-            "as before.",
+            "Compresses the Windows system files to free 2 to 5 GB for games. Windows and your apps " +
+            "work as before.",
         Glyph = "",
         CreateRestorePoint = true,
         DurationHint = "2 to 5 minutes",
         Warning =
-            "Keep the Ally plugged in and do not close the app while this runs. It can be reversed later with " +
+            "Keep the handheld plugged in and do not close the app while this runs. You can undo it later with " +
             "Undo Compact OS below.",
         Execute = async (ctx, progress, ct) =>
         {
@@ -49,7 +49,7 @@ public static class PowerActions
 
             return outcome.Succeeded
                 ? TweakResult.Ok("action.compact_os", "Windows system files are compressed.")
-                : TweakResult.Fail("action.compact_os", $"compact.exe failed (exit {outcome.ExitCode}). See log.");
+                : TweakResult.Fail("action.compact_os", $"compact.exe failed (exit {outcome.ExitCode}). The console has the detail.");
         }
     };
 
@@ -94,7 +94,7 @@ public static class PowerActions
         DurationHint = "2 to 10 minutes",
         Warning =
             $"Needs at least {UncompactMinFreeGb} GB free on the system drive, since the files take up their " +
-            "full size again. Keep the Ally plugged in and do not close the app while this runs.",
+            "full size again. Keep the handheld plugged in and do not close the app while this runs.",
         Precheck = CheckSpaceForUncompact,
         Execute = async (ctx, progress, ct) =>
         {
@@ -108,17 +108,17 @@ public static class PowerActions
 
             return outcome.Succeeded
                 ? TweakResult.Ok("action.uncompact_os", "Windows system files are no longer compressed.")
-                : TweakResult.Fail("action.uncompact_os", $"compact.exe failed (exit {outcome.ExitCode}). See log.");
+                : TweakResult.Fail("action.uncompact_os", $"compact.exe failed (exit {outcome.ExitCode}). The console has the detail.");
         }
     };
 
     public static PowerAction FlushNetwork => new()
     {
         Id = "action.network_reset",
-        Name = "Flush DNS & reset Winsock",
+        Name = "Reset network connections",
         Description =
-            "Clears cached DNS lookups and resets Winsock. Try this first when a game cannot reach its " +
-            "servers or ping is suddenly high.",
+            "Clears cached DNS lookups and resets Winsock, the part of Windows that handles network " +
+            "connections. Try this first when a game cannot reach its servers or ping is suddenly high.",
         Glyph = "",
         RequiresReboot = true,
         CreateRestorePoint = true,
@@ -136,7 +136,7 @@ public static class PowerActions
 
             return dns.Succeeded && winsock.Succeeded
                 ? TweakResult.Ok("action.network_reset", "DNS flushed and Winsock reset.", rebootRequired: true)
-                : TweakResult.Fail("action.network_reset", "DNS flush or Winsock reset reported an error. See log.");
+                : TweakResult.Fail("action.network_reset", "DNS flush or Winsock reset reported an error. The console has the detail.");
         }
     };
 
@@ -145,7 +145,7 @@ public static class PowerActions
         Id = "action.shader_cache",
         Name = "Clear shader caches",
         Description =
-            "Deletes the DirectX and AMD shader caches. Fixes stutter or graphical corruption after a " +
+            "Deletes the DirectX and AMD shader caches. Can fix stutter or graphical corruption after a " +
             "driver update.",
         Glyph = "",
         DurationHint = "Under a minute",
@@ -181,7 +181,7 @@ public static class PowerActions
     public static PowerAction DeepCleanup => new()
     {
         Id = "action.deep_cleanup",
-        Name = "Force deep cleanup",
+        Name = "Clear old update files and crash dumps",
         Description =
             "Removes superseded Windows Update components, crash dumps and error reports. Installed " +
             "updates can still be uninstalled afterwards.",
@@ -251,7 +251,7 @@ public static class PowerActions
         }
 
         return total.Blocked
-            ? TweakResult.Blocked(id, "A path was refused by the safety guard. See log.")
+            ? TweakResult.Blocked(id, "A path was refused by the safety guard. The console has the detail.")
             : TweakResult.Ok(id, $"{total.Describe()}.");
     }
 }

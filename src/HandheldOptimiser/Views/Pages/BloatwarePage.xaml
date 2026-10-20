@@ -60,7 +60,7 @@
                     <TextBlock Text="{Binding IdentityName}" FontFamily="Consolas" FontSize="12" Opacity="0.8"
                                TextWrapping="Wrap" />
                     <TextBlock Text="{Binding ScopeText}" FontSize="12" Opacity="0.7" Margin="0,3,0,0" />
-                    <TextBlock Text="{Binding KeepIfNote}" FontSize="12.5" Foreground="#E8C45F" Opacity="0.9"
+                    <TextBlock Text="{Binding KeepIfNote, StringFormat='Keep it if {0}'}" FontSize="12.5" Foreground="#E8C45F" Opacity="0.9"
                                TextWrapping="Wrap" Margin="0,8,0,0"
                                Visibility="{Binding HasKeepNote, Converter={StaticResource BoolToVis}}" />
                 </StackPanel>
@@ -73,7 +73,7 @@
                     IsOpen="True"
                     IsClosable="False"
                     Title="One-way operation"
-                    Message="Removal cannot be undone by the Revert button. Getting an app back means reinstalling it from the Microsoft Store. ASUS, AMD, Realtek, Xbox/Game Pass, Store and codec packages are never listed here and are blocked from removal." />
+                    Message="Removal cannot be undone from this app. Getting an app back means reinstalling it from the Microsoft Store. ASUS, AMD, Realtek, Xbox/Game Pass, Store and codec packages are never listed here and are blocked from removal." />
 
         <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
             <ui:Button Content="Select recommended" Command="{Binding SelectRecommendedCommand}" Margin="0,0,10,0" />

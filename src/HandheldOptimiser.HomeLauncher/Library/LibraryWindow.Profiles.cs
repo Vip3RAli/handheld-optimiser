@@ -11,7 +11,10 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 /// </summary>
 public partial class LibraryWindow
 {
+    // Two wordings on purpose. Don't change leaves Windows as it is, while Use default falls back to the
+    // library's own setting for TDP Engine and the fan curve.
     private const string Unchanged = "Don't change";
+    private const string UseDefault = "Use default";
 
     private static readonly int[] ProfileBrightnessLevels = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
@@ -39,7 +42,7 @@ public partial class LibraryWindow
 
         HideMenuLists();
         _menu = ProfileItems;
-        MenuStore.Text = "Game profile: set when it starts, undone when it closes";
+        MenuStore.Text = "Applied when the game starts, undone when it closes";
         RefreshProfileItems();
         ShowMenuItems();
     }
@@ -73,10 +76,12 @@ public partial class LibraryWindow
 
         ProfileAutoTdpSetting.Tag = _profile.AutoTdpFps switch
         {
-            null => "As in settings",
+            null => UseDefault,
             0 => "Off",
             var fps => $"{fps} fps"
         };
+
+        ProfileFanSetting.Tag = _profile.FanCurve is { } fans ? AutoTdp.FanName(fans) : UseDefault;
     }
 
     /// <summary>Left and right on a profile row. Each row's choices start with Don't change.</summary>
@@ -122,6 +127,12 @@ public partial class LibraryWindow
         {
             profile = _profile with { AutoTdpFps = StepChoice(_profile.AutoTdpFps, [0, .. AutoTdp.FrameRates], step) };
         }
+        else if (ReferenceEquals(row, ProfileFanSetting))
+        {
+            string?[] options = [null, .. AutoTdp.FanChoices];
+            var index = Math.Max(0, Array.IndexOf(options, _profile.FanCurve));
+            profile = _profile with { FanCurve = options[(index + step + options.Length) % options.Length] };
+        }
         else
         {
             return false;
@@ -159,6 +170,8 @@ public partial class LibraryWindow
     private void OnStepProfileApps(object sender, RoutedEventArgs e) => StepProfileSetting(ProfileAppsSetting, 1);
 
     private void OnStepProfileAutoTdp(object sender, RoutedEventArgs e) => StepProfileSetting(ProfileAutoTdpSetting, 1);
+
+    private void OnStepProfileFans(object sender, RoutedEventArgs e) => StepProfileSetting(ProfileFanSetting, 1);
 
     /// <summary>Switches to a game's profile as it starts, keeping what it replaces.</summary>
     private void ApplyProfile(Game game, GameProfile profile)

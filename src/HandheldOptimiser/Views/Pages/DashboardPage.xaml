@@ -156,14 +156,14 @@
                             IsClosable="False"
                             Margin="0,0,0,12"
                             Title="Unrecognised hardware"
-                            Message="This device does not report as a handheld this app knows (ROG Ally, Legion Go, MSI Claw, Steam Deck, AYANEO, GPD or OneXPlayer). The tweaks are still valid Windows 11 changes, but they are tuned for handheld hardware."
+                            Message="This is not a handheld the app recognises. It knows the ROG Ally, Legion Go, MSI Claw, Steam Deck, AYANEO, GPD and OneXPlayer. The tweaks still work, but are tuned for handhelds."
                             IsOpen="{Binding IsRecognisedDevice, Converter={StaticResource InverseBool}}" />
 
                 <ui:InfoBar Severity="Error"
                             IsClosable="False"
                             Margin="0,0,0,12"
                             Title="System Protection is off"
-                            Message="Restore points cannot be created, so tweaks will refuse to run. Turn on System Protection for the C: drive, or use Create restore point on the Maintenance &amp; Backup page, which turns it on."
+                            Message="Tweaks cannot be applied without a restore point. Turn on System Protection for the C: drive, or use Create restore point on the Maintenance &amp; backup page, which turns it on."
                             IsOpen="{Binding ProtectionEnabled, Converter={StaticResource InverseBool}}" />
             </StackPanel>
 
@@ -232,7 +232,7 @@
                     </Grid>
 
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0">
-                        <TextBlock Text="Recommended Tweaks" FontSize="22" FontWeight="SemiBold"
+                        <TextBlock Text="Recommended tweaks" FontSize="22" FontWeight="SemiBold"
                                    FontFamily="{StaticResource AppDisplayFont}" />
                         <TextBlock TextWrapping="Wrap" Opacity="0.8" FontSize="14" Margin="0,2,0,0">
                             <Run Text="{Binding AppliedCount, Mode=OneWay}" />
@@ -261,7 +261,7 @@
                             IsEnabled="{Binding DataContext.IsBusy, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource InverseBool}}">
                         <StackPanel Orientation="Horizontal">
                             <ui:FontIcon Glyph="&#xE945;" FontSize="20" Margin="0,0,10,0" VerticalAlignment="Center" />
-                            <TextBlock Text="Apply Now" VerticalAlignment="Center" />
+                            <TextBlock Text="Apply now" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
                 </Grid>

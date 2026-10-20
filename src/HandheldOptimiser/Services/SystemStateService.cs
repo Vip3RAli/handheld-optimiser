@@ -1,4 +1,5 @@
 using HandheldOptimiser.Models;
+using HandheldOptimiser.TweakDefinitions;
 
 namespace HandheldOptimiser.Services;
 
@@ -174,7 +175,8 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
         var storage = StorageHealth.RunAsync(_runner, ct);
 
         var watched = WatchedServices();
-        var serviceNames = string.Join(",", watched.Select(s => $"'{s.ServiceName.Replace("'", "''")}'"));
+        var replacing = IsReplacingArmouryCrate();
+        var serviceNames = string.Join(",", watched.Select(s => PsQuote.Literal(s.ServiceName)));
 
         var outcome = await _runner.RunScriptAsync(
             $$"""
@@ -218,30 +220,15 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
                     Summary = "Not installed",
                     Status = absentStatus,
                     Advice = absentStatus == HealthStatus.Bad
-                        ? "This service should exist on Windows 11. Investigate before applying tweaks."
+                        ? "Windows 11 should have this service. Find out why it is missing before applying tweaks."
                         : null
                 });
                 continue;
             }
 
-            var disabled = state.StartType.Equals("Disabled", StringComparison.OrdinalIgnoreCase);
-            var status = ServiceStatus(state.Status, state.StartType);
-            var running = state.Status.Equals("Running", StringComparison.OrdinalIgnoreCase);
-            var resting = status == HealthStatus.Good && !running;
-
-            checks.Add(new HealthCheck
-            {
-                Name = $"[{group}] {friendly}",
-                Detail = resting ? $"Stopped until Windows needs it, start type {state.StartType}"
-                    : status == HealthStatus.Warning ? $"{state.Status}, though it is set to start by itself"
-                    : $"{state.Status}, start type {state.StartType}",
-                Summary = disabled ? "Disabled" : running ? "Running" : resting ? "Resting" : state.Status,
-                Status = status,
-                Advice = disabled
-                    ? "This service is disabled. Handheld Optimiser never disables it, so another tool likely did. " +
-                      "Repair disabled services, at the top of this page, switches it back on."
-                    : null
-            });
+            checks.Add(ServiceCheck(
+                friendly, group, state.Status, state.StartType,
+                offForArmouryCrate: replacing && IsArmouryCrateService(serviceName)));
         }
 
         checks.AddRange(await GetVirtualisationChecksAsync(ct));
@@ -262,6 +249,62 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
                   $"{checks.Count(c => c.Status == HealthStatus.Bad)} problems.");
 
         return checks;
+    }
+
+    /// <summary>
+    /// Whether TDP Engine is told to stand in for Armoury Crate, from the value Replace Armoury Crate writes.
+    /// Any non-zero value counts, as TDP Engine itself reads it.
+    /// </summary>
+    private bool IsReplacingArmouryCrate() =>
+        _registry.ReadValue(RegistryRoot.LocalMachine, ArmouryCrateTweaks.ControlsKey, ArmouryCrateTweaks.ReplacingValue)
+            is int value && value != 0;
+
+    /// <summary>Whether Replace Armoury Crate turns this service off on purpose.</summary>
+    private static bool IsArmouryCrateService(string serviceName) =>
+        ArmouryCrateTweaks.ServicesInStopOrder.Contains(serviceName, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The row for one watched service that is installed, from its run state and start type as Get-Service names
+    /// them. <paramref name="offForArmouryCrate"/> is true for an ASUS service that Replace Armoury Crate turned off
+    /// while it is on: that service is Disabled on purpose, so the row is a plain fact with no advice, and nothing
+    /// on the page offers to switch it back on behind the switch.
+    /// </summary>
+    public static HealthCheck ServiceCheck(
+        string friendly,
+        string group,
+        string status,
+        string startType,
+        bool offForArmouryCrate)
+    {
+        if (offForArmouryCrate)
+        {
+            return new HealthCheck
+            {
+                Name = $"[{group}] {friendly}",
+                Detail = $"{status}, start type {startType}",
+                Summary = "Off while Handheld Optimiser replaces Armoury Crate",
+                Status = HealthStatus.Info
+            };
+        }
+
+        var disabled = startType.Equals("Disabled", StringComparison.OrdinalIgnoreCase);
+        var health = ServiceStatus(status, startType);
+        var running = status.Equals("Running", StringComparison.OrdinalIgnoreCase);
+        var resting = health == HealthStatus.Good && !running;
+
+        return new HealthCheck
+        {
+            Name = $"[{group}] {friendly}",
+            Detail = resting ? $"Stopped until Windows needs it, start type {startType}"
+                : health == HealthStatus.Warning ? $"{status}, though it is set to start by itself"
+                : $"{status}, start type {startType}",
+            Summary = disabled ? "Disabled" : running ? "Running" : resting ? "Resting" : status,
+            Status = health,
+            Advice = disabled
+                ? "This service is disabled. Handheld Optimiser never disables it, so another tool likely did. " +
+                  "Use Repair disabled services at the top of this page to switch it back on."
+                : null
+        };
     }
 
     /// <summary>
@@ -297,11 +340,11 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
 
         checks.Add(new HealthCheck
         {
-            Name = "[Performance] Memory Integrity (HVCI)",
-            Detail = hvciOn ? "Enabled (costing frame rate)" : "Disabled (optimised for gaming)",
+            Name = "[Performance] Memory Integrity",
+            Detail = hvciOn ? "On, which lowers frame rates" : "Off",
             Summary = hvciOn ? "On" : "Off",
             Status = hvciOn ? HealthStatus.Warning : HealthStatus.Good,
-            Advice = hvciOn ? "Disable this on the Performance page for the largest single FPS gain." : null
+            Advice = hvciOn ? "Switch on the \"Turn off Memory Integrity\" tweak on the Performance page. This can raise frame rates." : null
         });
 
         var outcome = await _runner.RunScriptAsync(
@@ -324,12 +367,20 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
         checks.Add(new HealthCheck
         {
             Name = "[Performance] Virtual Machine Platform",
-            Detail = vmp,
-            Status = vmp.Equals("Disabled", StringComparison.OrdinalIgnoreCase) ? HealthStatus.Good : HealthStatus.Warning
+            Detail = VmpText(vmp),
+            Status = VmpText(vmp) == "Off" ? HealthStatus.Good : HealthStatus.Warning
         });
 
         return checks;
     }
+
+    /// <summary>Windows' optional feature state in plain words: On, Off, or that Windows did not say.</summary>
+    public static string VmpText(string state) => state.Trim() switch
+    {
+        "Enabled" or "EnablePending" => "On",
+        "Disabled" or "DisabledWithPayloadRemoved" or "DisablePending" => "Off",
+        _ => "Windows did not say"
+    };
 
     /// <summary>
     /// Whether VBS is running, from the status Windows itself reports for this boot: 0 is off, 1 is
@@ -338,10 +389,10 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
     /// </summary>
     public static HealthCheck VbsCheck(string? status)
     {
-        const string name = "[Performance] Virtualisation-based security (VBS)";
+        const string name = "[Performance] Virtualisation-based security";
         const string advice =
-            "VBS adds overhead to every process. Disable Virtual Machine Platform & VBS on the Performance " +
-            "page turns it off, then restart.";
+            "VBS slows every process down. Switch on the \"Turn off Virtual Machine Platform and VBS\" tweak on the " +
+            "Performance page, then restart.";
 
         return status?.Trim() switch
         {
@@ -353,14 +404,19 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
     }
 
     /// <summary>
-    /// Re-enables a protected service that some other tool disabled. This app only ever moves these in the
-    /// safe direction. There is no code path here that disables them.
+    /// Re-enables a protected service that some other tool disabled. This class only ever moves these in the
+    /// safe direction. The one switch in the app that disables any of them is Replace Armoury Crate, which turns
+    /// ASUS's services off on purpose, so while it is on those are left out here: switching them back on would
+    /// bring Armoury Crate back behind the switch.
     /// </summary>
     public async Task<bool> RepairProtectedServicesAsync(CancellationToken ct = default)
     {
         _log.Info("Repairing any disabled vendor / driver / security / update services…");
 
-        var names = string.Join(",", WatchedServices().Select(s => $"'{s.ServiceName.Replace("'", "''")}'"));
+        var replacing = IsReplacingArmouryCrate();
+        var names = string.Join(",", WatchedServices()
+            .Where(s => !(replacing && IsArmouryCrateService(s.ServiceName)))
+            .Select(s => PsQuote.Literal(s.ServiceName)));
 
         var outcome = await _runner.RunScriptAsync(
             $$"""

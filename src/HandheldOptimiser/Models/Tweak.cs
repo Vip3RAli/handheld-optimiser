@@ -11,6 +11,23 @@ public sealed class TweakContext(LogService log, IRegistryStore registry, PowerS
     public LogService Log { get; } = log;
     public IRegistryStore Registry { get; } = registry;
     public PowerShellRunner Runner { get; } = runner;
+
+    /// <summary>
+    /// Saves the undo data a tweak has captured so far into the journal, for a script tweak that captures its
+    /// originals itself and then runs a long script: if the app is closed or crashes while that script runs, the
+    /// originals are already saved. <see cref="TweakEngine"/> sets it. Null where nothing journals, as in a test,
+    /// and then a call through <see cref="SaveCheckpoint"/> does nothing.
+    /// </summary>
+    public Action<TweakJournalEntry>? Checkpoint { get; init; }
+
+    /// <summary>Calls <see cref="Checkpoint"/> when there is one and something has been captured.</summary>
+    public void SaveCheckpoint(TweakJournalEntry journal)
+    {
+        if (journal.RegistrySnapshots.Count > 0 || journal.CapturedState.Count > 0)
+        {
+            Checkpoint?.Invoke(journal);
+        }
+    }
 }
 
 /// <summary>
@@ -61,6 +78,12 @@ public sealed class Tweak
             string.Equals(spec.ValueName, snapshot.ValueName, StringComparison.OrdinalIgnoreCase));
 
     public Func<TweakContext, CancellationToken, Task<TweakState>>? ScriptDetect { get; init; }
+
+    /// <summary>
+    /// True when <see cref="ScriptDetect"/> only reads the registry or asks Windows directly, starting no
+    /// PowerShell, so it does not have to queue behind the slow checks.
+    /// </summary>
+    public bool ScriptDetectIsQuick { get; init; }
     public Func<TweakContext, TweakJournalEntry, CancellationToken, Task<TweakResult>>? ScriptApply { get; init; }
     public Func<TweakContext, TweakJournalEntry, CancellationToken, Task<TweakResult>>? ScriptRevert { get; init; }
 
@@ -115,13 +138,32 @@ public sealed class Tweak
 
     public async Task<(TweakResult Result, TweakJournalEntry Journal)> ApplyAsync(TweakContext ctx, CancellationToken ct)
     {
-        var journal = new TweakJournalEntry
-        {
-            TweakId = Id,
-            TweakName = Name,
-            AppliedAtUtc = DateTimeOffset.UtcNow
-        };
+        var journal = NewJournalEntry();
+        var result = await ApplyAsync(ctx, journal, beforeScript: null, ct);
+        return (result, journal);
+    }
 
+    /// <summary>An empty undo record for this tweak, for the apply below to fill.</summary>
+    public TweakJournalEntry NewJournalEntry() => new()
+    {
+        TweakId = Id,
+        TweakName = Name,
+        AppliedAtUtc = DateTimeOffset.UtcNow
+    };
+
+    /// <summary>
+    /// Applies the tweak, filling <paramref name="journal"/> with undo data as it goes. The caller owns
+    /// the record, so whatever was captured is still in its hands if this throws or is cancelled
+    /// partway. <paramref name="beforeScript"/> is called once the registry half has written and before
+    /// the script half starts, so those originals can be saved before the slower and riskier step: if
+    /// the app is closed or crashes during the script, the registry changes can still be reverted.
+    /// </summary>
+    public async Task<TweakResult> ApplyAsync(
+        TweakContext ctx,
+        TweakJournalEntry journal,
+        Action<TweakJournalEntry>? beforeScript,
+        CancellationToken ct)
+    {
         ctx.Log.Info($"Applying: {Name}");
 
         var anyFailed = false;
@@ -152,6 +194,11 @@ public sealed class Tweak
         {
             ct.ThrowIfCancellationRequested();
 
+            if (journal.RegistrySnapshots.Count > 0)
+            {
+                beforeScript?.Invoke(journal);
+            }
+
             try
             {
                 var scriptResult = await ScriptApply(ctx, journal, ct);
@@ -176,13 +223,11 @@ public sealed class Tweak
             }
         }
 
-        var result = anyFailed
-            ? TweakResult.Fail(Id, $"\"{Name}\" did not fully apply. See log.")
+        return anyFailed
+            ? TweakResult.Fail(Id, $"\"{Name}\" did not fully apply. The console has the detail.")
             : anyChanged
                 ? TweakResult.Ok(Id, $"\"{Name}\" applied.", RequiresReboot)
                 : TweakResult.NoChange(Id, $"\"{Name}\" was already applied.");
-
-        return (result, journal);
     }
 
     public async Task<TweakResult> RevertAsync(TweakContext ctx, TweakJournalEntry journal, CancellationToken ct)
@@ -232,7 +277,7 @@ public sealed class Tweak
         }
 
         return anyFailed
-            ? TweakResult.Fail(Id, $"\"{Name}\" did not fully revert. See log.")
-            : TweakResult.Ok(Id, $"\"{Name}\" reverted.", RequiresReboot);
+            ? TweakResult.Fail(Id, $"\"{Name}\" did not fully undo. The console has the detail.")
+            : TweakResult.Ok(Id, $"\"{Name}\" undone.", RequiresReboot);
     }
 }

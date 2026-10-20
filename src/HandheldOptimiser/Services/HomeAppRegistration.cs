@@ -1,6 +1,8 @@
 using System.IO;
+using System.IO.Compression;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Security.Cryptography.Pkcs;
 using System.Security.Cryptography.X509Certificates;
 using Microsoft.Win32;
 using HandheldOptimiser.Models;
@@ -33,7 +35,7 @@ public static class HomeAppRegistration
     public const string PackageName = "HandheldOptimiser.HomeApp";
 
     /// <summary>Must match Identity Version in installer\HomeApp\AppxManifest.xml.</summary>
-    public const string PackageVersion = "0.2.2.0";
+    public const string PackageVersion = "0.2.3.0";
 
     /// <summary>
     /// Derived by Windows from the Publisher in installer\HomeApp\AppxManifest.xml ("CN=Handheld
@@ -218,8 +220,8 @@ public static class HomeAppRegistration
         {
             trustedByUs = TrustTemporarily(certificate, ctx.Log);
 
-            var package = PackagePath.Replace("'", "''");
-            var location = InstallDirectory.Replace("'", "''");
+            var package = PsQuote.Escape(PackagePath);
+            var location = PsQuote.Escape(InstallDirectory);
 
             var script = $$"""
                 $ErrorActionPreference = 'Stop'
@@ -259,28 +261,89 @@ public static class HomeAppRegistration
         }
     }
 
-    /// <summary>The bundled certificate, refused unless it is ours: it is about to be trusted machine-wide.</summary>
+    /// <summary>
+    /// The bundled certificate, refused unless it is the one the bundled package is signed with: it is
+    /// about to be trusted machine-wide.
+    ///
+    /// A matching subject alone proves nothing, since anyone can make a certificate called "CN=Handheld
+    /// Optimiser". A fixed thumbprint cannot be built in either: installer\build-installer.ps1 makes the
+    /// certificate on whichever machine builds the installer, so it differs between builders. What is
+    /// fixed is that it must be the certificate that signed HomeApp.msix, which Windows will check the
+    /// package against anyway, so nothing else is ever put in the trusted store.
+    /// </summary>
     private static X509Certificate2? LoadSigningCertificate(LogService log)
     {
+        X509Certificate2? certificate = null;
+
         try
         {
             // The loader that only reads a certificate, where the old constructor took whatever kind of
             // file it was handed.
-            var certificate = X509CertificateLoader.LoadCertificateFromFile(CertificatePath);
-            if (certificate.Subject == SigningSubject)
+            certificate = X509CertificateLoader.LoadCertificateFromFile(CertificatePath);
+            if (certificate.Subject != SigningSubject)
             {
-                return certificate;
+                log.Error($"The home app certificate is for \"{certificate.Subject}\", not \"{SigningSubject}\". Refusing to trust it.");
+                certificate.Dispose();
+                return null;
             }
 
-            log.Error($"The home app certificate is for \"{certificate.Subject}\", not \"{SigningSubject}\". Refusing to trust it.");
-            certificate.Dispose();
-            return null;
+            using var signer = ReadPackageSigner(PackagePath);
+            if (signer is null || !signer.RawData.AsSpan().SequenceEqual(certificate.RawData))
+            {
+                log.Error("The home app certificate is not the one its package is signed with. Refusing to trust it.");
+                certificate.Dispose();
+                return null;
+            }
+
+            return certificate;
         }
-        catch (CryptographicException ex)
+        catch (Exception ex) when (ex is CryptographicException or IOException or InvalidDataException or UnauthorizedAccessException)
         {
-            log.Error($"Could not read the home app certificate: {ex.Message}");
+            log.Error($"Could not read the home app certificate or package signature: {ex.Message}");
+            certificate?.Dispose();
             return null;
         }
+    }
+
+    /// <summary>
+    /// The certificate an MSIX package is signed with, or null if it has no usable signature. The
+    /// signature is the AppxSignature.p7x part: a four-byte "PKCX" header, then a PKCS #7 signature
+    /// whose signer certificate is carried with it. Only checked to be a genuine signature by that
+    /// certificate here; Windows checks it against the package's contents when adding it.
+    /// </summary>
+    private static X509Certificate2? ReadPackageSigner(string packagePath)
+    {
+        using var package = ZipFile.OpenRead(packagePath);
+        var entry = package.GetEntry("AppxSignature.p7x");
+        if (entry is null)
+        {
+            return null;
+        }
+
+        byte[] bytes;
+        using (var stream = entry.Open())
+        using (var buffer = new MemoryStream())
+        {
+            stream.CopyTo(buffer);
+            bytes = buffer.ToArray();
+        }
+
+        if (bytes.Length <= 4 || bytes[0] != (byte)'P' || bytes[1] != (byte)'K' || bytes[2] != (byte)'C' || bytes[3] != (byte)'X')
+        {
+            return null;
+        }
+
+        var signature = new SignedCms();
+        signature.Decode(bytes.AsSpan(4));
+
+        if (signature.SignerInfos.Count != 1 || signature.SignerInfos[0].Certificate is not { } signer)
+        {
+            return null;
+        }
+
+        // Throws CryptographicException if the signature was not made with this certificate's key.
+        signature.SignerInfos[0].CheckSignature(verifySignatureOnly: true);
+        return signer;
     }
 
     /// <returns>True when the certificate was added here, and so must be removed again.</returns>
