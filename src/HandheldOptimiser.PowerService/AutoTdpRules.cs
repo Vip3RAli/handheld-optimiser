@@ -39,12 +39,23 @@ internal static class AutoTdpRules
     /// busiest program of all but Windows' own compositor, whose frames are every window's.
     /// </summary>
     /// <param name="pathOf">A program's full path from its process id, or null when it cannot be read.</param>
-    public static double GameFps(IReadOnlyDictionary<int, double> frames, string? folder, Func<int, string?> pathOf)
+    public static double GameFps(IReadOnlyDictionary<int, double> frames, string? folder, Func<int, string?> pathOf) =>
+        GameFps(frames, folder, null, pathOf).Fps;
+
+    /// <summary>
+    /// The game's frames a second and the program they came from. With no folder yet, the library's game
+    /// folders narrow it down, as when started from Game Bar.
+    /// </summary>
+    /// <param name="library">The library's game folders: only programs inside one of them count. Null when
+    /// the library has not saved any, and then the busiest program counts.</param>
+    public static (double Fps, string? Program) GameFps(IReadOnlyDictionary<int, double> frames, string? folder,
+        string[]? library, Func<int, string?> pathOf)
     {
         // With a separator on the end, C:\Games\Foo does not take in C:\Games\FooBar's programs.
         var inside = folder is null ? null : folder.TrimEnd('\\', '/') + '\\';
 
         var best = 0.0;
+        string? program = null;
         foreach (var (processId, fps) in frames)
         {
             if (fps <= best)
@@ -58,17 +69,18 @@ internal static class AutoTdpRules
                 continue;
             }
 
-            var counts = inside is not null
-                ? path.StartsWith(inside, StringComparison.OrdinalIgnoreCase)
+            var counts = inside is not null ? path.StartsWith(inside, StringComparison.OrdinalIgnoreCase)
+                : library is not null ? GameLock.InFolders(path, library)
                 : !string.Equals(Path.GetFileName(path), "dwm.exe", StringComparison.OrdinalIgnoreCase);
 
             if (counts)
             {
                 best = fps;
+                program = path;
             }
         }
 
-        return best;
+        return (best, program);
     }
 
     /// <summary>

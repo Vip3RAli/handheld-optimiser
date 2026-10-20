@@ -30,6 +30,21 @@ jobs:
       - name: Test
         run: dotnet test tests/HandheldOptimiser.Tests/HandheldOptimiser.Tests.csproj --configuration Release --no-build --logger "console;verbosity=normal"
 
+      # The Game Bar widget is an old-style UWP project, which needs Visual Studio's MSBuild rather than
+      # dotnet. Release, so .NET Native compiles it as it will for the installer.
+      - uses: microsoft/setup-msbuild@v2
+
+      - name: Build the Game Bar widget
+        run: msbuild src\HandheldOptimiser.GameBar\HandheldOptimiser.GameBar.csproj /restore /p:Configuration=Release /p:Platform=x64 /v:minimal /nologo
+
+      # Unsigned; build-installer.ps1 signs it. Unzipped into artifacts\GameBar, it lets an installer be
+      # built on a machine without Visual Studio's UWP tools. Uploaded before the installer is built,
+      # since that build may build the widget again in the same folder.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GameBar-widget
+          path: artifacts/GameBar/
+
       # Inno Setup comes with the runner image; installed here only if an image ever leaves it out.
       - name: Make sure Inno Setup is there
         shell: pwsh
