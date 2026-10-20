@@ -125,9 +125,21 @@ public partial class LibraryWindow
         StopAutoTdp();
     }
 
-    /// <summary>Puts everything back, for the library closing in the middle of a game.</summary>
-    private void EndSession()
+    // Set once EndSession has run, so the window closing and LibraryApp's finally do not both do it.
+    private bool _sessionEnded;
+
+    /// <summary>
+    /// Puts everything back, for the library closing in the middle of a game. Runs once: from the window
+    /// closing, and again from LibraryApp.Run's finally in case the library failed before it could close.
+    /// </summary>
+    internal void EndSession()
     {
+        if (_sessionEnded)
+        {
+            return;
+        }
+
+        _sessionEnded = true;
         StopFollowing();
         RestoreProfileSettings();
 

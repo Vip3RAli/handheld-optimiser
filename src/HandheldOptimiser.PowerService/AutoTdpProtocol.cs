@@ -15,6 +15,9 @@ internal static class AutoTdpProtocol
     public const string Status = "status";
     public const string Stop = "stop";
 
+    /// <summary>The error a start gets while the service is on its way out; the library starts it again once it has stopped.</summary>
+    public const string EndingError = "TDP Engine is ending. Try again in a moment.";
+
     /// <summary>From the Game Bar widget: hold this frame rate and fan curve now, starting if need be.</summary>
     public const string Update = "update";
 

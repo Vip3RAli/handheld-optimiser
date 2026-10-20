@@ -79,6 +79,9 @@ public partial class LibraryWindow : Window
 
     private void OnActivated(object? sender, EventArgs e)
     {
+        // About fifteen settings are read below and in what it calls; the registry key is opened once for them.
+        using var settings = LibrarySettings.ReadOnce();
+
         // Just woken with a game running: straight back to it. Otherwise the game is paused, with Quick Resume.
         _ = ResumeGameAsync();
         if (!_resuming && !JustWoke)
@@ -86,7 +89,12 @@ public partial class LibraryWindow : Window
             PauseOnReturn();
         }
 
-        _gamepad.Start();
+        // Not while the screen is off: Windows can bring the library to the front as the device sleeps.
+        if (!_displayOff)
+        {
+            _gamepad.Start();
+        }
+
         _background = LibrarySettings.Background;
         _strength = LibrarySettings.Strength;
         _blur = LibrarySettings.Blur;
@@ -128,7 +136,11 @@ public partial class LibraryWindow : Window
             _showFilter = !_showFilter;
             ApplyFilter();
         }
-        _clock.Start();
+        if (!_displayOff)
+        {
+            _clock.Start();
+        }
+
         UpdateTopBar();
         _ = CheckForUpdateAsync();
 
@@ -215,6 +227,13 @@ public partial class LibraryWindow : Window
                 ApplyFilter();
             }
 
+            UpdateEmptyText();
+        }
+        catch (Exception ex) when (!LibraryApp.IsFatal(ex))
+        {
+            // Nobody awaits a scan, so a failure would only reach the log as unobserved. The grid keeps the
+            // games it had, and the next activation scans again.
+            Program.Log($"The game scan failed: {ex}");
             UpdateEmptyText();
         }
         finally

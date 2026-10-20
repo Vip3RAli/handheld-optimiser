@@ -198,16 +198,26 @@ public static class SleepTweaks
             var ok = commands.Count == 0
                 || await WriteAsync(ctx, subgroup, setting, commands, $"Restore power plans for \"{name}\"", ct);
 
-            if (journal.CapturedState.ContainsKey(HibernateSwitchedOn))
+            // Hibernate goes back off if it was off before this app switched it on, whichever of the
+            // settings that need it switched it on and whichever of them is reverted last.
+            if (needsHibernate && (journal.CapturedState.ContainsKey(HibernateSwitchedOn) || HibernateWasOffBeforeUs(ctx)))
             {
                 if (await AnotherSettingNeedsHibernateAsync(ctx, id, ct))
                 {
+                    // Written down here as well, so undo data from before the shared record existed
+                    // still lets the other setting's revert turn hibernate off.
+                    RecordHibernateWasOff(ctx);
                     ctx.Log.Info("Hibernate is left on: another Battery & Sleep setting still uses it.");
                 }
                 else
                 {
-                    var off = await ctx.Runner.RunScriptAsync("& powercfg.exe /hibernate off", "Switch hibernate back off", ct);
+                    var off = await ctx.Runner.RunProcessAsync("powercfg.exe", ["/hibernate", "off"], "Switch hibernate back off", ct);
                     ok &= off.Succeeded;
+
+                    if (off.Succeeded)
+                    {
+                        ClearHibernateWasOff(ctx);
+                    }
                 }
             }
 
@@ -335,18 +345,68 @@ public static class SleepTweaks
             return true;
         }
 
-        var outcome = await ctx.Runner.RunScriptAsync("& powercfg.exe /hibernate on", "Switch hibernate on", ct);
+        // Run directly rather than through a script, whose exit code would not be powercfg's.
+        var outcome = await ctx.Runner.RunProcessAsync("powercfg.exe", ["/hibernate", "on"], "Switch hibernate on", ct);
         if (!outcome.Succeeded)
         {
             return false;
         }
 
         journal.CapturedState[HibernateSwitchedOn] = "1";
+        RecordHibernateWasOff(ctx);
         return true;
     }
 
-    private const string WakeDevices = "wake.devices";
-    private const char DeviceSeparator = '\n';
+    /// <summary>
+    /// Where "hibernate was off before this app switched it on" is kept for every setting that needs
+    /// hibernate, not only in the undo data of the one that happened to switch it on. Otherwise reverting
+    /// that one first, while another still needed hibernate, left hibernate on for good. In HKLM, next to
+    /// the app's other machine-wide records, so only an administrator can plant it.
+    /// </summary>
+    private const string MachineStateKey = @"SOFTWARE\HandheldOptimiser";
+    private const string HibernateWasOffValue = "HibernateOffBeforeUs";
+
+    private static bool HibernateWasOffBeforeUs(TweakContext ctx) =>
+        ctx.Registry.ReadValue(RegistryRoot.LocalMachine, MachineStateKey, HibernateWasOffValue) is 1;
+
+    private static void RecordHibernateWasOff(TweakContext ctx)
+    {
+        if (HibernateWasOffBeforeUs(ctx))
+        {
+            return;
+        }
+
+        if (ctx.Registry.WriteValue(new RegistryValueSpec(
+                RegistryRoot.LocalMachine, MachineStateKey, HibernateWasOffValue, 1, RegistryValueKind.DWord)) is null)
+        {
+            ctx.Log.Warning("Could not record that hibernate was off before; reverting may leave it on.");
+        }
+    }
+
+    private static void ClearHibernateWasOff(TweakContext ctx)
+    {
+        if (!HibernateWasOffBeforeUs(ctx))
+        {
+            return;
+        }
+
+        ctx.Registry.RestoreSnapshot(new RegistryValueSnapshot
+        {
+            Root = RegistryRoot.LocalMachine,
+            SubKey = MachineStateKey,
+            ValueName = HibernateWasOffValue,
+            KeyExisted = true,
+            ValueExisted = false
+        });
+    }
+
+    /// <summary>
+    /// Undo data keys that hold a list of device names, one per line. Re-applying adds to the list
+    /// rather than replacing it (see <see cref="TweakJournalService"/>), so every device either run
+    /// changed is put back.
+    /// </summary>
+    public const string WakeDevices = "wake.devices";
+    public const char DeviceSeparator = '\n';
 
     /// <summary>
     /// powercfg prints one device per line, and a placeholder line when there are none ("NONE" in English,
@@ -387,7 +447,7 @@ public static class SleepTweaks
         ScriptApply = async (ctx, journal, ct) =>
         {
             var listed = await ctx.Runner.RunScriptAsync(ListArmedScript, "List devices allowed to wake the handheld", ct, echoScript: false);
-            var devices = ArmedDevices(listed);
+            var devices = UsableDeviceNames(ctx, ArmedDevices(listed));
 
             if (devices.Count == 0)
             {
@@ -413,7 +473,13 @@ public static class SleepTweaks
                 return TweakResult.NoChange("sleep.wakedevices");
             }
 
-            var devices = saved.Split(DeviceSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+            var devices = UsableDeviceNames(ctx,
+                saved.Split(DeviceSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+
+            if (devices.Count == 0)
+            {
+                return TweakResult.NoChange("sleep.wakedevices");
+            }
 
             // A device that has since been unplugged cannot be re-armed; that is not a failed revert.
             await ctx.Runner.RunScriptAsync(
@@ -425,7 +491,7 @@ public static class SleepTweaks
         }
     };
 
-    private const string CardReaders = "sdreader.devices";
+    public const string CardReaders = "sdreader.devices";
 
     /// <summary>
     /// SD host controllers on the PCI bus, found by the standard class code (base 08, sub 05) in the
@@ -546,12 +612,34 @@ public static class SleepTweaks
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
+    /// <summary>
+    /// Device names go into an elevated script. One with a line break or other control character in it
+    /// did not come from a real device, so it is left out rather than passed on.
+    /// </summary>
+    private static List<string> UsableDeviceNames(TweakContext ctx, IEnumerable<string> names)
+    {
+        var usable = new List<string>();
+
+        foreach (var name in names)
+        {
+            if (PsQuote.HasControlCharacters(name))
+            {
+                ctx.Log.Warning("Skipped a device name with a control character in it.");
+                continue;
+            }
+
+            usable.Add(name);
+        }
+
+        return usable;
+    }
+
     private static string WakeScript(string verb, IEnumerable<string> devices)
     {
         // Device names come from powercfg (or the journal) and go into an elevated script, so each is a
-        // single-quoted literal with its quotes doubled.
+        // single-quoted literal with every form of quote PowerShell recognises doubled.
         var lines = devices.Select(d =>
-            $"& powercfg.exe {verb} '{d.Replace("'", "''")}'; if ($LASTEXITCODE -ne 0) {{ $failed = $true }}");
+            $"& powercfg.exe {verb} {PsQuote.Literal(d)}; if ($LASTEXITCODE -ne 0) {{ $failed = $true }}");
 
         return "$failed = $false\n" + string.Join("\n", lines) + "\nif ($failed) { exit 1 }";
     }

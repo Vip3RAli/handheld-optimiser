@@ -138,6 +138,7 @@ public static class ServiceTweaks
 
         // Detection reads the registry directly: it is kept in step because changes go through sc.exe,
         // and it avoids starting a PowerShell process for every card on the page.
+        ScriptDetectIsQuick = true,
         ScriptDetect = (ctx, _) =>
         {
             var startTypes = services

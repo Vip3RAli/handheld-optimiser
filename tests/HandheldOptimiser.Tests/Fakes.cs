@@ -81,10 +81,19 @@ internal sealed class FakeJournal : ITweakJournal
 
     public void Record(TweakJournalEntry entry)
     {
-        if (Entries.All(e => e.TweakId != entry.TweakId))
+        // Merges captured state into an earlier entry as the real journal does, so a checkpoint
+        // recorded before a script does not hide what the script captured afterwards.
+        if (Find(entry.TweakId) is { } existing)
         {
-            Entries.Add(entry);
+            if (!ReferenceEquals(existing, entry))
+            {
+                TweakJournalService.MergeCapturedState(existing.CapturedState, entry.CapturedState);
+            }
+
+            return;
         }
+
+        Entries.Add(entry);
     }
 
     public TweakJournalEntry? Find(string tweakId) => Entries.FirstOrDefault(e => e.TweakId == tweakId);

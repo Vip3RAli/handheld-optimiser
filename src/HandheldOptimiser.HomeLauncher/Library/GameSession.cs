@@ -463,18 +463,39 @@ internal sealed class GameSession
     private static async Task WaitForAnyExitAsync(List<Process> processes, CancellationToken cancel)
     {
         using var round = CancellationTokenSource.CreateLinkedTokenSource(cancel);
+        var waits = new List<Task>();
         try
         {
-            await Task.WhenAny(processes.Select(p => p.WaitForExitAsync(round.Token)));
+            foreach (var process in processes)
+            {
+                waits.Add(process.WaitForExitAsync(round.Token));
+            }
+
+            // WhenAny never throws: a wait that failed is simply the first one done. Without looking at
+            // it, a process this account may not wait on, as some anti-cheat protected games are, would
+            // send the caller straight round again, finding and failing on it in a tight loop.
+            var done = await Task.WhenAny(waits);
+            if (done.Exception?.InnerException is Win32Exception or InvalidOperationException or NotSupportedException)
+            {
+                await Task.Delay(PollEvery, cancel);
+            }
         }
         catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or NotSupportedException)
         {
-            // A process this account may not wait on, as some anti-cheat protected games are. Look again later.
+            // Failed as the wait was started rather than inside it. Look again later, the same.
             await Task.Delay(PollEvery, cancel);
         }
         finally
         {
             round.Cancel();
+
+            // The waits still going end cancelled, and any that failed are looked at here, so none is left
+            // for the finaliser to report as unobserved.
+            foreach (var wait in waits)
+            {
+                _ = wait.ContinueWith(static t => _ = t.Exception, CancellationToken.None,
+                    TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+            }
         }
 
         cancel.ThrowIfCancellationRequested();

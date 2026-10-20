@@ -130,7 +130,7 @@ public sealed class AppxService(LogService log, PowerShellRunner runner)
 
             _log.Info($"Removing {target.FriendlyName} ({target.IdentityName})");
 
-            var safeName = target.IdentityName.Replace("'", "''");
+            var safeName = PsQuote.Escape(target.IdentityName);
 
             var script = $$"""
                 $ErrorActionPreference = 'Continue'
