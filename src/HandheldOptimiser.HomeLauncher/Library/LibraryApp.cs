@@ -10,15 +10,30 @@ internal static class LibraryApp
 {
     private const string ShowEventName = @"Local\HandheldOptimiser.Library.Show";
 
-    public static int Run()
+    // The Armoury Crate button has its own signal: pressed while the library is in front it sends the
+    // player back, which the home button must not do.
+    private const string ButtonEventName = @"Local\HandheldOptimiser.Library.Button";
+
+    /// <param name="startedByService">
+    /// True when started with --library --from-button, as the Armoury Crate button's service does. A program
+    /// started by a service does not own the foreground, so it takes it with a synthetic key press. Every other
+    /// start (the home button, a shortcut) already has the foreground and is left as it was.
+    /// </param>
+    public static int Run(bool startedByService = false)
     {
         using var showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowEventName, out var createdNew);
+        using var buttonEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ButtonEventName);
 
         if (!createdNew)
         {
             // This process got the foreground from the home button press; pass that right on to the library.
+            if (startedByService)
+            {
+                Native.TakeForegroundRights();
+            }
+
             Native.AllowSetForegroundWindow(Native.AsfwAny);
-            showEvent.Set();
+            (startedByService ? buttonEvent : showEvent).Set();
             return 0;
         }
 
@@ -48,6 +63,7 @@ internal static class LibraryApp
 
         LibraryWindow? window = null;
         RegisteredWaitHandle? registration = null;
+        RegisteredWaitHandle? buttonRegistration = null;
         try
         {
             window = new LibraryWindow();
@@ -55,13 +71,25 @@ internal static class LibraryApp
             registration = ThreadPool.RegisterWaitForSingleObject(showEvent,
                 (_, _) => app.Dispatcher.BeginInvoke(shown.ShowLibrary),
                 null, Timeout.Infinite, executeOnlyOnce: false);
+            buttonRegistration = ThreadPool.RegisterWaitForSingleObject(buttonEvent,
+                (_, _) => app.Dispatcher.BeginInvoke(shown.OnArmouryCrateButton),
+                null, Timeout.Infinite, executeOnlyOnce: false);
 
             Program.Log("Game library started");
+
+            // Taken as the window is first drawn: done any earlier, Windows has handed the right on by the
+            // time the window asks for the front, and the library opens behind what was there.
+            if (startedByService)
+            {
+                window.ContentRendered += (_, _) => shown.BringToFront();
+            }
+
             return app.Run(window);
         }
         finally
         {
             registration?.Unregister(null);
+            buttonRegistration?.Unregister(null);
             TaskScheduler.UnobservedTaskException -= OnUnobservedTaskException;
 
             // The window puts back a game's profile and programs as it closes. If the library failed

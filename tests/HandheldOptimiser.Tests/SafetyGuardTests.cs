@@ -45,7 +45,7 @@ public sealed class SafetyGuardTests
     [InlineData("Audiosrv")]
     [InlineData("AudioEndpointBuilder")]
     [InlineData("StorSvc")]
-    [InlineData("AsusAppService")]
+    [InlineData("AsusCertService")]
     [InlineData("amdfendr")]
     public void Protected_services_are_refused(string service)
     {

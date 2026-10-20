@@ -29,7 +29,7 @@ public sealed class HubLayoutTests
     [InlineData("Performance", 11, 8)]
     [InlineData("Battery & Sleep", 6, 0)]
     [InlineData("Clean Up", 19, 12)]
-    [InlineData("Full Screen", 7, 3)]
+    [InlineData("Full Screen", 8, 3)]
     [InlineData("Maintenance & Backup", 4, 1)]
     [InlineData("Apps", 0, 0)]
     public void A_goal_holds_the_tweaks_the_map_gives_it(string title, int tweaks, int recommended)
@@ -53,6 +53,6 @@ public sealed class HubLayoutTests
         Assert.Equal(category, TweakCatalog.All.Single(t => t.Name == name).Category);
 
     [Fact]
-    public void The_catalog_holds_all_47_tweaks_once() =>
-        Assert.Equal(47, TweakCatalog.All.Select(t => t.Id).Distinct().Count());
+    public void The_catalog_holds_all_48_tweaks_once() =>
+        Assert.Equal(48, TweakCatalog.All.Select(t => t.Id).Distinct().Count());
 }

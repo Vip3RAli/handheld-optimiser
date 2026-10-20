@@ -24,6 +24,15 @@ namespace HandheldOptimiser.GameBar
         /// <summary>The power limit chosen in the widget, or 0 for Auto.</summary>
         public int PowerLimit;
 
+        /// <summary>True while TDP Engine stands in for Armoury Crate on the Ally's controller.</summary>
+        public bool Replacing;
+
+        /// <summary>Whether the Ally's controller is found and awake, while replacing.</summary>
+        public bool ControllerConnected;
+
+        /// <summary>"gamepad" or "desktop", the mode the controller was last set to, or null when not known.</summary>
+        public string ControllerMode;
+
         public static readonly EngineStatus Off = new EngineStatus();
 
         public static EngineStatus Failed(string error) => new EngineStatus { Error = error };
@@ -87,6 +96,22 @@ namespace HandheldOptimiser.GameBar
             return answer == null ? EngineStatus.Failed("TDP Engine unresponsive.") : Read(answer);
         }
 
+        /// <summary>
+        /// Sets the Ally controller's mode, "gamepad" or "desktop". The service always runs while it replaces
+        /// Armoury Crate, which is the only time this is offered, so it is never started here.
+        /// </summary>
+        public static EngineStatus SetControllerMode(string mode)
+        {
+            var request = new JsonObject
+            {
+                ["Command"] = JsonValue.CreateStringValue("set-controls"),
+                ["ControllerMode"] = JsonValue.CreateStringValue(mode)
+            }.Stringify();
+
+            var answer = Send(request);
+            return answer == null ? EngineStatus.Failed("TDP Engine unresponsive.") : Read(answer);
+        }
+
         private static EngineStatus Read(string answer)
         {
             if (!JsonObject.TryParse(answer, out var json))
@@ -105,7 +130,10 @@ namespace HandheldOptimiser.GameBar
                 Error = Text(json, "Error"),
                 TargetFps = (int)(Number(json, "TargetFps") ?? 0),
                 FanCurve = Text(json, "FanCurve"),
-                PowerLimit = (int)(Number(json, "PowerLimit") ?? 0)
+                PowerLimit = (int)(Number(json, "PowerLimit") ?? 0),
+                Replacing = json.GetNamedBoolean("Replacing", false),
+                ControllerConnected = json.GetNamedBoolean("ControllerConnected", false),
+                ControllerMode = Text(json, "ControllerMode")
             };
         }
 

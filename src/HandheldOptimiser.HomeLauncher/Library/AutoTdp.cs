@@ -107,6 +107,19 @@ internal static partial class AutoTdp
     });
 
     /// <summary>A line on what it is doing, or null when it is not running.</summary>
+    /// <summary>TDP Engine's status, with the controller's state while it replaces Armoury Crate, or null when it is not running.</summary>
+    public static async Task<AutoTdpStatus?> StatusAsync() =>
+        ServiceRunning() ? await SendAsync(new AutoTdpRequest(AutoTdpProtocol.Status)) : null;
+
+    /// <summary>Puts the controller in a mode; with <paramref name="temporary"/>, without saving it.</summary>
+    /// <returns>The status, its Error a notice when the mode could not be sent, or null when TDP Engine did not answer.</returns>
+    public static Task<AutoTdpStatus?> SetControllerModeAsync(string mode, bool temporary) =>
+        SendAsync(new AutoTdpRequest(AutoTdpProtocol.SetControls, ControllerMode: mode, Temporary: temporary));
+
+    /// <summary>Ends a temporary hold: the controller goes back to the mode the player saved, whatever it is now.</summary>
+    public static Task<AutoTdpStatus?> ReleaseControllerModeAsync() =>
+        SendAsync(new AutoTdpRequest(AutoTdpProtocol.SetControls, Temporary: true));
+
     public static Task<string?> DescribeAsync() => Queue(async () =>
     {
         if (!ServiceRunning() || await SendAsync(new AutoTdpRequest(AutoTdpProtocol.Status)) is not { Running: true } status)

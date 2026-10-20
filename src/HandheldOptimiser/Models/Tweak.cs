@@ -11,6 +11,23 @@ public sealed class TweakContext(LogService log, IRegistryStore registry, PowerS
     public LogService Log { get; } = log;
     public IRegistryStore Registry { get; } = registry;
     public PowerShellRunner Runner { get; } = runner;
+
+    /// <summary>
+    /// Saves the undo data a tweak has captured so far into the journal, for a script tweak that captures its
+    /// originals itself and then runs a long script: if the app is closed or crashes while that script runs, the
+    /// originals are already saved. <see cref="TweakEngine"/> sets it. Null where nothing journals, as in a test,
+    /// and then a call through <see cref="SaveCheckpoint"/> does nothing.
+    /// </summary>
+    public Action<TweakJournalEntry>? Checkpoint { get; init; }
+
+    /// <summary>Calls <see cref="Checkpoint"/> when there is one and something has been captured.</summary>
+    public void SaveCheckpoint(TweakJournalEntry journal)
+    {
+        if (journal.RegistrySnapshots.Count > 0 || journal.CapturedState.Count > 0)
+        {
+            Checkpoint?.Invoke(journal);
+        }
+    }
 }
 
 /// <summary>

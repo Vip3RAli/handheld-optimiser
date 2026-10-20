@@ -32,6 +32,36 @@ public sealed class WingetUpdates(LogService log, PowerShellRunner runner)
     /// </summary>
     private static readonly Regex IdShape = new(@"^[A-Za-z0-9][A-Za-z0-9._+\-]*$", RegexOptions.CultureInvariant);
 
+    /// <summary>
+    /// Game launchers that update themselves each time they start. Windows keeps the version of the installer
+    /// they first came with, so winget offers that installer again for ever, and running it over a launcher
+    /// that has moved on can break it: on 2026-10-12 it left the Epic Games Launcher unable to open until it
+    /// was installed again from Epic's site. These are left to update themselves.
+    /// </summary>
+    public static readonly IReadOnlySet<string> SelfUpdatingLaunchers = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "EpicGames.EpicGamesLauncher",
+        "Valve.Steam",
+        "ElectronicArts.EADesktop",
+        "Ubisoft.Connect",
+        "Blizzard.BattleNet",
+        "GOG.Galaxy",
+        "Amazon.Games",
+        "ItchIo.Itch",
+        "RockstarGames.Launcher",
+    };
+
+    /// <summary>The rows the app offers to update: not Store apps, which have their own section, and not self-updating launchers.</summary>
+    public static IReadOnlyList<UpdateItem> Offered(IEnumerable<UpdateItem> rows) =>
+        [.. rows.Where(i => !string.Equals(i.Detail, "msstore", StringComparison.OrdinalIgnoreCase)
+            && !IsSelfUpdating(i.Key))];
+
+    /// <summary>Whether an ID is one of <see cref="SelfUpdatingLaunchers"/>, also when winget cut it short with an ellipsis.</summary>
+    public static bool IsSelfUpdating(string id) =>
+        id.EndsWith(Ellipsis, StringComparison.Ordinal)
+            ? SelfUpdatingLaunchers.Any(l => l.StartsWith(id[..^1], StringComparison.OrdinalIgnoreCase))
+            : SelfUpdatingLaunchers.Contains(id);
+
     private readonly LogService _log = log;
     private readonly PowerShellRunner _runner = runner;
 
@@ -55,10 +85,13 @@ public sealed class WingetUpdates(LogService log, PowerShellRunner runner)
             return UpdateScan.Failed($"winget could not check for updates (exit 0x{outcome.ExitCode:X8}).");
         }
 
-        var items = ParseUpgradeTable(outcome.StdOut)
-            // Store apps have their own section, which updates them through the Store itself.
-            .Where(i => !string.Equals(i.Detail, "msstore", StringComparison.OrdinalIgnoreCase))
-            .ToList();
+        var rows = ParseUpgradeTable(outcome.StdOut);
+        var items = Offered(rows);
+
+        foreach (var skipped in rows.Where(r => IsSelfUpdating(r.Key)))
+        {
+            _log.Trace($"    {skipped.Name} ({skipped.Key}): left alone, as it updates itself");
+        }
 
         foreach (var item in items)
         {

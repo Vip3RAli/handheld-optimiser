@@ -319,6 +319,27 @@
                     </Grid>
                 </StackPanel>
             </Border>
+
+            <!-- Only while TDP Engine replaces Armoury Crate, which is when it runs the Ally's controller. The fan
+                 card above keeps the last card's zero margin, so this one carries the gap above it instead. -->
+            <Border x:Name="ControllerCard" Style="{StaticResource Card}" Margin="0,10,0,0" Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource CardTitle}" Text="Controller" />
+                    <Grid x:Name="ControllerModes" Margin="-3,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <!-- The Tag is the mode sent to the service. -->
+                        <ToggleButton Style="{StaticResource Tile}" Tag="gamepad" Click="OnControllerMode">
+                            <TextBlock Style="{StaticResource TileNumber}" Text="Gamepad" />
+                        </ToggleButton>
+                        <ToggleButton Grid.Column="1" Style="{StaticResource Tile}" Tag="desktop" Click="OnControllerMode">
+                            <TextBlock Style="{StaticResource TileNumber}" Text="Desktop" />
+                        </ToggleButton>
+                    </Grid>
+                </StackPanel>
+            </Border>
         </StackPanel>
     </ScrollViewer>
 </Page>

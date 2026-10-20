@@ -173,9 +173,23 @@ begin
   SecureFolder(ExpandConstant('{commonappdata}\HandheldOptimiser\logs'));
 end;
 
+// True while TDP Engine replaces Armoury Crate: the main app's Replace Armoury Crate tweak sets HKLM
+// SOFTWARE\HandheldOptimiser\AllyControls Replacing to 1. Any value but 0 counts, as it does for the
+// service (AllyControlsStore.Replacing), so the two never disagree. A missing value means it does not.
+function IsReplacingArmouryCrate(): Boolean;
+var
+  Value: Cardinal;
+begin
+  Result := RegQueryDWordValue(HKLM64, 'SOFTWARE\HandheldOptimiser\AllyControls', 'Replacing', Value) and (Value <> 0);
+end;
+
 // Registers the TDP Engine service, which counts a game's frames (that needs administrator, which the
 // game library never has) and sets the power limit. It only starts on demand: the library starts it
 // when a game starts with TDP Engine on, and it ends itself once the game closes.
+//
+// While it replaces Armoury Crate it also runs the Ally's buttons and starts with Windows, so a
+// reinstall or an update keeps it starting with Windows. Set back to demand, the buttons would stop
+// working after the next restart.
 //
 // Its permissions are Windows' defaults for a service plus one: the signed-in player (IU) may start
 // it (RP). They cannot stop, change or delete it. The exe path is quoted because it has spaces. App
@@ -183,27 +197,57 @@ end;
 // takes requests from the widget's own package.
 procedure RegisterAutoTdp();
 var
-  Sc, Path: String;
+  Sc, Path, Start: String;
   Code: Integer;
 begin
   Sc := ExpandConstant('{sys}\sc.exe');
   Path := ExpandConstant('{app}\{#ServiceExeName}');
+  if IsReplacingArmouryCrate() then
+  begin
+    Start := 'auto';
+    Log('TDP Engine replaces Armoury Crate, so it is kept starting with Windows.');
+  end
+  else
+    Start := 'demand';
 
-  if not Exec(Sc, 'create {#ServiceName} binPath= "\"' + Path + '\"" start= demand DisplayName= "Handheld Optimiser TDP Engine"',
+  if not Exec(Sc, 'create {#ServiceName} binPath= "\"' + Path + '\"" start= ' + Start + ' DisplayName= "Handheld Optimiser TDP Engine"',
     '', SW_HIDE, ewWaitUntilTerminated, Code) or (Code <> 0) then
     // Already there from an earlier version: brought up to date instead.
-    Exec(Sc, 'config {#ServiceName} binPath= "\"' + Path + '\"" start= demand DisplayName= "Handheld Optimiser TDP Engine"',
+    Exec(Sc, 'config {#ServiceName} binPath= "\"' + Path + '\"" start= ' + Start + ' DisplayName= "Handheld Optimiser TDP Engine"',
       '', SW_HIDE, ewWaitUntilTerminated, Code);
 
-  Exec(Sc, 'description {#ServiceName} "Holds a game at the frame rate chosen in the Handheld Optimiser game library with the lowest power limit. Runs only during games."',
+  Exec(Sc, 'description {#ServiceName} "Holds a game at the frame rate chosen in the Handheld Optimiser game library with the lowest power limit, and runs the ROG Ally''s buttons and controller mode when it replaces Armoury Crate."',
     '', SW_HIDE, ewWaitUntilTerminated, Code);
   Exec(Sc, 'sdset {#ServiceName} D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWRPLOCRRC;;;IU)(A;;RP;;;AC)',
     '', SW_HIDE, ewWaitUntilTerminated, Code);
 
   // If it crashes mid-game, Windows starts it again after 5 seconds, and on starting it puts back the
   // operating mode it saved, so the game's power limit is not left set. The count resets after a day.
-  Exec(Sc, 'failure {#ServiceName} reset= 86400 actions= restart/5000',
-    '', SW_HIDE, ewWaitUntilTerminated, Code);
+  //
+  // While it replaces Armoury Crate, the actions are the ones Replace Armoury Crate sets, so a reinstall
+  // or an update does not undo them, and failureflag 1 makes Windows start it again when it ends with an
+  // error as well as when it crashes: it ends that way when it fails while running the buttons.
+  if IsReplacingArmouryCrate() then
+  begin
+    Exec(Sc, 'failure {#ServiceName} reset= 86400 actions= restart/5000/restart/5000/restart/30000',
+      '', SW_HIDE, ewWaitUntilTerminated, Code);
+    Exec(Sc, 'failureflag {#ServiceName} 1',
+      '', SW_HIDE, ewWaitUntilTerminated, Code);
+  end
+  else
+    Exec(Sc, 'failure {#ServiceName} reset= 86400 actions= restart/5000',
+      '', SW_HIDE, ewWaitUntilTerminated, Code);
+
+  // PrepareToInstall stopped it to replace its exe. While it replaces Armoury Crate, ASUS's services
+  // are off and it is what runs the Ally's buttons, so it is started again now rather than at the next
+  // restart. 1056 means it was already running.
+  if IsReplacingArmouryCrate() then
+  begin
+    if Exec(Sc, 'start {#ServiceName}', '', SW_HIDE, ewWaitUntilTerminated, Code) and ((Code = 0) or (Code = 1056)) then
+      Log('Started TDP Engine again (exit ' + IntToStr(Code) + ').')
+    else
+      Log('Could not start TDP Engine again (exit ' + IntToStr(Code) + ').');
+  end;
 end;
 
 // Adds the TDP Engine widget to the player's Game Bar, when this build has it (it needs Visual Studio's
@@ -246,8 +290,102 @@ begin
   end;
 end;
 
+// Sets one ASUS service's start type with sc config, and logs how it went. The name is quoted, since
+// some have spaces.
+procedure SetAsusStart(Name, Start: String);
+var
+  Code: Integer;
+begin
+  if Exec(ExpandConstant('{sys}\sc.exe'), 'config "' + Name + '" start= ' + Start, '', SW_HIDE,
+    ewWaitUntilTerminated, Code) and (Code = 0) then
+    Log('Set ' + Name + ' to start ' + Start + '.')
+  else
+    Log('Could not set ' + Name + ' to start ' + Start + ' (exit ' + IntToStr(Code) + ').');
+end;
+
+// Starts one ASUS service with sc start, and logs how it went. 1056 means it was already running.
+procedure StartAsus(Name: String);
+var
+  Code: Integer;
+begin
+  if Exec(ExpandConstant('{sys}\sc.exe'), 'start "' + Name + '"', '', SW_HIDE, ewWaitUntilTerminated, Code)
+    and ((Code = 0) or (Code = 1056)) then
+    Log('Started ' + Name + '.')
+  else
+    Log('Could not start ' + Name + ' (exit ' + IntToStr(Code) + ').');
+end;
+
+// Gives the Ally its ASUS services back when TDP Engine was replacing Armoury Crate, since nothing
+// will run the Ally's buttons once TDP Engine is gone. The main app's journal is not available to the
+// uninstaller, so these are the stock values recorded on this Ally on 2026-10-18: every service
+// Automatic except asusm, which is Manual. The lists repeat ServicesInStopOrder and UpdateServices in
+// src\HandheldOptimiser\TweakDefinitions\ArmouryCrateTweaks.cs, which is their source, and so do the
+// task and the startup entry; a change there is made here too. The services that start are started
+// as the tweak's revert starts them: the update service first and ArmouryCrateSEService last.
+procedure PutBackArmouryCrate();
+var
+  Code: Integer;
+begin
+  if not IsReplacingArmouryCrate() then
+    Exit;
+
+  Log('TDP Engine was replacing Armoury Crate, so the ASUS services are put back.');
+
+  // UpdateServices.
+  SetAsusStart('asus', 'auto');
+  SetAsusStart('asusm', 'demand');
+
+  // ServicesInStopOrder.
+  SetAsusStart('AsusAppService', 'auto');
+  SetAsusStart('ASUSOptimization', 'auto');
+  SetAsusStart('ASUSSoftwareManager', 'auto');
+  SetAsusStart('ASUSSwitch', 'auto');
+  SetAsusStart('ASUSSystemAnalysis', 'auto');
+  SetAsusStart('ASUSSystemDiagnosis', 'auto');
+  SetAsusStart('ArmouryCrateControlInterface', 'auto');
+  SetAsusStart('ROG Live Service', 'auto');
+  SetAsusStart('GameSDK Service', 'auto');
+  SetAsusStart('LightingService', 'auto');
+  SetAsusStart('ArmouryCrateSEService', 'auto');
+
+  // FrameworkTask, which starts asus_framework at sign-in.
+  if Exec(ExpandConstant('{sys}\schtasks.exe'), '/Change /TN "\ASUS\Framework Service" /ENABLE', '', SW_HIDE,
+    ewWaitUntilTerminated, Code) and (Code = 0) then
+    Log('Enabled the scheduled task \ASUS\Framework Service.')
+  else
+    Log('Could not enable the scheduled task \ASUS\Framework Service (exit ' + IntToStr(Code) + ').');
+
+  // ScreenManagerEntry: the tweak turns it off under Run32 as Task Manager does. With no flag there,
+  // Windows runs the entry again.
+  if RegDeleteValue(HKLM64, 'SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run32', 'ROG Screen Manager') then
+    Log('Turned the ROG Screen Manager startup entry back on.')
+  else
+    Log('There was no ROG Screen Manager startup flag to remove.');
+
+  StartAsus('asus');
+  StartAsus('AsusAppService');
+  StartAsus('ASUSOptimization');
+  StartAsus('ASUSSoftwareManager');
+  StartAsus('ASUSSwitch');
+  StartAsus('ASUSSystemAnalysis');
+  StartAsus('ASUSSystemDiagnosis');
+  StartAsus('ArmouryCrateControlInterface');
+  StartAsus('ROG Live Service');
+  StartAsus('GameSDK Service');
+  StartAsus('LightingService');
+  StartAsus('ArmouryCrateSEService');
+
+  // Nothing is left to read the flag, and a stale 1 would make a later install start TDP Engine with
+  // Windows again.
+  if RegWriteDWordValue(HKLM64, 'SOFTWARE\HandheldOptimiser\AllyControls', 'Replacing', 0) then
+    Log('Set AllyControls Replacing to 0.')
+  else
+    Log('Could not set AllyControls Replacing to 0.');
+end;
+
 // The TDP Engine service goes first, so its exe is free to delete. Stopping it puts Armoury Crate's
-// operating mode back if a game was being held.
+// operating mode back if a game was being held. While it replaced Armoury Crate, the ASUS services
+// are put back once it has stopped and let go of the controller, and before it is deleted.
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   Code: Integer;
@@ -255,6 +393,7 @@ begin
   if CurUninstallStep = usUninstall then
   begin
     StopAutoTdp();
+    PutBackArmouryCrate();
     Exec(ExpandConstant('{sys}\sc.exe'), 'delete {#ServiceName}', '', SW_HIDE, ewWaitUntilTerminated, Code);
     // Where the service notes the operating mode to put back while a game is held; nothing reads it now.
     RegDeleteKeyIncludingSubkeys(HKLM64, 'SOFTWARE\HandheldOptimiser\TdpEngine');

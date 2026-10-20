@@ -46,6 +46,101 @@ internal static partial class Native
 
     public const int AsfwAny = -1;
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct KeyInput
+    {
+        public uint Type;
+        // On x64 the union that follows starts at offset 8.
+        public uint Alignment;
+        public ushort VirtualKey;
+        public ushort ScanCode;
+        public uint Flags;
+        public uint Time;
+        public nint ExtraInfo;
+        // INPUT is 40 bytes because its largest member (MOUSEINPUT) is longer than KEYBDINPUT; this pads to it.
+        public nint Padding;
+    }
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    private static unsafe partial uint SendInput(uint count, KeyInput* inputs, int size);
+
+    private const uint InputKeyboard = 1;
+    private const ushort VkMenu = 0x12;
+    private const uint KeyEventFKeyUp = 0x0002;
+
+    /// <summary>
+    /// Lets a program that a service started take the foreground. Windows only gives it to a program that
+    /// has just had input, which a service-started one has not, so one Alt press is sent first.
+    /// </summary>
+    public static unsafe void TakeForegroundRights()
+    {
+        var inputs = stackalloc KeyInput[2];
+        inputs[0] = new KeyInput { Type = InputKeyboard, VirtualKey = VkMenu };
+        inputs[1] = new KeyInput { Type = InputKeyboard, VirtualKey = VkMenu, Flags = KeyEventFKeyUp };
+        SendInput(2, inputs, sizeof(KeyInput));
+        AllowSetForegroundWindow(AsfwAny);
+    }
+
+    /// <summary>
+    /// Puts a window in front even when this process does not own the foreground: the Alt press has to
+    /// come straight before SetForegroundWindow, or Windows has handed the right on by the time it is asked.
+    /// </summary>
+    public static void BringToFront(nint window)
+    {
+        TakeForegroundRights();
+        SetForegroundWindow(window);
+    }
+
+    private const int SwMinimize = 6;
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool ShowWindowAsync(nint window, int command);
+
+    /// <summary>
+    /// Minimises another program's window without waiting for it to answer, so a game that is busy or
+    /// paused cannot hold the library up.
+    /// </summary>
+    public static void Minimise(nint window) => ShowWindowAsync(window, SwMinimize);
+
+    [LibraryImport("api-ms-win-gaming-experience-l1-1-0.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool IsGamingFullScreenExperienceActive();
+
+    /// <summary>
+    /// Whether Windows is in its full screen experience (Xbox mode) right now. False on a build of Windows
+    /// that does not have it, which is the same API set the main app checks for it.
+    /// </summary>
+    public static bool IsFullScreenExperience()
+    {
+        try
+        {
+            return IsGamingFullScreenExperienceActive();
+        }
+        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
+        {
+            return false;
+        }
+    }
+
+    private const ushort VkLeftWindows = 0x5B;
+    private const ushort VkG = 0x47;
+
+    /// <summary>
+    /// Opens Xbox Game Bar as the player would, with Win+G. Windows does not deliver a synthetic key to an
+    /// elevated window, so this does nothing while the main app is in front.
+    /// </summary>
+    /// <returns>False when Windows would not take the key presses.</returns>
+    public static unsafe bool PressWinG()
+    {
+        var inputs = stackalloc KeyInput[4];
+        inputs[0] = new KeyInput { Type = InputKeyboard, VirtualKey = VkLeftWindows };
+        inputs[1] = new KeyInput { Type = InputKeyboard, VirtualKey = VkG };
+        inputs[2] = new KeyInput { Type = InputKeyboard, VirtualKey = VkG, Flags = KeyEventFKeyUp };
+        inputs[3] = new KeyInput { Type = InputKeyboard, VirtualKey = VkLeftWindows, Flags = KeyEventFKeyUp };
+        return SendInput(4, inputs, sizeof(KeyInput)) == 4;
+    }
+
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static partial bool SetForegroundWindow(nint window);
