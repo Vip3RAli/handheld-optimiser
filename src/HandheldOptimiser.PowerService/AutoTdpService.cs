@@ -323,7 +323,8 @@ internal sealed partial class AutoTdpService : ServiceBase
             if (controller.Tick(now, fps, temperature) is { } watts)
             {
                 Apply(control, watts);
-                Log.Write($"{watts} W: {fps:0} fps, {temperature?.ToString() ?? "?"} °C, {controller.State}");
+                // The frame rate the change went on, not this second's count, which can be far from it.
+                Log.Write($"{watts} W: {controller.DecidedFps ?? fps:0} fps, {temperature?.ToString() ?? "?"} °C, {controller.State}");
             }
             else if (now - control.LastSet >= Reassert)
             {
