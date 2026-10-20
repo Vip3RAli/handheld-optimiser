@@ -25,14 +25,14 @@ internal sealed record AutoTdpSettings(int TargetFps, int MinWatts, int MaxWatts
 ///   more power. Two raises in a row that gain under 3% are taken back and the limit held for a minute.
 ///   A game that is already at the top limit has no raises to judge, as when a game idles at a menu
 ///   that runs at 30 fps. After a minute there, short of the target, it tries a quarter less. If that
-///   costs under 10% of the frame rate the lower limit is held as above, and it keeps stepping down
+///   costs under 15% of the frame rate the lower limit is held as above, and it keeps stepping down
 ///   while nothing is lost. A step that costs frames is taken back, and the next try waits twice as long.
 ///   An idle menu's frame rate wanders far from one second to the next, so these steps are judged on
 ///   10 seconds, the two highest and two lowest left out, rather than the middle of 3.
 /// - Holding a cap the game has outgrown. When a hold runs out, one step up of a quarter decides: a gain
-///   of 15% hands the game back to the usual raises, and anything less holds the limit again. A hold is
-///   also let go when the frame rate has moved 20% from where it was held for 5 seconds, as when the
-///   player goes from a menu back into a match.
+///   of 15%, with most seconds above the old ones, hands the game back to the usual raises, and anything
+///   less holds the limit again. A hold is also let go when most of 10 seconds have moved 20% from where
+///   it was held, for 8 seconds, as when the player goes from a menu back into a match.
 /// - Reacting to loading screens and pauses. Under 5 frames a second nothing changes.
 /// - Heat. At the temperature limit the power limit comes down whatever the frame rate, and climbs back
 ///   only a watt every 20 seconds once it has cooled a few degrees.
@@ -54,15 +54,15 @@ internal sealed class AutoTdpController
     private const double Gain = 1.03;
     private const int WastedRaises = 2;
 
-    // A step down from the top is judged on the middle of 10 seconds rather than 3, and may cost up to 10%:
+    // A step down from the top is judged on the middle of 10 seconds rather than 3, and may cost up to 15%:
     // an idle menu's frame rate swings more than that from one second to the next. A held limit is let go
-    // when the frame rate has moved 20% from where it was held for 5 seconds running.
+    // when three quarters of the last 10 seconds have moved 20% from where it was held, for 8 seconds running.
     private const int StepDownWindow = 10;
-    private const double StepDownLoss = 0.90;
+    private const double StepDownLoss = 0.85;
     private const double HeldMoved = 0.20;
 
     // A step down takes a quarter of the limit, at least 2 W: big enough that a game the power is helping
-    // loses well over the 10% allowed, where a game that gains nothing from it loses nothing.
+    // loses well over the 15% allowed, where a game that gains nothing from it loses nothing.
     private const int StepDownShare = 4;
     private const int SmallestStepDown = 2;
 
@@ -77,7 +77,7 @@ internal sealed class AutoTdpController
     private static readonly TimeSpan RecentlyLowered = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan NoGainHold = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan CoolRaiseEvery = TimeSpan.FromSeconds(20);
-    private static readonly TimeSpan HeldMovedFor = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan HeldMovedFor = TimeSpan.FromSeconds(8);
     private static readonly TimeSpan FirstStepDownWait = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan LongestStepDownWait = TimeSpan.FromMinutes(4);
 
@@ -121,6 +121,9 @@ internal sealed class AutoTdpController
     // A step up has to gain this much to show the power helps again: a game that needs the power gains
     // about 20% from a quarter more watts, where an idle menu's middle reading wanders by 10%.
     private const double StepUpGain = 1.15;
+
+    // The longer window's high quarter before a step up, which most seconds after it have to beat.
+    private double _stepUpBeforeHigh;
 
     // Set by heat: the limit stays at or under this until it has cooled, then climbs back slowly.
     private bool _hot;
@@ -190,8 +193,14 @@ internal sealed class AutoTdpController
         var middle = sorted[sorted.Length / 2];
         var low = sorted[0];
         var target = (double)_settings.TargetFps;
+        var unsteady = low * Unsteady < middle || sorted[^1] > middle * Unsteady;
 
-        if (low * Unsteady < middle || sorted[^1] > middle * Unsteady)
+        // Steps down and back up are judged on the longer window, which already leaves out hitches and
+        // spikes. An idle menu has a stray second every few, so a step judged that way is kept through one:
+        // dropping it left the limit wherever the step had put it, and the raises took over from there.
+        var longJudge = _judging is { Kind: Step.Down or Step.Up };
+
+        if (unsteady && !longJudge)
         {
             // A hitch or a spike: whatever was being judged is lost in it too.
             _judging = null;
@@ -199,10 +208,6 @@ internal sealed class AutoTdpController
             return null;
         }
 
-        DecidedFps = middle;
-
-        // Steps down and back up are judged on the longer window, so they wait until it has filled.
-        var longJudge = _judging is { Kind: Step.Down or Step.Up };
         if (longJudge && _longReadings.Count < StepDownWindow)
         {
             State = AutoTdpState.Settling;
@@ -214,9 +219,20 @@ internal sealed class AutoTdpController
             return takenBack;
         }
 
-        // Measured on the longer window too: an idle menu's single seconds stray 20% all the time.
-        if (now < _noGainUntil && _longReadings.Count >= StepDownWindow
-            && Math.Abs(LongMiddle() - _noGainFps) > _noGainFps * HeldMoved)
+        if (unsteady)
+        {
+            // The step has been judged, but nothing new is decided on an unsteady window.
+            State = AutoTdpState.Settling;
+            return null;
+        }
+
+        DecidedFps = middle;
+
+        // Measured on the longer window, and only when three quarters of its seconds have moved: an idle
+        // menu's seconds stray 20% either way all the time, so its middle wanders that far now and then,
+        // and a hold let go there handed the limit to raises judged on three noisy seconds, which climbed
+        // to the top. A new scene moves nearly every second at once.
+        if (now < _noGainUntil && _longReadings.Count >= StepDownWindow && HeldMovedAway())
         {
             // The game changed, so what power could not do before it may do now.
             _movedSince ??= now;
@@ -373,7 +389,9 @@ internal sealed class AutoTdpController
 
         if (last.Kind == Step.Up)
         {
-            if (fps >= last.FpsBefore * StepUpGain)
+            // Most of the seconds have to rise, not only the average: an idle menu's average wanders 15% by
+            // noise alone now and then, and a pass handed it to raises that then climbed to the top.
+            if (fps >= last.FpsBefore * StepUpGain && LowQuarter() > _stepUpBeforeHigh)
             {
                 // The power helps again: back to the usual raises and steps down.
                 _heldNoGain = false;
@@ -459,8 +477,24 @@ internal sealed class AutoTdpController
         }
 
         State = AutoTdpState.NoGain;
-        _judging = (Step.Up, Watts, _longReadings.Count >= StepDownWindow ? LongMiddle() : DecidedFps ?? 0);
+        var full = _longReadings.Count >= StepDownWindow;
+        _judging = (Step.Up, Watts, full ? LongMiddle() : DecidedFps ?? 0);
+        _stepUpBeforeHigh = full ? HighQuarter() : 0;
         return Change(now, Watts + Math.Max(SmallestStepDown, Watts / StepDownShare), SettleAfterLower);
+    }
+
+    /// <summary>The longer window's reading a quarter of the way up: three quarters of its seconds are at or above it.</summary>
+    private double LowQuarter()
+    {
+        var sorted = _longReadings.Order().ToArray();
+        return sorted[sorted.Length / 4];
+    }
+
+    /// <summary>The longer window's reading a quarter of the way down: three quarters of its seconds are at or under it.</summary>
+    private double HighQuarter()
+    {
+        var sorted = _longReadings.Order().ToArray();
+        return sorted[^(sorted.Length / 4 + 1)];
     }
 
     /// <summary>
@@ -474,6 +508,13 @@ internal sealed class AutoTdpController
         var trim = sorted.Length >= StepDownWindow ? 2 : 0;
         return sorted[trim..^trim].Average();
     }
+
+    /// <summary>
+    /// Whether three quarters of the longer window's seconds are 20% above, or 20% below, the frame rate
+    /// the limit was held at.
+    /// </summary>
+    private bool HeldMovedAway() =>
+        LowQuarter() > _noGainFps * (1 + HeldMoved) || HighQuarter() < _noGainFps * (1 - HeldMoved);
 
     private enum Step
     {
