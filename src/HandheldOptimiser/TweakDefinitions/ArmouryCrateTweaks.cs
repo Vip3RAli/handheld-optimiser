@@ -108,7 +108,7 @@ public static class ArmouryCrateTweaks
         Description =
             "Turns off Armoury Crate and ASUS's background services. Handheld Optimiser runs the Armoury Crate and " +
             "Command Center buttons and the controller mode instead, through the game library and its Game Bar widget. " +
-            "This replaces about a dozen ASUS services with one small one, using about 16 MB of memory instead of about 480 MB.",
+            "This replaces about a dozen ASUS services with one small one, using about 20 MB of memory instead of about 480 MB.",
         Category = TweakCategory.FullScreen,
         Risk = RiskLevel.Moderate,
         Warning =
