@@ -133,7 +133,7 @@ public static class StorageHealth
         (string Summary, string Detail)? found = (protection, conversion) switch
         {
             ("1", _) => ("On",
-                "If the handheld is lost or stolen, nobody can read the drive or the logins saved on it. " +
+                "If the handheld is lost or stolen, nobody who finds it can read the drive or the logins saved on it. " +
                 "It costs some drive speed."),
             ("0", "0") => ("Off",
                 "Anyone who takes the drive out can read it, saved logins included."),

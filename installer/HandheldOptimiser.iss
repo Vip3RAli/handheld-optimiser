@@ -11,11 +11,14 @@
 
 #define AppName "Handheld Optimiser"
 #define AppExeName "HandheldOptimiser.exe"
-#define LibraryName "Game Library"
+#define LibraryName "Handheld Optimiser Game Library"
 #define LauncherExeName "HandheldOptimiser.HomeLauncher.exe"
 #define ServiceExeName "HandheldOptimiser.PowerService.exe"
 ; Must match AutoTdpProtocol.ServiceName.
 #define ServiceName "HandheldOptimiserAutoTdp"
+; The home app package's app ID, which the launcher runs under however it starts. Must match
+; HomeAppRegistration.AppUserModelId.
+#define LibraryAppId "HandheldOptimiser.HomeApp_pgc7cpy78bqbw!HomeApp"
 
 [Setup]
 ; Never change AppId: upgrades find the existing install by it.
@@ -43,6 +46,9 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0.19041
 CloseApplications=yes
+; Tells Windows to reload icons after installing, so a changed app icon shows on the taskbar and in
+; shortcuts at once instead of the old one from its icon cache.
+ChangesAssociations=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -53,11 +59,17 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+; Versions up to 1.1.0 named the library's shortcut "Game Library". An upgrade would keep it next to the new one.
+[InstallDelete]
+Type: files; Name: "{group}\Game Library.lnk"
+
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
 ; Opens the game library directly, whatever the chosen full screen home app. The launcher carries the
-; library's own icon, and does not need administrator, so this starts without a UAC prompt.
-Name: "{group}\{#LibraryName}"; Filename: "{app}\{#LauncherExeName}"; Parameters: "--library"; Comment: "Open the Handheld Optimiser game library"
+; library's own icon, and does not need administrator, so this starts without a UAC prompt. It carries
+; the package's app ID, as the running library does, so a pinned copy and the open library share one
+; taskbar button however the library was started.
+Name: "{group}\{#LibraryName}"; Filename: "{app}\{#LauncherExeName}"; Parameters: "--library"; Comment: "Open the Handheld Optimiser game library"; AppUserModelID: "{#LibraryAppId}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
 
 [Run]
@@ -216,7 +228,7 @@ begin
     Exec(Sc, 'config {#ServiceName} binPath= "\"' + Path + '\"" start= ' + Start + ' DisplayName= "Handheld Optimiser TDP Engine"',
       '', SW_HIDE, ewWaitUntilTerminated, Code);
 
-  Exec(Sc, 'description {#ServiceName} "Holds a game at the frame rate chosen in the Handheld Optimiser game library with the lowest power limit, and runs the ROG Ally''s buttons and controller mode when it replaces Armoury Crate."',
+  Exec(Sc, 'description {#ServiceName} "Holds a game at the frame rate chosen in the Handheld Optimiser game library, using the lowest power it can. When it replaces Armoury Crate, it also runs the ROG Ally''s buttons and controller mode."',
     '', SW_HIDE, ewWaitUntilTerminated, Code);
   Exec(Sc, 'sdset {#ServiceName} D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWRPLOCRRC;;;IU)(A;;RP;;;AC)',
     '', SW_HIDE, ewWaitUntilTerminated, Code);
@@ -418,9 +430,9 @@ begin
 
   if not UninstallSilent then
     Result := MsgBox(
-      'Uninstalling does not undo any tweaks this app applied.' + Gap +
-      'To put Windows back first, cancel now, open Handheld Optimiser and use "Undo all changes" ' +
-      'on the Dashboard. Your undo data is kept either way, so reinstalling later can still revert them.' + Gap +
+      'Uninstalling does not undo the tweaks Handheld Optimiser applied.' + Gap +
+      'To put Windows back first, choose No, open Handheld Optimiser and use "Undo all changes" ' +
+      'on the Maintenance & backup page. Your undo data is kept, so you can still undo them if you reinstall.' + Gap +
       'Continue uninstalling?',
       mbConfirmation, MB_YESNO) = IDYES;
 end;

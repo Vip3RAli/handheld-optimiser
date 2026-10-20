@@ -153,7 +153,7 @@ public sealed class RuntimeService(LogService log, PowerShellRunner runner, Rest
                 Package = package,
                 Status = RuntimeStatus.Error,
                 InstalledVersion = installed,
-                Note = "could not read the latest version from winget"
+                Note = "winget did not give a latest version"
             };
         }
 
@@ -220,7 +220,7 @@ public sealed class RuntimeService(LogService log, PowerShellRunner runner, Rest
             {
                 Package = package,
                 Status = RuntimeStatus.Error,
-                Note = outcome.ExitCode == -1 ? "winget is not available" : $"winget exit 0x{outcome.ExitCode:X8}"
+                Note = outcome.ExitCode == -1 ? "winget is not available" : "winget did not answer"
             };
         }
 
@@ -385,8 +385,15 @@ public sealed class RuntimeService(LogService log, PowerShellRunner runner, Rest
             WingetUpdateNotApplicable or WingetAlreadyInstalled =>
                 TweakResult.NoChange(package.Id, $"{package.Name} is already the latest version."),
             -1 => TweakResult.Fail(package.Id, "winget could not be started. Install \"App Installer\" from the Microsoft Store."),
-            _ => TweakResult.Fail(package.Id, $"{package.Name} failed (winget exit 0x{outcome.ExitCode:X8}). See log.")
+            _ => FailedInstall(package, $"winget exit 0x{outcome.ExitCode:X8}")
         };
+    }
+
+    /// <summary>The exit code goes to the log. The player is told the runtime did not install and where the detail is.</summary>
+    private TweakResult FailedInstall(RuntimePackage package, string exitText)
+    {
+        _log.Error($"{package.Name} did not install ({exitText}).");
+        return TweakResult.Fail(package.Id, $"{package.Name} did not install. The console has the detail.");
     }
 
     private async Task<TweakResult> InstallNetFx3Async(RuntimePackage package, CancellationToken ct)
@@ -401,7 +408,7 @@ public sealed class RuntimeService(LogService log, PowerShellRunner runner, Rest
         {
             0 => TweakResult.Ok(package.Id, ".NET Framework 3.5 enabled."),
             MsiRebootRequired => TweakResult.Ok(package.Id, ".NET Framework 3.5 enabled; restart to finish.", rebootRequired: true),
-            _ => TweakResult.Fail(package.Id, $".NET Framework 3.5 could not be enabled (DISM exit {outcome.ExitCode}). See log.")
+            _ => FailedInstall(package, $"DISM exit {outcome.ExitCode}")
         };
     }
 

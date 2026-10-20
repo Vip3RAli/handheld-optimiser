@@ -292,7 +292,7 @@ public partial class LibraryWindow
                     () => OpenSettingsCategoryFromCard(SleepTweaksItems)));
                 cards.Add(new ActionCard("", "Refresh library", null,
                     () => OnRescan(this, new RoutedEventArgs())));
-                cards.Add(new ActionCard("", "Quit", null, () => OnQuit(this, new RoutedEventArgs())));
+                cards.Add(new ActionCard("", "Close library", null, () => OnQuit(this, new RoutedEventArgs())));
                 break;
 
             case CategoryKind.Power:

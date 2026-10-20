@@ -55,7 +55,7 @@ public partial class LibraryWindow
         var games = consoles.Where(c => Emulators.ChosenFor(c.System, emulators) is not null).Sum(c => c.Games);
 
         MenuStore.Text = folders.Count == 0 ? "No ROM folders yet. Add one below"
-            : consoles.Count == 0 ? "No console folders found. Name them snes, ps2, gc and so on"
+            : consoles.Count == 0 ? "No console folders found. Name each one after its console, like snes or ps2"
             : $"{games} games in the library from {consoles.Count} consoles";
 
         foreach (var (system, count) in consoles)
@@ -139,7 +139,7 @@ public partial class LibraryWindow
         {
             _confirming = row;
             row.Tag = "Press again to remove";
-            Notice = "Its games leave the library. Nothing is deleted.";
+            Notice = "The folder's games leave the library. Nothing is deleted.";
             return;
         }
 
@@ -178,7 +178,7 @@ public partial class LibraryWindow
 
         if (!Emulators.IsKnown(picker.FileName))
         {
-            Notice = $"That is not an emulator the library knows. It works with {Emulators.KnownNames}.";
+            Notice = $"The library does not know that emulator. It works with {Emulators.KnownNames}.";
             return;
         }
 

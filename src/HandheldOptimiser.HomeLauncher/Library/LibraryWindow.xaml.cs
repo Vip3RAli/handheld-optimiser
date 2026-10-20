@@ -202,7 +202,7 @@ public partial class LibraryWindow : Window
         _scanning = true;
         if (_allTiles.Count == 0)
         {
-            EmptyText.Text = "Finding your games...";
+            EmptyText.Text = "Looking for your games...";
         }
 
         try
@@ -370,11 +370,11 @@ public partial class LibraryWindow : Window
                 : string.Empty
             : _filter.Apps
             ? _tiles.Count == 0
-                ? "No apps yet. Press Menu, choose Games and Apps then Add a program while this tab is open, and pick Chrome, Discord or anything else from the Start menu."
+                ? "No apps yet. Press Menu, then Games and apps, then Add a program."
                 : string.Empty
             : _allTiles.All(t => !t.IsInstalled || t.IsApp) && !_filter.NotInstalled
-            ? "No installed games were found in Steam, Xbox, Epic Games, Battle.net, GOG, the EA App or Ubisoft Connect.\nInstall a game or add a program under Settings, then press Menu and choose Refresh library."
-            : _tiles.Count == 0 ? "Every game is hidden. Switch on Show hidden games under Settings, Library Display to bring them back."
+            ? "No installed games were found in Steam, Xbox, Epic Games, Battle.net, GOG, the EA App or Ubisoft Connect.\nInstall a game, or press Menu, then Games and apps, then Add a program."
+            : _tiles.Count == 0 ? "Every game is hidden. Turn on Show hidden games to bring them back. Press Menu, then Library display, then What it shows."
             : string.Empty;
     }
 
@@ -583,7 +583,7 @@ public partial class LibraryWindow : Window
         if (!tile.IsInstalled)
         {
             var problem = GameCatalog.Launch(tile.Game);
-            ShowNotice(problem ?? $"Opening {Game.NameOf(tile.Game.Store)} to install {tile.Title}", tile);
+            ShowNotice(problem ?? $"Opening {Game.NameOf(tile.Game.Store)} to install {tile.Title}...", tile);
             if (problem is not null)
             {
                 _launchBlockedUntil = DateTime.MinValue;
@@ -596,7 +596,7 @@ public partial class LibraryWindow : Window
         if (tile.IsApp)
         {
             var failed = GameCatalog.Launch(tile.Game);
-            ShowNotice(failed ?? $"Opening {tile.Title}", tile);
+            ShowNotice(failed ?? $"Opening {tile.Title}...", tile);
             if (failed is not null)
             {
                 _launchBlockedUntil = DateTime.MinValue;
@@ -611,7 +611,7 @@ public partial class LibraryWindow : Window
         var storeWasOpen = StoreClients.IsRunning(tile.Game.Store);
 
         var error = GameCatalog.Launch(tile.Game);
-        ShowNotice(error ?? $"Launching {tile.Title}", tile, error is null ? LaunchNoticeShownFor : null);
+        ShowNotice(error ?? $"Launching {tile.Title}...", tile, error is null ? LaunchNoticeShownFor : null);
         if (error is not null)
         {
             _launchBlockedUntil = DateTime.MinValue;

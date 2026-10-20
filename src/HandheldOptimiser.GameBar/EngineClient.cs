@@ -93,7 +93,7 @@ namespace HandheldOptimiser.GameBar
                 }
             }
 
-            return answer == null ? EngineStatus.Failed("TDP Engine unresponsive.") : Read(answer);
+            return answer == null ? EngineStatus.Failed("TDP Engine is not responding. Try again in a moment.") : Read(answer);
         }
 
         /// <summary>
@@ -109,14 +109,14 @@ namespace HandheldOptimiser.GameBar
             }.Stringify();
 
             var answer = Send(request);
-            return answer == null ? EngineStatus.Failed("TDP Engine unresponsive.") : Read(answer);
+            return answer == null ? EngineStatus.Failed("TDP Engine is not responding. Try again in a moment.") : Read(answer);
         }
 
         private static EngineStatus Read(string answer)
         {
             if (!JsonObject.TryParse(answer, out var json))
             {
-                return EngineStatus.Failed("TDP Engine invalid response.");
+                return EngineStatus.Failed("TDP Engine sent an answer the widget could not read. Update Handheld Optimiser.");
             }
 
             return new EngineStatus
@@ -210,7 +210,7 @@ namespace HandheldOptimiser.GameBar
             var manager = OpenSCManager(null, null, ScManagerConnect);
             if (manager == IntPtr.Zero)
             {
-                return "Windows would not let Game Bar start TDP Engine. Try launching a game from the game library to restart it.";
+                return "Windows could not start TDP Engine from Game Bar. Start a game from the Handheld Optimiser game library to start it.";
             }
 
             try
@@ -219,15 +219,15 @@ namespace HandheldOptimiser.GameBar
                 if (service == IntPtr.Zero)
                 {
                     return Marshal.GetLastWin32Error() == ErrorServiceDoesNotExist
-                        ? "TDP Engine is not installed. Install the latest Handheld Optimiser to access it."
-                        : "Windows would not let Game Bar start TDP Engine. Try launching a game from the game library to restart it.";
+                        ? "TDP Engine is not installed. Reinstall Handheld Optimiser to add it."
+                        : "Windows could not start TDP Engine from Game Bar. Start a game from the Handheld Optimiser game library to start it.";
                 }
 
                 try
                 {
                     if (!StartServiceW(service, 0, IntPtr.Zero) && Marshal.GetLastWin32Error() != ErrorAlreadyRunning)
                     {
-                        return "Windows would not start TDP Engine.";
+                        return "Windows could not start TDP Engine. Restart the handheld and try again.";
                     }
 
                     return null;

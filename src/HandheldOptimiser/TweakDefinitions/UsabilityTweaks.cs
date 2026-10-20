@@ -20,9 +20,10 @@ public static class UsabilityTweaks
     public static Tweak StickyKeys => new()
     {
         Id = "usability.stickykeys",
-        Name = "Disable Sticky Keys shortcut",
+        Name = "Turn off the Sticky Keys shortcut",
         Description =
-            "Stops five presses of Shift opening the Sticky Keys prompt and dropping you out of a game.",
+            "Stops pressing Shift five times from opening the Sticky Keys prompt, which can drop you out " +
+            "of a game.",
         Category = TweakCategory.TouchAndDesktop,
         Risk = RiskLevel.Safe,
         RequiresReboot = true,
@@ -35,9 +36,9 @@ public static class UsabilityTweaks
     public static Tweak FilterKeys => new()
     {
         Id = "usability.filterkeys",
-        Name = "Disable Filter Keys shortcut",
+        Name = "Turn off the Filter Keys shortcut",
         Description =
-            "Stops holding right Shift for eight seconds turning on Filter Keys, which makes the " +
+            "Stops holding right Shift for eight seconds from turning on Filter Keys, which makes the " +
             "keyboard ignore quick presses.",
         Category = TweakCategory.TouchAndDesktop,
         Risk = RiskLevel.Safe,
@@ -51,7 +52,7 @@ public static class UsabilityTweaks
     public static Tweak PowerThrottling => new()
     {
         Id = "usability.powerthrottling",
-        Name = "Disable power throttling",
+        Name = "Turn off power throttling",
         Description =
             "Stops Windows slowing down background apps, so overlays and launchers stay at full speed " +
             "while you play.",

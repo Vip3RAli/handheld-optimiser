@@ -97,7 +97,7 @@ public partial class LibraryWindow
             ApplyFilter();
         }
 
-        Notice = game.IsApp ? $"{game.Title} added to Apps. Move to games in its quick actions if it is a game."
+        Notice = game.IsApp ? $"{game.Title} added to Apps. Move to Games in its quick actions if it is a game."
             : $"{game.Title} added to the library.";
         _ = ScanAsync();
     }

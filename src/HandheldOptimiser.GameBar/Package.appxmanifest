@@ -43,7 +43,7 @@
         DisplayName="Handheld Optimiser TDP Engine"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png"
-        Description="TDP Engine's frame rate and fan curve, from Xbox Game Bar"
+        Description="Choose a frame rate, power limit and fan setting from Xbox Game Bar"
         BackgroundColor="transparent"
         AppListEntry="none">
         <uap:SplashScreen Image="Assets\SplashScreen.png" />
@@ -53,7 +53,7 @@
           <uap3:AppExtension Name="microsoft.gameBarUIExtension"
                              Id="TdpEngine"
                              DisplayName="TDP Engine"
-                             Description="Hold a frame rate with the lowest power, and pick a fan curve"
+                             Description="Hold a frame rate on the least power, set a power limit and choose a fan setting"
                              PublicFolder="GameBar">
             <uap3:Properties>
               <GameBarWidget Type="Standard">
@@ -61,7 +61,7 @@
                 <PinningSupported>true</PinningSupported>
                 <Window>
                   <Size>
-                    <Height>560</Height>
+                    <Height>600</Height>
                     <Width>400</Width>
                     <MinHeight>220</MinHeight>
                     <MinWidth>340</MinWidth>

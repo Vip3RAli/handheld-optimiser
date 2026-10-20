@@ -28,8 +28,8 @@ public partial class App : Application
             // The manifest requests administrator, so reaching here means elevation was declined or
             // stripped. Every tweak needs HKLM, DISM or bcdedit, so there is nothing useful to do.
             MessageBox.Show(
-                "Handheld Optimiser needs to run as Administrator.\n\n" +
-                "Close this and relaunch, accepting the User Account Control prompt.",
+                "Handheld Optimiser needs to run as administrator.\n\n" +
+                "Close this, open the app again and choose Yes at the prompt.",
                 "Administrator required",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
@@ -143,7 +143,7 @@ public partial class App : Application
 
         MessageBox.Show(
             $"Something went wrong:\n\n{Innermost(e.Exception).Message}\n\n" +
-            "The session log has the detail of what had been executed up to this point.",
+            "The session log shows what the app had done up to that point.",
             "Unexpected error",
             MessageBoxButton.OK,
             MessageBoxImage.Error);

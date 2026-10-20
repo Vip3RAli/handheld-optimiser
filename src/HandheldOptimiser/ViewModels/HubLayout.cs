@@ -46,12 +46,12 @@ public static class HubLayout
             Tweaks("Network", TweakCategory.Network)
         ]),
 
-        new("Battery & Sleep", "", "Hibernate, wake, standby drain",
+        new("Battery & sleep", "", "Hibernate, wake, standby drain",
         [
             Tweaks(string.Empty, TweakCategory.Sleep)
         ]),
 
-        new("Clean Up", "", "Privacy, ads, background, services",
+        new("Clean up", "", "Privacy, ads, background, services",
         [
             Tweaks("Privacy", TweakCategory.Privacy),
             Tweaks("Ads & assistants", TweakCategory.AdsAndAssistants),
@@ -65,14 +65,14 @@ public static class HubLayout
             new(SectionKind.PreinstalledApps, "Preinstalled apps")
         ]),
 
-        new("Full Screen", "", "Home app, sign-in, touch",
+        new("Full screen", "", "Home app, sign-in, touch",
         [
             new(SectionKind.HomeApp, "Home app"),
-            Tweaks("Full screen", TweakCategory.FullScreen),
+            Tweaks("Sign-in and Armoury Crate", TweakCategory.FullScreen),
             Tweaks("Touch & desktop", TweakCategory.TouchAndDesktop)
         ]),
 
-        new("Maintenance & Backup", "", "Restore point, undo, cleanup jobs",
+        new("Maintenance & backup", "", "Restore point, undo, clean-up jobs",
         [
             new(SectionKind.Backup, "Backup"),
             new(SectionKind.Jobs, "Jobs"),

@@ -58,7 +58,7 @@ internal static class Updates
         if (MainApp.Start(UpdateArgument) is { } problem)
         {
             Program.Log($"Could not open the main app to update: {problem}");
-            return $"The update was not started: {problem}";
+            return $"The update was not started. {problem}";
         }
 
         Program.Log("Opened the main app to install the update");

@@ -69,7 +69,7 @@
             <WrapPanel Orientation="Horizontal">
                 <ui:Button Content="Check for updates" Command="{Binding CheckCommand}" Margin="0,0,10,6" />
                 <ui:Button Content="Select all" Command="{Binding SelectAllCommand}" Margin="0,0,10,6" />
-                <ui:Button Content="Select none" Command="{Binding SelectNoneCommand}" Margin="0,0,16,6" />
+                <ui:Button Content="Clear selection" Command="{Binding SelectNoneCommand}" Margin="0,0,16,6" />
                 <ui:ToggleSwitch IsChecked="{Binding IncludeDrivers, Mode=TwoWay}" MinHeight="36" Margin="0,0,0,6"
                                  VerticalAlignment="Center"
                                  Content="Include driver updates" />

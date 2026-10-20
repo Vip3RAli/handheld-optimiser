@@ -285,7 +285,7 @@
                                Command="{Binding CheckForUpdatesCommand}"
                                IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}" />
                     <TextBlock Opacity="0.5" FontSize="11" VerticalAlignment="Center"
-                               Text="Running as Administrator" />
+                               Text="Running as administrator" />
                 </StackPanel>
             </Grid>
         </Border>

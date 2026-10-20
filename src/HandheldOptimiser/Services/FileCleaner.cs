@@ -18,7 +18,7 @@ public sealed class CleanTally
     }
 
     public string Describe() =>
-        $"{FilesDeleted} file(s), {BytesFreed / (1024.0 * 1024.0):0.0} MB freed" +
+        Plural.Count(FilesDeleted, "file") + $", {BytesFreed / (1024.0 * 1024.0):0.0} MB freed" +
         (Skipped > 0 ? $", {Skipped} in use or locked and skipped" : string.Empty);
 }
 

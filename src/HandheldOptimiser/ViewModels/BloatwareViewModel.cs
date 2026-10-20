@@ -26,9 +26,9 @@ public sealed partial class AppxRowViewModel(AppxPresence presence) : Observable
 
     public string ScopeText => (Presence.InstalledForUser, Presence.Provisioned) switch
     {
-        (true, true) => "Installed + provisioned",
+        (true, true) => "Installed, and set to install for new users",
         (true, false) => "Installed for you",
-        (false, true) => "Provisioned only (installs for new users)",
+        (false, true) => "Set to install for new users",
         _ => "Not present"
     };
 }
@@ -43,7 +43,7 @@ public sealed class AppxGroupViewModel
 }
 
 /// <summary>
-/// The bloatware page. Nothing is ticked on load. The user reviews each package, with its real Appx
+/// The preinstalled apps page. Nothing is ticked on load. The user reviews each package, with its real Appx
 /// identity name visible, before anything is removed.
 /// </summary>
 public sealed partial class BloatwareViewModel(
@@ -145,8 +145,8 @@ public sealed partial class BloatwareViewModel(
         var selected = AllRows.Count(r => r.IsSelected);
 
         SummaryText = total == 0
-            ? "No catalog bloatware found on this machine. It is already clean."
-            : $"{total} removable app(s) found.";
+            ? "None of the apps this page removes are installed."
+            : Plural.Count(total, "removable app") + " found.";
         SelectedText = $"{selected} selected";
     }
 
@@ -191,22 +191,22 @@ public sealed partial class BloatwareViewModel(
         var list = string.Join("\n", selected.Select(r => $"  • {r.FriendlyName}  ({r.IdentityName})"));
 
         var confirmed = await Shell.ConfirmAsync(
-            $"Remove {selected.Count} app(s)?",
-            $"{list}\n\nThese will be removed for all users and from the provisioned image, so Windows will " +
-            "not reinstall them.\n\nThis cannot be undone by the Revert button. Getting one back means " +
+            $"Remove {Plural.Count(selected.Count, "app")}?",
+            $"{list}\n\nThese will be removed for every user, so new accounts do not get them either and Windows will " +
+            "not reinstall them.\n\nThis cannot be undone from this app. Getting one back means " +
             "reinstalling it from the Microsoft Store. A System Restore point will be created first.",
-            $"Remove {selected.Count} app(s)");
+            $"Remove {Plural.Count(selected.Count, "app")}");
 
         if (!confirmed)
         {
             return;
         }
 
-        await Shell.RunExclusiveAsync("Removing bloatware…", async (progress, ct) =>
+        await Shell.RunExclusiveAsync("Removing preinstalled apps…", async (progress, ct) =>
         {
             progress.Report("Creating System Restore point…");
 
-            var rp = await _restorePoints.CreateAsync("Handheld Optimiser: bloatware removal", ct);
+            var rp = await _restorePoints.CreateAsync("Handheld Optimiser: preinstalled app removal", ct);
 
             if (!rp.Created)
             {
@@ -240,9 +240,9 @@ public sealed partial class BloatwareViewModel(
             await LoadPackagesAsync(ct);
 
             await Shell.ConfirmAsync(
-                "Bloatware removal finished",
-                $"{removed} app(s) removed." +
-                (failed > 0 ? $"\n{failed} could not be fully removed. See the log for details." : string.Empty),
+                "Preinstalled apps removed",
+                Plural.Count(removed, "app") + " removed." +
+                (failed > 0 ? $"\n{failed} could not be fully removed. The console has the detail." : string.Empty),
                 "OK");
         });
     }

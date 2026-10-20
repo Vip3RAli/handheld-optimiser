@@ -35,7 +35,8 @@ internal readonly record struct PlayStats(TimeSpan Played, DateTimeOffset? LastP
         : $"{Math.Max(1, time.Minutes)} min";
 
     public static string Ago(TimeSpan time) =>
-        time < TimeSpan.FromHours(1) ? "just now"
+        time < TimeSpan.FromMinutes(5) ? "just now"
+        : time < TimeSpan.FromHours(1) ? (time.Minutes == 1 ? "1 minute ago" : $"{time.Minutes} minutes ago")
         : time < TimeSpan.FromDays(1) ? "today"
         : time < TimeSpan.FromDays(2) ? "yesterday"
         : time < TimeSpan.FromDays(60) ? $"{(int)time.TotalDays} days ago"

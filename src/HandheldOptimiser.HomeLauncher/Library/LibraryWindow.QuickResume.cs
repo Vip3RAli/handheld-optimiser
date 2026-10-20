@@ -85,7 +85,7 @@ public partial class LibraryWindow
 
             case PauseOutcome.AntiCheat when !ReferenceEquals(_toldNotPaused, session):
                 _toldNotPaused = session;
-                Notice = $"{title} keeps running behind the library: it uses {session.AntiCheat}, which pausing could trip.";
+                Notice = $"{title} keeps running behind the library: it uses {session.AntiCheat}, and pausing it could get you flagged.";
                 break;
 
             case PauseOutcome.Refused when !ReferenceEquals(_toldNotPaused, session):

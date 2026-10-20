@@ -33,9 +33,9 @@ public partial class LibraryWindow
     }
 
     // The categories the settings list opens, each a short list of groups.
-    private const string LibraryDisplay = "Library Display";
-    private const string GamesApps = "Games and Apps";
-    private const string SleepTweaks = "Sleep and Tweaks";
+    private const string LibraryDisplay = "Library display";
+    private const string GamesApps = "Games and apps";
+    private const string SleepTweaks = "Sleep and clean-up";
 
     private void OnOpenLibraryDisplay(object sender, RoutedEventArgs e) => OpenSettingsCategory(LibraryDisplayItems);
 
@@ -54,10 +54,10 @@ public partial class LibraryWindow
     }
 
     private void OnOpenBackgroundSettings(object sender, RoutedEventArgs e) =>
-        OpenSettingsGroup(BackgroundItems, "Art and Background", LibraryDisplay);
+        OpenSettingsGroup(BackgroundItems, "Art and background", LibraryDisplay);
 
     private void OnOpenDisplaySettings(object sender, RoutedEventArgs e) =>
-        OpenSettingsGroup(DisplayItems, "Library View Options", LibraryDisplay);
+        OpenSettingsGroup(DisplayItems, "What it shows", LibraryDisplay);
 
     /// <summary>One group of settings, in place of the list it was opened from, which is named under its title.</summary>
     private void OpenSettingsGroup(StackPanel group, string title, string from, Button? focus = null)
@@ -265,7 +265,7 @@ public partial class LibraryWindow
         if (MainApp.Start() is { } problem)
         {
             Program.Log($"Could not open the main app from settings: {problem}");
-            Notice = $"Handheld Optimiser was not opened: {problem}";
+            Notice = $"Handheld Optimiser was not opened. {problem}";
             return;
         }
 
@@ -378,6 +378,6 @@ public partial class LibraryWindow
 
     private void OnEditArtworkKey(object sender, RoutedEventArgs e) =>
         BeginEdit(MenuEditor.ArtworkKey, "SteamGridDB API key",
-            "Free at steamgriddb.com, under Preferences then API. Fetches artwork for apps and for games outside Steam, whose names are sent to SteamGridDB. Leave empty to remove the key.",
+            "Free at steamgriddb.com, under Preferences, then API. Game names are sent to SteamGridDB to find artwork. Leave empty to remove it.",
             LibrarySettings.ArtworkKey);
 }

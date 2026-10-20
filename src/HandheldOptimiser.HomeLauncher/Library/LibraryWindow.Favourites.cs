@@ -77,7 +77,7 @@ public partial class LibraryWindow
         _filter = app ? TileFilter.AppsTab : TileFilter.All;
         ApplyFilter();
         RestoreFocus();
-        Notice = app ? $"{tile.Title} moved to Apps." : $"{tile.Title} moved to the games.";
+        Notice = app ? $"{tile.Title} moved to Apps." : $"{tile.Title} moved to Games.";
     }
 
     /// <summary>Hides or shows a game, or takes a program the player added off the library altogether.</summary>
@@ -125,6 +125,6 @@ public partial class LibraryWindow
         RestoreFocus();
         Notice = !hidden ? $"{tile.Title} is back in the library."
             : _showHidden ? $"{tile.Title} is hidden. It shows faded while Show hidden games is on."
-            : $"{tile.Title} is hidden. Show hidden games in Settings, Library Display brings it back.";
+            : $"{tile.Title} is hidden. Turn on Show hidden games to bring it back. It is under Library display, What it shows.";
     }
 }

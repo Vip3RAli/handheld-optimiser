@@ -57,9 +57,8 @@ public sealed partial class BackupViewModel : SectionViewModel
     {
         if (!await Shell.ConfirmAsync(
                 "Undo all changes",
-                "Every tweak this app applied will be restored to the value it had beforehand, using the " +
-                "recorded undo data.\n\nRemoved bloatware is not restored. That has to come back from the " +
-                "Microsoft Store.",
+                "Every tweak this app applied goes back to the value it had before.\n\n" +
+                "Removed preinstalled apps are not restored. They have to come back from the Microsoft Store.",
                 "Undo all changes"))
         {
             return;
@@ -80,8 +79,8 @@ public sealed partial class BackupViewModel : SectionViewModel
 
             await Shell.ConfirmAsync(
                 "Undo finished",
-                $"{summary.Applied} tweak(s) reverted." +
-                (summary.Failures > 0 ? $"\n{summary.Failures} failed. Check the log." : string.Empty),
+                Plural.Count(summary.Applied, "tweak") + " undone." +
+                (summary.Failures > 0 ? $"\n{summary.Failures} failed. The console has the detail." : string.Empty),
                 "OK");
         });
     }

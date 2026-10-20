@@ -117,14 +117,14 @@ public sealed partial class HomeAppPickerViewModel : SectionViewModel
 
         IsAvailable = HomeAppRegistration.IsFullScreenExperienceAvailable();
         AvailabilityText = !IsAvailable
-            ? "The full screen experience is not available on this version of Windows. It needs Windows 11 24H2 or later on a handheld."
+            ? "Full screen mode is not available on this version of Windows. It needs Windows 11 24H2 or later on a handheld."
             : HomeAppRegistration.IsLegacyHomeApp()
-                ? "This version fixes full screen mode opening to a blank screen after a restart. Switch on \"Use Handheld Optimiser as the full screen home app\" below to apply the fix."
+                ? "This version fixes full screen mode opening to a blank screen after a restart. Switch on \"Open your chosen app in full screen mode\" below to apply the fix."
             : HomeAppRegistration.IsCurrentHomeApp() && !HomeAppRegistration.IsRegistered()
-                ? "This version of the app has an updated home app registration. Switch on \"Use Handheld Optimiser as the full screen home app\" below to refresh it."
+                ? "This version of the app has an updated home app registration. Switch on \"Open your chosen app in full screen mode\" below to refresh it."
                 : HomeAppRegistration.IsCurrentHomeApp()
                     ? "Handheld Optimiser is the current home app."
-                    : "Choose an app below, then switch on \"Use Handheld Optimiser as the full screen home app\".";
+                    : "Choose an app below, then switch on \"Open your chosen app in full screen mode\".";
     }
 
     partial void OnTargetChanged(HomeAppTarget value)

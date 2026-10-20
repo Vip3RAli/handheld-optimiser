@@ -137,7 +137,7 @@ internal static class OwnedGames
 
         if (SteamAccount() is not { } steamId)
         {
-            return (false, "Sign in to Steam once, so the library knows which account's games to list.");
+            return (false, "Sign in to Steam once, so the library knows which account to use.");
         }
 
         var path = SteamCachePath(steamId);
