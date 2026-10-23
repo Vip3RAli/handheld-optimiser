@@ -41,6 +41,12 @@ public enum UpdateOutcomeKind
     /// <summary>The source says there was nothing to install after all, usually because it updated itself in the meantime.</summary>
     AlreadyCurrent,
 
+    /// <summary>
+    /// The installer said it succeeded, but the old version is still the one in use. A packaged app that is
+    /// open has its new version staged by Windows, which only switches over once the app is closed.
+    /// </summary>
+    WaitingToClose,
+
     Failed
 }
 
@@ -50,6 +56,8 @@ public sealed record UpdateOutcome(UpdateOutcomeKind Kind, string Message, bool 
         new(UpdateOutcomeKind.Updated, message, rebootRequired);
 
     public static UpdateOutcome Current(string message) => new(UpdateOutcomeKind.AlreadyCurrent, message);
+
+    public static UpdateOutcome Waiting(string message) => new(UpdateOutcomeKind.WaitingToClose, message);
 
     public static UpdateOutcome Fail(string message) => new(UpdateOutcomeKind.Failed, message);
 }

@@ -201,6 +201,10 @@ public sealed class WingetUpdates(LogService log, PowerShellRunner runner)
             {
                 _log.Error($"{item.Name}: {outcome.Message}");
             }
+            else if (outcome.Kind == UpdateOutcomeKind.WaitingToClose)
+            {
+                _log.Warning($"{item.Name}: {outcome.Message}");
+            }
             else
             {
                 _log.Success($"{item.Name}: {outcome.Message}");
@@ -210,7 +214,8 @@ public sealed class WingetUpdates(LogService log, PowerShellRunner runner)
         return results;
     }
 
-    private async Task<UpdateOutcome> InstallOneAsync(UpdateItem item, CancellationToken ct)
+    /// <summary>Updates one app, and checks afterwards that the new version is the one in use.</summary>
+    public async Task<UpdateOutcome> InstallOneAsync(UpdateItem item, CancellationToken ct)
     {
         // winget cuts long IDs short with an ellipsis when its table is too wide. The full ID cannot be
         // recovered from the table, so a cut one is passed without --exact: winget then matches it as part
@@ -238,6 +243,11 @@ public sealed class WingetUpdates(LogService log, PowerShellRunner runner)
 
         var outcome = await _runner.RunProcessAsync("winget.exe", args, $"Update {item.Name} ({id})", ct);
 
+        if (outcome.ExitCode == 0 && await IsStillOnOldVersionAsync(item, id, truncated, ct))
+        {
+            return UpdateOutcome.Waiting($"Still on {item.InstalledVersion}. Close {item.Name} fully to finish, then check again.");
+        }
+
         return outcome.ExitCode switch
         {
             0 => UpdateOutcome.Ok($"Updated to {item.AvailableVersion}."),
@@ -254,4 +264,57 @@ public sealed class WingetUpdates(LogService log, PowerShellRunner runner)
             _ => UpdateOutcome.Fail($"The update failed (winget exit 0x{outcome.ExitCode:X8}). The console has the detail.")
         };
     }
+
+    /// <summary>
+    /// Asks winget again whether the app still has this update waiting. winget exits with success when it
+    /// has only staged a packaged app that is open (on 2026-10-23 the Claude app stayed on its old version
+    /// while the page said "Updated"), and the message it prints then is translated, so the version is
+    /// compared instead. When the check itself cannot be made, winget's own answer stands.
+    /// </summary>
+    private async Task<bool> IsStillOnOldVersionAsync(UpdateItem item, string id, bool truncated, CancellationToken ct)
+    {
+        List<string> args = ["list", "--id", id];
+        if (!truncated)
+        {
+            args.Add("--exact");
+        }
+
+        if (item.Detail is { } source && IdShape.IsMatch(source))
+        {
+            args.AddRange(["--source", source]);
+        }
+
+        args.AddRange(["--upgrade-available", "--accept-source-agreements", "--disable-interactivity"]);
+
+        var check = await _runner.RunProcessAsync(
+            "winget.exe",
+            args,
+            $"Check {item.Name} is on the new version",
+            ct,
+            logOutput: false,
+            timeout: TimeSpan.FromMinutes(2));
+
+        if (check.TimedOut || check.ExitCode == -1)
+        {
+            return false;
+        }
+
+        var waiting = StillOnOldVersion(item, ParseUpgradeTable(check.StdOut));
+        if (waiting)
+        {
+            _log.Warning($"    {item.Name}: winget reported success, but {item.InstalledVersion} is still installed.");
+        }
+
+        return waiting;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="after"/>, the table winget printed once the update had run, still shows the
+    /// app at the version it had before. An app that is no longer listed, or that moved on and already has
+    /// a newer update again, has finished.
+    /// </summary>
+    public static bool StillOnOldVersion(UpdateItem item, IReadOnlyList<UpdateItem> after) =>
+        after.Any(row =>
+            string.Equals(row.Key, item.Key, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(row.InstalledVersion, item.InstalledVersion, StringComparison.OrdinalIgnoreCase));
 }
