@@ -28,10 +28,42 @@ internal static partial class Log
 
     private static readonly string FilePath = Path.Combine(Folder, "auto-tdp.log");
 
+    /// <summary>
+    /// Every second of a TDP Engine session, for tuning the controller on real play rather than made-up
+    /// readings: the log keeps only the changes, not the seconds that led to them. About 50 bytes a second,
+    /// so the cap is some 20 hours of play.
+    /// </summary>
+    private static readonly string SecondsPath = Path.Combine(Folder, "tdp-seconds.csv");
+    private const long SecondsMaxSize = 4 * 1024 * 1024;
+    private const string SecondsHeader = "time,game,target,fps,temperature,watts,state";
+
     // Whether the folders passed their checks; null until the first line.
     private static bool? _safe;
 
-    public static void Write(string message)
+    public static void Write(string message) =>
+        Append(FilePath, MaxSize, null, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}");
+
+    /// <summary>One second of a session: the frame rate and temperature read, and the limit and state that followed.</summary>
+    public static void Second(DateTime now, string? game, int target, double fps, int? temperature, int watts, AutoTdpState state) =>
+        Append(SecondsPath, SecondsMaxSize, SecondsHeader,
+            string.Join(',',
+                now.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture),
+                CsvName(game),
+                target.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                fps.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture),
+                temperature?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,
+                watts.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                state));
+
+    /// <summary>The last folder of a game's path, without commas or quotes, so the line stays plain CSV.</summary>
+    private static string CsvName(string? folder) =>
+        folder is null ? string.Empty : Path.GetFileName(folder.TrimEnd('\\', '/')).Replace(',', ' ').Replace('"', ' ');
+
+    /// <summary>
+    /// Adds a line to one of the files in the locked folder. A file over its cap is emptied, through the
+    /// handle just checked, not deleted and made again by name, and starts again with its header if it has one.
+    /// </summary>
+    private static void Append(string path, long maxSize, string? header, string line)
     {
         lock (Gate)
         {
@@ -43,22 +75,21 @@ internal static partial class Log
                     return;
                 }
 
-                using var file = new FileStream(FilePath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read);
+                using var file = new FileStream(path, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read);
                 if (!IsPlainFile(file.SafeFileHandle))
                 {
                     _safe = false;
                     return;
                 }
 
-                // A change a few seconds over hours of play adds up; cap the file rather than rotate it. It
-                // is emptied through the handle just checked, not deleted and made again by name.
-                if (file.Length > MaxSize)
+                if (file.Length > maxSize)
                 {
                     file.SetLength(0);
                 }
 
+                var text = file.Length == 0 && header is not null ? header + Environment.NewLine + line : line;
                 file.Seek(0, SeekOrigin.End);
-                file.Write(Encoding.UTF8.GetBytes($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}{Environment.NewLine}"));
+                file.Write(Encoding.UTF8.GetBytes(text + Environment.NewLine));
             }
             catch (Exception)
             {
@@ -75,26 +106,36 @@ internal static partial class Log
             return false;
         }
 
-        // From before the folder was locked, a user could have left a link in the log's place. With the
-        // folder now ours, removing that name is safe: it removes the link, never what it points at.
-        if (File.Exists(FilePath) || Directory.Exists(FilePath))
-        {
-            var attributes = File.GetAttributes(FilePath);
-            if (attributes.HasFlag(FileAttributes.Directory) && !attributes.HasFlag(FileAttributes.ReparsePoint))
-            {
-                return false;
-            }
+        return ClearLink(FilePath) && ClearLink(SecondsPath);
+    }
 
-            if (attributes.HasFlag(FileAttributes.ReparsePoint) || !HasOneName(FilePath))
+    /// <summary>
+    /// From before the folder was locked, a user could have left a link in a file's place. With the folder
+    /// now ours, removing that name is safe: it removes the link, never what it points at. False when a
+    /// real folder has the file's name.
+    /// </summary>
+    private static bool ClearLink(string path)
+    {
+        if (!File.Exists(path) && !Directory.Exists(path))
+        {
+            return true;
+        }
+
+        var attributes = File.GetAttributes(path);
+        if (attributes.HasFlag(FileAttributes.Directory) && !attributes.HasFlag(FileAttributes.ReparsePoint))
+        {
+            return false;
+        }
+
+        if (attributes.HasFlag(FileAttributes.ReparsePoint) || !HasOneName(path))
+        {
+            if (attributes.HasFlag(FileAttributes.Directory))
             {
-                if (attributes.HasFlag(FileAttributes.Directory))
-                {
-                    Directory.Delete(FilePath);
-                }
-                else
-                {
-                    File.Delete(FilePath);
-                }
+                Directory.Delete(path);
+            }
+            else
+            {
+                File.Delete(path);
             }
         }
 

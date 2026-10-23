@@ -5,14 +5,14 @@ namespace HandheldOptimiser.PowerService;
 
 /// <summary>
 /// The ROG Ally's controller over HID: its button reports in, and its settings out as feature reports.
-/// Only the original Ally, USB <c>0B05:1ABE</c>, is looked for.
+/// The Ally and the Ally X are looked for, by the IDs in <see cref="AllyControllers"/>. Linux's hid-asus driver
+/// treats the two the same for the reports used here.
 ///
 /// The input collection and the feature collections are opened as separate handles. A blocking read holds
 /// its own handle, so a report can be sent from another thread while one thread waits for a button.
 /// </summary>
-internal sealed partial class AllyHid : IDisposable
+internal sealed partial class AllyHid : IControllerBackend
 {
-    private const string DeviceId = "vid_0b05&pid_1abe";
     private const ushort VendorPage = 0xFF31;
 
     /// <summary>The collection the button reports arrive on.</summary>
@@ -44,7 +44,7 @@ internal sealed partial class AllyHid : IDisposable
     }
 
     /// <summary>
-    /// The controller, or null when there is no <c>0B05:1ABE</c> controller, or it has no collection to
+    /// The controller, or null when there is no Ally controller, or it has no collection to
     /// read buttons from or none to send settings to.
     /// </summary>
     public static AllyHid? Open()
@@ -184,6 +184,20 @@ internal sealed partial class AllyHid : IDisposable
     /// <summary>The controller's collections, for the log.</summary>
     public string Describe() => _description;
 
+    /// <inheritdoc/>
+    public bool Wake() => Send(AllyCommands.Wake());
+
+    /// <inheritdoc/>
+    public bool SetMode(ControllerMode mode) => Send(AllyCommands.Mode(mode));
+
+    /// <inheritdoc/>
+    public bool TryRead(out AllyButton button)
+    {
+        var report = Read();
+        button = report is null ? AllyButton.None : AllyButtons.Parse(report);
+        return report is not null;
+    }
+
     public void Dispose()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
@@ -230,7 +244,7 @@ internal sealed partial class AllyHid : IDisposable
                 }
 
                 if (InterfacePath(set, ref data) is { } path &&
-                    path.Contains(DeviceId, StringComparison.OrdinalIgnoreCase) &&
+                    AllyControllers.Matches(path) &&
                     Probe(path) is { } collection)
                 {
                     found.Add(collection);

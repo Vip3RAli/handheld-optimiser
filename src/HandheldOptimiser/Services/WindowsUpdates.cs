@@ -44,7 +44,14 @@ public sealed class WindowsUpdates(LogService log, PowerShellRunner runner)
             }
             """;
 
-        var outcome = await _runner.RunScriptAsync(script, "Check Windows Update", ct, echoScript: false, logOutput: false);
+        // A search can rightly take minutes, but one that has not answered in ten is not going to.
+        var outcome = await _runner.RunScriptAsync(
+            script, "Check Windows Update", ct, echoScript: false, logOutput: false, timeout: TimeSpan.FromMinutes(10));
+
+        if (outcome.TimedOut)
+        {
+            return UpdateScan.Failed("Windows Update did not answer. Try again later, or check in Settings.");
+        }
 
         var error = outcome.OutputLines.FirstOrDefault(l => l.StartsWith(Tag + "ERROR", StringComparison.Ordinal));
         if (!outcome.Succeeded || error is not null)

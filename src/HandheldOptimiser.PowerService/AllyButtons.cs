@@ -48,9 +48,11 @@ internal sealed class AllyButtonFilter
     private readonly Dictionary<AllyButton, DateTime> _lastCounted = [];
 
     /// <summary>The button when this report is a new press, otherwise null (a release, an unknown code or a repeat).</summary>
-    public AllyButton? Press(ReadOnlySpan<byte> report, DateTime now)
+    public AllyButton? Press(ReadOnlySpan<byte> report, DateTime now) => Press(AllyButtons.Parse(report), now);
+
+    /// <summary>The button when it is a new press, otherwise null (a release, no button or a repeat).</summary>
+    public AllyButton? Press(AllyButton button, DateTime now)
     {
-        var button = AllyButtons.Parse(report);
         if (button is not (AllyButton.ArmouryCrate or AllyButton.CommandCenter or AllyButton.Paddle))
         {
             return null;

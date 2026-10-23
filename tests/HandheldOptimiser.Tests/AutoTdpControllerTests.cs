@@ -259,6 +259,56 @@ public class AutoTdpControllerTests
     }
 
     [Fact]
+    public void Short_bursts_of_spare_frames_do_not_step_it_down()
+    {
+        // Like Fortnite at 60 fps on the Ally on 2026-10-21: a little short of the target even at the top
+        // limit (1.9 fps a watt, 57 fps at 30 W, give or take 3), with a few seconds now and then well over
+        // it, as when the player looks at the sky. Those seconds were stepped down on, and raised straight
+        // back: 56 times in two hours. Eight runs of ten minutes.
+        var lowered = 0;
+        for (var seed = 1; seed <= 8; seed++)
+        {
+            var random = new Random(seed);
+            var controller = new AutoTdpController(Sixty, startWatts: 30);
+            var watts = Run(controller, 600, (second, w) => 1.9 * w + random.Next(-3, 4) + (second % 40 < 4 ? 25 : 0));
+
+            // A step down that is not one of the checks from the top, which take a quarter (7 W) at a time.
+            lowered += watts.Zip(watts.Skip(1)).Count(pair => pair.Second < pair.First && pair.First - pair.Second < 7);
+        }
+
+        Assert.True(lowered <= 2, $"{lowered} small steps down in 80 minutes");
+    }
+
+    [Fact]
+    public void Reaching_the_temperature_limit_again_and_again_keeps_the_limit_under_it()
+    {
+        // A game that wants all 30 W, on a device that reaches 80 °C from 28 W and is cool under it. Without a
+        // memory the limit climbed back a watt every 20 seconds and reached the heat every minute or so, as
+        // it did 15 times in two hours of Fortnite.
+        var controller = new AutoTdpController(Sixty, startWatts: 26);
+        var watts = Run(controller, 1200, (_, w) => 2.0 * w, (_, w) => w >= 28 ? 86 : 74);
+
+        var hits = watts.Zip(watts.Skip(1)).Count(pair => pair.First < 28 && pair.Second >= 28);
+        Assert.True(hits <= 4, $"Reached the heat {hits} times in 20 minutes");
+
+        // Still using what it can: a watt under the heat, not cut to the bottom. Under there only for the
+        // checks from the top, a quarter down for a few seconds now and then.
+        var under = watts.TakeLast(600).Count(w => w < 26);
+        Assert.True(under <= 60, $"{under} of the last 600 seconds under 26 W");
+    }
+
+    [Fact]
+    public void Heat_that_stops_lets_the_limit_climb_again_after_ten_minutes()
+    {
+        // Hot from 28 W for the first five minutes, then cool at any limit, as when the player moves somewhere
+        // cooler or the fans catch up. Once ten minutes pass with no heat, the remembered limit goes.
+        var controller = new AutoTdpController(Sixty, startWatts: 26);
+        var watts = Run(controller, 1500, (_, w) => 2.0 * w, (second, w) => second < 300 && w >= 28 ? 86 : 74);
+
+        Assert.Equal(Sixty.MaxWatts, watts[^1]);
+    }
+
+    [Fact]
     public void Loading_screens_change_nothing()
     {
         var controller = new AutoTdpController(Sixty, startWatts: 15);

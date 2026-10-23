@@ -8,6 +8,9 @@ public sealed record ProcessOutcome(int ExitCode, string StdOut, string StdErr)
 {
     public bool Succeeded => ExitCode == 0;
 
+    /// <summary>True when the run was stopped for passing its time limit.</summary>
+    public bool TimedOut { get; init; }
+
     public IEnumerable<string> OutputLines =>
         StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(l => l.TrimEnd('\r'));
 }
@@ -47,7 +50,8 @@ public sealed class PowerShellRunner(LogService log)
         CancellationToken ct = default,
         bool echoScript = true,
         bool logOutput = true,
-        Action<string>? onOutputLine = null)
+        Action<string>? onOutputLine = null,
+        TimeSpan? timeout = null)
     {
         _log.Command($"{description}");
 
@@ -71,9 +75,15 @@ public sealed class PowerShellRunner(LogService log)
             echoCommand: false,
             logOutput: logOutput,
             standardInput: script,
-            onOutputLine: onOutputLine);
+            onOutputLine: onOutputLine,
+            timeout: timeout);
     }
 
+    /// <summary>
+    /// Runs a console tool hidden, logging what it prints. With a <paramref name="timeout"/>, a tool that
+    /// has not finished by then is stopped and the outcome is a failure, rather than a check that never
+    /// answers. Leave it out for anything that installs or changes the system, which can rightly take long.
+    /// </summary>
     public async Task<ProcessOutcome> RunProcessAsync(
         string fileName,
         IReadOnlyList<string> arguments,
@@ -82,7 +92,8 @@ public sealed class PowerShellRunner(LogService log)
         bool echoCommand = true,
         bool logOutput = true,
         string? standardInput = null,
-        Action<string>? onOutputLine = null)
+        Action<string>? onOutputLine = null,
+        TimeSpan? timeout = null)
     {
         if (echoCommand)
         {
@@ -174,6 +185,16 @@ public sealed class PowerShellRunner(LogService log)
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
 
+        // The caller's token, plus the time limit when there is one. Which of the two fired decides
+        // whether this is a cancel, passed on, or a timeout, reported as a failed run.
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        if (timeout is { } span)
+        {
+            limit.CancelAfter(span);
+        }
+
+        var token = limit.Token;
+
         try
         {
             // Written after the output pipes are being drained, so a chatty process cannot deadlock the write.
@@ -181,7 +202,7 @@ public sealed class PowerShellRunner(LogService log)
             {
                 try
                 {
-                    await process.StandardInput.WriteAsync(standardInput.AsMemory(), ct);
+                    await process.StandardInput.WriteAsync(standardInput.AsMemory(), token);
                     process.StandardInput.Close();
                 }
                 catch (IOException)
@@ -190,27 +211,43 @@ public sealed class PowerShellRunner(LogService log)
                 }
             }
 
-            await process.WaitForExitAsync(ct);
+            await process.WaitForExitAsync(token);
+        }
+        catch (OperationCanceledException) when (timeout is { } allowed && !ct.IsCancellationRequested)
+        {
+            Stop(process);
+            var message = $"{description} did not finish within {Describe(allowed)}, so it was stopped.";
+            _log.Warning($"    {message}");
+            return new ProcessOutcome(-1, stdout.ToString(), message) { TimedOut = true };
         }
         catch (OperationCanceledException)
         {
-            try
-            {
-                if (!process.HasExited)
-                {
-                    process.Kill(entireProcessTree: true);
-                }
-            }
-            catch (InvalidOperationException)
-            {
-                // Process already gone.
-            }
-
+            Stop(process);
             throw;
         }
 
         return new ProcessOutcome(process.ExitCode, stdout.ToString(), stderr.ToString());
     }
+
+    /// <summary>Stops a process and everything it started, if it is still running.</summary>
+    private static void Stop(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            // Process already gone.
+        }
+    }
+
+    /// <summary>A time limit in words for the log, such as "5 minutes" or "90 seconds".</summary>
+    public static string Describe(TimeSpan span) =>
+        span.TotalSeconds < 120 ? $"{span.TotalSeconds:0} seconds" : $"{span.TotalMinutes:0.#} minutes";
 
     /// <summary>
     /// winget and DISM draw progress bars by rewriting one line with carriage returns. Only the final

@@ -11,7 +11,7 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 /// </summary>
 internal static class OldSchoolStack
 {
-    // A card in DIPs, as LibraryWindow.xaml draws it.
+    // A card in DIPs, as LibraryResources.xaml draws it.
     public const double CardWidth = 420;
     public const double CardHeight = 320;
 

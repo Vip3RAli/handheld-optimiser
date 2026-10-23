@@ -1,0 +1,68 @@
+<!--
+    The Deals row: the deals below the games, or the Old School layout's deal cards. DealsPresenter fills it
+    and wires its buttons.
+-->
+<UserControl x:Class="HandheldOptimiser.HomeLauncher.Library.DealsView"
+             x:ClassModifier="internal"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!--
+        Deals: Epic's free games and the games on sale from IsThereAnyDeal, below the games. Only
+        when switched on, on the Games tab. Below the grid they are one row that scrolls across.
+        Below the row of games there is a card for each place the deals are from, and pressing
+        one shows its deals in a grid underneath.
+    -->
+    <StackPanel x:Name="DealsPanel" Margin="0,18,0,0" Visibility="Collapsed">
+        <StackPanel x:Name="DealsHeading" Orientation="Horizontal" Margin="10,0,0,2">
+            <TextBlock Text="Deals" FontSize="22" FontWeight="SemiBold" Opacity="0.85" />
+            <TextBlock x:Name="DealsSource" Text="Prices from IsThereAnyDeal" Margin="12,0,0,2" FontSize="13" Opacity="0.5"
+                       VerticalAlignment="Bottom" />
+        </StackPanel>
+        <ItemsControl x:Name="DealSources" Focusable="False" Visibility="Collapsed">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Button Style="{StaticResource CardButton}">
+                        <Grid Width="440" Height="150">
+                            <Border CornerRadius="8" ClipToBounds="True" Background="#262B36">
+                                <Image Source="{Binding Banner}" Stretch="UniformToFill"
+                                       RenderOptions.BitmapScalingMode="HighQuality" />
+                            </Border>
+                            <Border CornerRadius="8">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Color="#00000000" Offset="0.15" />
+                                        <GradientStop Color="#D8000000" Offset="1" />
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
+                            <StackPanel Style="{StaticResource HiddenByNotice}" Margin="16,0,16,12" VerticalAlignment="Bottom">
+                                <TextBlock Text="{Binding Title}" FontSize="19" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding Detail}" Margin="0,2,0,0" FontSize="13" Opacity="0.8"
+                                           TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                            <TextBlock Style="{StaticResource ShownByNotice}" Text="{Binding Notice}" Margin="16,0,16,12"
+                                       FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Bottom" />
+                            <!-- A mark in the corner while its deals are showing underneath. -->
+                            <Border Margin="10" Padding="8,3" CornerRadius="6" Background="#F2F3F5"
+                                    HorizontalAlignment="Right" VerticalAlignment="Top"
+                                    Visibility="{Binding IsOpen, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="Showing below" FontSize="12" FontWeight="SemiBold" Foreground="#101010" />
+                            </Border>
+                        </Grid>
+                    </Button>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <ScrollViewer x:Name="DealsScroller" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                      PanningMode="HorizontalOnly" Focusable="False">
+            <ItemsControl x:Name="DealTiles" Focusable="False" ItemsPanel="{StaticResource RowPanel}"
+                          ItemTemplate="{StaticResource DealCard}" />
+        </ScrollViewer>
+
+    </StackPanel>
+</UserControl>

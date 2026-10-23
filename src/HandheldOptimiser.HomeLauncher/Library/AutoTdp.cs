@@ -111,6 +111,13 @@ internal static partial class AutoTdp
     public static async Task<AutoTdpStatus?> StatusAsync() =>
         ServiceRunning() ? await SendAsync(new AutoTdpRequest(AutoTdpProtocol.Status)) : null;
 
+    /// <summary>
+    /// For the overlay, each second: the frame rate of the program in front, with the power limit, the
+    /// temperature and the overlay's level and corner, or null when TDP Engine does not answer.
+    /// </summary>
+    public static Task<AutoTdpStatus?> OverlayAsync(int processId) =>
+        SendAsync(new AutoTdpRequest(AutoTdpProtocol.Overlay, ProcessId: processId));
+
     /// <summary>Puts the controller in a mode; with <paramref name="temporary"/>, without saving it.</summary>
     /// <returns>The status, its Error a notice when the mode could not be sent, or null when TDP Engine did not answer.</returns>
     public static Task<AutoTdpStatus?> SetControllerModeAsync(string mode, bool temporary) =>

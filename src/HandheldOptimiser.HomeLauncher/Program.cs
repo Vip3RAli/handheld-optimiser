@@ -35,6 +35,13 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        // The performance overlay, which TDP Engine starts when it is switched on in the widget.
+        if (args.Contains(OverlayArgument, StringComparer.OrdinalIgnoreCase))
+        {
+            RunOverlay();
+            return 0;
+        }
+
         var action = ActionFor(args);
 
         // Game Bar is opened whatever the home app choice is, and the choice is not read or changed.
@@ -87,6 +94,24 @@ internal static class Program
         {
             Log($"Game library failed: {ex}");
             return false;
+        }
+    }
+
+    /// <summary>
+    /// The argument TDP Engine starts the overlay with. The service's copy is in
+    /// src\HandheldOptimiser.PowerService\OverlayHost.cs, and the two must be kept in step.
+    /// </summary>
+    internal const string OverlayArgument = "--overlay";
+
+    private static void RunOverlay()
+    {
+        try
+        {
+            Library.OverlayApp.Run();
+        }
+        catch (Exception ex)
+        {
+            Log($"Overlay failed: {ex}");
         }
     }
 

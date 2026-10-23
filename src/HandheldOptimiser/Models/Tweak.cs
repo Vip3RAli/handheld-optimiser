@@ -87,6 +87,12 @@ public sealed class Tweak
     public Func<TweakContext, TweakJournalEntry, CancellationToken, Task<TweakResult>>? ScriptApply { get; init; }
     public Func<TweakContext, TweakJournalEntry, CancellationToken, Task<TweakResult>>? ScriptRevert { get; init; }
 
+    /// <summary>
+    /// How long one tweak's check may take. Checks share a few slots, so one that never answers would
+    /// hold a slot and keep every check behind it waiting too.
+    /// </summary>
+    public static readonly TimeSpan DetectLimit = TimeSpan.FromMinutes(2);
+
     public async Task<TweakState> DetectAsync(TweakContext ctx, CancellationToken ct)
     {
         var states = new List<TweakState>();
@@ -101,9 +107,17 @@ public sealed class Tweak
 
         if (ScriptDetect is not null)
         {
+            using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            limit.CancelAfter(DetectLimit);
+
             try
             {
-                states.Add(await ScriptDetect(ctx, ct));
+                states.Add(await ScriptDetect(ctx, limit.Token));
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested && limit.IsCancellationRequested)
+            {
+                ctx.Log.Warning($"Detection for \"{Name}\" did not finish within {PowerShellRunner.Describe(DetectLimit)}, so it was stopped.");
+                states.Add(TweakState.Unknown);
             }
             catch (OperationCanceledException)
             {

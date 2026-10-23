@@ -56,13 +56,15 @@ public sealed class StartupService(LogService log, RegistryHelper registry)
         return entries.OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
+    private static RegistryKey OpenBase(RegistryRoot root, RegistryView view) =>
+        root == RegistryRoot.LocalMachine ? RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, view) : SignedInUser.OpenRegistry(view);
+
     private IEnumerable<StartupEntry> ScanRoot(RegistryRoot root, string runKey, string approvedKey, bool is32Bit)
     {
-        var hive = root == RegistryRoot.LocalMachine ? RegistryHive.LocalMachine : RegistryHive.CurrentUser;
-
         // The 32-bit view redirects the Run key to WOW6432Node; approval flags are always in the 64-bit view.
-        using var runBase = RegistryKey.OpenBaseKey(hive, is32Bit ? RegistryView.Registry32 : RegistryView.Registry64);
-        using var approvedBase = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
+        // Per-user entries are the signed-in person's, as the registry helper that changes them reads them.
+        using var runBase = OpenBase(root, is32Bit ? RegistryView.Registry32 : RegistryView.Registry64);
+        using var approvedBase = OpenBase(root, RegistryView.Registry64);
 
         using var run = runBase.OpenSubKey(runKey, writable: false);
         if (run is null)

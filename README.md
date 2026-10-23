@@ -69,7 +69,7 @@ The other pages:
 
 ### Replacing Armoury Crate on the ROG Ally
 
-**Replace ASUS Services with Handheld Library and widget**, on the Full screen page, turns off Armoury Crate and about a dozen ASUS background services. Handheld Optimiser then runs the Armoury Crate and Command Center buttons and the controller mode itself, through the game library and its Game Bar widget. It uses about 20 MB of memory, where ASUS's services use about 480 MB. ASUS's drivers stay installed. BIOS and controller updates come through Armoury Crate, so switch this off to update, then on again.
+**Replace ASUS Services with Handheld Library and widget**, on the Full screen page, turns off Armoury Crate and about a dozen ASUS background services. Handheld Optimiser then runs the Armoury Crate and Command Center buttons and the controller mode itself, through the game library and its Game Bar widget. It uses about 20 MB of memory, where ASUS's services use about 480 MB. ASUS's drivers stay installed. It is for the ROG Ally and the Ally X, though it has only been tried on the Ally so far. BIOS and controller updates come through Armoury Crate, so switch this off to update, then on again.
 
 ## Full screen mode and the game library
 

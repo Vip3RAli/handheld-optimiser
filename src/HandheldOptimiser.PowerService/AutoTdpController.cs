@@ -13,7 +13,8 @@ internal sealed record AutoTdpSettings(int TargetFps, int MinWatts, int MaxWatts
 ///
 /// Controllers like this tend to go wrong in a few known ways, and each has its own guard:
 /// - Chasing noise. Decisions use the middle of three seconds of readings, a change waits for its effect
-///   before the next one, and there is a band just under the target where nothing changes.
+///   before the next one, and there is a band just under the target where nothing changes. A step down
+///   needs 10 seconds of spare frames, not three: quick up, slow down.
 /// - Chasing hitches and spikes. Some games jump between a few frames and hundreds from one second to
 ///   the next (level changes, uncapped menus, stutters). A second that far from the others is not
 ///   something power fixes, so nothing changes until the readings agree again.
@@ -35,7 +36,8 @@ internal sealed record AutoTdpSettings(int TargetFps, int MinWatts, int MaxWatts
 ///   it was held, for 8 seconds, as when the player goes from a menu back into a match.
 /// - Reacting to loading screens and pauses. Under 5 frames a second nothing changes.
 /// - Heat. At the temperature limit the power limit comes down whatever the frame rate, and climbs back
-///   only a watt every 20 seconds once it has cooled a few degrees.
+///   only a watt every 20 seconds once it has cooled a few degrees. Reached twice within 10 minutes, the
+///   limit stays a watt under where it was reached for 10 minutes, rather than climbing back into it.
 /// </summary>
 internal sealed class AutoTdpController
 {
@@ -129,6 +131,13 @@ internal sealed class AutoTdpController
     private bool _hot;
     private int? _heatCeiling;
     private DateTime _nextCoolRaise = DateTime.MinValue;
+
+    // When the temperature limit was last reached, and, once it has been reached twice within HeatMemory,
+    // a ceiling a watt under where it was reached, kept for HeatMemory after the last time.
+    private static readonly TimeSpan HeatMemory = TimeSpan.FromMinutes(10);
+    private DateTime _lastHeatHit = DateTime.MinValue;
+    private int? _rememberedHeat;
+    private DateTime _rememberedUntil = DateTime.MinValue;
 
     public AutoTdpController(AutoTdpSettings settings, int startWatts)
     {
@@ -290,13 +299,13 @@ internal sealed class AutoTdpController
         if (middle >= target * Comfortable && low >= target * SteadyLow)
         {
             var floor = now < _floorUntil ? Math.Max(_floor, _settings.MinWatts) : _settings.MinWatts;
-            if (Watts <= floor)
+            if (Watts <= floor || !SustainedSpare(target))
             {
                 State = AutoTdpState.Holding;
                 return null;
             }
 
-            var spare = (middle - target) / target;
+            var spare = (LongMiddle() - target) / target;
             var step = spare > 0.25 ? 2 : 1;
             State = AutoTdpState.Lowering;
             _judging = (Step.Lower, Watts, middle);
@@ -318,6 +327,11 @@ internal sealed class AutoTdpController
 
         if (degrees >= _settings.TemperatureLimit)
         {
+            if (!_hot)
+            {
+                RememberHeat(now);
+            }
+
             _hot = true;
         }
         else if (degrees <= _settings.TemperatureLimit - CoolBy)
@@ -352,6 +366,23 @@ internal sealed class AutoTdpController
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// The temperature limit has just been reached. A second time within <see cref="HeatMemory"/> means the
+    /// slow climb back after cooling leads straight into it again, as it did 15 times in two hours of
+    /// Fortnite on the Ally on 2026-10-21. So the limit is kept a watt under where it was reached, until
+    /// <see cref="HeatMemory"/> passes with no more heat. Reached again under that, it goes a watt lower.
+    /// </summary>
+    private void RememberHeat(DateTime now)
+    {
+        if (now - _lastHeatHit <= HeatMemory)
+        {
+            _rememberedHeat = Math.Max(Watts - 1, _settings.MinWatts);
+            _rememberedUntil = now + HeatMemory;
+        }
+
+        _lastHeatHit = now;
     }
 
     /// <summary>Weighs the last change now it has had time to work. Returns a limit when a change is taken back.</summary>
@@ -510,6 +541,20 @@ internal sealed class AutoTdpController
     }
 
     /// <summary>
+    /// Whether the game has had frames to spare for long enough to give up a watt: a full 10 seconds since
+    /// the last change, its trimmed average at the target and three quarters of its seconds at it too, so
+    /// a game that sits just under the target cannot pass on a few lucky seconds and a spike. Raises
+    /// go on three seconds, as a game short of frames stutters; a step down waits, as a few seconds over the
+    /// target is usually a light moment (the sky, a menu) and not spare power. On the Ally on 2026-10-21,
+    /// Fortnite at 60 fps was stepped down on three seconds 56 times in two hours, at a median of 69 fps,
+    /// and most were raised again within half a minute.
+    /// </summary>
+    private bool SustainedSpare(double target) =>
+        _longReadings.Count >= StepDownWindow &&
+        LongMiddle() >= target * Comfortable &&
+        LowQuarter() >= target * Comfortable;
+
+    /// <summary>
     /// Whether three quarters of the longer window's seconds are 20% above, or 20% below, the frame rate
     /// the limit was held at.
     /// </summary>
@@ -539,6 +584,11 @@ internal sealed class AutoTdpController
         if (_heatCeiling is { } heat)
         {
             ceiling = Math.Min(ceiling, heat);
+        }
+
+        if (_rememberedHeat is { } remembered && now < _rememberedUntil)
+        {
+            ceiling = Math.Min(ceiling, remembered);
         }
 
         return ceiling;

@@ -25,12 +25,25 @@ internal static partial class SessionLauncher
     private const int TokenPrimary = 1;
     private const uint CreateUnicodeEnvironment = 0x00000400;
 
+    // TOKEN_INFORMATION_CLASS TokenUIAccess.
+    private const int TokenUIAccess = 26;
+
+    /// <summary>The session of the player at the console, or null when nobody is signed in.</summary>
+    public static uint? ActiveSession() => WTSGetActiveConsoleSessionId() is var session && session != NoSession ? session : null;
+
     /// <summary>
     /// Starts <paramref name="exePath"/> with <paramref name="arguments"/> on the signed-in player's desktop.
     /// </summary>
     /// <param name="processId">The started process's ID, or 0 when it did not start.</param>
+    /// <param name="uiAccess">
+    /// Sets the UIAccess flag on the token, which puts the program's topmost windows in the band above full
+    /// screen games, and lets it past the walls between programs of different rights. Windows otherwise
+    /// gives it only to programs signed by a trusted publisher in Program Files, and setting it takes the
+    /// TCB privilege, which this service has as SYSTEM. Only for the overlay, which is this app's own and
+    /// in its own folder. Should Windows refuse it, the program starts without it.
+    /// </param>
     /// <returns>Why it did not start, or null when it did.</returns>
-    public static unsafe string? Launch(string exePath, string arguments, out int processId)
+    public static unsafe string? Launch(string exePath, string arguments, out int processId, bool uiAccess = false)
     {
         processId = 0;
 
@@ -58,6 +71,15 @@ internal static partial class SessionLauncher
             if (!DuplicateTokenEx(userToken, MaximumAllowed, 0, SecurityImpersonation, TokenPrimary, out primaryToken))
             {
                 return $"The player's token could not be copied (error {Marshal.GetLastPInvokeError()}).";
+            }
+
+            if (uiAccess)
+            {
+                var on = 1;
+                if (!SetTokenInformation(primaryToken, TokenUIAccess, &on, sizeof(int)))
+                {
+                    Log.Write($"Windows would not set UIAccess for {Path.GetFileName(exePath)} (error {Marshal.GetLastPInvokeError()}), so it starts without it");
+                }
             }
 
             if (!CreateEnvironmentBlock(out environment, primaryToken, inherit: false))
@@ -182,6 +204,10 @@ internal static partial class SessionLauncher
     [return: MarshalAs(UnmanagedType.Bool)]
     private static partial bool DuplicateTokenEx(nint token, uint access, nint attributes, int impersonationLevel,
         int tokenType, out nint newToken);
+
+    [LibraryImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static unsafe partial bool SetTokenInformation(nint token, int infoClass, void* information, int length);
 
     [LibraryImport("userenv.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
