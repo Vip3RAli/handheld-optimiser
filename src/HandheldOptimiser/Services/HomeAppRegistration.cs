@@ -108,7 +108,8 @@ public static class HomeAppRegistration
 
     public static bool IsSteamInstalled()
     {
-        using var key = Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam");
+        using var user = SignedInUser.OpenRegistry(RegistryView.Default);
+        using var key = user.OpenSubKey(@"Software\Valve\Steam");
         return key?.GetValue("SteamExe") is string exe && File.Exists(exe);
     }
 
@@ -119,19 +120,22 @@ public static class HomeAppRegistration
 
     private static string? ReadHomeApp()
     {
-        using var key = Registry.CurrentUser.OpenSubKey(GamingConfigurationKey);
+        using var user = SignedInUser.OpenRegistry(RegistryView.Default);
+        using var key = user.OpenSubKey(GamingConfigurationKey);
         return key?.GetValue(HomeAppValue) as string;
     }
 
     private static bool HasPackage(string prefix)
     {
+        // The account this runs as, not the signed-in one: packages are registered for whoever registers them.
         using var repo = Registry.CurrentUser.OpenSubKey(PackageRepositoryKey);
         return repo?.GetSubKeyNames().Any(n => n.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) == true;
     }
 
     public static (HomeAppTarget Target, string CustomPath, string CustomArgs) LoadChoice()
     {
-        using var key = Registry.CurrentUser.OpenSubKey(SettingsKey);
+        using var user = SignedInUser.OpenRegistry(RegistryView.Default);
+        using var key = user.OpenSubKey(SettingsKey);
 
         var target = (key?.GetValue("Target") as string)?.ToLowerInvariant() switch
         {
@@ -150,7 +154,8 @@ public static class HomeAppRegistration
     /// </summary>
     public static void SaveChoice(HomeAppTarget target, string customPath, string customArgs)
     {
-        using var key = Registry.CurrentUser.CreateSubKey(SettingsKey);
+        using var user = SignedInUser.OpenRegistry(RegistryView.Default);
+        using var key = user.CreateSubKey(SettingsKey);
         key.SetValue("Target", target switch
         {
             HomeAppTarget.Library => "library",

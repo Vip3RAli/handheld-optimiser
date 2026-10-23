@@ -72,7 +72,13 @@ public sealed class WingetUpdates(LogService log, PowerShellRunner runner)
             ["upgrade", "--accept-source-agreements", "--disable-interactivity"],
             "Check for app updates with winget",
             ct,
-            logOutput: false);
+            logOutput: false,
+            timeout: TimeSpan.FromMinutes(5));
+
+        if (outcome.TimedOut)
+        {
+            return UpdateScan.Failed("winget did not answer. Try again later.");
+        }
 
         if (outcome.ExitCode == -1)
         {

@@ -81,7 +81,13 @@ public sealed class StoreUpdates(LogService log, PowerShellRunner runner)
             }
             """;
 
-        var outcome = await _runner.RunScriptAsync(script, "Check Microsoft Store apps for updates", ct, echoScript: false, logOutput: false);
+        var outcome = await _runner.RunScriptAsync(
+            script, "Check Microsoft Store apps for updates", ct, echoScript: false, logOutput: false, timeout: TimeSpan.FromMinutes(5));
+
+        if (outcome.TimedOut)
+        {
+            return UpdateScan.Failed("The Microsoft Store did not answer. Open the Store to update apps there.");
+        }
 
         var error = outcome.OutputLines.FirstOrDefault(l => l.StartsWith(Tag + "ERROR", StringComparison.Ordinal));
         if (!outcome.Succeeded || error is not null)

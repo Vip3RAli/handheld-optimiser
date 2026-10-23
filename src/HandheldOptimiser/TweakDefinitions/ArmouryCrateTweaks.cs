@@ -33,8 +33,12 @@ public static class ArmouryCrateTweaks
     /// <summary>The TDP Engine service, the same name as <c>AutoTdpProtocol.ServiceName</c>.</summary>
     public const string EngineService = "HandheldOptimiserAutoTdp";
 
-    /// <summary>The Ally's controller, the only device this switch is for.</summary>
-    public const string AllyController = "VID_0B05&PID_1ABE";
+    /// <summary>
+    /// The Ally controllers this switch is for: the Ally (RC71) and the Ally X (RC72). The main app does not build in
+    /// the service's files, so this is its own copy of <c>AllyControllers.ProductIds</c> in
+    /// src\HandheldOptimiser.PowerService\AllyControllers.cs, and a test keeps the two in step.
+    /// </summary>
+    public static IReadOnlyList<string> AllyControllers { get; } = ["VID_0B05&PID_1ABE", "VID_0B05&PID_1B4C"];
 
     /// <summary>
     /// ASUS's services, in the order they are stopped. ASUS App Service is the watchdog that starts the others
@@ -97,7 +101,7 @@ public static class ArmouryCrateTweaks
     /// <summary>The journal's word for a Run32 value that was not there, so revert removes it again.</summary>
     private const string Absent = "absent";
 
-    private const string NotSupported = "This needs the original ROG Ally and TDP Engine installed.";
+    private const string NotSupported = "This needs a ROG Ally or Ally X and TDP Engine installed.";
 
     public static IReadOnlyList<Tweak> All => [ReplaceArmouryCrate];
 
@@ -253,12 +257,13 @@ public static class ArmouryCrateTweaks
     }
 
     /// <summary>
-    /// Prints DEVICE=1 when the Ally's controller is present, ENGINE=1 when the TDP Engine service is installed,
-    /// and TASK= with the framework task's state when the task exists. Changes nothing.
+    /// Prints DEVICE=1 when one of the <see cref="AllyControllers"/> is present, ENGINE=1 when the TDP Engine service
+    /// is installed, and TASK= with the framework task's state when the task exists. Changes nothing.
     /// </summary>
     public static string BuildCheckScript() => $$"""
         $ErrorActionPreference = 'SilentlyContinue'
-        $pad = @(Get-PnpDevice -PresentOnly | Where-Object { $_.InstanceId -like {{Quote($"*{AllyController}*")}} })
+        $ids = @({{string.Join(", ", AllyControllers.Select(id => Quote($"*{id}*")))}})
+        $pad = @(Get-PnpDevice -PresentOnly | Where-Object { $instance = $_.InstanceId; @($ids | Where-Object { $instance -like $_ }).Count -gt 0 })
         Write-Output "DEVICE=$(if ($pad.Count -gt 0) { 1 } else { 0 })"
         Write-Output "ENGINE=$(if (Get-Service -Name {{Quote(EngineService)}}) { 1 } else { 0 })"
         $task = Get-ScheduledTask -TaskPath {{Quote(TaskFolder)}} -TaskName {{Quote(TaskLeaf)}}

@@ -9,7 +9,7 @@ namespace HandheldOptimiser.PowerService;
 /// is a device ASUS's own driver (ATKACPI) puts there; nothing is installed for it. The method and device
 /// numbers are the ones G-Helper (github.com/seerge/g-helper, app/AsusACPI.cs) uses on the ROG Ally.
 /// </summary>
-internal sealed partial class AsusAcpi : IDisposable
+internal sealed partial class AsusAcpi : IPowerBackend
 {
     private const string DevicePath = @"\\.\ATKACPI";
     private const uint ControlCode = 0x0022240C;
@@ -29,7 +29,7 @@ internal sealed partial class AsusAcpi : IDisposable
     /// <summary>Armoury Crate's operating mode: 0 Performance, 1 Turbo, 2 Silent.</summary>
     private const uint OperatingMode = 0x00120075;
 
-    public const int PerformanceMode = 0;
+    private const int PerformanceMode = 0;
 
     // The fan curves, one for each of the Ally's two fans, each 16 bytes: eight temperatures then eight speeds.
     private const uint CpuFanCurve = 0x00110024;
@@ -62,10 +62,14 @@ internal sealed partial class AsusAcpi : IDisposable
         return new AsusAcpi(device);
     }
 
-    /// <summary>Whether this model takes power limits this way.</summary>
+    /// <inheritdoc/>
+    public string Name => "ASUS ACPI";
+
+    /// <inheritdoc/>
     public bool CanSetPowerLimits => Get(SustainedLimit) >= 0 && Get(SlowLimit) >= 0;
 
-    /// <returns>False when the firmware refused it.</returns>
+    /// <inheritdoc/>
+    /// <remarks>The sustained, slow boost and fast boost limits are all set to it.</remarks>
     public bool SetPowerLimit(int watts)
     {
         var sustained = Set(SustainedLimit, watts);
@@ -78,8 +82,8 @@ internal sealed partial class AsusAcpi : IDisposable
         return sustained == 1 && slow == 1;
     }
 
-    /// <summary>The processor's temperature in °C, or null when the firmware does not report it.</summary>
-    public int? Temperature() => Get(CpuTemperature) is var degrees and > 0 and < 120 ? degrees : null;
+    /// <inheritdoc/>
+    public int? ReadTemperature() => Get(CpuTemperature) is var degrees and > 0 and < 120 ? degrees : null;
 
     /// <summary>Armoury Crate's operating mode, or null when it cannot be read.</summary>
     /// <remarks>
@@ -87,10 +91,13 @@ internal sealed partial class AsusAcpi : IDisposable
     /// mode may read as another number, but whether the firmware takes that number back through the same
     /// call is not known (G-Helper sets Manual's limits itself on top of Performance), so it is not kept.
     /// </remarks>
-    public int? OperatingModeNow() => Get(OperatingMode) is var mode and >= 0 and <= 2 ? mode : null;
+    public int? ReadVendorMode() => Get(OperatingMode) is var mode and >= 0 and <= 2 ? mode : null;
 
-    /// <summary>Sets an operating mode, which also puts back that mode's own power limits.</summary>
-    public bool SetOperatingMode(int mode) => Set(OperatingMode, mode) == 1;
+    /// <summary>Performance, Armoury Crate's own default.</summary>
+    public int DefaultVendorMode => PerformanceMode;
+
+    /// <summary>Sets an operating mode, which also puts back that mode's own power limits and fan curve.</summary>
+    public bool SetVendorMode(int mode) => Set(OperatingMode, mode) == 1;
 
     /// <summary>
     /// Sets both fans to a curve, as G-Helper does. It holds until the operating mode is set again, which

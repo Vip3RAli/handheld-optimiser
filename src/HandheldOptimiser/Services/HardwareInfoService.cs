@@ -49,7 +49,8 @@ public sealed class HardwareInfoService(LogService log, PowerShellRunner runner)
     /// <summary>Set when the battery counts in units of its own rather than mWh, so only ratios mean anything.</summary>
     private const uint CapacityRelative = 0x40000000;
 
-    private static Guid _batteryInterface = new("72631e54-78a4-11d0-bcf7-00aa00b7b32a");
+    /// <summary>GUID_DEVINTERFACE_BATTERY, the device interface every battery driver offers.</summary>
+    private static readonly Guid BatteryInterface = new("72631e54-78a4-11d0-bcf7-00aa00b7b32a");
 
     private readonly LogService _log = log;
     private readonly PowerShellRunner _runner = runner;
@@ -106,10 +107,10 @@ public sealed class HardwareInfoService(LogService log, PowerShellRunner runner)
         int informationLevel, IntPtr inputBuffer, uint inputLength, out SystemBatteryStateData output, uint outputLength);
 
     [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode)]
-    private static extern int CM_Get_Device_Interface_List_SizeW(out uint length, ref Guid interfaceClass, string? deviceId, uint flags);
+    private static extern int CM_Get_Device_Interface_List_SizeW(out uint length, in Guid interfaceClass, string? deviceId, uint flags);
 
     [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode)]
-    private static extern int CM_Get_Device_Interface_ListW(ref Guid interfaceClass, string? deviceId, char[] buffer, uint length, uint flags);
+    private static extern int CM_Get_Device_Interface_ListW(in Guid interfaceClass, string? deviceId, char[] buffer, uint length, uint flags);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern SafeFileHandle CreateFileW(
@@ -157,13 +158,13 @@ public sealed class HardwareInfoService(LogService log, PowerShellRunner runner)
     {
         try
         {
-            if (CM_Get_Device_Interface_List_SizeW(out var length, ref _batteryInterface, null, 0) != 0 || length <= 1)
+            if (CM_Get_Device_Interface_List_SizeW(out var length, in BatteryInterface, null, 0) != 0 || length <= 1)
             {
                 return null;
             }
 
             var buffer = new char[length];
-            if (CM_Get_Device_Interface_ListW(ref _batteryInterface, null, buffer, length, 0) != 0)
+            if (CM_Get_Device_Interface_ListW(in BatteryInterface, null, buffer, length, 0) != 0)
             {
                 return null;
             }

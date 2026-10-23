@@ -46,6 +46,13 @@ internal static class LibraryApp
 
         var app = new Application { ShutdownMode = ShutdownMode.OnMainWindowClose };
 
+        // The styles and templates, at the application's level rather than the window's, so a view inside
+        // the window finds them as it is parsed, before it is part of the window.
+        app.Resources.MergedDictionaries.Add(new ResourceDictionary
+        {
+            Source = new Uri("/HandheldOptimiser.HomeLauncher;component/Library/LibraryResources.xaml", UriKind.Relative)
+        });
+
         // The library stays open for hours behind games. One bad picture, file or reply from a store
         // should cost that one thing, not take the home screen away; it is logged and the library goes on.
         app.DispatcherUnhandledException += (_, e) =>

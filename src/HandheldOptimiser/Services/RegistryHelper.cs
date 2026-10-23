@@ -16,7 +16,7 @@ public sealed class RegistryHelper(LogService log) : IRegistryStore
     private static RegistryKey OpenRoot(RegistryRoot root) => root switch
     {
         RegistryRoot.LocalMachine => RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64),
-        RegistryRoot.CurrentUser => RegistryKey.OpenBaseKey(RegistryHive.CurrentUser, RegistryView.Registry64),
+        RegistryRoot.CurrentUser => SignedInUser.OpenRegistry(RegistryView.Registry64),
         RegistryRoot.ClassesRoot => RegistryKey.OpenBaseKey(RegistryHive.ClassesRoot, RegistryView.Registry64),
         RegistryRoot.Users => RegistryKey.OpenBaseKey(RegistryHive.Users, RegistryView.Registry64),
         _ => throw new ArgumentOutOfRangeException(nameof(root))
