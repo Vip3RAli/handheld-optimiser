@@ -19,7 +19,7 @@
     <AssemblyName>HandheldOptimiser.PowerService</AssemblyName>
     <RootNamespace>HandheldOptimiser.PowerService</RootNamespace>
     <Product>Handheld Optimiser</Product>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
   </PropertyGroup>
 
