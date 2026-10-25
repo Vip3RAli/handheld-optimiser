@@ -374,6 +374,30 @@
                         </StackPanel>
                     </Grid>
 
+                    <!-- Big stats and the time on the Ally's own screen while it sits under a monitor. Turning it on
+                         turns the Ally's screen on beside the monitor at 720p; off puts the screens back. -->
+                    <Border Style="{StaticResource Bar}" Margin="0,14,0,0" Padding="12,6,6,6">
+                        <Grid>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource Label}" Margin="0" Text="Stats on Ally screen" />
+                                <TextBlock Style="{StaticResource ReadoutName}" Text="While docked to a monitor" />
+                            </StackPanel>
+                            <ToggleSwitch x:Name="ScreenStatsSwitch" HorizontalAlignment="Right" MinWidth="0" Width="52" OnContent="" OffContent=""
+                                          Toggled="OnScreenStats" FocusVisualPrimaryBrush="{StaticResource Cyan}">
+                                <ToggleSwitch.Resources>
+                                    <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#22D3EE" />
+                                    <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#67E8F9" />
+                                    <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#22D3EE" />
+                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#062229" />
+                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#062229" />
+                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#062229" />
+                                    <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="#5A6272" />
+                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#A9B0BC" />
+                                </ToggleSwitch.Resources>
+                            </ToggleSwitch>
+                        </Grid>
+                    </Border>
+
                     <!-- Only while TDP Engine replaces Armoury Crate, which is when it runs the Ally's controller. -->
                     <StackPanel x:Name="ControllerCard" Visibility="Collapsed" Margin="0,14,0,0">
                         <TextBlock Style="{StaticResource Label}" Text="Controller" />

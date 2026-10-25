@@ -80,10 +80,11 @@ internal static partial class AutoTdpProtocol
 /// <param name="OverlayCorner">With set-overlay: one of <see cref="AutoTdpProtocol.OverlayCorners"/>, or null to keep it.</param>
 /// <param name="ProcessId">With overlay: the program in front, whose frame rate is wanted.</param>
 /// <param name="OverlayLayout">With set-overlay: one of <see cref="AutoTdpProtocol.OverlayLayouts"/>, or null to keep it.</param>
+/// <param name="ScreenStats">With set-screen-stats: true to show the stats on the Ally's screen while docked, false to stop.</param>
 internal sealed record AutoTdpRequest(string Command, int TargetFps = 0, int MinWatts = 0, int MaxWatts = 0,
     int TemperatureLimit = 0, int StartWatts = 0, string? GameFolder = null, string? FanCurve = null, int PowerLimit = 0,
     string? ControllerMode = null, bool Temporary = false, bool? CpuBoost = null, string? OverlayLevel = null,
-    string? OverlayCorner = null, int ProcessId = 0, string? OverlayLayout = null);
+    string? OverlayCorner = null, int ProcessId = 0, string? OverlayLayout = null, bool? ScreenStats = null);
 
 /// <param name="Running">Whether it is setting the power limit or the fans right now.</param>
 /// <param name="State">One of the AutoTdpState names.</param>
@@ -99,7 +100,8 @@ internal sealed record AutoTdpRequest(string Command, int TargetFps = 0, int Min
 /// <param name="OverlayLevel">The overlay's level, one of <see cref="AutoTdpProtocol.OverlayLevels"/>.</param>
 /// <param name="OverlayCorner">The overlay's corner, one of <see cref="AutoTdpProtocol.OverlayCorners"/>.</param>
 /// <param name="OverlayLayout">The overlay's layout, one of <see cref="AutoTdpProtocol.OverlayLayouts"/>.</param>
+/// <param name="ScreenStats">Whether the stats screen on the Ally's own panel is switched on.</param>
 internal sealed record AutoTdpStatus(bool Running, double? Fps = null, int? Watts = null, int? Temperature = null,
     string? State = null, string? Error = null, int TargetFps = 0, string? FanCurve = null, int PowerLimit = 0,
     bool Replacing = false, bool ControllerConnected = false, string? ControllerMode = null, bool? CpuBoost = null,
-    string? OverlayLevel = null, string? OverlayCorner = null, string? OverlayLayout = null);
+    string? OverlayLevel = null, string? OverlayCorner = null, string? OverlayLayout = null, bool ScreenStats = false);

@@ -29,6 +29,7 @@ namespace HandheldOptimiser.GameBar
         private bool _loaded;
         private bool _placingSlider;
         private bool _placingBoost;
+        private bool _placingScreenStats;
         private bool _sliding;
         private EngineStatus _status = EngineStatus.Off;
         private bool _busy;
@@ -163,6 +164,18 @@ namespace HandheldOptimiser.GameBar
             Send(() => EngineClient.SetOverlay(level, null, null));
         }
 
+        private void OnScreenStats(object sender, RoutedEventArgs e)
+        {
+            // Set from TDP Engine's answer, not by the player: nothing to send.
+            if (_placingScreenStats)
+            {
+                return;
+            }
+
+            var on = ScreenStatsSwitch.IsOn;
+            Send(() => EngineClient.SetScreenStats(on));
+        }
+
         private void OnOverlayCorner(object sender, RoutedEventArgs e)
         {
             var corner = (string)((FrameworkElement)sender).Tag;
@@ -237,6 +250,9 @@ namespace HandheldOptimiser.GameBar
             Check(OverlayLevels, status.OverlayLevel ?? "");
             Check(OverlayCorners, status.OverlayCorner ?? "");
             Check(OverlayLayouts, status.OverlayLayout ?? "");
+            _placingScreenStats = true;
+            ScreenStatsSwitch.IsOn = status.ScreenStats;
+            _placingScreenStats = false;
 
             // The readouts only mean something while the engine runs, so the state line stands alone otherwise.
             var readouts = status.Running && status.Error == null;

@@ -28,6 +28,9 @@ namespace HandheldOptimiser.PowerService
         /// <summary>From the overlay, each second: the frame rate of ProcessId, and what else it shows.</summary>
         public const string Overlay = "overlay";
 
+        /// <summary>From the widget: show the stats screen on the Ally's own panel while docked, or not, named by ScreenStats.</summary>
+        public const string SetScreenStats = "set-screen-stats";
+
         /// <summary>The overlay's levels: how much it shows, or Off.</summary>
         public const string OverlayOff = "off";
         public const string OverlaySmall = "small";
@@ -96,6 +99,7 @@ namespace HandheldOptimiser.PowerService
             public const string OverlayLevel = "OverlayLevel";
             public const string OverlayCorner = "OverlayCorner";
             public const string OverlayLayout = "OverlayLayout";
+            public const string ScreenStats = "ScreenStats";
         }
     }
 

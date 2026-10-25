@@ -50,9 +50,10 @@ internal sealed partial class AutoTdpService : ServiceBase
     private FrameCounter? _frames;
     private string? _error;
 
-    // The performance overlay, and what it is told each second: every program's frames in the last second,
-    // and the temperature, read only while the overlay is on.
+    // The performance overlay and the stats screen, and what they are told each second: every program's
+    // frames in the last second, and the temperature, read only while one of them is on.
     private readonly OverlayHost _overlay = new();
+    private readonly ScreenStatsHost _screenStats = new();
     private Dictionary<int, double>? _lastFrames;
     private int? _overlayTemperature;
 
@@ -190,9 +191,9 @@ internal sealed partial class AutoTdpService : ServiceBase
                         Log.Write($"A second's work failed: {ex.Message}");
                     }
 
-                    // While replacing Armoury Crate it runs the controller too, and while the overlay is on it
-                    // feeds it, so it stays.
-                    if (_controls is null && _control is null && !_overlay.Wanted && DateTime.UtcNow - _idleSince > IdleExit)
+                    // While replacing Armoury Crate it runs the controller too, and while the overlay or the stats
+                    // screen is on it feeds them, so it stays.
+                    if (_controls is null && _control is null && !_overlay.Wanted && !_screenStats.On && DateTime.UtcNow - _idleSince > IdleExit)
                     {
                         _ending = true;
                         Log.Write("Nothing to do, so ending");
@@ -299,10 +300,11 @@ internal sealed partial class AutoTdpService : ServiceBase
     {
         var frames = _frames?.Take();
         _lastFrames = frames;
-        if (_overlay.Wanted)
+        if (_overlay.Wanted || _screenStats.On)
         {
             _overlayTemperature = _power?.ReadTemperature();
             _overlay.Keep();
+            _screenStats.Keep();
         }
 
         if (_control is not { } control || _power is null)
@@ -554,6 +556,7 @@ internal sealed partial class AutoTdpService : ServiceBase
                     AutoTdpProtocol.Update => Update(request, client),
                     AutoTdpProtocol.Stop => End(),
                     AutoTdpProtocol.SetOverlay => SetOverlay(request),
+                    AutoTdpProtocol.SetScreenStats => SetScreenStats(request),
                     AutoTdpProtocol.Overlay => OverlayStatus(request),
                     _ => _error is not null ? new AutoTdpStatus(false, Error: _error) : _last
                 };
@@ -566,7 +569,8 @@ internal sealed partial class AutoTdpService : ServiceBase
             CpuBoost = CpuBoost.Read(),
             OverlayLevel = _overlay.Level,
             OverlayCorner = _overlay.Corner,
-            OverlayLayout = _overlay.Layout
+            OverlayLayout = _overlay.Layout,
+            ScreenStats = _screenStats.On
         };
         await writer.WriteLineAsync(AutoTdpProtocol.Write(status).AsMemory(), cancel).ConfigureAwait(false);
     }
@@ -575,6 +579,18 @@ internal sealed partial class AutoTdpService : ServiceBase
     private AutoTdpStatus SetOverlay(AutoTdpRequest request)
     {
         _overlay.Set(request.OverlayLevel, request.OverlayCorner, request.OverlayLayout);
+        _idleSince = DateTime.UtcNow;
+        return _error is not null && _control is null ? new AutoTdpStatus(false, Error: _error) : _last;
+    }
+
+    /// <summary>The stats screen switched on or off, from the widget. Called under the gate.</summary>
+    private AutoTdpStatus SetScreenStats(AutoTdpRequest request)
+    {
+        if (request.ScreenStats is { } on)
+        {
+            _screenStats.Set(on);
+        }
+
         _idleSince = DateTime.UtcNow;
         return _error is not null && _control is null ? new AutoTdpStatus(false, Error: _error) : _last;
     }
