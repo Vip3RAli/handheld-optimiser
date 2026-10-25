@@ -2,6 +2,7 @@ using System;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using HandheldOptimiser.PowerService;
 using Windows.Data.Json;
 
 namespace HandheldOptimiser.GameBar
@@ -33,6 +34,14 @@ namespace HandheldOptimiser.GameBar
         /// <summary>"gamepad" or "desktop", the mode the controller was last set to, or null when not known.</summary>
         public string ControllerMode;
 
+        /// <summary>Whether the processor's boost is on for the power source in use, or null when not known.</summary>
+        public bool? CpuBoost;
+
+        /// <summary>The overlay's level, corner and layout, or null when not known.</summary>
+        public string OverlayLevel;
+        public string OverlayCorner;
+        public string OverlayLayout;
+
         public static readonly EngineStatus Off = new EngineStatus();
 
         public static EngineStatus Failed(string error) => new EngineStatus { Error = error };
@@ -40,18 +49,17 @@ namespace HandheldOptimiser.GameBar
 
     /// <summary>
     /// Talks to the TDP Engine service over its pipe, as the game library does: one line of JSON each way.
-    /// The service's side is AutoTdpProtocol in HandheldOptimiser.PowerService, which this cannot share as
-    /// it is not a UWP library, so the names here must stay in step with it. Every call blocks, so call
-    /// from a background thread.
+    /// The names come from AutoTdpProtocol.Names.cs, shared with the service. Its JSON records are not,
+    /// as this project cannot build them, so the JSON is written and read by hand here. Every call
+    /// blocks, so call from a background thread.
     /// </summary>
     internal static class EngineClient
     {
-        private const string PipePath = @"\\.\pipe\HandheldOptimiser.AutoTdp";
-        private const string ServiceName = "HandheldOptimiserAutoTdp";
+        private const string PipePath = @"\\.\pipe\" + AutoTdpProtocol.PipeName;
 
         public static EngineStatus Status()
         {
-            var answer = Send("{\"Command\":\"status\"}");
+            var answer = Send(new JsonObject { [AutoTdpProtocol.Fields.Command] = JsonValue.CreateStringValue(AutoTdpProtocol.Status) }.Stringify());
             return answer == null ? EngineStatus.Off : Read(answer);
         }
 
@@ -64,10 +72,10 @@ namespace HandheldOptimiser.GameBar
         {
             var request = new JsonObject
             {
-                ["Command"] = JsonValue.CreateStringValue("update"),
-                ["TargetFps"] = JsonValue.CreateNumberValue(targetFps),
-                ["PowerLimit"] = JsonValue.CreateNumberValue(powerLimit),
-                ["FanCurve"] = string.IsNullOrEmpty(fanCurve) ? JsonValue.CreateNullValue() : JsonValue.CreateStringValue(fanCurve)
+                [AutoTdpProtocol.Fields.Command] = JsonValue.CreateStringValue(AutoTdpProtocol.Update),
+                [AutoTdpProtocol.Fields.TargetFps] = JsonValue.CreateNumberValue(targetFps),
+                [AutoTdpProtocol.Fields.PowerLimit] = JsonValue.CreateNumberValue(powerLimit),
+                [AutoTdpProtocol.Fields.FanCurve] = string.IsNullOrEmpty(fanCurve) ? JsonValue.CreateNullValue() : JsonValue.CreateStringValue(fanCurve)
             }.Stringify();
 
             var answer = Send(request);
@@ -97,6 +105,64 @@ namespace HandheldOptimiser.GameBar
         }
 
         /// <summary>
+        /// Turns the processor's boost on or off, starting the service if need be. Windows keeps the setting
+        /// in the power plan, so it holds after the service ends.
+        /// </summary>
+        public static EngineStatus SetCpuBoost(bool on)
+        {
+            var request = new JsonObject
+            {
+                [AutoTdpProtocol.Fields.Command] = JsonValue.CreateStringValue(AutoTdpProtocol.SetBoost),
+                [AutoTdpProtocol.Fields.CpuBoost] = JsonValue.CreateBooleanValue(on)
+            }.Stringify();
+
+            return SendStarting(request);
+        }
+
+        /// <summary>
+        /// Sets the performance overlay's level ("off" to close it), its corner or its layout, any null to
+        /// keep it, starting the service if need be. The service starts the overlay and keeps it running.
+        /// </summary>
+        public static EngineStatus SetOverlay(string level, string corner, string layout)
+        {
+            var request = new JsonObject
+            {
+                [AutoTdpProtocol.Fields.Command] = JsonValue.CreateStringValue(AutoTdpProtocol.SetOverlay),
+                [AutoTdpProtocol.Fields.OverlayLevel] = TextOrNull(level),
+                [AutoTdpProtocol.Fields.OverlayCorner] = TextOrNull(corner),
+                [AutoTdpProtocol.Fields.OverlayLayout] = TextOrNull(layout)
+            }.Stringify();
+
+            return SendStarting(request);
+        }
+
+        private static JsonValue TextOrNull(string text) =>
+            text == null ? JsonValue.CreateNullValue() : JsonValue.CreateStringValue(text);
+
+        /// <summary>Sends a request, starting the service first if it is not running.</summary>
+        private static EngineStatus SendStarting(string request)
+        {
+            var answer = Send(request);
+            if (answer == null)
+            {
+                var problem = StartService();
+                if (problem != null)
+                {
+                    return EngineStatus.Failed(problem);
+                }
+
+                // It opens its pipe a moment after starting.
+                for (var tries = 0; answer == null && tries < 30; tries++)
+                {
+                    Thread.Sleep(200);
+                    answer = Send(request);
+                }
+            }
+
+            return answer == null ? EngineStatus.Failed("TDP Engine is not responding. Try again in a moment.") : Read(answer);
+        }
+
+        /// <summary>
         /// Sets the Ally controller's mode, "gamepad" or "desktop". The service always runs while it replaces
         /// Armoury Crate, which is the only time this is offered, so it is never started here.
         /// </summary>
@@ -104,8 +170,8 @@ namespace HandheldOptimiser.GameBar
         {
             var request = new JsonObject
             {
-                ["Command"] = JsonValue.CreateStringValue("set-controls"),
-                ["ControllerMode"] = JsonValue.CreateStringValue(mode)
+                [AutoTdpProtocol.Fields.Command] = JsonValue.CreateStringValue(AutoTdpProtocol.SetControls),
+                [AutoTdpProtocol.Fields.ControllerMode] = JsonValue.CreateStringValue(mode)
             }.Stringify();
 
             var answer = Send(request);
@@ -122,18 +188,24 @@ namespace HandheldOptimiser.GameBar
             return new EngineStatus
             {
                 Reachable = true,
-                Running = json.GetNamedBoolean("Running", false),
-                Fps = Number(json, "Fps"),
-                Watts = (int?)Number(json, "Watts"),
-                Temperature = (int?)Number(json, "Temperature"),
-                State = Text(json, "State"),
-                Error = Text(json, "Error"),
-                TargetFps = (int)(Number(json, "TargetFps") ?? 0),
-                FanCurve = Text(json, "FanCurve"),
-                PowerLimit = (int)(Number(json, "PowerLimit") ?? 0),
-                Replacing = json.GetNamedBoolean("Replacing", false),
-                ControllerConnected = json.GetNamedBoolean("ControllerConnected", false),
-                ControllerMode = Text(json, "ControllerMode")
+                Running = json.GetNamedBoolean(AutoTdpProtocol.Fields.Running, false),
+                Fps = Number(json, AutoTdpProtocol.Fields.Fps),
+                Watts = (int?)Number(json, AutoTdpProtocol.Fields.Watts),
+                Temperature = (int?)Number(json, AutoTdpProtocol.Fields.Temperature),
+                State = Text(json, AutoTdpProtocol.Fields.State),
+                Error = Text(json, AutoTdpProtocol.Fields.Error),
+                TargetFps = (int)(Number(json, AutoTdpProtocol.Fields.TargetFps) ?? 0),
+                FanCurve = Text(json, AutoTdpProtocol.Fields.FanCurve),
+                PowerLimit = (int)(Number(json, AutoTdpProtocol.Fields.PowerLimit) ?? 0),
+                Replacing = json.GetNamedBoolean(AutoTdpProtocol.Fields.Replacing, false),
+                ControllerConnected = json.GetNamedBoolean(AutoTdpProtocol.Fields.ControllerConnected, false),
+                ControllerMode = Text(json, AutoTdpProtocol.Fields.ControllerMode),
+                CpuBoost = json.TryGetValue(AutoTdpProtocol.Fields.CpuBoost, out var boost) && boost.ValueType == JsonValueType.Boolean
+                    ? boost.GetBoolean()
+                    : (bool?)null,
+                OverlayLevel = Text(json, AutoTdpProtocol.Fields.OverlayLevel),
+                OverlayCorner = Text(json, AutoTdpProtocol.Fields.OverlayCorner),
+                OverlayLayout = Text(json, AutoTdpProtocol.Fields.OverlayLayout)
             };
         }
 
@@ -215,7 +287,7 @@ namespace HandheldOptimiser.GameBar
 
             try
             {
-                var service = OpenService(manager, ServiceName, ServiceStart);
+                var service = OpenService(manager, AutoTdpProtocol.ServiceName, ServiceStart);
                 if (service == IntPtr.Zero)
                 {
                     return Marshal.GetLastWin32Error() == ErrorServiceDoesNotExist

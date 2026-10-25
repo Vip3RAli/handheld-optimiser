@@ -1,38 +1,68 @@
 <Page
     x:Class="HandheldOptimiser.GameBar.TdpWidget"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="#111318">
 
-    <!-- Laid out like Game Bar's own widgets: one flat panel, its groups split by a thin line, with the
-         chosen button filled. The fill is the brand cyan, deep with a bright edge so white text stays
-         readable on it. -->
+    <!-- Flat and dark, to sit in Game Bar: each group a rounded card with a small header, choices in one
+         segmented bar per row, the chosen one solid cyan with dark text. No gradients or glows, at the
+         user's request (2026-10-22). Icons are from Segoe MDL2 Assets, which every Windows 10 and 11 has. -->
     <Page.Resources>
         <SolidColorBrush x:Key="Cyan" Color="#22D3EE" />
-        <SolidColorBrush x:Key="CyanFill" Color="#0E4E5C" />
-        <SolidColorBrush x:Key="CyanFillHover" Color="#13616F" />
-        <SolidColorBrush x:Key="CardEdge" Color="#3A4150" />
-        <SolidColorBrush x:Key="ChoiceFill" Color="#2C3240" />
-        <SolidColorBrush x:Key="ChoiceFillHover" Color="#353C4C" />
-        <SolidColorBrush x:Key="ChoiceEdge" Color="#454D5E" />
+        <SolidColorBrush x:Key="CyanHover" Color="#67E8F9" />
+        <SolidColorBrush x:Key="OnCyan" Color="#062229" />
+        <SolidColorBrush x:Key="CardFill" Color="#1C2028" />
+        <SolidColorBrush x:Key="CardEdge" Color="#2E3440" />
+        <SolidColorBrush x:Key="BarFill" Color="#12151A" />
+        <SolidColorBrush x:Key="BarEdge" Color="#2A2F38" />
+        <SolidColorBrush x:Key="SegmentHover" Color="#262C36" />
         <SolidColorBrush x:Key="Text" Color="#F2F3F5" />
         <SolidColorBrush x:Key="Muted" Color="#A9B0BC" />
+        <SolidColorBrush x:Key="Transparent" Color="Transparent" />
 
-        <!-- A group of the panel: a line above it, and none above the first. -->
+        <!-- A group: a rounded card, a gap under the one before. -->
         <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource CardFill}" />
             <Setter Property="BorderBrush" Value="{StaticResource CardEdge}" />
-            <Setter Property="BorderThickness" Value="0,1,0,0" />
-            <Setter Property="Padding" Value="0,14,0,14" />
-        </Style>
-
-        <Style x:Key="CardTitle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="15" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="{StaticResource Text}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Padding" Value="14,12,14,14" />
             <Setter Property="Margin" Value="0,0,0,10" />
         </Style>
 
+        <Style x:Key="CardIcon" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Foreground" Value="{StaticResource Cyan}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+        </Style>
+
+        <Style x:Key="CardTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="CharacterSpacing" Value="60" />
+            <Setter Property="Foreground" Value="{StaticResource Muted}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <!-- The line under a card's header. -->
+        <Style x:Key="HeaderLine" TargetType="Border">
+            <Setter Property="BorderBrush" Value="{StaticResource CardEdge}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="Padding" Value="0,0,0,9" />
+            <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+
+        <Style x:Key="Label" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource Text}" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
+
         <Style x:Key="ReadoutValue" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="24" />
+            <Setter Property="FontSize" Value="26" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{StaticResource Text}" />
         </Style>
@@ -42,86 +72,99 @@
             <Setter Property="Foreground" Value="{StaticResource Muted}" />
         </Style>
 
-        <Style x:Key="TileNumber" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="20" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="HorizontalAlignment" Value="Center" />
-        </Style>
-
-        <Style x:Key="TileUnit" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="11" />
-            <Setter Property="HorizontalAlignment" Value="Center" />
-            <Setter Property="Margin" Value="0,2,0,0" />
-            <Setter Property="Foreground" Value="{StaticResource Muted}" />
-        </Style>
-
-        <!-- A frame rate tile, like an Operating Mode tile. -->
-        <Style x:Key="Tile" TargetType="ToggleButton">
-            <Setter Property="Background" Value="{StaticResource ChoiceFill}" />
-            <Setter Property="BorderBrush" Value="{StaticResource ChoiceEdge}" />
+        <!-- The dark strip a row of segments sits in. -->
+        <Style x:Key="Bar" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource BarFill}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BarEdge}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Foreground" Value="{StaticResource Text}" />
-            <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="Height" Value="58" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="3" />
+        </Style>
+
+        <!-- One choice in a bar. Text inherits the foreground, so it turns dark on the cyan fill. -->
+        <Style x:Key="Tile" TargetType="ToggleButton">
+            <Setter Property="Background" Value="{StaticResource Transparent}" />
+            <Setter Property="Foreground" Value="{StaticResource Muted}" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="CornerRadius" Value="7" />
+            <Setter Property="Height" Value="40" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
-            <Setter Property="Margin" Value="3,0" />
+            <Setter Property="Margin" Value="1.5,0" />
             <Setter Property="UseSystemFocusVisuals" Value="True" />
+            <Setter Property="FocusVisualPrimaryBrush" Value="{StaticResource Cyan}" />
+            <Setter Property="FocusVisualPrimaryThickness" Value="2" />
+            <Setter Property="FocusVisualSecondaryThickness" Value="0" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
-                        <Grid x:Name="Root" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-                              BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}">
+                        <Grid x:Name="Root" Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}">
                             <VisualStateManager.VisualStateGroups>
                                 <VisualStateGroup x:Name="CommonStates">
                                     <VisualState x:Name="Normal" />
                                     <VisualState x:Name="PointerOver">
                                         <VisualState.Setters>
-                                            <Setter Target="Root.Background" Value="{StaticResource ChoiceFillHover}" />
+                                            <Setter Target="Root.Background" Value="{StaticResource SegmentHover}" />
+                                            <Setter Target="Content.Foreground" Value="{StaticResource Text}" />
                                         </VisualState.Setters>
                                     </VisualState>
                                     <VisualState x:Name="Pressed">
                                         <VisualState.Setters>
-                                            <Setter Target="Root.Background" Value="{StaticResource CyanFill}" />
+                                            <Setter Target="Root.Background" Value="{StaticResource SegmentHover}" />
+                                            <Setter Target="Content.Foreground" Value="{StaticResource Text}" />
                                         </VisualState.Setters>
                                     </VisualState>
                                     <VisualState x:Name="Checked">
                                         <VisualState.Setters>
-                                            <Setter Target="Root.Background" Value="{StaticResource CyanFill}" />
-                                            <Setter Target="Root.BorderBrush" Value="{StaticResource Cyan}" />
-                                            <Setter Target="Root.BorderThickness" Value="2" />
+                                            <Setter Target="Root.Background" Value="{StaticResource Cyan}" />
+                                            <Setter Target="Content.Foreground" Value="{StaticResource OnCyan}" />
                                         </VisualState.Setters>
                                     </VisualState>
                                     <VisualState x:Name="CheckedPointerOver">
                                         <VisualState.Setters>
-                                            <Setter Target="Root.Background" Value="{StaticResource CyanFillHover}" />
-                                            <Setter Target="Root.BorderBrush" Value="{StaticResource Cyan}" />
-                                            <Setter Target="Root.BorderThickness" Value="2" />
+                                            <Setter Target="Root.Background" Value="{StaticResource CyanHover}" />
+                                            <Setter Target="Content.Foreground" Value="{StaticResource OnCyan}" />
                                         </VisualState.Setters>
                                     </VisualState>
                                     <VisualState x:Name="CheckedPressed">
                                         <VisualState.Setters>
-                                            <Setter Target="Root.Background" Value="{StaticResource CyanFill}" />
-                                            <Setter Target="Root.BorderBrush" Value="{StaticResource Cyan}" />
-                                            <Setter Target="Root.BorderThickness" Value="2" />
+                                            <Setter Target="Root.Background" Value="{StaticResource Cyan}" />
+                                            <Setter Target="Content.Foreground" Value="{StaticResource OnCyan}" />
                                         </VisualState.Setters>
                                     </VisualState>
                                 </VisualStateGroup>
                             </VisualStateManager.VisualStateGroups>
-                            <ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                              Foreground="{TemplateBinding Foreground}" />
+                            <ContentPresenter x:Name="Content" Content="{TemplateBinding Content}" HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" Foreground="{TemplateBinding Foreground}"
+                                              FontSize="{TemplateBinding FontSize}" FontWeight="{TemplateBinding FontWeight}" />
                         </Grid>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- A corner arrow: a small segment of a fixed size, four in one slim row. -->
+        <Style x:Key="Corner" TargetType="ToggleButton" BasedOn="{StaticResource Tile}">
+            <Setter Property="Width" Value="34" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Margin" Value="1" />
+            <Setter Property="FontSize" Value="14" />
+        </Style>
     </Page.Resources>
 
-    <!-- Game Bar draws its own frame and title bar, so the page starts with the first group. -->
+    <!-- Game Bar draws its own frame and title bar, so the page starts with the first card. -->
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Padding="14,0">
-            <Border Style="{StaticResource Card}" BorderThickness="0" Padding="0,4,0,14">
+        <StackPanel Padding="12,4,12,2">
+
+            <!-- ===== Now ===== -->
+            <Border Style="{StaticResource Card}">
                 <StackPanel>
-                    <TextBlock Style="{StaticResource CardTitle}" Text="Now" />
+                    <Border Style="{StaticResource HeaderLine}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource CardIcon}" Text="&#xE9D9;" />
+                            <TextBlock Style="{StaticResource CardTitle}" Text="NOW" />
+                        </StackPanel>
+                    </Border>
                     <Grid x:Name="Readouts">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -155,80 +198,64 @@
                 </StackPanel>
             </Border>
 
+            <!-- ===== Performance and power ===== -->
             <Border Style="{StaticResource Card}">
                 <StackPanel>
-                    <TextBlock Style="{StaticResource CardTitle}" Text="Frame rate" />
-                    <!-- The outer margin takes back the tiles' own, so the row lines up with the card's edges. -->
-                    <Grid x:Name="FrameRates" Margin="-3,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <!-- The Tag is the frame rate sent to the service. -->
-                        <ToggleButton Style="{StaticResource Tile}" Tag="0" Click="OnFrameRate">
-                            <TextBlock Style="{StaticResource TileNumber}" Text="Off" />
-                        </ToggleButton>
-                        <ToggleButton Grid.Column="1" Style="{StaticResource Tile}" Tag="30" Click="OnFrameRate">
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource TileNumber}" Text="30" />
-                                <TextBlock Style="{StaticResource TileUnit}" Text="fps" />
+                    <Border Style="{StaticResource HeaderLine}">
+                        <Grid>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE945;" />
+                                <TextBlock Style="{StaticResource CardTitle}" Text="PERFORMANCE &amp; POWER" />
                             </StackPanel>
-                        </ToggleButton>
-                        <ToggleButton Grid.Column="2" Style="{StaticResource Tile}" Tag="40" Click="OnFrameRate">
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource TileNumber}" Text="40" />
-                                <TextBlock Style="{StaticResource TileUnit}" Text="fps" />
-                            </StackPanel>
-                        </ToggleButton>
-                        <ToggleButton Grid.Column="3" Style="{StaticResource Tile}" Tag="45" Click="OnFrameRate">
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource TileNumber}" Text="45" />
-                                <TextBlock Style="{StaticResource TileUnit}" Text="fps" />
-                            </StackPanel>
-                        </ToggleButton>
-                        <ToggleButton Grid.Column="4" Style="{StaticResource Tile}" Tag="60" Click="OnFrameRate">
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource TileNumber}" Text="60" />
-                                <TextBlock Style="{StaticResource TileUnit}" Text="fps" />
-                            </StackPanel>
-                        </ToggleButton>
-                    </Grid>
-                </StackPanel>
-            </Border>
+                            <TextBlock x:Name="PowerValue" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="13"
+                                       FontWeight="Bold" Foreground="{StaticResource Cyan}" Text="Auto" />
+                        </Grid>
+                    </Border>
 
-            <!-- With a frame rate, the most TDP Engine may use; with frame rate Off, a limit held as it is. -->
-            <Border Style="{StaticResource Card}">
-                <StackPanel>
+                    <TextBlock Style="{StaticResource Label}" Text="Frame rate (fps)" />
+                    <Border Style="{StaticResource Bar}">
+                        <!-- The Tag is the frame rate sent to the service. -->
+                        <Grid x:Name="FrameRates">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <ToggleButton Style="{StaticResource Tile}" Tag="0" Click="OnFrameRate" Content="Off" />
+                            <ToggleButton Grid.Column="1" Style="{StaticResource Tile}" Tag="30" Click="OnFrameRate" Content="30" />
+                            <ToggleButton Grid.Column="2" Style="{StaticResource Tile}" Tag="40" Click="OnFrameRate" Content="40" />
+                            <ToggleButton Grid.Column="3" Style="{StaticResource Tile}" Tag="45" Click="OnFrameRate" Content="45" />
+                            <ToggleButton Grid.Column="4" Style="{StaticResource Tile}" Tag="60" Click="OnFrameRate" Content="60" />
+                        </Grid>
+                    </Border>
+
+                    <!-- With a frame rate, the most TDP Engine may use; with frame rate Off, a limit held as it is. -->
+                    <TextBlock Style="{StaticResource Label}" Text="Power limit" Margin="0,14,0,8" />
                     <Grid>
-                        <TextBlock Style="{StaticResource CardTitle}" Text="Power limit" />
-                        <TextBlock x:Name="PowerValue" HorizontalAlignment="Right" FontSize="15" FontWeight="SemiBold"
-                                   Foreground="{StaticResource Cyan}" Text="Auto" />
-                    </Grid>
-                    <Grid Margin="-3,0,0,0">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="76" />
+                            <ColumnDefinition Width="72" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <!-- Auto sends 0: TDP Engine's usual range, or Armoury Crate's own limit. -->
-                        <ToggleButton x:Name="AutoPower" Style="{StaticResource Tile}" Tag="0" Click="OnPowerLimit">
-                            <TextBlock Style="{StaticResource TileNumber}" Text="Auto" />
-                        </ToggleButton>
+                        <Border Style="{StaticResource Bar}">
+                            <ToggleButton x:Name="AutoPower" Style="{StaticResource Tile}" Margin="0" Tag="0" Click="OnPowerLimit" Content="Auto" />
+                        </Border>
                         <!-- From TDP Engine's lowest limit to the Ally's highest (30 W plugged in, 25 W on battery), a watt a step. Left and right on
                              the D-pad move it once it has focus; the choice is sent when it stops moving. -->
-                        <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                             <Slider x:Name="PowerSlider" Minimum="7" Maximum="30" StepFrequency="1" SmallChange="1" LargeChange="5"
                                     TickFrequency="5" TickPlacement="None" Value="15" IsThumbToolTipEnabled="False"
-                                    ValueChanged="OnPowerSlider" Foreground="{StaticResource Cyan}" Background="{StaticResource ChoiceEdge}">
+                                    ValueChanged="OnPowerSlider" Foreground="{StaticResource Cyan}" Background="{StaticResource BarEdge}"
+                                    FocusVisualPrimaryBrush="{StaticResource Cyan}">
                                 <Slider.Resources>
                                     <SolidColorBrush x:Key="SliderTrackValueFill" Color="#22D3EE" />
                                     <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="#22D3EE" />
                                     <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="#22D3EE" />
-                                    <SolidColorBrush x:Key="SliderTrackFill" Color="#454D5E" />
-                                    <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="#454D5E" />
-                                    <SolidColorBrush x:Key="SliderTrackFillPressed" Color="#454D5E" />
+                                    <SolidColorBrush x:Key="SliderTrackFill" Color="#2A2F38" />
+                                    <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="#2A2F38" />
+                                    <SolidColorBrush x:Key="SliderTrackFillPressed" Color="#2A2F38" />
                                     <SolidColorBrush x:Key="SliderThumbBackground" Color="#22D3EE" />
                                     <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="#67E8F9" />
                                     <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#F2F3F5" />
@@ -243,54 +270,135 @@
                 </StackPanel>
             </Border>
 
+            <!-- ===== Cooling and CPU ===== -->
             <Border Style="{StaticResource Card}">
                 <StackPanel>
-                    <TextBlock Style="{StaticResource CardTitle}" Text="Fans" />
-                    <!-- Tiles as for the frame rate, with a smaller word so Default fits a fifth of the width. -->
-                    <Grid x:Name="Fans" Margin="-3,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <ToggleButton Style="{StaticResource Tile}" Tag="" Click="OnFans">
-                            <TextBlock Style="{StaticResource TileNumber}" FontSize="15" Text="Default" />
-                        </ToggleButton>
-                        <ToggleButton Grid.Column="1" Style="{StaticResource Tile}" Tag="quiet" Click="OnFans">
-                            <TextBlock Style="{StaticResource TileNumber}" FontSize="15" Text="Quiet" />
-                        </ToggleButton>
-                        <ToggleButton Grid.Column="2" Style="{StaticResource Tile}" Tag="cool" Click="OnFans">
-                            <TextBlock Style="{StaticResource TileNumber}" FontSize="15" Text="Cool" />
-                        </ToggleButton>
-                        <ToggleButton Grid.Column="3" Style="{StaticResource Tile}" Tag="full" Click="OnFans">
-                            <TextBlock Style="{StaticResource TileNumber}" FontSize="15" Text="Max" />
-                        </ToggleButton>
-                        <ToggleButton Grid.Column="4" Style="{StaticResource Tile}" Tag="dynamic" Click="OnFans">
-                            <TextBlock Style="{StaticResource TileNumber}" FontSize="15" Text="Auto" />
-                        </ToggleButton>
-                    </Grid>
+                    <Border Style="{StaticResource HeaderLine}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource CardIcon}" Text="&#xE9CA;" />
+                            <TextBlock Style="{StaticResource CardTitle}" Text="COOLING &amp; CPU" />
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock Style="{StaticResource Label}" Text="Fan curve" />
+                    <Border Style="{StaticResource Bar}">
+                        <Grid x:Name="Fans">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <ToggleButton Style="{StaticResource Tile}" FontSize="13" Tag="" Click="OnFans" Content="Default" />
+                            <ToggleButton Grid.Column="1" Style="{StaticResource Tile}" FontSize="13" Tag="quiet" Click="OnFans" Content="Quiet" />
+                            <ToggleButton Grid.Column="2" Style="{StaticResource Tile}" FontSize="13" Tag="cool" Click="OnFans" Content="Cool" />
+                            <ToggleButton Grid.Column="3" Style="{StaticResource Tile}" FontSize="13" Tag="full" Click="OnFans" Content="Max" />
+                            <ToggleButton Grid.Column="4" Style="{StaticResource Tile}" FontSize="13" Tag="dynamic" Click="OnFans" Content="Auto" />
+                        </Grid>
+                    </Border>
+
+                    <!-- On or off for the power source in use. Not known while TDP Engine is not running: the switch
+                         then shows off with a line saying so, and turning it on starts TDP Engine. -->
+                    <Border Style="{StaticResource Bar}" Margin="0,14,0,0" Padding="12,6,6,6">
+                        <Grid>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource Label}" Margin="0" Text="CPU boost" />
+                                <TextBlock x:Name="BoostNote" Style="{StaticResource ReadoutName}" Text="Faster bursts, more heat" />
+                            </StackPanel>
+                            <!-- The switch's own template keeps room for a label beside it; a fixed width leaves only the switch. -->
+                            <ToggleSwitch x:Name="BoostSwitch" HorizontalAlignment="Right" MinWidth="0" Width="52" OnContent="" OffContent=""
+                                          Toggled="OnCpuBoost" FocusVisualPrimaryBrush="{StaticResource Cyan}">
+                                <ToggleSwitch.Resources>
+                                    <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#22D3EE" />
+                                    <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#67E8F9" />
+                                    <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#22D3EE" />
+                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#062229" />
+                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#062229" />
+                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#062229" />
+                                    <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="#5A6272" />
+                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#A9B0BC" />
+                                </ToggleSwitch.Resources>
+                            </ToggleSwitch>
+                        </Grid>
+                    </Border>
                 </StackPanel>
             </Border>
 
-            <!-- Only while TDP Engine replaces Armoury Crate, which is when it runs the Ally's controller. -->
-            <Border x:Name="ControllerCard" Style="{StaticResource Card}" Visibility="Collapsed">
+            <!-- ===== Overlay and controller ===== -->
+            <Border Style="{StaticResource Card}">
                 <StackPanel>
-                    <TextBlock Style="{StaticResource CardTitle}" Text="Controller" />
-                    <Grid x:Name="ControllerModes" Margin="-3,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <!-- The Tag is the mode sent to the service. -->
-                        <ToggleButton Style="{StaticResource Tile}" Tag="gamepad" Click="OnControllerMode">
-                            <TextBlock Style="{StaticResource TileNumber}" Text="Gamepad" />
-                        </ToggleButton>
-                        <ToggleButton Grid.Column="1" Style="{StaticResource Tile}" Tag="desktop" Click="OnControllerMode">
-                            <TextBlock Style="{StaticResource TileNumber}" Text="Desktop" />
-                        </ToggleButton>
+                    <Border Style="{StaticResource HeaderLine}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource CardIcon}" Text="&#xE7F4;" />
+                            <TextBlock Style="{StaticResource CardTitle}" Text="OVERLAY &amp; CONTROLLER" />
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock Style="{StaticResource Label}" Text="Overlay" />
+                    <Border Style="{StaticResource Bar}">
+                        <!-- The Tag is the level sent to the service. Nothing is lit while TDP Engine is not running. -->
+                        <Grid x:Name="OverlayLevels">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <ToggleButton Style="{StaticResource Tile}" FontSize="13" Tag="off" Click="OnOverlayLevel" Content="Off" />
+                            <ToggleButton Grid.Column="1" Style="{StaticResource Tile}" FontSize="13" Tag="small" Click="OnOverlayLevel" Content="Small" />
+                            <ToggleButton Grid.Column="2" Style="{StaticResource Tile}" FontSize="13" Tag="medium" Click="OnOverlayLevel" Content="Medium" />
+                            <ToggleButton Grid.Column="3" Style="{StaticResource Tile}" FontSize="13" Tag="full" Click="OnOverlayLevel" Content="Full" />
+                        </Grid>
+                    </Border>
+
+                    <!-- One slim row: the label, the layout (rows one under another, or one strip), then four small
+                         arrows. Each arrow points at its corner. The Tags are what is sent to the service. -->
+                    <Grid Margin="0,8,0,0">
+                        <TextBlock Style="{StaticResource Label}" Margin="0" VerticalAlignment="Center" Text="Position" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Border Style="{StaticResource Bar}" Padding="2" Margin="0,0,6,0">
+                                <StackPanel x:Name="OverlayLayouts" Orientation="Horizontal">
+                                    <ToggleButton Style="{StaticResource Corner}" Tag="vertical" Click="OnOverlayLayout" Content="↕" />
+                                    <ToggleButton Style="{StaticResource Corner}" Tag="horizontal" Click="OnOverlayLayout" Content="↔" />
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource Bar}" Padding="2">
+                                <StackPanel x:Name="OverlayCorners" Orientation="Horizontal">
+                                    <ToggleButton Style="{StaticResource Corner}" Tag="top-left" Click="OnOverlayCorner" Content="↖" />
+                                    <ToggleButton Style="{StaticResource Corner}" Tag="top-right" Click="OnOverlayCorner" Content="↗" />
+                                    <ToggleButton Style="{StaticResource Corner}" Tag="bottom-left" Click="OnOverlayCorner" Content="↙" />
+                                    <ToggleButton Style="{StaticResource Corner}" Tag="bottom-right" Click="OnOverlayCorner" Content="↘" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
                     </Grid>
+
+                    <!-- Only while TDP Engine replaces Armoury Crate, which is when it runs the Ally's controller. -->
+                    <StackPanel x:Name="ControllerCard" Visibility="Collapsed" Margin="0,14,0,0">
+                        <TextBlock Style="{StaticResource Label}" Text="Controller" />
+                        <Border Style="{StaticResource Bar}">
+                            <Grid x:Name="ControllerModes">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <!-- The Tag is the mode sent to the service. -->
+                                <ToggleButton Style="{StaticResource Tile}" FontSize="13" Tag="gamepad" Click="OnControllerMode">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7FC;" FontSize="13" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                        <TextBlock Text="Gamepad" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </ToggleButton>
+                                <ToggleButton Grid.Column="1" Style="{StaticResource Tile}" FontSize="13" Tag="desktop" Click="OnControllerMode">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7F4;" FontSize="13" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                        <TextBlock Text="Desktop" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </ToggleButton>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
                 </StackPanel>
             </Border>
         </StackPanel>

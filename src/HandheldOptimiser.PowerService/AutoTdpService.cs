@@ -45,9 +45,16 @@ internal sealed partial class AutoTdpService : ServiceBase
     // as it starts: switching that on or off restarts the service.
     private AllyControlsHost? _controls;
 
-    private AsusAcpi? _acpi;
+    // The maker's firmware, through which the power limit and the fans are set.
+    private IPowerBackend? _power;
     private FrameCounter? _frames;
     private string? _error;
+
+    // The performance overlay, and what it is told each second: every program's frames in the last second,
+    // and the temperature, read only while the overlay is on.
+    private readonly OverlayHost _overlay = new();
+    private Dictionary<int, double>? _lastFrames;
+    private int? _overlayTemperature;
 
     // The game being controlled, or null between games.
     private Control? _control;
@@ -127,7 +134,7 @@ internal sealed partial class AutoTdpService : ServiceBase
 
         _controls?.Dispose();
         _frames?.Dispose();
-        _acpi?.Dispose();
+        _power?.Dispose();
     }
 
     private async Task RunAsync(CancellationToken cancel)
@@ -143,24 +150,28 @@ internal sealed partial class AutoTdpService : ServiceBase
                 _controls.Start(cancel);
             }
 
-            _acpi = AsusAcpi.Open();
-            if (_acpi is null || !_acpi.CanSetPowerLimits)
+            _power = PowerBackends.Open();
+            if (_power is null)
             {
                 _error = "TDP Engine cannot set the power limit on this device. It works on the ROG Ally with ASUS's drivers installed.";
                 Log.Write(_error);
             }
             else
             {
+                Log.Write($"Power limits through {_power.Name}");
                 RestoreAfterCrash();
-                try
-                {
-                    _frames = FrameCounter.Start();
-                }
-                catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or DllNotFoundException or EntryPointNotFoundException)
-                {
-                    _error = "Windows did not let TDP Engine read the frame rate. Restart the handheld and try again.";
-                    Log.Write($"{_error} {ex.Message}");
-                }
+            }
+
+            // Frames are counted on any device, for the overlay, even where the power limit cannot be set.
+            try
+            {
+                _frames = FrameCounter.Start();
+            }
+            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or DllNotFoundException or EntryPointNotFoundException)
+            {
+                var problem = "Windows did not let TDP Engine read the frame rate. Restart the handheld and try again.";
+                _error ??= problem;
+                Log.Write($"{problem} {ex.Message}");
             }
 
             serving = ServeAsync(cancel);
@@ -179,8 +190,9 @@ internal sealed partial class AutoTdpService : ServiceBase
                         Log.Write($"A second's work failed: {ex.Message}");
                     }
 
-                    // While replacing Armoury Crate it runs the controller too, so it stays.
-                    if (_controls is null && _control is null && DateTime.UtcNow - _idleSince > IdleExit)
+                    // While replacing Armoury Crate it runs the controller too, and while the overlay is on it
+                    // feeds it, so it stays.
+                    if (_controls is null && _control is null && !_overlay.Wanted && DateTime.UtcNow - _idleSince > IdleExit)
                     {
                         _ending = true;
                         Log.Write("Nothing to do, so ending");
@@ -242,7 +254,7 @@ internal sealed partial class AutoTdpService : ServiceBase
             return;
         }
 
-        var restored = _acpi!.SetOperatingMode(mode);
+        var restored = _power!.SetVendorMode(mode);
         Log.Write($"The last run ended while holding a game. Operating mode {mode} {(restored ? "put back" : "was refused")}");
         MarkHolding(null);
     }
@@ -286,7 +298,14 @@ internal sealed partial class AutoTdpService : ServiceBase
     private void Tick()
     {
         var frames = _frames?.Take();
-        if (_control is not { } control || _acpi is null)
+        _lastFrames = frames;
+        if (_overlay.Wanted)
+        {
+            _overlayTemperature = _power?.ReadTemperature();
+            _overlay.Keep();
+        }
+
+        if (_control is not { } control || _power is null)
         {
             return;
         }
@@ -298,7 +317,7 @@ internal sealed partial class AutoTdpService : ServiceBase
         }
 
         var (fps, program) = frames is null ? (0, null) : GameFps(frames, control.GameFolder ?? control.FoundFolder, control.LibraryFolders);
-        var temperature = _acpi.Temperature();
+        var temperature = _power.ReadTemperature();
         var now = DateTime.UtcNow;
 
         if (control.Lock?.Observe(now, program, fps) is { } found)
@@ -330,6 +349,9 @@ internal sealed partial class AutoTdpService : ServiceBase
             {
                 Apply(control, controller.Watts);
             }
+
+            Log.Second(now, control.GameFolder ?? control.FoundFolder, control.Settings?.TargetFps ?? 0, fps, temperature,
+                controller.Watts, controller.State);
         }
         else if (control.FixedWatts is { } fixedWatts && now - control.LastSet >= Reassert)
         {
@@ -390,7 +412,7 @@ internal sealed partial class AutoTdpService : ServiceBase
 
     private void Apply(Control control, int watts)
     {
-        if (!_acpi!.SetPowerLimit(watts))
+        if (!_power!.SetPowerLimit(watts))
         {
             Log.Write($"The firmware refused {watts} W");
         }
@@ -401,7 +423,7 @@ internal sealed partial class AutoTdpService : ServiceBase
     private void ApplyFans(Control control)
     {
         control.LastFans = DateTime.UtcNow;
-        if (_acpi!.SetFanCurve(control.Curve!))
+        if (_power!.SetFanCurve(control.Curve!))
         {
             return;
         }
@@ -517,6 +539,11 @@ internal sealed partial class AutoTdpService : ServiceBase
             // Not under the gate, as it writes to the controller.
             status = SetControls(request);
         }
+        else if (request?.Command == AutoTdpProtocol.SetBoost)
+        {
+            // Not under the gate either: it changes Windows' power plan, not anything the engine holds.
+            status = SetBoost(request);
+        }
         else
         {
             lock (_gate)
@@ -526,12 +553,61 @@ internal sealed partial class AutoTdpService : ServiceBase
                     AutoTdpProtocol.Start => Begin(request, client),
                     AutoTdpProtocol.Update => Update(request, client),
                     AutoTdpProtocol.Stop => End(),
+                    AutoTdpProtocol.SetOverlay => SetOverlay(request),
+                    AutoTdpProtocol.Overlay => OverlayStatus(request),
                     _ => _error is not null ? new AutoTdpStatus(false, Error: _error) : _last
                 };
             }
         }
 
-        await writer.WriteLineAsync(AutoTdpProtocol.Write(WithControls(status)).AsMemory(), cancel).ConfigureAwait(false);
+        // Read each time, as the player or another program can change the power plan.
+        status = WithControls(status) with
+        {
+            CpuBoost = CpuBoost.Read(),
+            OverlayLevel = _overlay.Level,
+            OverlayCorner = _overlay.Corner,
+            OverlayLayout = _overlay.Layout
+        };
+        await writer.WriteLineAsync(AutoTdpProtocol.Write(status).AsMemory(), cancel).ConfigureAwait(false);
+    }
+
+    /// <summary>A new overlay level, corner or layout, from the widget. Called under the gate.</summary>
+    private AutoTdpStatus SetOverlay(AutoTdpRequest request)
+    {
+        _overlay.Set(request.OverlayLevel, request.OverlayCorner, request.OverlayLayout);
+        _idleSince = DateTime.UtcNow;
+        return _error is not null && _control is null ? new AutoTdpStatus(false, Error: _error) : _last;
+    }
+
+    /// <summary>
+    /// What the overlay shows from here, each second: the frame rate of the program in front, the power limit
+    /// TDP Engine holds (none when it holds none), and the temperature. Called under the gate.
+    /// </summary>
+    private AutoTdpStatus OverlayStatus(AutoTdpRequest request)
+    {
+        double? fps = _lastFrames is { } frames ? frames.GetValueOrDefault(request.ProcessId) : null;
+        int? watts = _control is { } control ? WattsNow(control) : null;
+        return _last with { Fps = fps, Watts = watts, Temperature = _overlayTemperature };
+    }
+
+    /// <summary>
+    /// Turns the processor's boost on or off, from the widget. Answered with the last status, its Error
+    /// saying why when Windows would not change it.
+    /// </summary>
+    private AutoTdpStatus SetBoost(AutoTdpRequest request)
+    {
+        AutoTdpStatus last;
+        lock (_gate)
+        {
+            last = _last;
+        }
+
+        if (request.CpuBoost is not { } on)
+        {
+            return last with { Error = "The request did not say whether to turn boost on or off." };
+        }
+
+        return CpuBoost.Set(on) is { } problem ? last with { Error = problem } : last;
     }
 
     /// <summary>
@@ -582,7 +658,7 @@ internal sealed partial class AutoTdpService : ServiceBase
     /// <summary>A game starting from the library, or from the widget when nothing is running.</summary>
     private AutoTdpStatus Begin(AutoTdpRequest request, int client, bool fromWidget = false)
     {
-        if (_error is not null || _acpi is null)
+        if (_error is not null || _power is null)
         {
             return new AutoTdpStatus(false, Error: _error);
         }
@@ -631,7 +707,7 @@ internal sealed partial class AutoTdpService : ServiceBase
         }
 
         // A new game keeps the operating mode saved for the first, which is the player's own.
-        var restoreMode = _control?.RestoreMode ?? _acpi.OperatingModeNow();
+        var restoreMode = _control?.RestoreMode ?? _power.ReadVendorMode();
         _control?.ClientProcess?.Dispose();
         _control = new Control(settings, controller, folder, clientProcess, restoreMode, fromWidget)
         {
@@ -642,15 +718,15 @@ internal sealed partial class AutoTdpService : ServiceBase
             LibraryFolders = folder is null && fromWidget ? ClientGameFolders(client) : null,
             LastFrames = DateTime.UtcNow
         };
-        ChooseFans(_control, fans, _acpi.Temperature());
+        ChooseFans(_control, fans, _power.ReadTemperature());
 
         // Saved before the limit is first set, so a crash from here on still gets the mode put back.
-        MarkHolding(restoreMode ?? AsusAcpi.PerformanceMode);
+        MarkHolding(restoreMode ?? _power.DefaultVendorMode);
         Set(_control);
         var target = (folder is null ? null : AutoTdpRules.Printable(folder))
             ?? (_control.LibraryFolders is { } library ? $"the busiest of the library's {library.Length} games" : "the busiest program");
         Log.Write($"{Describe(_control)}, for {target}{(fromWidget ? ", from Game Bar" : "")}");
-        _last = Status(_control, null, _acpi.Temperature());
+        _last = Status(_control, null, _power.ReadTemperature());
         return _last;
     }
 
@@ -660,7 +736,7 @@ internal sealed partial class AutoTdpService : ServiceBase
     /// </summary>
     private AutoTdpStatus Update(AutoTdpRequest request, int client)
     {
-        if (_error is not null || _acpi is null)
+        if (_error is not null || _power is null)
         {
             return new AutoTdpStatus(false, Error: _error);
         }
@@ -696,19 +772,19 @@ internal sealed partial class AutoTdpService : ServiceBase
         _control.AutoSettings = auto;
         _control.PowerLimit = power;
         _control.FixedWatts = fixedWatts;
-        ChooseFans(_control, fans, _acpi.Temperature());
+        ChooseFans(_control, fans, _power.ReadTemperature());
         _control.LastFrames = old.LastFrames;
 
         // Letting go of the power limit or the fans means setting the mode again, which puts back its own of
         // both, so whatever is still wanted is set again straight after.
         if ((WattsNow(old) is not null && WattsNow(_control) is null) || (old.Curve is not null && _control.Curve is null))
         {
-            _acpi.SetOperatingMode(old.RestoreMode ?? AsusAcpi.PerformanceMode);
+            _power.SetVendorMode(old.RestoreMode ?? _power.DefaultVendorMode);
         }
 
         Set(_control);
         Log.Write($"{Describe(_control)}, changed in Game Bar");
-        _last = Status(_control, null, _acpi.Temperature());
+        _last = Status(_control, null, _power.ReadTemperature());
         return _last;
     }
 
@@ -793,10 +869,10 @@ internal sealed partial class AutoTdpService : ServiceBase
         _last = _last with { Running = false };
         control.ClientProcess?.Dispose();
 
-        // Setting the mode again brings back its own power limits. When it could not be read, Performance,
-        // Armoury Crate's own default, is put back instead.
-        var mode = control.RestoreMode ?? AsusAcpi.PerformanceMode;
-        var restored = _acpi!.SetOperatingMode(mode);
+        // Setting the mode again brings back its own power limits. When it could not be read, the maker's own
+        // default (Performance, on the Ally) is put back instead.
+        var mode = control.RestoreMode ?? _power!.DefaultVendorMode;
+        var restored = _power!.SetVendorMode(mode);
         MarkHolding(null);
         Log.Write($"Stopped, as {why}. Operating mode {mode} {(restored ? "put back" : "was refused")}");
     }

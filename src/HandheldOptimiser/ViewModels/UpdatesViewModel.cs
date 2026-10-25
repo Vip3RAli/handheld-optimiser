@@ -49,8 +49,23 @@ public sealed partial class UpdateRowViewModel(UpdateItem item, UpdatesViewModel
     /// <summary>A failed update can be ticked and tried again; one that is running or done cannot.</summary>
     public bool CanSelect => State is UpdateRowState.Available or UpdateRowState.Failed;
 
+    /// <summary>
+    /// Set when the update installed but the app is still running from its old version, so Windows has
+    /// not switched over. The row then offers to close the app and finish.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanCloseAndFinish))]
+    private OpenPackagedApp? _openApp;
+
+    public bool CanCloseAndFinish => OpenApp is not null;
+
+    public string CloseAndFinishText => $"Close {Name} and finish";
+
     [RelayCommand]
     private void Skip() => page.Skip(this);
+
+    [RelayCommand]
+    private Task CloseAndFinishAsync() => page.CloseAndFinishAsync(this);
 }
 
 /// <summary>One source's list on the page: Windows Update, the Microsoft Store, or apps updated through winget.</summary>
@@ -128,6 +143,7 @@ public sealed partial class UpdatesViewModel : SectionViewModel
     private readonly WindowsUpdates _windows;
     private readonly StoreUpdates _store;
     private readonly WingetUpdates _winget;
+    private readonly PackagedAppCloser _openApps;
     private readonly UpdateSettings _settings;
     private readonly RestorePointService _restorePoints;
     private readonly LogService _log;
@@ -176,6 +192,7 @@ public sealed partial class UpdatesViewModel : SectionViewModel
         _windows = sources.Windows;
         _store = sources.Store;
         _winget = sources.Winget;
+        _openApps = sources.OpenApps;
         _settings = sources.Settings;
         _restorePoints = restorePoints;
         _log = log;
@@ -474,6 +491,7 @@ public sealed partial class UpdatesViewModel : SectionViewModel
             var total = rows.Count;
             var finished = 0;
             var results = new List<UpdateOutcome>();
+            var waitingRows = new List<UpdateRowViewModel>();
 
             // Made here, on the UI thread, so reports from installer output threads land back on it.
             var progress = new Progress<UpdateProgress>(p =>
@@ -495,7 +513,20 @@ public sealed partial class UpdatesViewModel : SectionViewModel
 
                 finished++;
                 results.Add(p.Outcome);
-                row.State = p.Outcome.Kind == UpdateOutcomeKind.Failed ? UpdateRowState.Failed : UpdateRowState.Done;
+                row.OpenApp = null;
+                if (p.Outcome.Kind == UpdateOutcomeKind.WaitingToClose)
+                {
+                    waitingRows.Add(row);
+                }
+
+                // An app waiting to be closed still has its update to come, so its row stays an available
+                // update that can be picked again once the app is closed.
+                row.State = p.Outcome.Kind switch
+                {
+                    UpdateOutcomeKind.Failed => UpdateRowState.Failed,
+                    UpdateOutcomeKind.WaitingToClose => UpdateRowState.Available,
+                    _ => UpdateRowState.Done
+                };
                 if (row.State == UpdateRowState.Done)
                 {
                     row.IsSelected = false;
@@ -566,8 +597,16 @@ public sealed partial class UpdatesViewModel : SectionViewModel
                 CountSelected();
             }
 
+            // Nothing is closed here. The row only offers it, and the user decides.
+            foreach (var row in waitingRows)
+            {
+                status.Report($"Looking for what keeps {row.Name} open…");
+                row.OpenApp = await _openApps.FindAsync(row.Item, ct);
+            }
+
             var updated = results.Count(r => r.Kind == UpdateOutcomeKind.Updated);
             var current = results.Count(r => r.Kind == UpdateOutcomeKind.AlreadyCurrent);
+            var waiting = results.Count(r => r.Kind == UpdateOutcomeKind.WaitingToClose);
             var failed = rows.Count(r => r.State == UpdateRowState.Failed);
             var reboot = results.Any(r => r.RebootRequired);
 
@@ -576,15 +615,133 @@ public sealed partial class UpdatesViewModel : SectionViewModel
                 Shell.NotifyRebootRequired();
             }
 
-            _log.Info($"=== Updates finished: {updated} updated, {current} already current, {failed} failed ===");
+            _log.Info($"=== Updates finished: {updated} updated, {current} already current, {waiting} waiting to be closed, {failed} failed ===");
 
             await Shell.ConfirmAsync(
                 "Updates finished",
                 $"{updated} updated.\n" +
                 (current > 0 ? $"{current} were already up to date.\n" : string.Empty) +
+                (waiting > 0 ? WaitingLine(waiting, waitingRows.Any(r => r.OpenApp is not null)) : string.Empty) +
                 (failed > 0 ? $"{failed} failed. Each one says why on its row, and the console has the detail.\n" : string.Empty) +
                 (reboot ? "\nRestart to finish installing." : string.Empty),
                 "OK");
+        });
+    }
+
+    private static string WaitingLine(int waiting, bool canClose) =>
+        $"{waiting} will finish once closed. " +
+        (canClose
+            ? "Press Close and finish on its row, or close it yourself and check again.\n"
+            : $"Close {(waiting == 1 ? "it" : "them")} fully, then check again.\n");
+
+    /// <summary>
+    /// Closes an app whose update is waiting for it, runs the update again and starts its services again.
+    /// Only ever from the row's own button, after the user has said yes.
+    ///
+    /// No restore point is made: the button only shows after this same update was installed in this run
+    /// of the app, which made one first.
+    /// </summary>
+    internal async Task CloseAndFinishAsync(UpdateRowViewModel row)
+    {
+        if (Shell.IsBusy || row.OpenApp is not { } found)
+        {
+            return;
+        }
+
+        var what = found.ProcessCount > 0
+            ? $"closes {row.Name}"
+            : $"stops {row.Name}'s background {(found.Services.Count == 1 ? "service" : "services")}";
+        var services = found.Services.Count switch
+        {
+            0 => string.Empty,
+            1 => $" and stops its {found.Services[0]} service",
+            _ => $" and stops its services ({string.Join(", ", found.Services)})"
+        };
+
+        var message =
+            $"{row.Name} is still running, so Windows has kept the old version.\n\n" +
+            $"This {what}{(found.ProcessCount > 0 ? services : string.Empty)}, then runs the update again. " +
+            (found.ProcessCount > 0 ? $"Anything unsaved in {row.Name} is lost. " : string.Empty) +
+            (found.RunningServices.Count > 0 ? $"{(found.RunningServices.Count == 1 ? "The service is" : "The services are")} started again afterwards. " : string.Empty) +
+            $"{row.Name} itself is not opened again.";
+
+        if (!await Shell.ConfirmAsync($"Close {row.Name}?", message, "Close and finish"))
+        {
+            return;
+        }
+
+        await Shell.RunExclusiveAsync($"Finishing the {row.Name} update", async (status, ct) =>
+        {
+            _log.Info($"=== Closing {row.Name} to finish its update ===");
+            row.State = UpdateRowState.Working;
+            UpdateOutcome? outcome = null;
+
+            // Found again: since the button appeared, the app may have been closed, or opened again. When
+            // nothing of it runs now there is nothing to close, and the update only needs running again.
+            var app = await _openApps.FindAsync(row.Item, ct);
+
+            try
+            {
+                if (app is not null)
+                {
+                    status.Report($"Closing {row.Name}…");
+                    row.StatusText = "Closing…";
+                    var left = await _openApps.CloseAsync(app, ct);
+
+                    if (left > 0)
+                    {
+                        outcome = UpdateOutcome.Fail($"{row.Name} could not be closed. Close it yourself, then try again.");
+                        return;
+                    }
+                }
+
+                status.Report($"Updating {row.Name}…");
+                row.StatusText = "Updating…";
+                outcome = await _winget.InstallOneAsync(row.Item, ct);
+            }
+            finally
+            {
+                // Started again even when something went wrong, so the app is not left without them.
+                if (app is { RunningServices.Count: > 0 })
+                {
+                    status.Report($"Starting {row.Name}'s services again…");
+                    await _openApps.StartServicesAsync(app, CancellationToken.None);
+                }
+
+                outcome ??= UpdateOutcome.Fail("Stopped before it finished.");
+                row.StatusText = outcome.Message;
+                row.State = outcome.Kind switch
+                {
+                    UpdateOutcomeKind.Failed => UpdateRowState.Failed,
+                    UpdateOutcomeKind.WaitingToClose => UpdateRowState.Available,
+                    _ => UpdateRowState.Done
+                };
+                row.IsSelected = row.State != UpdateRowState.Done;
+                row.OpenApp = null;
+
+                AppsSection.RefreshSummary();
+                CountSelected();
+
+                if (outcome.Kind == UpdateOutcomeKind.Failed)
+                {
+                    _log.Error($"{row.Name}: {outcome.Message}");
+                }
+                else
+                {
+                    _log.Info($"{row.Name}: {outcome.Message}");
+                }
+            }
+
+            // Still held back, which can happen if the app started itself again straight away.
+            if (outcome.Kind == UpdateOutcomeKind.WaitingToClose)
+            {
+                row.OpenApp = await _openApps.FindAsync(row.Item, ct);
+            }
+
+            if (outcome.RebootRequired)
+            {
+                Shell.NotifyRebootRequired();
+            }
         });
     }
 }

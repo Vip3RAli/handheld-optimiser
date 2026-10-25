@@ -50,14 +50,22 @@
                     </StackPanel>
 
                     <!-- Sized for a thumb on a 7" touchscreen. -->
-                    <ui:Button Grid.Column="2"
-                               Content="Skip"
-                               ToolTip="Stop listing this update"
-                               Command="{Binding SkipCommand}"
-                               Visibility="{Binding CanSelect, Converter={StaticResource BoolToVis}}"
-                               MinWidth="80"
-                               MinHeight="40"
-                               VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Only on an update Windows is holding back because the app is still running. -->
+                        <ui:Button Content="{Binding CloseAndFinishText}"
+                                   ToolTip="Close the app and its background services, then finish the update"
+                                   Command="{Binding CloseAndFinishCommand}"
+                                   Visibility="{Binding CanCloseAndFinish, Converter={StaticResource BoolToVis}}"
+                                   Appearance="Primary"
+                                   MinHeight="40"
+                                   Margin="0,0,8,0" />
+                        <ui:Button Content="Skip"
+                                   ToolTip="Stop listing this update"
+                                   Command="{Binding SkipCommand}"
+                                   Visibility="{Binding CanSelect, Converter={StaticResource BoolToVis}}"
+                                   MinWidth="80"
+                                   MinHeight="40" />
+                    </StackPanel>
                 </Grid>
             </Border>
         </DataTemplate>

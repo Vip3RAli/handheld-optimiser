@@ -1,0 +1,527 @@
+<!--
+    The menu: a game's quick actions, the library's settings, the power menu and quick settings, as lists
+    that take each other's place in one box, and the text box for typed settings. MenuPresenter brings it on
+    screen and moves between the lists, and each menu wires its own rows.
+-->
+<UserControl x:Class="HandheldOptimiser.HomeLauncher.Library.MenuView"
+             x:ClassModifier="internal"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Quick actions for one game, over the dimmed library. Tapping outside the panel closes it. -->
+    <Grid x:Name="MenuOverlay" Background="#C0000000" Visibility="Collapsed">
+        <!--
+            Over the dimmed library in the grid and the row. In the Old School layout it is put where
+            the front card is and shown as that card's other side: see MenuPresenter.cs.
+        -->
+        <Border x:Name="MenuBox" Width="560" Margin="0,24" Padding="28,24,28,20" CornerRadius="12" Background="#181B22"
+                HorizontalAlignment="Center" VerticalAlignment="Center"
+                KeyboardNavigation.TabNavigation="Cycle" KeyboardNavigation.DirectionalNavigation="Contained">
+            <!-- Scrolls when the list is taller than the screen, as on a small or heavily scaled display. -->
+            <ScrollViewer x:Name="MenuScroller" VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly" Focusable="False">
+            <StackPanel>
+                <TextBlock x:Name="MenuTitle" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                <TextBlock x:Name="MenuStore" Margin="0,2,0,18" FontSize="13" Opacity="0.55" />
+                <!-- A notice raised while the menu is open, such as that a setting could not be saved. -->
+                <TextBlock x:Name="MenuNotice" Margin="0,-6,0,12" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap"
+                           Visibility="Collapsed" />
+
+                <StackPanel x:Name="GameItems">
+                    <!-- Only for a game that is not installed, which has none of the other rows but Hide. -->
+                    <Button x:Name="InstallItem" Style="{StaticResource MenuButton}" Content="Install"
+                            Visibility="Collapsed" />
+                    <Button x:Name="FavouriteItem" Style="{StaticResource MenuButton}" />
+                    <Button x:Name="ProfileItem" Style="{StaticResource MenuButton}" Content="Game profile" />
+                    <!-- Only for a game on the recommended settings list. -->
+                    <Button x:Name="RecommendedItem" Style="{StaticResource MenuButton}" Content="Optimised settings"
+                            Visibility="Collapsed" />
+                    <!-- Only for a program the player added: moves it between the games and Apps. -->
+                    <Button x:Name="MoveItem" Style="{StaticResource MenuButton}" />
+                    <Button x:Name="ArgumentsItem" Style="{StaticResource MenuButton}" Content="Launch arguments" />
+                    <Button x:Name="FolderItem" Style="{StaticResource MenuButton}" Content="Open install folder" />
+                    <Button x:Name="PropertiesItem" Style="{StaticResource MenuButton}" Content="Executable properties" />
+                    <Button x:Name="ArtworkItem" Style="{StaticResource MenuButton}" Content="Artwork" />
+                    <Button x:Name="CloseGameItem" Style="{StaticResource MenuButton}" Content="Close game"
+                            Visibility="Collapsed" />
+                    <Button x:Name="HideItem" Style="{StaticResource MenuButton}" />
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Select" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- The library's settings: a short list of categories, each with its groups of settings behind it. -->
+                <StackPanel x:Name="SettingsItems" Visibility="Collapsed">
+                    <Button x:Name="UpdateSetting" Style="{StaticResource MenuButton}" Content="Update now"
+                            Visibility="Collapsed" />
+                    <Button x:Name="LibraryDisplayGroup" Style="{StaticResource MenuButton}" Content="Library display" />
+                    <Button x:Name="GamesAppsGroup" Style="{StaticResource MenuButton}" Content="Games and apps" />
+                    <Button x:Name="SleepTweaksGroup" Style="{StaticResource MenuButton}" Content="Sleep and clean-up" />
+                    <Button x:Name="RescanItem" Style="{StaticResource MenuButton}" Content="Refresh library" />
+                    <Button x:Name="QuitSetting" Style="{StaticResource MenuButton}" Content="Close library" />
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Select" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Library display: how the library looks, on the built-in screen and docked. -->
+                <StackPanel x:Name="LibraryDisplayItems" Visibility="Collapsed">
+                    <Button x:Name="BackgroundGroup" Style="{StaticResource MenuButton}" Content="Art and background" />
+                    <Button x:Name="DisplayGroup" Style="{StaticResource MenuButton}" Content="What it shows" />
+                    <Button x:Name="TvGroup" Style="{StaticResource MenuButton}" Content="Docked mode" />
+                    <!-- For touch, which has no B button. -->
+                    <Button x:Name="LibraryDisplaySettingsBackItem" Style="{StaticResource MenuButton}" Content="Back" />
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Select" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Games and apps: what the library lists besides the installed games. -->
+                <StackPanel x:Name="GamesAppsItems" Visibility="Collapsed">
+                    <Button x:Name="OwnedGroup" Style="{StaticResource MenuButton}" Content="Games not installed" />
+                    <Button x:Name="DealsGroup" Style="{StaticResource MenuButton}" Content="Game deals" />
+                    <Button x:Name="EmulatorsGroup" Style="{StaticResource MenuButton}" Content="Emulators" />
+                    <Button x:Name="AddProgramGroup" Style="{StaticResource MenuButton}" Content="Add a program" />
+                    <!-- For touch, which has no B button. -->
+                    <Button x:Name="GamesAppsSettingsBackItem" Style="{StaticResource MenuButton}" Content="Back" />
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Select" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Sleep and clean-up: what happens around a game and sleep, clean-ups, and the main app. -->
+                <StackPanel x:Name="SleepTweaksItems" Visibility="Collapsed">
+                    <Button x:Name="WhilePlayingGroup" Style="{StaticResource MenuButton}" Content="Play and sleep" />
+                    <Button x:Name="MaintenanceGroup" Style="{StaticResource MenuButton}" Content="Clean up" />
+                    <Button x:Name="OpenMainAppSetting" Style="{StaticResource MenuButton}" Content="Launch Handheld Optimiser" />
+                    <!-- For touch, which has no B button. -->
+                    <Button x:Name="SleepTweaksSettingsBackItem" Style="{StaticResource MenuButton}" Content="Back" />
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Select" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- The background settings. A steps a row to its next value. -->
+                <StackPanel x:Name="BackgroundItems" Visibility="Collapsed">
+                    <Button x:Name="BackgroundSetting" Style="{StaticResource MenuButton}" Content="Background" />
+                    <Button x:Name="StrengthSetting" Style="{StaticResource MenuButton}" Content="Colour strength" />
+                    <Button x:Name="BlurSetting" Style="{StaticResource MenuButton}" Content="Artwork blur" />
+                    <Button x:Name="PositionSetting" Style="{StaticResource MenuButton}" Content="Artwork position" />
+                    <Button x:Name="ArtworkKeySetting" Style="{StaticResource MenuButton}" Content="SteamGridDB API key" />
+                    <!-- For touch, which has no B button. -->
+                    <Button x:Name="BackgroundSettingsBackItem" Style="{StaticResource MenuButton}" Content="Back" />
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Change" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- What the library shows and which buttons it offers. A switches a row on or off. -->
+                <StackPanel x:Name="DisplayItems" Visibility="Collapsed">
+                    <Button x:Name="LayoutSetting" Style="{StaticResource MenuButton}" Content="Layout" />
+                    <Button x:Name="ContinueSetting" Style="{StaticResource MenuButton}" Content="Show last played" />
+                    <Button x:Name="ContinueInfoSetting" Style="{StaticResource MenuButton}" Content="Game info" />
+                    <Button x:Name="StoreDetailsSetting" Style="{StaticResource MenuButton}" Content="Store details" />
+                    <Button x:Name="StatusSetting" Style="{StaticResource MenuButton}" Content="Battery and Wi-Fi" />
+                    <Button x:Name="FilterSetting" Style="{StaticResource MenuButton}" Content="Store filter" />
+                    <Button x:Name="QuickActionsSetting" Style="{StaticResource MenuButton}" Content="Options hint" />
+                    <Button x:Name="HiddenSetting" Style="{StaticResource MenuButton}" Content="Show hidden games" />
+                    <Button x:Name="SortSetting" Style="{StaticResource MenuButton}" Content="Sort games" />
+                    <!-- For touch, which has no B button. -->
+                    <Button x:Name="DisplaySettingsBackItem" Style="{StaticResource MenuButton}" Content="Back" />
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Change" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- The power menu. Restart and Shut down take a second press, so a stray A cannot end a session. -->
+                <StackPanel x:Name="PowerItems" Visibility="Collapsed">
+                    <Button x:Name="SleepItem" Style="{StaticResource MenuButton}" Content="Sleep" />
+                    <Button x:Name="HibernateItem" Style="{StaticResource MenuButton}" Content="Hibernate" />
+                    <Button x:Name="RestartItem" Style="{StaticResource MenuButton}" Content="Restart" />
+                    <Button x:Name="ShutDownItem" Style="{StaticResource MenuButton}" Content="Shut down" />
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Select" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!--
+                    Quick settings, like Armoury Crate's Command Center. Left and right adjust a row; A
+                    mutes the volume and steps the other rows on, for touch.
+                -->
+                <StackPanel x:Name="QuickItems" Visibility="Collapsed">
+                    <Button x:Name="VolumeSetting" Style="{StaticResource MenuButton}" Content="Volume" />
+                    <Button x:Name="BrightnessSetting" Style="{StaticResource MenuButton}" Content="Brightness" />
+                    <Button x:Name="PowerModeSetting" Style="{StaticResource MenuButton}" Content="Power mode" />
+                    <Button x:Name="ResolutionSetting" Style="{StaticResource MenuButton}" Content="Resolution" />
+                    <Button x:Name="RefreshRateSetting" Style="{StaticResource MenuButton}" Content="Refresh rate" />
+                    <Button x:Name="CloseAppsNowItem" Style="{StaticResource MenuButton}" Content="Close background programs" />
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Style="{StaticResource BumperGlyph}" Margin="22,0,8,0">
+                            <TextBlock Text="&#x25C0; &#x25B6;" FontSize="11" FontWeight="Bold" />
+                        </Border>
+                        <TextBlock Text="Adjust" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Select" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Close" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- One game's profile, switched to when it starts from the library. -->
+                <StackPanel x:Name="ProfileItems" Visibility="Collapsed">
+                    <Button x:Name="ProfilePowerSetting" Style="{StaticResource MenuButton}" Content="Power mode" />
+                    <Button x:Name="ProfileResolutionSetting" Style="{StaticResource MenuButton}" Content="Resolution" />
+                    <Button x:Name="ProfileRefreshSetting" Style="{StaticResource MenuButton}" Content="Refresh rate" />
+                    <Button x:Name="ProfileBrightnessSetting" Style="{StaticResource MenuButton}" Content="Brightness" />
+                    <Button x:Name="ProfileAppsSetting" Style="{StaticResource MenuButton}" Content="Background programs" />
+                    <Button x:Name="ProfileAutoTdpSetting" Style="{StaticResource MenuButton}" Content="TDP Engine" />
+                    <Button x:Name="ProfileFanSetting" Style="{StaticResource MenuButton}" Content="Fan curve" />
+                    <!-- For touch, which has no B button. -->
+                    <Button x:Name="ProfileSettingsBackItem" Style="{StaticResource MenuButton}" Content="Back" />
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Style="{StaticResource BumperGlyph}" Margin="22,0,8,0">
+                            <TextBlock Text="&#x25C0; &#x25B6;" FontSize="11" FontWeight="Bold" />
+                        </Border>
+                        <TextBlock Text="Adjust" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Change" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!--
+                    Optimised settings for one game. The device half can go into its profile with
+                    one press; the in-game half is a list to set in the game's own menu. The text is not
+                    in a StackPanel, which would be taken for the hints row and hidden on a card.
+                -->
+                <StackPanel x:Name="RecommendedItems" Visibility="Collapsed">
+                    <TextBlock x:Name="RecommendedNote" Margin="4,0,4,14" FontSize="14.5" TextWrapping="Wrap" Opacity="0.85" />
+                    <Button x:Name="RecommendedApplyItem" Style="{StaticResource MenuButton}" Content="Apply optimised settings" />
+                    <TextBlock x:Name="RecommendedDevice" Margin="4,2,4,16" FontSize="13.5" TextWrapping="Wrap" Opacity="0.6" />
+                    <TextBlock Text="Set these in the game" Margin="4,0,4,8" FontSize="16" FontWeight="SemiBold" />
+                    <ItemsControl x:Name="RecommendedList" Margin="4,0,4,12" Focusable="False">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding Name}" FontSize="14.5" Opacity="0.8" TextWrapping="Wrap" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Value}" Margin="16,0,0,0" FontSize="14.5"
+                                               FontWeight="SemiBold" TextAlignment="Right" TextWrapping="Wrap" MaxWidth="260" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock x:Name="RecommendedSource" Margin="4,0,4,12" FontSize="13" TextWrapping="Wrap" Opacity="0.55" />
+                    <!-- For touch, which has no B button. -->
+                    <Button x:Name="RecommendedBackItem" Style="{StaticResource MenuButton}" Content="Back" />
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Select" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Programs from the Start menu are added as rows above the hints once they are found. -->
+                <StackPanel x:Name="AddItems" Visibility="Collapsed">
+                    <Button x:Name="BrowseItem" Style="{StaticResource MenuButton}" Content="Browse for a program" />
+                    <!-- For touch, which has no B button. -->
+                    <Button x:Name="AddBackItem" Style="{StaticResource MenuButton}" Content="Back" />
+
+                    <StackPanel x:Name="AddHints" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Add" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Around games: closing background programs as one starts, and the store's app once it ends. -->
+                <StackPanel x:Name="WhilePlayingItems" Visibility="Collapsed">
+                    <Button x:Name="GameModeSetting" Style="{StaticResource MenuButton}" Content="Close background programs" />
+                    <Button x:Name="AppsToCloseGroup" Style="{StaticResource MenuButton}" Content="Programs to close" />
+                    <Button x:Name="ReopenSetting" Style="{StaticResource MenuButton}" Content="Open them again afterwards" />
+                    <Button x:Name="AutoTdpSetting" Style="{StaticResource MenuButton}" Content="TDP Engine" />
+                    <Button x:Name="AutoTdpTemperatureSetting" Style="{StaticResource MenuButton}" Content="TDP Engine temperature limit" />
+                    <Button x:Name="AutoTdpWattsSetting" Style="{StaticResource MenuButton}" Content="TDP Engine maximum power" />
+                    <Button x:Name="FanCurveSetting" Style="{StaticResource MenuButton}" Content="Fan curve" />
+                    <Button x:Name="StoreClosingSetting" Style="{StaticResource MenuButton}" Content="Close store apps after playing" />
+                    <Button x:Name="StoreStartupItem" Style="{StaticResource MenuButton}" Content="Store apps at startup" />
+                    <Button x:Name="QuickResumeSetting" Style="{StaticResource MenuButton}" Content="Quick Resume" />
+                    <Button x:Name="ResumeSetting" Style="{StaticResource MenuButton}" Content="Back to your game after sleep" />
+                    <!-- For touch, which has no B button. -->
+                    <Button x:Name="WhilePlayingSettingsBackItem" Style="{StaticResource MenuButton}" Content="Back" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Style="{StaticResource BumperGlyph}" Margin="22,0,8,0">
+                            <TextBlock Text="&#x25C0; &#x25B6;" FontSize="11" FontWeight="Bold" />
+                        </Border>
+                        <TextBlock Text="Adjust" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Change" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- A row per program, added when the list opens. A switches whether it is closed. -->
+                <StackPanel x:Name="AppsToCloseItems" Visibility="Collapsed">
+                    <Button x:Name="AddRunningAppItem" Style="{StaticResource MenuButton}" Content="Add a running program" />
+                    <!-- For touch, which has no B button. -->
+                    <Button x:Name="AppsToCloseBackItem" Style="{StaticResource MenuButton}" Content="Back" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Change" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- The programs running now, added as rows when the list opens. -->
+                <StackPanel x:Name="RunningAppsItems" Visibility="Collapsed">
+                    <!-- For touch, which has no B button. -->
+                    <Button x:Name="RunningAppsBackItem" Style="{StaticResource MenuButton}" Content="Back" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Add" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Clean-ups a standard user may run, and the startup apps. Clearing takes a second press. -->
+                <StackPanel x:Name="MaintenanceItems" Visibility="Collapsed">
+                    <Button x:Name="TempItem" Style="{StaticResource MenuButton}" Content="Clear temporary files" />
+                    <Button x:Name="ShaderItem" Style="{StaticResource MenuButton}" Content="Clear shader caches" />
+                    <Button x:Name="RecycleItem" Style="{StaticResource MenuButton}" Content="Empty the Recycle Bin" />
+                    <Button x:Name="StartupGroup" Style="{StaticResource MenuButton}" Content="Startup apps" />
+                    <!-- For touch, which has no B button. -->
+                    <Button x:Name="MaintenanceSettingsBackItem" Style="{StaticResource MenuButton}" Content="Back" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Select" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- A row per program that starts with Windows, added when the list opens. -->
+                <StackPanel x:Name="StartupItems" Visibility="Collapsed">
+                    <!-- For touch, which has no B button. -->
+                    <Button x:Name="StartupBackItem" Style="{StaticResource MenuButton}" Content="Back" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Change" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- A row per console found and per ROM folder, added when the list opens. -->
+                <StackPanel x:Name="EmulatorItems" Visibility="Collapsed">
+                    <Button x:Name="AddRomFolderItem" Style="{StaticResource MenuButton}" Content="Add a ROM folder" />
+                    <Button x:Name="AddEmulatorItem" Style="{StaticResource MenuButton}" Content="Find an emulator" />
+                    <Button x:Name="RescanEmulatorsItem" Style="{StaticResource MenuButton}" Content="Look again" />
+                    <!-- For touch, which has no B button. -->
+                    <Button x:Name="EmulatorsBackItem" Style="{StaticResource MenuButton}" Content="Back" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Style="{StaticResource BumperGlyph}" Margin="22,0,8,0">
+                            <TextBlock Text="&#x25C0; &#x25B6;" FontSize="11" FontWeight="Bold" />
+                        </Border>
+                        <TextBlock Text="Adjust" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Select" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Docked mode: a layout and size of its own on a TV or monitor. -->
+                <StackPanel x:Name="TvItems" Visibility="Collapsed">
+                    <Button x:Name="DockedSetting" Style="{StaticResource MenuButton}" Content="Docked mode" />
+                    <Button x:Name="DockedLayoutSetting" Style="{StaticResource MenuButton}" Content="Layout" />
+                    <Button x:Name="DockedSizeSetting" Style="{StaticResource MenuButton}" Content="Zoom" />
+                    <!-- For touch, which has no B button. -->
+                    <Button x:Name="TvSettingsBackItem" Style="{StaticResource MenuButton}" Content="Back" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Style="{StaticResource BumperGlyph}" Margin="22,0,8,0">
+                            <TextBlock Text="&#x25C0; &#x25B6;" FontSize="11" FontWeight="Bold" />
+                        </Border>
+                        <TextBlock Text="Adjust" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Change" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Owned games that are not installed, in a tab of their own. -->
+                <StackPanel x:Name="OwnedItems" Visibility="Collapsed">
+                    <Button x:Name="NotInstalledSetting" Style="{StaticResource MenuButton}" Content="Show games not installed" />
+                    <Button x:Name="SteamKeySetting" Style="{StaticResource MenuButton}" Content="Steam Web API key" />
+                    <Button x:Name="OwnedRefreshItem" Style="{StaticResource MenuButton}" Content="Look again" />
+                    <!-- For touch, which has no B button. -->
+                    <Button x:Name="OwnedSettingsBackItem" Style="{StaticResource MenuButton}" Content="Back" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Select" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- The Deals row below the library. A switches a row on or off. -->
+                <StackPanel x:Name="DealsItems" Visibility="Collapsed">
+                    <Button x:Name="DealsSetting" Style="{StaticResource MenuButton}" Content="Show game deals" />
+                    <Button x:Name="EpicFreeSetting" Style="{StaticResource MenuButton}" Content="Epic's free games" />
+                    <Button x:Name="DealsKeySetting" Style="{StaticResource MenuButton}" Content="IsThereAnyDeal API key" />
+                    <Button x:Name="WishlistDealsSetting" Style="{StaticResource MenuButton}" Content="Wishlist deals first" />
+                    <Button x:Name="DealsRefreshItem" Style="{StaticResource MenuButton}" Content="Look again" />
+                    <!-- For touch, which has no B button. -->
+                    <Button x:Name="DealsSettingsBackItem" Style="{StaticResource MenuButton}" Content="Back" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Select" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel x:Name="TextEditor" Visibility="Collapsed">
+                    <TextBlock x:Name="EditorTitle" FontSize="16" FontWeight="SemiBold" />
+                    <TextBlock x:Name="EditorHint" Margin="0,2,0,12" FontSize="12.5" Opacity="0.6" TextWrapping="Wrap" />
+                    <TextBox x:Name="EditorBox" Padding="12,10" FontSize="17" MaxLength="512"
+                             Background="#0F1115" Foreground="#F2F3F5" CaretBrush="#F2F3F5" BorderBrush="#3A4050" />
+                    <Grid Margin="0,16,0,0">
+                        <TextBlock Text="Menu saves, View cancels" FontSize="12.5" Opacity="0.6" VerticalAlignment="Center" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button x:Name="CancelEditItem" Style="{StaticResource DialogButton}" Content="Cancel" />
+                            <Button x:Name="SaveEditItem" Style="{StaticResource DialogButton}" Content="Save" />
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </StackPanel>
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</UserControl>

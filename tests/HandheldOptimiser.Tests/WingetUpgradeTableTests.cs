@@ -87,4 +87,53 @@ public class WingetUpgradeTableTests
         Assert.Empty(WingetUpdates.ParseUpgradeTable("No installed package found matching input criteria.\r\n"));
         Assert.Empty(WingetUpdates.ParseUpgradeTable(string.Empty));
     }
+
+    private static readonly UpdateItem Claude =
+        new(UpdateSource.Winget, "Anthropic.Claude", "Claude", "2.37337.1.0", "2.42304.2", "winget");
+
+    [Fact]
+    public void An_app_still_on_its_old_version_after_an_update_has_not_finished()
+    {
+        // What winget list --upgrade-available printed on 2026-10-23 after winget reported the update as
+        // installed: the Claude app was open, so Windows staged the new package and kept the old one.
+        const string after =
+            "Name   Id               Version     Available Source\r\n" +
+            "----------------------------------------------------\r\n" +
+            "Claude Anthropic.Claude 2.37337.1.0 2.42304.2 winget\r\n" +
+            "1 upgrades available.\r\n";
+
+        Assert.True(WingetUpdates.StillOnOldVersion(Claude, WingetUpdates.ParseUpgradeTable(after)));
+    }
+
+    [Fact]
+    public void An_app_still_on_its_old_version_is_found_when_winget_leaves_out_the_source_column()
+    {
+        // The check passes --source, and winget then prints no Source column.
+        const string after =
+            "Name   Id               Version     Available\r\n" +
+            "---------------------------------------------\r\n" +
+            "Claude Anthropic.Claude 2.37337.1.0 2.42304.2\r\n" +
+            "1 upgrades available.\r\n";
+
+        Assert.True(WingetUpdates.StillOnOldVersion(Claude, WingetUpdates.ParseUpgradeTable(after)));
+    }
+
+    [Fact]
+    public void An_app_no_longer_listed_after_an_update_has_finished()
+    {
+        var after = WingetUpdates.ParseUpgradeTable("No installed package found matching input criteria.\r\n");
+
+        Assert.False(WingetUpdates.StillOnOldVersion(Claude, after));
+    }
+
+    [Fact]
+    public void An_app_that_moved_on_but_has_a_newer_update_again_has_finished()
+    {
+        const string after =
+            "Name   Id               Version   Available Source\r\n" +
+            "--------------------------------------------------\r\n" +
+            "Claude Anthropic.Claude 2.42304.2 2.50000.0 winget\r\n";
+
+        Assert.False(WingetUpdates.StillOnOldVersion(Claude, WingetUpdates.ParseUpgradeTable(after)));
+    }
 }

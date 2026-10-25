@@ -67,6 +67,10 @@
       <DependentUpon>TdpWidget.xaml</DependentUpon>
     </Compile>
     <Compile Include="EngineClient.cs" />
+    <!-- The names and limits shared with the TDP Engine service, kept to C# 7.3 so this project can build it. -->
+    <Compile Include="..\HandheldOptimiser.PowerService\AutoTdpProtocol.Names.cs">
+      <Link>AutoTdpProtocol.Names.cs</Link>
+    </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

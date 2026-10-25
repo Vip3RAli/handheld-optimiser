@@ -45,4 +45,15 @@ public class AllyButtonsTests
         Assert.Null(filter.Press([0x5A, 0x00, 0, 0, 0, 0], DateTime.UtcNow));
         Assert.Null(filter.Press([0x5A, 0xEC, 0, 0, 0, 0], DateTime.UtcNow));
     }
+
+    [Fact]
+    public void A_button_already_read_is_filtered_the_same_as_its_report()
+    {
+        var filter = new AllyButtonFilter();
+        var t0 = DateTime.UtcNow;
+        Assert.Equal(AllyButton.ArmouryCrate, filter.Press(AllyButton.ArmouryCrate, t0));
+        Assert.Null(filter.Press([0x5A, 0x38, 0, 0, 0, 0], t0.AddMilliseconds(100)));
+        Assert.Null(filter.Press(AllyButton.None, t0));
+        Assert.Null(filter.Press(AllyButton.Release, t0));
+    }
 }

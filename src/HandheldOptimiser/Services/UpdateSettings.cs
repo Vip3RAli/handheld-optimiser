@@ -5,10 +5,16 @@ using Microsoft.Win32;
 namespace HandheldOptimiser.Services;
 
 /// <summary>Everything the Updates page installs through, and what it remembers.</summary>
-public sealed record UpdateSources(WindowsUpdates Windows, StoreUpdates Store, WingetUpdates Winget, UpdateSettings Settings)
+public sealed record UpdateSources(
+    WindowsUpdates Windows, StoreUpdates Store, WingetUpdates Winget, PackagedAppCloser OpenApps, UpdateSettings Settings)
 {
     public static UpdateSources Create(LogService log, PowerShellRunner runner) =>
-        new(new WindowsUpdates(log, runner), new StoreUpdates(log, runner), new WingetUpdates(log, runner), new UpdateSettings(log));
+        new(
+            new WindowsUpdates(log, runner),
+            new StoreUpdates(log, runner),
+            new WingetUpdates(log, runner),
+            new PackagedAppCloser(log, runner),
+            new UpdateSettings(log));
 }
 
 /// <summary>An update the user chose to skip, kept with its name so it can be listed without checking again.</summary>

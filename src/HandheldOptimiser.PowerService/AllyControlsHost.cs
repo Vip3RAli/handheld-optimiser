@@ -33,7 +33,7 @@ internal sealed class AllyControlsHost : IDisposable
 
     private CancellationTokenSource? _stop;
     private Thread? _thread;
-    private AllyHid? _hid;
+    private IControllerBackend? _hid;
     private ControllerMode? _mode = AllyControlsStore.SavedMode();
 
     // The mode held while Game Bar is open, over the saved one, or null. Never saved.
@@ -93,7 +93,7 @@ internal sealed class AllyControlsHost : IDisposable
     /// </summary>
     public void Resume()
     {
-        AllyHid? hid;
+        IControllerBackend? hid;
         lock (_state)
         {
             if (_disposed)
@@ -162,7 +162,7 @@ internal sealed class AllyControlsHost : IDisposable
     /// <summary>Sends the mode the controller should be in now, the hold or the saved one.</summary>
     private string? SendCurrent()
     {
-        AllyHid? hid;
+        IControllerBackend? hid;
         lock (_state)
         {
             hid = _hid;
@@ -183,7 +183,7 @@ internal sealed class AllyControlsHost : IDisposable
                 mode = AllyCommands.ModeToSend(_mode, _hold);
             }
 
-            sent = mode is not { } chosen || hid.Send(AllyCommands.Mode(chosen));
+            sent = mode is not { } chosen || hid.SetMode(chosen);
         }
 
         if (sent)
@@ -199,7 +199,7 @@ internal sealed class AllyControlsHost : IDisposable
 
     public void Dispose()
     {
-        AllyHid? hid;
+        IControllerBackend? hid;
         Thread? thread;
         lock (_state)
         {
@@ -235,7 +235,7 @@ internal sealed class AllyControlsHost : IDisposable
                     return;
                 }
 
-                if (AllyHid.Open() is not { } hid)
+                if (ControllerBackends.Open() is not { } hid)
                 {
                     if (attempt == 0)
                     {
@@ -263,12 +263,12 @@ internal sealed class AllyControlsHost : IDisposable
 
                 Log.Write($"Controller found: {hid.Describe()}");
                 Apply(hid);
-                while (hid.Read() is { } report)
+                while (hid.TryRead(out var read))
                 {
                     // The back-off starts again only once a read has worked. A controller that opens but
                     // cannot be read would otherwise be opened again flat out.
                     attempt = 0;
-                    if (_filter.Press(report, DateTime.UtcNow) is { } button)
+                    if (_filter.Press(read, DateTime.UtcNow) is { } button)
                     {
                         Act(button);
                     }
@@ -303,7 +303,7 @@ internal sealed class AllyControlsHost : IDisposable
                 // Anything thrown on this thread would end the whole service, TDP Engine included, so it is
                 // logged and the controller looked for again.
                 Log.Write($"The controller failed: {ex.Message}");
-                AllyHid? broken;
+                IControllerBackend? broken;
                 lock (_state)
                 {
                     broken = _hid;
@@ -320,7 +320,7 @@ internal sealed class AllyControlsHost : IDisposable
     }
 
     /// <summary>Wakes the controller and puts it in the saved mode, if one is saved.</summary>
-    private void Apply(AllyHid hid)
+    private void Apply(IControllerBackend hid)
     {
         // After sleep or a reconnect Game Bar is not holding anything, and the saved mode is what counts.
         lock (_state)
@@ -328,14 +328,14 @@ internal sealed class AllyControlsHost : IDisposable
             _hold = null;
         }
 
-        if (!hid.Send(AllyCommands.Wake()))
+        if (!hid.Wake())
         {
             Log.Write("The controller did not take the wake report");
         }
 
         lock (_send)
         {
-            if (Mode is { } mode && !hid.Send(AllyCommands.Mode(mode)))
+            if (Mode is { } mode && !hid.SetMode(mode))
             {
                 Log.Write($"The controller did not take the {AllyCommands.ModeName(mode)} mode");
             }
@@ -366,7 +366,7 @@ internal sealed class AllyControlsHost : IDisposable
     }
 
     /// <summary>Lets go of this handle, and forgets it if it is still the current one.</summary>
-    private void Drop(AllyHid hid)
+    private void Drop(IControllerBackend hid)
     {
         lock (_state)
         {

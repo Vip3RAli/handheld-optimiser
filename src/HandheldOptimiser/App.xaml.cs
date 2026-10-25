@@ -56,6 +56,13 @@ public partial class App : Application
         log.Info($"Handheld Optimiser {UpdateService.Display(updates.CurrentVersion)} started (elevated).");
         log.Info($"Session log: {log.LogFilePath}");
 
+        if (SignedInUser.OtherSid is not null)
+        {
+            log.Warning($"Running as {SignedInUser.ProcessAccount}, while {SignedInUser.SessionAccount} is signed in. " +
+                "Per-user registry settings are changed for the signed-in account. App packages and a few Windows " +
+                "settings still change for the account this runs as.");
+        }
+
         HomeAppRegistration.RestoreIfInterrupted(registry, log);
         journal.ImportLegacyFile(id => engine.FindById(id) is not null);
         UpdateService.CleanUpOldDownloads(log);

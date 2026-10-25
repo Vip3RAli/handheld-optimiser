@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using HandheldOptimiser.PowerService;
 using Windows.System.Power;
 using Windows.UI.Core;
 using Windows.UI.Xaml;
@@ -27,6 +28,7 @@ namespace HandheldOptimiser.GameBar
         private readonly DispatcherTimer _sliderPause = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
         private bool _loaded;
         private bool _placingSlider;
+        private bool _placingBoost;
         private bool _sliding;
         private EngineStatus _status = EngineStatus.Off;
         private bool _busy;
@@ -137,9 +139,45 @@ namespace HandheldOptimiser.GameBar
         private void OnFans(object sender, RoutedEventArgs e) =>
             Change(CurrentFps, CurrentPower, (string)((FrameworkElement)sender).Tag);
 
-        private async void OnControllerMode(object sender, RoutedEventArgs e)
+        private void OnControllerMode(object sender, RoutedEventArgs e)
         {
             var mode = (string)((FrameworkElement)sender).Tag;
+            Send(() => EngineClient.SetControllerMode(mode));
+        }
+
+        private void OnCpuBoost(object sender, RoutedEventArgs e)
+        {
+            // Set from TDP Engine's answer, not by the player: nothing to send.
+            if (_placingBoost)
+            {
+                return;
+            }
+
+            var on = BoostSwitch.IsOn;
+            Send(() => EngineClient.SetCpuBoost(on));
+        }
+
+        private void OnOverlayLevel(object sender, RoutedEventArgs e)
+        {
+            var level = (string)((FrameworkElement)sender).Tag;
+            Send(() => EngineClient.SetOverlay(level, null, null));
+        }
+
+        private void OnOverlayCorner(object sender, RoutedEventArgs e)
+        {
+            var corner = (string)((FrameworkElement)sender).Tag;
+            Send(() => EngineClient.SetOverlay(null, corner, null));
+        }
+
+        private void OnOverlayLayout(object sender, RoutedEventArgs e)
+        {
+            var layout = (string)((FrameworkElement)sender).Tag;
+            Send(() => EngineClient.SetOverlay(null, null, layout));
+        }
+
+        /// <summary>Sends one change on a background thread, shows the answer, and ignores presses meanwhile.</summary>
+        private async void Send(Func<EngineStatus> change)
+        {
             if (_busy)
             {
                 Show(_status);
@@ -150,7 +188,7 @@ namespace HandheldOptimiser.GameBar
             SetState("", "Applying…");
             try
             {
-                Show(await Task.Run(() => EngineClient.SetControllerMode(mode)));
+                Show(await Task.Run(change));
             }
             finally
             {
@@ -195,6 +233,10 @@ namespace HandheldOptimiser.GameBar
             // the mode is not known, so the player is not told something that may be wrong.
             ControllerCard.Visibility = status.Replacing ? Visibility.Visible : Visibility.Collapsed;
             Check(ControllerModes, status.ControllerMode ?? "");
+            ShowBoost(status.CpuBoost);
+            Check(OverlayLevels, status.OverlayLevel ?? "");
+            Check(OverlayCorners, status.OverlayCorner ?? "");
+            Check(OverlayLayouts, status.OverlayLayout ?? "");
 
             // The readouts only mean something while the engine runs, so the state line stands alone otherwise.
             var readouts = status.Running && status.Error == null;
@@ -223,10 +265,10 @@ namespace HandheldOptimiser.GameBar
 
             if (status.Watts == null)
             {
-                SetState(status.FanCurve == "dynamic" ? "Fans controlled automatically" : FanName(status.FanCurve) + " fans",
+                SetState(status.FanCurve == AutoTdpProtocol.DynamicFans ? "Fans controlled automatically" : FanName(status.FanCurve) + " fans",
                     ". Power controlled automatically.");
             }
-            else if (status.State == "Fixed")
+            else if (status.State == AutoTdpProtocol.FixedState)
             {
                 SetState("Fixed power", ". Held at " + status.Watts + " W.");
             }
@@ -260,6 +302,18 @@ namespace HandheldOptimiser.GameBar
             }
         }
 
+        /// <summary>
+        /// The boost switch as TDP Engine reports it. A switch has no "not known", so while TDP Engine is not
+        /// running it shows off and the line under it says so; turning it on then starts TDP Engine.
+        /// </summary>
+        private void ShowBoost(bool? on)
+        {
+            _placingBoost = true;
+            BoostSwitch.IsOn = on == true;
+            _placingBoost = false;
+            BoostNote.Text = on == null ? "Not known while TDP Engine is off" : "Faster bursts, more heat";
+        }
+
         /// <summary>A readout's number, with its unit hidden when the value is a word such as Auto.</summary>
         private static void SetReadout(Run value, Run unit, string unitText, string text, bool known)
         {
@@ -286,26 +340,26 @@ namespace HandheldOptimiser.GameBar
         {
             switch (fans)
             {
-                case "quiet": return "Quiet";
-                case "cool": return "Cool";
-                case "full": return "Max";
-                case "dynamic": return "Auto";
+                case AutoTdpProtocol.QuietFans: return "Quiet";
+                case AutoTdpProtocol.CoolFans: return "Cool";
+                case AutoTdpProtocol.FullFans: return "Max";
+                case AutoTdpProtocol.DynamicFans: return "Auto";
                 default: return "Default";
             }
         }
 
-        /// <summary>The service's state names, from AutoTdpState in HandheldOptimiser.PowerService.</summary>
+        /// <summary>The service's state names, from AutoTdpState in AutoTdpProtocol.Names.cs.</summary>
         private void Explain(string state, int targetFps)
         {
             switch (state)
             {
-                case "Holding": SetState("Holding", ". " + targetFps + " fps at the lowest power it can."); break;
-                case "Raising": SetState("Raising power", ". Below " + targetFps + " fps."); break;
-                case "Lowering": SetState("Lowering power", ". Above " + targetFps + " fps, so it can use less."); break;
-                case "AtMaximum": SetState("At the power limit", ". Cannot reach " + targetFps + " fps. Try lower game settings."); break;
-                case "NoGain": SetState("No gain from more power", ". It would not raise the frame rate."); break;
-                case "TooHot": SetState("Too hot", ". At the temperature limit, so power is lowered."); break;
-                case "Waiting": SetState("Waiting", ". Waiting for the game."); break;
+                case nameof(AutoTdpState.Holding): SetState("Holding", ". " + targetFps + " fps at the lowest power it can."); break;
+                case nameof(AutoTdpState.Raising): SetState("Raising power", ". Below " + targetFps + " fps."); break;
+                case nameof(AutoTdpState.Lowering): SetState("Lowering power", ". Above " + targetFps + " fps, so it can use less."); break;
+                case nameof(AutoTdpState.AtMaximum): SetState("At the power limit", ". Cannot reach " + targetFps + " fps. Try lower game settings."); break;
+                case nameof(AutoTdpState.NoGain): SetState("No gain from more power", ". It would not raise the frame rate."); break;
+                case nameof(AutoTdpState.TooHot): SetState("Too hot", ". At the temperature limit, so power is lowered."); break;
+                case nameof(AutoTdpState.Waiting): SetState("Waiting", ". Waiting for the game."); break;
                 default: SetState("Checking", ". Watching the result of the change."); break;
             }
         }
