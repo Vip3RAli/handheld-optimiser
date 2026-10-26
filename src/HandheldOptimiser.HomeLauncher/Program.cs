@@ -42,6 +42,13 @@ internal static class Program
             return 0;
         }
 
+        // The stats screen on the Ally's own panel while docked, which TDP Engine starts when it is switched on in the widget.
+        if (args.Contains(ScreenStatsArgument, StringComparer.OrdinalIgnoreCase))
+        {
+            RunScreenStats();
+            return 0;
+        }
+
         var action = ActionFor(args);
 
         // Game Bar is opened whatever the home app choice is, and the choice is not read or changed.
@@ -112,6 +119,24 @@ internal static class Program
         catch (Exception ex)
         {
             Log($"Overlay failed: {ex}");
+        }
+    }
+
+    /// <summary>
+    /// The argument TDP Engine starts the stats screen with. The service's copy is in
+    /// src\HandheldOptimiser.PowerService\ScreenStatsHost.cs, and the two must be kept in step.
+    /// </summary>
+    internal const string ScreenStatsArgument = "--screen-stats";
+
+    private static void RunScreenStats()
+    {
+        try
+        {
+            Library.ScreenStatsApp.Run();
+        }
+        catch (Exception ex)
+        {
+            Log($"Stats screen failed: {ex}");
         }
     }
 

@@ -42,6 +42,9 @@ namespace HandheldOptimiser.GameBar
         public string OverlayCorner;
         public string OverlayLayout;
 
+        /// <summary>Whether the stats screen on the Ally's own panel is switched on.</summary>
+        public bool ScreenStats;
+
         public static readonly EngineStatus Off = new EngineStatus();
 
         public static EngineStatus Failed(string error) => new EngineStatus { Error = error };
@@ -136,6 +139,21 @@ namespace HandheldOptimiser.GameBar
             return SendStarting(request);
         }
 
+        /// <summary>
+        /// Switches the stats screen on the Ally's own panel on or off, starting the service if need be. The
+        /// service starts it and keeps it running; it shows only while a monitor is in use.
+        /// </summary>
+        public static EngineStatus SetScreenStats(bool on)
+        {
+            var request = new JsonObject
+            {
+                [AutoTdpProtocol.Fields.Command] = JsonValue.CreateStringValue(AutoTdpProtocol.SetScreenStats),
+                [AutoTdpProtocol.Fields.ScreenStats] = JsonValue.CreateBooleanValue(on)
+            }.Stringify();
+
+            return SendStarting(request);
+        }
+
         private static JsonValue TextOrNull(string text) =>
             text == null ? JsonValue.CreateNullValue() : JsonValue.CreateStringValue(text);
 
@@ -205,7 +223,8 @@ namespace HandheldOptimiser.GameBar
                     : (bool?)null,
                 OverlayLevel = Text(json, AutoTdpProtocol.Fields.OverlayLevel),
                 OverlayCorner = Text(json, AutoTdpProtocol.Fields.OverlayCorner),
-                OverlayLayout = Text(json, AutoTdpProtocol.Fields.OverlayLayout)
+                OverlayLayout = Text(json, AutoTdpProtocol.Fields.OverlayLayout),
+                ScreenStats = json.GetNamedBoolean(AutoTdpProtocol.Fields.ScreenStats, false)
             };
         }
 

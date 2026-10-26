@@ -13,7 +13,6 @@ namespace HandheldOptimiser.PowerService;
 /// </summary>
 internal sealed class OverlayHost
 {
-    private const string LauncherExe = "HandheldOptimiser.HomeLauncher.exe";
     private const string OverlayArgument = "--overlay";
 
     // The overlay's single instance mutex, in the player's session. The launcher's copy is OverlayApp.MutexName.
@@ -24,13 +23,7 @@ internal sealed class OverlayHost
     private const string CornerValue = "Corner";
     private const string LayoutValue = "Layout";
 
-    // A start that fails, or an overlay that will not stay, is tried again no sooner than this.
-    private static readonly TimeSpan RetryEvery = TimeSpan.FromSeconds(10);
-
-    private readonly string _launcher = Path.Combine(AppContext.BaseDirectory, LauncherExe);
-    private DateTime _lastTry = DateTime.MinValue;
-    // What the last start said, so each change is logged once. Empty at first, so the first start is logged too.
-    private string? _lastProblem = string.Empty;
+    private readonly SessionProgram _program = new("Overlay", OverlayArgument, MutexName, uiAccess: true);
 
     public OverlayHost()
     {
@@ -90,51 +83,16 @@ internal sealed class OverlayHost
             Log.Write($"Could not save the overlay settings: {ex.Message}");
         }
 
-        _lastTry = DateTime.MinValue;
+        _program.TryNow();
         Keep();
     }
 
     /// <summary>Each second: starts the overlay when it is wanted and not running.</summary>
     public void Keep()
     {
-        if (!Wanted || DateTime.UtcNow - _lastTry < RetryEvery || Running())
+        if (Wanted)
         {
-            return;
-        }
-
-        _lastTry = DateTime.UtcNow;
-        var problem = SessionLauncher.Launch(_launcher, OverlayArgument, out _, uiAccess: true);
-
-        // Said once, not every ten seconds while the screen is locked.
-        if (problem != _lastProblem)
-        {
-            Log.Write(problem is null ? "Overlay started" : $"Could not start the overlay: {problem}");
-            _lastProblem = problem;
-        }
-    }
-
-    /// <summary>Whether an overlay holds its mutex in the player's session.</summary>
-    private static bool Running()
-    {
-        if (SessionLauncher.ActiveSession() is not { } session)
-        {
-            return false;
-        }
-
-        try
-        {
-            if (!Mutex.TryOpenExisting($@"Session\{session}\{MutexName}", out var mutex))
-            {
-                return false;
-            }
-
-            mutex.Dispose();
-            return true;
-        }
-        catch (UnauthorizedAccessException)
-        {
-            // It exists, which is all that is asked.
-            return true;
+            _program.Keep();
         }
     }
 }
