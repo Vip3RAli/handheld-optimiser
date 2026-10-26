@@ -67,6 +67,22 @@ internal static partial class AllyScreen
         return new ScreenSetup(monitorOn, PanelState.Own, SourceRect(modes, paths[panel].SourceModeIndex));
     }
 
+    /// <summary>Where each monitor is on the desktop, in pixels, leaving out the Ally's panel.</summary>
+    public static IReadOnlyList<ScreenRect> MonitorBounds()
+    {
+        if (Query() is not { } config)
+        {
+            return [];
+        }
+
+        var (paths, modes) = config;
+        return paths.Where(p => !Displays.IsBuiltIn(p.OutputTechnology))
+            .Select(p => SourceRect(modes, p.SourceModeIndex))
+            .OfType<ScreenRect>()
+            .Distinct()
+            .ToList();
+    }
+
     /// <summary>
     /// Turns the panel on as a screen of its own beside the monitor, then makes it 720p and puts it under the
     /// monitor, which stays the main screen.

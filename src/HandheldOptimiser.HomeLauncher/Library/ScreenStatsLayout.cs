@@ -16,7 +16,15 @@ internal sealed record StatTile(string Label, string Value, string Unit, StatTon
 /// <summary>A rectangle of the Windows desktop, in pixels.</summary>
 internal readonly record struct ScreenRect(int X, int Y, int Width, int Height)
 {
+    public int Right => X + Width;
+
     public int Bottom => Y + Height;
+
+    /// <summary>Whether the two share any pixel.</summary>
+    public bool Overlaps(ScreenRect other) => X < other.Right && other.X < Right && Y < other.Bottom && other.Y < Bottom;
+
+    /// <summary>Whether this one covers all of the other.</summary>
+    public bool Covers(ScreenRect other) => X <= other.X && Y <= other.Y && Right >= other.Right && Bottom >= other.Bottom;
 }
 
 /// <summary>
@@ -99,11 +107,65 @@ internal static class ScreenStatsLayout
             return (monitors, new ScreenRect(0, 0, panelWidth, panelHeight));
         }
 
-        var main = monitors.FirstOrDefault(m => m is { X: 0, Y: 0 }, monitors[0]);
+        var main = MainMonitor(monitors);
         var moved = monitors.Select(m => m with { X = m.X - main.X, Y = m.Y - main.Y }).ToList();
         var bottom = moved.Max(m => m.Bottom);
         return (moved, new ScreenRect((main.Width - panelWidth) / 2, bottom, panelWidth, panelHeight));
     }
+
+    /// <summary>Whether a window is on the panel, which is where its middle is.</summary>
+    public static bool IsOn(ScreenRect window, ScreenRect panel)
+    {
+        var x = window.X + window.Width / 2;
+        var y = window.Y + window.Height / 2;
+        return x >= panel.X && x < panel.Right && y >= panel.Y && y < panel.Bottom;
+    }
+
+    /// <summary>
+    /// Where a window on the panel goes on the monitor: the same distance from the corner as it was on the
+    /// panel, made smaller only when it is bigger than the monitor's free area, and kept inside it.
+    /// </summary>
+    /// <param name="area">The monitor's free area, without its taskbar.</param>
+    public static ScreenRect MoveOff(ScreenRect window, ScreenRect panel, ScreenRect area)
+    {
+        var width = Math.Min(window.Width, area.Width);
+        var height = Math.Min(window.Height, area.Height);
+        var x = Math.Clamp(area.X + window.X - panel.X, area.X, area.Right - width);
+        var y = Math.Clamp(area.Y + window.Y - panel.Y, area.Y, area.Bottom - height);
+        return new ScreenRect(x, y, width, height);
+    }
+
+    /// <summary>
+    /// Where a window that fills one area goes to fill another, as a maximised or full screen window does.
+    /// It keeps how far it reaches past each edge, as a maximised window's border does.
+    /// </summary>
+    public static ScreenRect Fill(ScreenRect window, ScreenRect from, ScreenRect to) => new(
+        to.X - (from.X - window.X),
+        to.Y - (from.Y - window.Y),
+        to.Width + window.Width - from.Width,
+        to.Height + window.Height - from.Height);
+
+    /// <summary>
+    /// Where the mouse is kept: around every monitor, which leaves out the panel as it sits under them all.
+    /// When that would take in the panel, as when Windows would not move it under, only the main monitor.
+    /// </summary>
+    /// <returns>The area, or null when there is no monitor.</returns>
+    public static ScreenRect? CursorArea(IReadOnlyList<ScreenRect> monitors, ScreenRect panel)
+    {
+        if (monitors.Count == 0)
+        {
+            return null;
+        }
+
+        var left = monitors.Min(m => m.X);
+        var top = monitors.Min(m => m.Y);
+        var all = new ScreenRect(left, top, monitors.Max(m => m.Right) - left, monitors.Max(m => m.Bottom) - top);
+        return all.Overlaps(panel) ? MainMonitor(monitors) : all;
+    }
+
+    /// <summary>The main monitor: the one at the desktop's corner, or else the first.</summary>
+    public static ScreenRect MainMonitor(IReadOnlyList<ScreenRect> monitors) =>
+        monitors.FirstOrDefault(m => m is { X: 0, Y: 0 }, monitors[0]);
 
     private static StatTile Percent(string label, double? value) => value is { } percent
         ? new StatTile(label, Math.Clamp(Math.Round(percent), 0, 100).ToString(Numbers), "%")

@@ -39,8 +39,8 @@ internal static partial class SessionLauncher
     /// Sets the UIAccess flag on the token, which puts the program's topmost windows in the band above full
     /// screen games, and lets it past the walls between programs of different rights. Windows otherwise
     /// gives it only to programs signed by a trusted publisher in Program Files, and setting it takes the
-    /// TCB privilege, which this service has as SYSTEM. Only for the overlay, which is this app's own and
-    /// in its own folder. Should Windows refuse it, the program starts without it.
+    /// TCB privilege, which this service has as SYSTEM. Only for the overlay and the stats screen, which are
+    /// this app's own and in its own folder. Should Windows refuse it, the program starts without it.
     /// </param>
     /// <returns>Why it did not start, or null when it did.</returns>
     public static unsafe string? Launch(string exePath, string arguments, out int processId, bool uiAccess = false)

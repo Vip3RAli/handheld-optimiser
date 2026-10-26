@@ -111,6 +111,54 @@ public class ScreenStatsTests
         Assert.Equal(new ScreenRect(320, 1240, 1280, 720), panel);
     }
 
+    // ----- Keeping other windows and the mouse off the panel -----
+
+    private static readonly ScreenRect Monitor = new(0, 0, 1920, 1080);
+    private static readonly ScreenRect MonitorWork = new(0, 0, 1920, 1032);
+    private static readonly ScreenRect Panel = new(320, 1080, 1280, 720);
+
+    [Theory]
+    [InlineData(400, 1100, 800, 600, true)]
+    [InlineData(100, 100, 800, 600, false)]
+    [InlineData(300, 800, 800, 600, true)]
+    [InlineData(300, 600, 800, 600, false)]
+    public void A_window_is_on_the_panel_when_its_middle_is(int x, int y, int width, int height, bool on) =>
+        Assert.Equal(on, ScreenStatsLayout.IsOn(new ScreenRect(x, y, width, height), Panel));
+
+    [Fact]
+    public void A_window_keeps_its_place_from_the_corner_on_the_monitor() =>
+        Assert.Equal(new ScreenRect(100, 50, 800, 600), ScreenStatsLayout.MoveOff(new ScreenRect(420, 1130, 800, 600), Panel, MonitorWork));
+
+    [Fact]
+    public void A_window_that_would_hang_off_the_monitor_is_kept_inside_it() =>
+        Assert.Equal(new ScreenRect(0, 432, 800, 600), ScreenStatsLayout.MoveOff(new ScreenRect(200, 1700, 800, 600), Panel, MonitorWork));
+
+    [Fact]
+    public void A_window_bigger_than_the_monitor_is_made_to_fit() =>
+        Assert.Equal(MonitorWork, ScreenStatsLayout.MoveOff(new ScreenRect(320, 1080, 2500, 1500), Panel, MonitorWork));
+
+    [Fact]
+    public void A_maximised_window_fills_the_monitor_with_the_same_border_past_each_edge() =>
+        Assert.Equal(new ScreenRect(-8, -8, 1936, 1048), ScreenStatsLayout.Fill(new ScreenRect(312, 1072, 1296, 736), Panel, MonitorWork));
+
+    [Fact]
+    public void A_full_screen_window_fills_the_whole_monitor() =>
+        Assert.Equal(Monitor, ScreenStatsLayout.Fill(Panel, Panel, Monitor));
+
+    [Fact]
+    public void The_mouse_is_kept_around_the_monitors_which_leaves_out_the_panel_under_them() =>
+        Assert.Equal(new ScreenRect(-2560, -200, 4480, 1440),
+            ScreenStatsLayout.CursorArea([new ScreenRect(-2560, -200, 2560, 1440), new ScreenRect(0, 0, 1920, 1080)], new ScreenRect(320, 1240, 1280, 720)));
+
+    [Fact]
+    public void A_panel_left_beside_the_monitors_keeps_the_mouse_on_the_main_monitor() =>
+        Assert.Equal(Monitor, ScreenStatsLayout.CursorArea(
+            [new ScreenRect(-1920, 400, 1920, 1080), Monitor], new ScreenRect(-1280, 0, 1280, 720)));
+
+    [Fact]
+    public void No_monitor_means_the_mouse_is_left_alone() =>
+        Assert.Null(ScreenStatsLayout.CursorArea([], Panel));
+
     // ----- The names they share -----
 
     [Fact]

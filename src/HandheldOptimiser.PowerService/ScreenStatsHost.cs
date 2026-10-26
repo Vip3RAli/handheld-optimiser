@@ -18,8 +18,9 @@ internal sealed class ScreenStatsHost
     private const string SettingsKey = @"SOFTWARE\HandheldOptimiser\ScreenStats";
     private const string OnValue = "On";
 
-    // Not given UIAccess: it is on a screen of its own, so there is nothing for it to be kept above.
-    private readonly SessionProgram _program = new("Stats screen", ScreenStatsArgument, MutexName, uiAccess: false);
+    // Given UIAccess so it can move windows of programs run as administrator, this app's own among them, off
+    // the Ally's screen. Without it Windows refuses, and those windows stay on the panel.
+    private readonly SessionProgram _program = new("Stats screen", ScreenStatsArgument, MutexName, uiAccess: true);
 
     public ScreenStatsHost()
     {

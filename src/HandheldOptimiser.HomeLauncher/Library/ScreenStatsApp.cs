@@ -7,7 +7,7 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 /// Runs the stats screen: the launcher started by TDP Engine with --screen-stats while the switch is on in
 /// the widget. One at a time. While a monitor is in use it turns the Ally's panel on beside it (see
 /// <see cref="PanelKeeper"/>) and fills it with the time and big readings, asked of TDP Engine each second as
-/// the overlay does. Undocked it shows nothing and waits. It ends, putting the screens back, when switched off
+/// the overlay does. Other windows and the mouse are kept off the panel (see <see cref="PanelGuard"/>). Undocked it shows nothing and waits. It ends, putting the screens back, when switched off
 /// or when TDP Engine has not answered for a few seconds, as when the service stops.
 /// </summary>
 internal static class ScreenStatsApp
@@ -42,6 +42,7 @@ internal static class ScreenStatsApp
         };
 
         var panel = new PanelKeeper();
+        using var guard = new PanelGuard();
         using var readings = new OverlayReadings();
         var fps = new FpsAverage();
         var window = new ScreenStatsWindow();
@@ -54,6 +55,7 @@ internal static class ScreenStatsApp
             timer.Stop();
             Program.Log($"Stats screen closed: {why}");
             window.Close();
+            guard.Stop();
             panel.PutBack();
             app.Shutdown();
         }
@@ -90,6 +92,7 @@ internal static class ScreenStatsApp
 
                 if (panel.Keep() is not { } bounds)
                 {
+                    guard.Stop();
                     window.HideAway();
                     return;
                 }
@@ -97,6 +100,7 @@ internal static class ScreenStatsApp
                 var reading = readings.Read(status) with { Fps = fps.Add(process, status.Fps) };
                 window.ShowReadings(ScreenStatsLayout.Tiles(reading), DateTime.Now);
                 window.ShowOn(bounds);
+                guard.Keep(bounds);
             }
             finally
             {
