@@ -1,4 +1,6 @@
+using System.IO;
 using System.Runtime.InteropServices;
+using Microsoft.Win32;
 
 namespace HandheldOptimiser.HomeLauncher.Library;
 
@@ -322,6 +324,8 @@ internal static partial class AllyScreen
 /// <summary>
 /// Keeps the Ally's panel on as the stats screen while docked, and remembers what to put back. It is tried
 /// once each time the Ally is docked: should the player turn the panel off again, as with Win+P, it is left off.
+/// What the panel was doing before is saved too (see <see cref="PanelNote"/>), so that a stats screen closed
+/// without warning, as by an install, leaves the next one able to put the screens back.
 /// </summary>
 internal sealed class PanelKeeper
 {
@@ -332,6 +336,23 @@ internal sealed class PanelKeeper
     // Whether the panel was turned off here while the screen is locked, to be turned on again when unlocked.
     private bool _offWhileLocked;
 
+    public PanelKeeper()
+    {
+        // Left by a stats screen that ended without putting the screens back, while still docked.
+        if (PanelNote.Read() is { } before)
+        {
+            if (AllyScreen.Read().MonitorOn)
+            {
+                _changedFrom = before;
+                Program.Log($"Stats screen: the last one turned the Ally's screen on and did not put it back, so it goes back to {(before == PanelState.Shared ? "duplicate" : "second screen only")} when this one ends");
+            }
+            else
+            {
+                PanelNote.Clear();
+            }
+        }
+    }
+
     /// <summary>Where the stats go, in desktop pixels, or null when there is nowhere for them now.</summary>
     public ScreenRect? Keep()
     {
@@ -341,8 +362,13 @@ internal sealed class PanelKeeper
         if (!now.MonitorOn)
         {
             _tried = false;
-            _changedFrom = null;
             _offWhileLocked = false;
+            if (_changedFrom is not null)
+            {
+                _changedFrom = null;
+                PanelNote.Clear();
+            }
+
             return null;
         }
 
@@ -366,9 +392,10 @@ internal sealed class PanelKeeper
         _tried = true;
 
         // Turned on again after the lock screen, it still goes back to what the player had at first.
-        if (AllyScreen.ShowBesideMonitor())
+        if (AllyScreen.ShowBesideMonitor() && _changedFrom is null)
         {
-            _changedFrom ??= now.Panel;
+            _changedFrom = now.Panel;
+            PanelNote.Save(now.Panel);
         }
 
         return AllyScreen.Read() is { MonitorOn: true, Panel: PanelState.Own } after ? after.PanelBounds : null;
@@ -398,6 +425,76 @@ internal sealed class PanelKeeper
         {
             _changedFrom = null;
             AllyScreen.PutBack(before);
+            PanelNote.Clear();
         }
     }
+}
+
+/// <summary>
+/// The saved note of what the Ally's panel was doing before the stats screen turned it on, in
+/// HKCU\Software\HandheldOptimiser\ScreenStats. It is kept with the time Windows started, as a restart puts the
+/// screens back by itself, which makes a note from before it wrong.
+/// </summary>
+internal static class PanelNote
+{
+    private const string Key = @"Software\HandheldOptimiser\ScreenStats";
+    private const string ChangedFromValue = "ChangedFrom";
+    private const string StartedValue = "WindowsStarted";
+
+    // How far apart two readings of when Windows started can be and still be the same start, as the clock is corrected now and then.
+    private static readonly TimeSpan SameStart = TimeSpan.FromMinutes(2);
+
+    /// <summary>What the panel was doing before, or null when there is no note from since Windows started.</summary>
+    public static PanelState? Read()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(Key);
+            return Parse(key?.GetValue(ChangedFromValue) as string, key?.GetValue(StartedValue) as long?, WindowsStarted());
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+        {
+            Program.Log($"Stats screen: could not read what the Ally's screen was doing before: {ex.Message}");
+            return null;
+        }
+    }
+
+    public static void Save(PanelState before)
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(Key);
+            key.SetValue(ChangedFromValue, before.ToString());
+            key.SetValue(StartedValue, WindowsStarted().Ticks, RegistryValueKind.QWord);
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+        {
+            Program.Log($"Stats screen: could not save what the Ally's screen was doing before: {ex.Message}");
+        }
+    }
+
+    public static void Clear()
+    {
+        try
+        {
+            Registry.CurrentUser.DeleteSubKey(Key, throwOnMissingSubKey: false);
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+        {
+            Program.Log($"Stats screen: could not clear what the Ally's screen was doing before: {ex.Message}");
+        }
+    }
+
+    /// <summary>The note's panel state, when it is one this app writes and is from since Windows last started.</summary>
+    /// <param name="savedStarted">When Windows had started as the note was saved, in UTC ticks.</param>
+    public static PanelState? Parse(string? changedFrom, long? savedStarted, DateTime started) =>
+        Enum.TryParse<PanelState>(changedFrom, out var before)
+        && before is PanelState.Off or PanelState.Shared
+        && savedStarted is { } ticks
+        && (new DateTime(ticks, DateTimeKind.Utc) - started).Duration() < SameStart
+            ? before
+            : null;
+
+    /// <summary>When Windows started, in UTC. The tick count goes on through sleep, so this stays the same until a restart.</summary>
+    private static DateTime WindowsStarted() => DateTime.UtcNow - TimeSpan.FromMilliseconds(Environment.TickCount64);
 }

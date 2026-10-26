@@ -159,6 +159,31 @@ public class ScreenStatsTests
     public void No_monitor_means_the_mouse_is_left_alone() =>
         Assert.Null(ScreenStatsLayout.CursorArea([], Panel));
 
+    // ----- The note of what to put back -----
+
+    private static readonly DateTime Started = new(2026, 10, 26, 8, 0, 0, DateTimeKind.Utc);
+
+    [Theory]
+    [InlineData("Off")]
+    [InlineData("Shared")]
+    public void A_note_from_since_Windows_started_is_used(string saved) =>
+        Assert.Equal(saved, PanelNote.Parse(saved, Started.AddSeconds(40).Ticks, Started).ToString());
+
+    [Fact]
+    public void A_note_from_before_a_restart_is_not_used() =>
+        Assert.Null(PanelNote.Parse("Off", Started.AddHours(-3).Ticks, Started));
+
+    [Theory]
+    [InlineData("Own")]
+    [InlineData("Sideways")]
+    [InlineData(null)]
+    public void A_note_this_app_would_not_write_is_not_used(string? saved) =>
+        Assert.Null(PanelNote.Parse(saved, Started.Ticks, Started));
+
+    [Fact]
+    public void A_note_without_its_time_is_not_used() =>
+        Assert.Null(PanelNote.Parse("Off", null, Started));
+
     // ----- The names they share -----
 
     [Fact]
