@@ -6,13 +6,21 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 
 /// <summary>
 /// What the overlay reads for itself each second, in the player's session: processor and graphics use,
-/// memory and the battery, and which program is in front. The frame rate, power limit and temperature come
+/// memory and the battery, the processor's clock and the power drawn, and which program is in front. The frame rate, power limit and temperature come
 /// from TDP Engine, which can read what this cannot.
 /// </summary>
 internal sealed partial class OverlayReadings : IDisposable
 {
     // The 3D engines' use, summed over every program, as Task Manager's GPU figure is.
     private const string GpuCounter = @"\GPU Engine(*engtype_3D)\Utilization Percentage";
+
+    // The processor's clock, as Task Manager's speed figure: its base clock in MHz, times how far above or
+    // below it the processors run, in percent.
+    private const string BaseClockCounter = @"\Processor Information(_Total)\Processor Frequency";
+    private const string PerformanceCounter = @"\Processor Information(_Total)\% Processor Performance";
+
+    // The power the whole chip draws, processor and graphics, in milliwatts, from Windows' energy meter.
+    private const string PackagePowerCounter = @"\Energy Meter(RAPL_Package0_PKG)\Power";
 
     private const uint PdhFormatDouble = 0x00000200;
     private const uint PdhMoreData = 0x800007D2;
@@ -21,29 +29,66 @@ internal sealed partial class OverlayReadings : IDisposable
     private long _busy;
     private nint _query;
     private nint _gpu;
+    private nint _baseClock;
+    private nint _performance;
+    private nint _packagePower;
 
     public OverlayReadings()
     {
         SampleCpu();
 
-        if (PdhOpenQueryW(null, 0, out _query) == 0 && PdhAddEnglishCounterW(_query, GpuCounter, 0, out _gpu) == 0)
+        if (PdhOpenQueryW(null, 0, out _query) != 0)
         {
-            PdhCollectQueryData(_query);
+            Program.Log("Overlay: Windows would not give its performance counters");
+            _query = 0;
+            return;
         }
-        else
-        {
-            Program.Log("Overlay: Windows would not give the graphics use counter");
-            _gpu = 0;
-        }
+
+        _gpu = Add(GpuCounter, "graphics use");
+        _baseClock = Add(BaseClockCounter, "processor clock");
+        _performance = Add(PerformanceCounter, "processor clock");
+        _packagePower = Add(PackagePowerCounter, "power drawn");
+
+        // Use and clock are rates, so they need a first sample to measure from.
+        PdhCollectQueryData(_query);
     }
 
     /// <summary>This second's readings, with TDP Engine's figures from <paramref name="status"/>.</summary>
     public OverlayReading Read(AutoTdpStatus status)
     {
+        var collected = _query != 0 && PdhCollectQueryData(_query) == 0;
         var (memoryUsed, memoryTotal) = Memory();
         var (battery, charging) = Battery();
-        return new OverlayReading(status.Fps, status.Watts, status.Temperature, SampleCpu(), Gpu(),
-            memoryUsed, memoryTotal, battery, charging);
+        return new OverlayReading(status.Fps, status.Watts, status.Temperature, SampleCpu(), collected ? Gpu() : null,
+            memoryUsed, memoryTotal, battery, charging,
+            CpuGhz: collected ? CpuGhz() : null,
+            PowerDrawn: collected && Value(_packagePower) is { } milliwatts ? milliwatts / 1000 : null);
+    }
+
+    /// <returns>The counter, or 0 when this device does not have it, which is logged once.</returns>
+    private nint Add(string path, string what)
+    {
+        if (PdhAddEnglishCounterW(_query, path, 0, out var counter) == 0)
+        {
+            return counter;
+        }
+
+        Program.Log($"Overlay: Windows would not give the {what} counter ({path})");
+        return 0;
+    }
+
+    private double? CpuGhz() =>
+        Value(_baseClock) is { } baseMhz and > 0 && Value(_performance) is { } percent and > 0 ? baseMhz * percent / 100 / 1000 : null;
+
+    /// <summary>A single counter's value now, or null when it is not there or has no value yet.</summary>
+    private static double? Value(nint counter)
+    {
+        if (counter == 0 || PdhGetFormattedCounterValue(counter, PdhFormatDouble, out _, out var value) != 0 || value.Status != 0)
+        {
+            return null;
+        }
+
+        return value.Value;
     }
 
     /// <summary>
@@ -123,7 +168,7 @@ internal sealed partial class OverlayReadings : IDisposable
 
     private unsafe double? Gpu()
     {
-        if (_gpu == 0 || PdhCollectQueryData(_query) != 0)
+        if (_gpu == 0)
         {
             return null;
         }
@@ -189,6 +234,14 @@ internal sealed partial class OverlayReadings : IDisposable
         [FieldOffset(16)] public double Value;
     }
 
+    // PDH_FMT_COUNTERVALUE: a status, then the value, as a double here.
+    [StructLayout(LayoutKind.Explicit, Size = 16)]
+    private struct CounterValue
+    {
+        [FieldOffset(0)] public uint Status;
+        [FieldOffset(8)] public double Value;
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     private struct MemoryStatus
     {
@@ -249,6 +302,9 @@ internal sealed partial class OverlayReadings : IDisposable
 
     [LibraryImport("pdh.dll")]
     private static unsafe partial uint PdhGetFormattedCounterArrayW(nint counter, uint format, ref uint size, out uint count, byte* items);
+
+    [LibraryImport("pdh.dll")]
+    private static partial uint PdhGetFormattedCounterValue(nint counter, uint format, out uint type, out CounterValue value);
 
     [LibraryImport("pdh.dll")]
     private static partial uint PdhCloseQuery(nint query);

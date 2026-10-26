@@ -6,6 +6,7 @@
     <UserControl.Resources>
         <views:StringNotEmptyToVisibilityConverter x:Key="StringToVis" />
         <views:UpperCaseConverter x:Key="Upper" />
+        <views:BooleanToVisibilityConverter x:Key="BoolToVis" />
     </UserControl.Resources>
 
     <!--
@@ -17,7 +18,8 @@
         <ItemsControl ItemsSource="{Binding Sections}" Margin="4,0,4,8" Focusable="False">
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                    <StackPanel Margin="0,0,0,12">
+                    <!-- A section that does not apply to this device is left out, heading and all. -->
+                    <StackPanel Margin="0,0,0,12" Visibility="{Binding IsShown, Converter={StaticResource BoolToVis}}">
                         <!-- A page with one section has no heading over it. -->
                         <Grid Margin="2,2,2,8"
                               Visibility="{Binding Heading, Converter={StaticResource StringToVis}}">

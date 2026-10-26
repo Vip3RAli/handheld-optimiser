@@ -6,6 +6,7 @@ namespace HandheldOptimiser.ViewModels;
 public enum SectionKind
 {
     Tweaks,
+    GpuMemory,
     HomeApp,
     Startup,
     PreinstalledApps,
@@ -41,6 +42,7 @@ public static class HubLayout
     [
         new("Performance", "", "Games, system, network",
         [
+            new(SectionKind.GpuMemory, "GPU memory"),
             Tweaks("Games", TweakCategory.Games),
             Tweaks("System", TweakCategory.System),
             Tweaks("Network", TweakCategory.Network)

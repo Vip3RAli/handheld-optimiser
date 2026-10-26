@@ -17,6 +17,15 @@ public sealed class HubLayoutTests
         HubLayout.Goals.Select(g => g.Title));
 
     [Fact]
+    public void GPU_memory_comes_first_on_the_Performance_page()
+    {
+        var first = HubLayout.Goals.Single(g => g.Title == "Performance").Sections[0];
+
+        Assert.Equal(SectionKind.GpuMemory, first.Kind);
+        Assert.Equal("GPU memory", first.Heading);
+    }
+
+    [Fact]
     public void Every_category_belongs_to_exactly_one_goal()
     {
         foreach (var category in Enum.GetValues<TweakCategory>())

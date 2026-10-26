@@ -15,13 +15,13 @@ public class ScreenStatsTests
 {
     private static readonly OverlayReading Everything = new(
         Fps: 59.6, Watts: 15, Temperature: 71, Cpu: 42.4, Gpu: 97.8, MemoryUsedGb: 9.24, MemoryTotalGb: 15.4,
-        Battery: 64, Charging: false);
+        Battery: 64, Charging: false, CpuGhz: 4.138, PowerDrawn: 11.6);
 
     // ----- The tiles -----
 
     [Fact]
-    public void Six_tiles_in_a_fixed_order() =>
-        Assert.Equal(["FPS", "TDP", "TEMP", "CPU", "GPU", "BATTERY"], ScreenStatsLayout.Tiles(Everything).Select(t => t.Label));
+    public void Six_tiles_in_a_fixed_order_with_no_battery() =>
+        Assert.Equal(["FPS", "TDP", "TEMP", "CPU", "CPU CLOCK", "GPU"], ScreenStatsLayout.Tiles(Everything).Select(t => t.Label));
 
     [Fact]
     public void Values_are_rounded_with_their_units_apart()
@@ -31,8 +31,15 @@ public class ScreenStatsTests
         Assert.Equal(("15", "W"), (tiles[1].Value, tiles[1].Unit));
         Assert.Equal(("71", "°C"), (tiles[2].Value, tiles[2].Unit));
         Assert.Equal(("42", "%"), (tiles[3].Value, tiles[3].Unit));
-        Assert.Equal(("98", "%"), (tiles[4].Value, tiles[4].Unit));
-        Assert.Equal(("64", "%"), (tiles[5].Value, tiles[5].Unit));
+        Assert.Equal(("4.1", "GHz"), (tiles[4].Value, tiles[4].Unit));
+        Assert.Equal(("98", "%"), (tiles[5].Value, tiles[5].Unit));
+    }
+
+    [Fact]
+    public void On_Auto_the_power_tile_shows_the_power_drawn()
+    {
+        var tile = ScreenStatsLayout.Tiles(Everything with { Watts = null })[1];
+        Assert.Equal(("POWER", "12", "W"), (tile.Label, tile.Value, tile.Unit));
     }
 
     [Fact]
@@ -40,12 +47,9 @@ public class ScreenStatsTests
     {
         var tiles = ScreenStatsLayout.Tiles(new OverlayReading());
         Assert.Equal(6, tiles.Count);
+        Assert.Equal("TDP", tiles[1].Label);
         Assert.All(tiles, t => Assert.Equal(("–", ""), (t.Value, t.Unit)));
     }
-
-    [Fact]
-    public void Charging_names_the_battery_tile_so() =>
-        Assert.Equal("CHARGING", ScreenStatsLayout.Tiles(Everything with { Charging = true })[5].Label);
 
     [Theory]
     [InlineData(79, "Normal")]
@@ -54,14 +58,6 @@ public class ScreenStatsTests
     [InlineData(90, "Hot")]
     public void The_temperature_turns_amber_then_red(int degrees, string tone) =>
         Assert.Equal(tone, ScreenStatsLayout.TemperatureTone(degrees).ToString());
-
-    [Theory]
-    [InlineData(26, false, "Normal")]
-    [InlineData(25, false, "Warm")]
-    [InlineData(15, false, "Hot")]
-    [InlineData(5, true, "Normal")]
-    public void A_low_battery_turns_amber_then_red_unless_charging(int charge, bool charging, string tone) =>
-        Assert.Equal(tone, ScreenStatsLayout.BatteryTone(charge, charging).ToString());
 
     [Fact]
     public void The_time_follows_the_players_own_format()

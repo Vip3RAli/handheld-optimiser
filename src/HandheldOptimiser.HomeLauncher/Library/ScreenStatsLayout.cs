@@ -44,26 +44,22 @@ internal static class ScreenStatsLayout
     private const int WarmDegrees = 80;
     private const int HotDegrees = 90;
 
-    // The battery's charge at or under which its tile turns amber, then red, while not charging.
-    private const int LowBattery = 25;
-    private const int VeryLowBattery = 15;
-
     private static readonly CultureInfo Numbers = CultureInfo.InvariantCulture;
 
     /// <summary>
-    /// The six tiles, in order: frame rate, power limit, temperature, processor use, graphics use and battery.
-    /// They are always all there, so nothing moves about; a reading not known shows a dash.
+    /// The six tiles, in order: frame rate, power, temperature, processor use, processor clock and graphics use.
+    /// No battery: the screen only shows while docked to a monitor. They are always all there, so nothing moves
+    /// about; a reading not known shows a dash.
     /// </summary>
     public static IReadOnlyList<StatTile> Tiles(OverlayReading reading) =>
     [
         new("FPS", reading.Fps is { } fps ? Math.Round(fps).ToString(Numbers) : Unknown, string.Empty),
-        new("TDP", reading.Watts is { } watts ? watts.ToString(Numbers) : Unknown, reading.Watts is null ? string.Empty : "W"),
+        Power(reading),
         new("TEMP", reading.Temperature is { } degrees ? degrees.ToString(Numbers) : Unknown,
             reading.Temperature is null ? string.Empty : "°C", TemperatureTone(reading.Temperature)),
         Percent("CPU", reading.Cpu),
-        Percent("GPU", reading.Gpu),
-        new(reading.Charging ? "CHARGING" : "BATTERY", reading.Battery is { } charge ? charge.ToString(Numbers) : Unknown,
-            reading.Battery is null ? string.Empty : "%", BatteryTone(reading.Battery, reading.Charging))
+        reading.CpuGhz is { } ghz ? new("CPU CLOCK", ghz.ToString("0.0", Numbers), "GHz") : new("CPU CLOCK", Unknown, string.Empty),
+        Percent("GPU", reading.Gpu)
     ];
 
     /// <summary>The time as the player's own settings write it, without seconds.</summary>
@@ -79,11 +75,16 @@ internal static class ScreenStatsLayout
         _ => StatTone.Normal
     };
 
-    public static StatTone BatteryTone(int? charge, bool charging) => charging || charge is not { } percent
-        ? StatTone.Normal
-        : percent <= VeryLowBattery ? StatTone.Hot
-        : percent <= LowBattery ? StatTone.Warm
-        : StatTone.Normal;
+    /// <summary>
+    /// The limit TDP Engine holds, as TDP. On Auto it holds none, and the firmware does not say the limit it
+    /// uses, so the power drawn now is shown instead, named POWER so it is not taken for a limit.
+    /// </summary>
+    private static StatTile Power(OverlayReading reading) => reading switch
+    {
+        { Watts: { } watts } => new("TDP", watts.ToString(Numbers), "W"),
+        { PowerDrawn: { } drawn } => new("POWER", Math.Round(drawn).ToString(Numbers), "W"),
+        _ => new("TDP", Unknown, string.Empty)
+    };
 
     /// <summary>
     /// The panel's size: 720p when it offers that, otherwise the size it has now, as a size the panel does

@@ -45,6 +45,15 @@ namespace HandheldOptimiser.GameBar
         /// <summary>Whether the stats screen on the Ally's own panel is switched on.</summary>
         public bool ScreenStats;
 
+        /// <summary>The GPU memory Windows has now, in GB with 0 for Auto, or null when not known.</summary>
+        public int? GpuMemoryNow;
+
+        /// <summary>The GPU memory size waiting for a restart, or null when nothing waits.</summary>
+        public int? GpuMemoryNext;
+
+        /// <summary>The GPU memory sizes that can be set, empty when this device cannot set it or the service did not say.</summary>
+        public int[] GpuMemoryOffered = new int[0];
+
         public static readonly EngineStatus Off = new EngineStatus();
 
         public static EngineStatus Failed(string error) => new EngineStatus { Error = error };
@@ -154,6 +163,31 @@ namespace HandheldOptimiser.GameBar
             return SendStarting(request);
         }
 
+        /// <summary>The GPU memory now, any size waiting for a restart, and the sizes on offer, starting the service if need be.</summary>
+        public static EngineStatus GpuMemory() =>
+            SendStarting(new JsonObject
+            {
+                [AutoTdpProtocol.Fields.Command] = JsonValue.CreateStringValue(AutoTdpProtocol.GpuMemoryRequest)
+            }.Stringify());
+
+        /// <summary>Sets the GPU memory, in GB with 0 for Auto, used from the next restart.</summary>
+        public static EngineStatus SetGpuMemory(int size) =>
+            SendStarting(new JsonObject
+            {
+                [AutoTdpProtocol.Fields.Command] = JsonValue.CreateStringValue(AutoTdpProtocol.SetGpuMemory),
+                [AutoTdpProtocol.Fields.GpuMemory] = JsonValue.CreateNumberValue(size)
+            }.Stringify());
+
+        /// <summary>
+        /// Asks TDP Engine to restart Windows now, as Game Bar cannot. Starting it if need be: it ends itself a
+        /// minute after it was last needed, which can pass while the question waits.
+        /// </summary>
+        public static EngineStatus Restart() =>
+            SendStarting(new JsonObject
+            {
+                [AutoTdpProtocol.Fields.Command] = JsonValue.CreateStringValue(AutoTdpProtocol.Restart)
+            }.Stringify());
+
         private static JsonValue TextOrNull(string text) =>
             text == null ? JsonValue.CreateNullValue() : JsonValue.CreateStringValue(text);
 
@@ -224,8 +258,28 @@ namespace HandheldOptimiser.GameBar
                 OverlayLevel = Text(json, AutoTdpProtocol.Fields.OverlayLevel),
                 OverlayCorner = Text(json, AutoTdpProtocol.Fields.OverlayCorner),
                 OverlayLayout = Text(json, AutoTdpProtocol.Fields.OverlayLayout),
-                ScreenStats = json.GetNamedBoolean(AutoTdpProtocol.Fields.ScreenStats, false)
+                ScreenStats = json.GetNamedBoolean(AutoTdpProtocol.Fields.ScreenStats, false),
+                GpuMemoryNow = (int?)Number(json, AutoTdpProtocol.Fields.GpuMemoryNow),
+                GpuMemoryNext = (int?)Number(json, AutoTdpProtocol.Fields.GpuMemoryNext),
+                GpuMemoryOffered = Numbers(json, AutoTdpProtocol.Fields.GpuMemoryOffered)
             };
+        }
+
+        private static int[] Numbers(JsonObject json, string name)
+        {
+            if (!json.TryGetValue(name, out var value) || value.ValueType != JsonValueType.Array)
+            {
+                return new int[0];
+            }
+
+            var list = value.GetArray();
+            var numbers = new int[list.Count];
+            for (var i = 0; i < list.Count; i++)
+            {
+                numbers[i] = list[i].ValueType == JsonValueType.Number ? (int)list[i].GetNumber() : 0;
+            }
+
+            return numbers;
         }
 
         private static double? Number(JsonObject json, string name) =>

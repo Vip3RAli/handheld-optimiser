@@ -28,6 +28,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- How the app talks to the TDP Engine service for the GPU memory, shared with it so the two always agree. -->
+    <Compile Include="..\HandheldOptimiser.PowerService\AutoTdpProtocol.cs" Link="Services\TdpEngine\AutoTdpProtocol.cs" />
+    <Compile Include="..\HandheldOptimiser.PowerService\AutoTdpProtocol.Names.cs" Link="Services\TdpEngine\AutoTdpProtocol.Names.cs" />
+    <Compile Include="..\HandheldOptimiser.PowerService\GpuMemory.cs" Link="Services\TdpEngine\GpuMemory.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Resource Include="Assets\app.ico" />
     <Resource Include="Assets\app-64.png" />
   </ItemGroup>

@@ -30,6 +30,11 @@ namespace HandheldOptimiser.GameBar
         private bool _placingSlider;
         private bool _placingBoost;
         private bool _placingScreenStats;
+        private bool _placingGpuMemory;
+
+        // Whether the GPU memory row is open, and whether the player just picked a size, which asks to restart.
+        private bool _gpuMemoryOpen;
+        private bool _askRestart;
         private bool _sliding;
         private EngineStatus _status = EngineStatus.Off;
         private bool _busy;
@@ -188,6 +193,113 @@ namespace HandheldOptimiser.GameBar
             Send(() => EngineClient.SetOverlay(null, null, layout));
         }
 
+        private void OnGpuMemoryToggle(object sender, RoutedEventArgs e)
+        {
+            _gpuMemoryOpen = !_gpuMemoryOpen;
+            _askRestart = false;
+            GpuMemoryPanel.Visibility = _gpuMemoryOpen ? Visibility.Visible : Visibility.Collapsed;
+            GpuMemoryRestart.Visibility = Visibility.Collapsed;
+            GpuMemoryChevron.Text = _gpuMemoryOpen ? "" : "";
+
+            // Read when opened, starting TDP Engine if need be, so the sizes are there to pick from.
+            if (_gpuMemoryOpen)
+            {
+                Send(() => EngineClient.GpuMemory());
+            }
+        }
+
+        private void OnGpuMemoryPicked(object sender, object e)
+        {
+            // Closed on the size it already had: nothing to send.
+            if (_placingGpuMemory || !(GpuMemorySizes.SelectedItem is ComboBoxItem item) || !(item.Tag is int size)
+                || size == (_status.GpuMemoryNext ?? _status.GpuMemoryNow))
+            {
+                return;
+            }
+
+            _askRestart = true;
+            Send(() => EngineClient.SetGpuMemory(size));
+        }
+
+        /// <summary>Up and down on the closed box move to the next control, as everywhere else in the widget, instead of changing the size.</summary>
+        private void OnGpuMemoryKey(object sender, Windows.UI.Xaml.Input.KeyRoutedEventArgs e)
+        {
+            if (GpuMemorySizes.IsDropDownOpen)
+            {
+                return;
+            }
+
+            var direction = e.Key == Windows.System.VirtualKey.Up || e.Key == Windows.System.VirtualKey.GamepadDPadUp
+                ? Windows.UI.Xaml.Input.FocusNavigationDirection.Up
+                : e.Key == Windows.System.VirtualKey.Down || e.Key == Windows.System.VirtualKey.GamepadDPadDown
+                    ? Windows.UI.Xaml.Input.FocusNavigationDirection.Down
+                    : Windows.UI.Xaml.Input.FocusNavigationDirection.None;
+
+            if (direction != Windows.UI.Xaml.Input.FocusNavigationDirection.None)
+            {
+                Windows.UI.Xaml.Input.FocusManager.TryMoveFocus(direction);
+                e.Handled = true;
+            }
+        }
+
+        private void OnGpuMemoryRestart(object sender, RoutedEventArgs e)
+        {
+            ((ToggleButton)sender).IsChecked = false;
+            Send(() => EngineClient.Restart());
+        }
+
+        private void OnGpuMemoryLater(object sender, RoutedEventArgs e)
+        {
+            ((ToggleButton)sender).IsChecked = false;
+            _askRestart = false;
+            GpuMemoryRestart.Visibility = Visibility.Collapsed;
+        }
+
+        /// <summary>The GPU memory row: what Windows has, what waits for a restart, and the sizes to pick from.</summary>
+        private void ShowGpuMemory(EngineStatus status)
+        {
+            // An answer that says it cannot be set hides the row. No answer at all leaves it as it was.
+            if (!status.Reachable)
+            {
+                return;
+            }
+
+            var offered = status.GpuMemoryOffered;
+            GpuMemoryRow.Visibility = offered.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+            if (offered.Length == 0)
+            {
+                return;
+            }
+
+            GpuMemoryValue.Text = status.GpuMemoryNow is int now
+                ? SizeName(now) + (status.GpuMemoryNext is int next ? ", " + SizeName(next) + " after restart" : "")
+                : "Unknown";
+
+            _placingGpuMemory = true;
+            if (GpuMemorySizes.Items.Count != offered.Length)
+            {
+                GpuMemorySizes.Items.Clear();
+                foreach (var size in offered)
+                {
+                    GpuMemorySizes.Items.Add(new ComboBoxItem { Content = SizeName(size), Tag = size });
+                }
+            }
+
+            var shown = status.GpuMemoryNext ?? status.GpuMemoryNow;
+            GpuMemorySizes.SelectedItem = GpuMemorySizes.Items.OfType<ComboBoxItem>().FirstOrDefault(i => i.Tag is int size && size == shown);
+            _placingGpuMemory = false;
+
+            // Asked only after the player picks a size, and gone once nothing waits.
+            var asking = _askRestart && status.GpuMemoryNext != null && status.Error == null;
+            GpuMemoryRestart.Visibility = asking ? Visibility.Visible : Visibility.Collapsed;
+            if (asking)
+            {
+                GpuMemoryQuestion.Text = "Restart now to use " + SizeName(status.GpuMemoryNext.Value) + "?";
+            }
+        }
+
+        private static string SizeName(int size) => size == 0 ? "Auto" : size + " GB";
+
         /// <summary>Sends one change on a background thread, shows the answer, and ignores presses meanwhile.</summary>
         private async void Send(Func<EngineStatus> change)
         {
@@ -253,6 +365,7 @@ namespace HandheldOptimiser.GameBar
             _placingScreenStats = true;
             ScreenStatsSwitch.IsOn = status.ScreenStats;
             _placingScreenStats = false;
+            ShowGpuMemory(status);
 
             // The readouts only mean something while the engine runs, so the state line stands alone otherwise.
             var readouts = status.Running && status.Error == null;

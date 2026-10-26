@@ -47,6 +47,9 @@ internal sealed partial class AutoTdpService : ServiceBase
 
     // The maker's firmware, through which the power limit and the fans are set.
     private IPowerBackend? _power;
+
+    // The GPU memory, set through the same firmware. Made once the firmware is opened.
+    private GpuMemoryHost _gpuMemory = new(null);
     private FrameCounter? _frames;
     private string? _error;
 
@@ -152,6 +155,7 @@ internal sealed partial class AutoTdpService : ServiceBase
             }
 
             _power = PowerBackends.Open();
+            _gpuMemory = new GpuMemoryHost(_power as AsusAcpi);
             if (_power is null)
             {
                 _error = "TDP Engine cannot set the power limit on this device. It works on the ROG Ally with ASUS's drivers installed.";
@@ -546,6 +550,11 @@ internal sealed partial class AutoTdpService : ServiceBase
             // Not under the gate either: it changes Windows' power plan, not anything the engine holds.
             status = SetBoost(request);
         }
+        else if (request?.Command is AutoTdpProtocol.GpuMemoryRequest or AutoTdpProtocol.SetGpuMemory or AutoTdpProtocol.Restart)
+        {
+            // Not under the gate: the GPU memory is nothing the engine holds, and has its own lock.
+            status = GpuMemoryStatus(request);
+        }
         else
         {
             lock (_gate)
@@ -572,7 +581,49 @@ internal sealed partial class AutoTdpService : ServiceBase
             OverlayLayout = _overlay.Layout,
             ScreenStats = _screenStats.On
         };
+        status = _gpuMemory.AddTo(status);
         await writer.WriteLineAsync(AutoTdpProtocol.Write(status).AsMemory(), cancel).ConfigureAwait(false);
+
+        // Restarted only once the widget has its answer.
+        if (request?.Command == AutoTdpProtocol.Restart)
+        {
+            RestartWindows();
+        }
+    }
+
+    /// <summary>
+    /// The GPU memory requests, from the widget or the app: read it, set it, or ask to restart Windows to use
+    /// it. Answered with the last status, its Error saying why a size was not set.
+    /// </summary>
+    private AutoTdpStatus GpuMemoryStatus(AutoTdpRequest request)
+    {
+        AutoTdpStatus last;
+        lock (_gate)
+        {
+            last = _last;
+            _idleSince = DateTime.UtcNow;
+        }
+
+        return request.Command == AutoTdpProtocol.SetGpuMemory && _gpuMemory.Set(request.GpuMemory) is { } problem
+            ? last with { Error = problem }
+            : last;
+    }
+
+    private static void RestartWindows()
+    {
+        Log.Write("Restarting Windows for a GPU memory change, at the player's request");
+        try
+        {
+            Process.Start(new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "shutdown.exe"), "/r /t 0")
+            {
+                CreateNoWindow = true,
+                UseShellExecute = false
+            })?.Dispose();
+        }
+        catch (System.ComponentModel.Win32Exception ex)
+        {
+            Log.Write($"Windows would not restart: {ex.Message}");
+        }
     }
 
     /// <summary>A new overlay level, corner or layout, from the widget. Called under the gate.</summary>

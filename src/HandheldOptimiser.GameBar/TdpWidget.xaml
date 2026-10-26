@@ -267,36 +267,6 @@
                             </Grid>
                         </StackPanel>
                     </Grid>
-                </StackPanel>
-            </Border>
-
-            <!-- ===== Cooling and CPU ===== -->
-            <Border Style="{StaticResource Card}">
-                <StackPanel>
-                    <Border Style="{StaticResource HeaderLine}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Style="{StaticResource CardIcon}" Text="&#xE9CA;" />
-                            <TextBlock Style="{StaticResource CardTitle}" Text="COOLING &amp; CPU" />
-                        </StackPanel>
-                    </Border>
-
-                    <TextBlock Style="{StaticResource Label}" Text="Fan curve" />
-                    <Border Style="{StaticResource Bar}">
-                        <Grid x:Name="Fans">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <ToggleButton Style="{StaticResource Tile}" FontSize="13" Tag="" Click="OnFans" Content="Default" />
-                            <ToggleButton Grid.Column="1" Style="{StaticResource Tile}" FontSize="13" Tag="quiet" Click="OnFans" Content="Quiet" />
-                            <ToggleButton Grid.Column="2" Style="{StaticResource Tile}" FontSize="13" Tag="cool" Click="OnFans" Content="Cool" />
-                            <ToggleButton Grid.Column="3" Style="{StaticResource Tile}" FontSize="13" Tag="full" Click="OnFans" Content="Max" />
-                            <ToggleButton Grid.Column="4" Style="{StaticResource Tile}" FontSize="13" Tag="dynamic" Click="OnFans" Content="Auto" />
-                        </Grid>
-                    </Border>
 
                     <!-- On or off for the power source in use. Not known while TDP Engine is not running: the switch
                          then shows off with a line saying so, and turning it on starts TDP Engine. -->
@@ -320,6 +290,73 @@
                                     <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#A9B0BC" />
                                 </ToggleSwitch.Resources>
                             </ToggleSwitch>
+                        </Grid>
+                    </Border>
+
+                    <!-- GPU memory: folded to one line, as it is seldom changed. Opened, a list of sizes. A new size
+                         is used from the next restart, so picking one asks to restart now. Hidden where it cannot be set. -->
+                    <StackPanel x:Name="GpuMemoryRow" Margin="0,14,0,0">
+                        <Button x:Name="GpuMemoryToggle" Click="OnGpuMemoryToggle" HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Stretch" Background="{StaticResource Transparent}" BorderThickness="0"
+                                Padding="0,6" UseSystemFocusVisuals="True" FocusVisualPrimaryBrush="{StaticResource Cyan}"
+                                FocusVisualPrimaryThickness="2" FocusVisualSecondaryThickness="0">
+                            <Grid>
+                                <TextBlock Style="{StaticResource Label}" Margin="0" Text="GPU memory" VerticalAlignment="Center" />
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                    <TextBlock x:Name="GpuMemoryValue" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Cyan}" />
+                                    <TextBlock x:Name="GpuMemoryChevron" FontFamily="Segoe MDL2 Assets" Text="&#xE70D;" FontSize="10"
+                                               Margin="8,0,0,0" Foreground="{StaticResource Muted}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+                        <StackPanel x:Name="GpuMemoryPanel" Visibility="Collapsed" Margin="0,6,0,0">
+                            <!-- A size is sent only once the list closes on it, and the D-pad on the closed box moves
+                                 on rather than changing it, so passing by never changes the GPU memory. -->
+                            <ComboBox x:Name="GpuMemorySizes" HorizontalAlignment="Stretch" DropDownClosed="OnGpuMemoryPicked"
+                                      PreviewKeyDown="OnGpuMemoryKey" />
+                            <StackPanel x:Name="GpuMemoryRestart" Visibility="Collapsed" Margin="0,10,0,0">
+                                <TextBlock x:Name="GpuMemoryQuestion" TextWrapping="Wrap" FontSize="13" Foreground="{StaticResource Text}" Margin="0,0,0,8" />
+                                <Border Style="{StaticResource Bar}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <ToggleButton Style="{StaticResource Tile}" FontSize="13" Click="OnGpuMemoryRestart" Content="Restart" />
+                                        <ToggleButton Grid.Column="1" Style="{StaticResource Tile}" FontSize="13" Click="OnGpuMemoryLater" Content="Later" />
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- ===== Cooling ===== -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <Border Style="{StaticResource HeaderLine}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource CardIcon}" Text="&#xE9CA;" />
+                            <TextBlock Style="{StaticResource CardTitle}" Text="COOLING" />
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock Style="{StaticResource Label}" Text="Fan curve" />
+                    <Border Style="{StaticResource Bar}">
+                        <Grid x:Name="Fans">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <ToggleButton Style="{StaticResource Tile}" FontSize="13" Tag="" Click="OnFans" Content="Default" />
+                            <ToggleButton Grid.Column="1" Style="{StaticResource Tile}" FontSize="13" Tag="quiet" Click="OnFans" Content="Quiet" />
+                            <ToggleButton Grid.Column="2" Style="{StaticResource Tile}" FontSize="13" Tag="cool" Click="OnFans" Content="Cool" />
+                            <ToggleButton Grid.Column="3" Style="{StaticResource Tile}" FontSize="13" Tag="full" Click="OnFans" Content="Max" />
+                            <ToggleButton Grid.Column="4" Style="{StaticResource Tile}" FontSize="13" Tag="dynamic" Click="OnFans" Content="Auto" />
                         </Grid>
                     </Border>
                 </StackPanel>

@@ -1,0 +1,23 @@
+<UserControl x:Class="HandheldOptimiser.Views.Pages.GpuMemorySection"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+
+    <!-- One row: what Windows has and what waits for a restart, and the sizes to pick from. The page draws the heading. -->
+    <ui:Card Margin="0,0,0,10">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0" Text="{Binding Detail}" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" />
+
+            <ComboBox Grid.Column="1" MinWidth="140" MinHeight="36" Margin="12,0,0,0"
+                      ItemsSource="{Binding Choices}" DisplayMemberPath="Name"
+                      SelectedItem="{Binding Selected, Mode=TwoWay}" IsEnabled="{Binding IsReachable}"
+                      FocusVisualStyle="{StaticResource FocusRing}" AutomationProperties.Name="GPU memory"
+                      PreviewKeyDown="OnKey" DropDownClosed="OnClosed" />
+        </Grid>
+    </ui:Card>
+</UserControl>

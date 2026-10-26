@@ -81,10 +81,12 @@ internal static partial class AutoTdpProtocol
 /// <param name="ProcessId">With overlay: the program in front, whose frame rate is wanted.</param>
 /// <param name="OverlayLayout">With set-overlay: one of <see cref="AutoTdpProtocol.OverlayLayouts"/>, or null to keep it.</param>
 /// <param name="ScreenStats">With set-screen-stats: true to show the stats on the Ally's screen while docked, false to stop.</param>
+/// <param name="GpuMemory">With set-gpu-memory: the size in GB, 0 for Auto, one of GpuMemory.Sizes.</param>
 internal sealed record AutoTdpRequest(string Command, int TargetFps = 0, int MinWatts = 0, int MaxWatts = 0,
     int TemperatureLimit = 0, int StartWatts = 0, string? GameFolder = null, string? FanCurve = null, int PowerLimit = 0,
     string? ControllerMode = null, bool Temporary = false, bool? CpuBoost = null, string? OverlayLevel = null,
-    string? OverlayCorner = null, int ProcessId = 0, string? OverlayLayout = null, bool? ScreenStats = null);
+    string? OverlayCorner = null, int ProcessId = 0, string? OverlayLayout = null, bool? ScreenStats = null,
+    int? GpuMemory = null);
 
 /// <param name="Running">Whether it is setting the power limit or the fans right now.</param>
 /// <param name="State">One of the AutoTdpState names.</param>
@@ -101,7 +103,11 @@ internal sealed record AutoTdpRequest(string Command, int TargetFps = 0, int Min
 /// <param name="OverlayCorner">The overlay's corner, one of <see cref="AutoTdpProtocol.OverlayCorners"/>.</param>
 /// <param name="OverlayLayout">The overlay's layout, one of <see cref="AutoTdpProtocol.OverlayLayouts"/>.</param>
 /// <param name="ScreenStats">Whether the stats screen on the Ally's own panel is switched on.</param>
+/// <param name="GpuMemoryNow">The GPU memory Windows has now, in GB, 0 for Auto, or null when not known.</param>
+/// <param name="GpuMemoryNext">The size waiting for a restart, or null when nothing waits.</param>
+/// <param name="GpuMemoryOffered">The sizes that can be set, empty when this device cannot set it, or null from an older service.</param>
 internal sealed record AutoTdpStatus(bool Running, double? Fps = null, int? Watts = null, int? Temperature = null,
     string? State = null, string? Error = null, int TargetFps = 0, string? FanCurve = null, int PowerLimit = 0,
     bool Replacing = false, bool ControllerConnected = false, string? ControllerMode = null, bool? CpuBoost = null,
-    string? OverlayLevel = null, string? OverlayCorner = null, string? OverlayLayout = null, bool ScreenStats = false);
+    string? OverlayLevel = null, string? OverlayCorner = null, string? OverlayLayout = null, bool ScreenStats = false,
+    int? GpuMemoryNow = null, int? GpuMemoryNext = null, int[]? GpuMemoryOffered = null);

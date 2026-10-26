@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-19",
+  "updated": "2026-10-25",
   "games": [
     {
       "title": "Fortnite",
@@ -188,6 +188,128 @@
       "source": { "name": "Steam Deck HQ patch notes", "url": "https://steamdeckhq.com/?p=28158" },
       "checked": "2026-10-18",
       "confidence": "starting-point"
+    },
+    {
+      "title": "Elden Ring",
+      "keys": ["steam:1245620"],
+      "titles": ["Elden Ring", "ELDEN RING"],
+      "target": "1080p at 45 fps",
+      "device": { "power": "performance", "resolution": "1920x1080", "refresh": 60, "fps": 45, "closeApps": true },
+      "settings": [
+        { "name": "Resolution", "value": "1920 x 1080" },
+        { "name": "Texture Quality", "value": "Low" },
+        { "name": "Antialiasing Quality", "value": "Low" },
+        { "name": "Shadow Quality", "value": "Medium" },
+        { "name": "Lighting Quality", "value": "Medium" },
+        { "name": "Volumetric Quality", "value": "Low" },
+        { "name": "Shader Quality", "value": "Low" },
+        { "name": "Water Surface Quality", "value": "Low" },
+        { "name": "Grass Quality", "value": "Medium" },
+        { "name": "Depth of Field", "value": "Off" },
+        { "name": "Motion Blur", "value": "Off" }
+      ],
+      "note": "Runs 40 to 50 fps, higher in dungeons. Rain, snow and some DLC areas dip lower. The game can set Antialiasing back to High in a new save.",
+      "source": { "name": "ASUS ROG performance guide", "url": "https://rog.asus.com/us/articles/rog-ally/elden-ring-on-the-rog-ally-performance-guide--best-settings/" },
+      "checked": "2026-10-25",
+      "confidence": "guide"
+    },
+    {
+      "title": "Red Dead Redemption 2",
+      "keys": ["steam:1174180"],
+      "titles": ["Red Dead Redemption 2", "RDR2"],
+      "target": "1080p at 45 fps",
+      "device": { "power": "performance", "resolution": "1920x1080", "refresh": 60, "fps": 45, "closeApps": true },
+      "settings": [
+        { "name": "Advanced Graphics: Graphics API", "value": "DirectX 12 (Vulkan runs about the same)" },
+        { "name": "Resolution", "value": "1920 x 1080" },
+        { "name": "AMD FSR 2.0", "value": "Balanced" },
+        { "name": "Texture Quality", "value": "Ultra" },
+        { "name": "Lighting Quality", "value": "Low" },
+        { "name": "Global Illumination Quality", "value": "Low" },
+        { "name": "Shadow Quality", "value": "Medium" },
+        { "name": "Far Shadow Quality", "value": "Low" },
+        { "name": "Screen Space Ambient Occlusion", "value": "Medium" },
+        { "name": "Reflection Quality", "value": "Low" },
+        { "name": "Volumetrics Quality", "value": "Low" },
+        { "name": "Grass Level of Detail", "value": "2/10" }
+      ],
+      "note": "Runs 40 to 50 fps. FSR Quality looks sharper if you can spare a few frames.",
+      "source": { "name": "ASUS ROG performance guide", "url": "https://rog.asus.com/articles/rog-ally/red-dead-redemption-2-on-the-rog-ally-performance-guide--best-settings/" },
+      "checked": "2026-10-25",
+      "confidence": "guide"
+    },
+    {
+      "title": "Grand Theft Auto V",
+      "keys": ["steam:271590"],
+      "titles": ["Grand Theft Auto V", "Grand Theft Auto V Legacy", "GTA V", "GTA 5"],
+      "target": "1080p at 60 fps",
+      "device": { "power": "performance", "resolution": "1920x1080", "refresh": 60, "fps": 60, "closeApps": true },
+      "settings": [
+        { "name": "DirectX Version", "value": "DirectX 11" },
+        { "name": "Resolution", "value": "1920 x 1080" },
+        { "name": "FXAA", "value": "On" },
+        { "name": "MSAA", "value": "Off" },
+        { "name": "Population Density", "value": "5/10" },
+        { "name": "Distance Scaling", "value": "7/10" },
+        { "name": "Texture Quality", "value": "Very High" },
+        { "name": "Shader Quality", "value": "High" },
+        { "name": "Shadow Quality", "value": "High" },
+        { "name": "Reflection Quality", "value": "High" },
+        { "name": "Post FX", "value": "High" },
+        { "name": "In-game Depth of Field Effects", "value": "Off" }
+      ],
+      "note": "Averages about 60 fps. Busy parts of the city can dip below that.",
+      "source": { "name": "ASUS ROG performance guide", "url": "https://rog.asus.com/articles/rog-ally/grand-theft-auto-v-on-the-rog-ally-performance-guide--best-settings/" },
+      "checked": "2026-10-25",
+      "confidence": "guide"
+    },
+    {
+      "title": "Forza Horizon 5",
+      "keys": ["steam:1551360"],
+      "titles": ["Forza Horizon 5"],
+      "target": "1080p at 60 fps",
+      "device": { "power": "performance", "resolution": "1920x1080", "refresh": 60, "fps": 60, "closeApps": true },
+      "settings": [
+        { "name": "Resolution", "value": "1920 x 1080" },
+        { "name": "Anti-Aliasing", "value": "TAA" },
+        { "name": "Shadow Quality", "value": "Low" },
+        { "name": "Night Shadows", "value": "Off" },
+        { "name": "Environment Texture Quality", "value": "High" },
+        { "name": "Environment Geometry Quality", "value": "Low" },
+        { "name": "Reflection Quality", "value": "Medium" },
+        { "name": "SSR Quality", "value": "Low" },
+        { "name": "Particle Effects Quality", "value": "Low" },
+        { "name": "Ray Tracing Quality", "value": "Off" },
+        { "name": "Motion Blur", "value": "Off" }
+      ],
+      "note": "About 60 fps in busy scenes, more on open roads. FSR can add frames if it dips.",
+      "source": { "name": "ASUS ROG performance guide", "url": "https://rog.asus.com/articles/rog-ally/forza-horizon-5-on-the-rog-ally-performance-guide--best-settings/" },
+      "checked": "2026-10-25",
+      "confidence": "guide"
+    },
+    {
+      "title": "Helldivers 2",
+      "keys": ["steam:553850"],
+      "titles": ["Helldivers 2", "HELLDIVERS 2"],
+      "target": "1080p at 40 fps",
+      "device": { "power": "performance", "resolution": "1920x1080", "refresh": 60, "fps": 40, "closeApps": true },
+      "settings": [
+        { "name": "Resolution", "value": "1920 x 1080" },
+        { "name": "Render Scale", "value": "Balanced" },
+        { "name": "Texture Quality", "value": "Medium" },
+        { "name": "Object Detail Quality", "value": "Low" },
+        { "name": "Shadow Quality", "value": "Lowest" },
+        { "name": "Particle Quality", "value": "Lowest" },
+        { "name": "Reflection Quality", "value": "Low" },
+        { "name": "Volumetric Fog Quality", "value": "Lowest" },
+        { "name": "Volumetric Cloud Quality", "value": "Lowest" },
+        { "name": "Lighting Quality", "value": "Low" },
+        { "name": "Screen-Space Global Illumination", "value": "Off" }
+      ],
+      "note": "Runs 35 to 40 fps. Medium textures need at least 6 GB of memory given to the GPU in Armoury Crate SE.",
+      "source": { "name": "ASUS ROG performance guide", "url": "https://rog.asus.com/articles/rog-ally/helldivers-2-on-the-rog-ally-performance-guide--best-settings/" },
+      "checked": "2026-10-25",
+      "confidence": "guide"
     }
   ]
 }

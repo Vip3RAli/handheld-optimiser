@@ -31,6 +31,15 @@ namespace HandheldOptimiser.PowerService
         /// <summary>From the widget: show the stats screen on the Ally's own panel while docked, or not, named by ScreenStats.</summary>
         public const string SetScreenStats = "set-screen-stats";
 
+        /// <summary>From the widget or the app: the GPU memory Windows has now, any size waiting for a restart, and the sizes on offer.</summary>
+        public const string GpuMemoryRequest = "gpu-memory";
+
+        /// <summary>From the widget or the app: set the GPU memory to the request's GpuMemory, used from the next restart.</summary>
+        public const string SetGpuMemory = "set-gpu-memory";
+
+        /// <summary>From the widget, which cannot itself: restart Windows now, to use a new GPU memory size.</summary>
+        public const string Restart = "restart";
+
         /// <summary>The overlay's levels: how much it shows, or Off.</summary>
         public const string OverlayOff = "off";
         public const string OverlaySmall = "small";
@@ -100,6 +109,10 @@ namespace HandheldOptimiser.PowerService
             public const string OverlayCorner = "OverlayCorner";
             public const string OverlayLayout = "OverlayLayout";
             public const string ScreenStats = "ScreenStats";
+            public const string GpuMemory = "GpuMemory";
+            public const string GpuMemoryNow = "GpuMemoryNow";
+            public const string GpuMemoryNext = "GpuMemoryNext";
+            public const string GpuMemoryOffered = "GpuMemoryOffered";
         }
     }
 
