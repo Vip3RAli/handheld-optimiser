@@ -76,4 +76,37 @@ public class GpuMemoryTests
         Assert.Null(GpuMemory.BootCode(null, Started.Ticks, Started));
         Assert.Null(GpuMemory.BootCode(0x108, null, Started));
     }
+
+    // ----- The requests the widget and the app send -----
+
+    [Fact]
+    public void A_request_to_set_the_GPU_memory_reads_back()
+    {
+        var request = AutoTdpProtocol.Read<AutoTdpRequest>(
+            $"{{\"{AutoTdpProtocol.Fields.Command}\":\"{AutoTdpProtocol.SetGpuMemory}\",\"{AutoTdpProtocol.Fields.GpuMemory}\":4}}");
+
+        Assert.Equal(AutoTdpProtocol.SetGpuMemory, request?.Command);
+        Assert.Equal(4, request?.GpuMemory);
+    }
+
+    [Fact]
+    public void A_status_carries_the_GPU_memory()
+    {
+        var status = AutoTdpProtocol.Read<AutoTdpStatus>(AutoTdpProtocol.Write(
+            new AutoTdpStatus(false, GpuMemoryNow: 6, GpuMemoryNext: 4, GpuMemoryOffered: GpuMemory.Sizes)));
+
+        Assert.Equal(6, status?.GpuMemoryNow);
+        Assert.Equal(4, status?.GpuMemoryNext);
+        Assert.Equal(GpuMemory.Sizes, status?.GpuMemoryOffered);
+    }
+
+    [Fact]
+    public void The_status_names_its_GPU_memory_fields_as_the_widget_reads_them()
+    {
+        var json = AutoTdpProtocol.Write(new AutoTdpStatus(false, GpuMemoryNow: 6, GpuMemoryNext: 4, GpuMemoryOffered: [0, 1]));
+
+        Assert.Contains($"\"{AutoTdpProtocol.Fields.GpuMemoryNow}\":6", json);
+        Assert.Contains($"\"{AutoTdpProtocol.Fields.GpuMemoryNext}\":4", json);
+        Assert.Contains($"\"{AutoTdpProtocol.Fields.GpuMemoryOffered}\":[0,1]", json);
+    }
 }

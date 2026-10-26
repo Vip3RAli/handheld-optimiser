@@ -35,6 +35,9 @@ internal sealed partial class AsusAcpi : IPowerBackend
     private const uint CpuFanCurve = 0x00110024;
     private const uint GpuFanCurve = 0x00110025;
 
+    // Set in a status read when this model has the device.
+    private const int PresenceBit = 0x00010000;
+
     private const uint GenericRead = 0x80000000;
     private const uint GenericWrite = 0x40000000;
     private const uint ShareReadWrite = 3;
@@ -115,6 +118,19 @@ internal sealed partial class AsusAcpi : IPowerBackend
         var gpu = Set(GpuFanCurve, curve);
         return cpu == 1 && gpu == 1;
     }
+
+    /// <summary>The firmware's GPU memory code (see <see cref="GpuMemory"/>), or null when this model does not have it.</summary>
+    public int? ReadGpuMemory()
+    {
+        Span<byte> args = stackalloc byte[8];
+        BitConverter.TryWriteBytes(args, GpuMemory.Device);
+        var answer = Call(Dsts, args);
+        return answer != int.MinValue && (answer & PresenceBit) != 0 ? answer & ~PresenceBit : null;
+    }
+
+    /// <summary>Sets the GPU memory code, used from the next restart.</summary>
+    /// <returns>False when the firmware refused it.</returns>
+    public bool SetGpuMemory(int code) => Set(GpuMemory.Device, code) == 1;
 
     /// <summary>A device's status, or below 0 when this model does not have it.</summary>
     private int Get(uint device)
