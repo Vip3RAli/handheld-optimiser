@@ -268,6 +268,31 @@
                         </StackPanel>
                     </Grid>
 
+                    <!-- On or off for the power source in use. Not known while TDP Engine is not running: the switch
+                         then shows off with a line saying so, and turning it on starts TDP Engine. -->
+                    <Border Style="{StaticResource Bar}" Margin="0,14,0,0" Padding="12,6,6,6">
+                        <Grid>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource Label}" Margin="0" Text="CPU boost" />
+                                <TextBlock x:Name="BoostNote" Style="{StaticResource ReadoutName}" Text="Faster bursts, more heat" />
+                            </StackPanel>
+                            <!-- The switch's own template keeps room for a label beside it; a fixed width leaves only the switch. -->
+                            <ToggleSwitch x:Name="BoostSwitch" HorizontalAlignment="Right" MinWidth="0" Width="52" OnContent="" OffContent=""
+                                          Toggled="OnCpuBoost" FocusVisualPrimaryBrush="{StaticResource Cyan}">
+                                <ToggleSwitch.Resources>
+                                    <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#22D3EE" />
+                                    <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#67E8F9" />
+                                    <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#22D3EE" />
+                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#062229" />
+                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#062229" />
+                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#062229" />
+                                    <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="#5A6272" />
+                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#A9B0BC" />
+                                </ToggleSwitch.Resources>
+                            </ToggleSwitch>
+                        </Grid>
+                    </Border>
+
                     <!-- GPU memory: folded to one line, as it is seldom changed. Opened, a list of sizes. A new size
                          is used from the next restart, so picking one asks to restart now. Hidden where it cannot be set. -->
                     <StackPanel x:Name="GpuMemoryRow" Margin="0,14,0,0">
@@ -307,13 +332,13 @@
                 </StackPanel>
             </Border>
 
-            <!-- ===== Cooling and CPU ===== -->
+            <!-- ===== Cooling ===== -->
             <Border Style="{StaticResource Card}">
                 <StackPanel>
                     <Border Style="{StaticResource HeaderLine}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Style="{StaticResource CardIcon}" Text="&#xE9CA;" />
-                            <TextBlock Style="{StaticResource CardTitle}" Text="COOLING &amp; CPU" />
+                            <TextBlock Style="{StaticResource CardTitle}" Text="COOLING" />
                         </StackPanel>
                     </Border>
 
@@ -332,31 +357,6 @@
                             <ToggleButton Grid.Column="2" Style="{StaticResource Tile}" FontSize="13" Tag="cool" Click="OnFans" Content="Cool" />
                             <ToggleButton Grid.Column="3" Style="{StaticResource Tile}" FontSize="13" Tag="full" Click="OnFans" Content="Max" />
                             <ToggleButton Grid.Column="4" Style="{StaticResource Tile}" FontSize="13" Tag="dynamic" Click="OnFans" Content="Auto" />
-                        </Grid>
-                    </Border>
-
-                    <!-- On or off for the power source in use. Not known while TDP Engine is not running: the switch
-                         then shows off with a line saying so, and turning it on starts TDP Engine. -->
-                    <Border Style="{StaticResource Bar}" Margin="0,14,0,0" Padding="12,6,6,6">
-                        <Grid>
-                            <StackPanel VerticalAlignment="Center">
-                                <TextBlock Style="{StaticResource Label}" Margin="0" Text="CPU boost" />
-                                <TextBlock x:Name="BoostNote" Style="{StaticResource ReadoutName}" Text="Faster bursts, more heat" />
-                            </StackPanel>
-                            <!-- The switch's own template keeps room for a label beside it; a fixed width leaves only the switch. -->
-                            <ToggleSwitch x:Name="BoostSwitch" HorizontalAlignment="Right" MinWidth="0" Width="52" OnContent="" OffContent=""
-                                          Toggled="OnCpuBoost" FocusVisualPrimaryBrush="{StaticResource Cyan}">
-                                <ToggleSwitch.Resources>
-                                    <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#22D3EE" />
-                                    <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#67E8F9" />
-                                    <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#22D3EE" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#062229" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#062229" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#062229" />
-                                    <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="#5A6272" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#A9B0BC" />
-                                </ToggleSwitch.Resources>
-                            </ToggleSwitch>
                         </Grid>
                     </Border>
                 </StackPanel>
