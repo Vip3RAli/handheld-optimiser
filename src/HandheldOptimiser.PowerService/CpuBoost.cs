@@ -99,7 +99,7 @@ internal static partial class CpuBoost
         }
     }
 
-    private static bool OnBattery() => GetSystemPowerStatus(out var status) && status.AcLineStatus == 0;
+    internal static bool OnBattery() => GetSystemPowerStatus(out var status) && status.AcLineStatus == 0;
 
     /// <summary>The modes saved from before boost was turned off, or Disabled for each when none are.</summary>
     private static BoostModes LoadSaved()

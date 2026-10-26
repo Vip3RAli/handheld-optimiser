@@ -50,6 +50,9 @@ internal sealed partial class AutoTdpService : ServiceBase
 
     // The GPU memory, set through the same firmware. Made once the firmware is opened.
     private GpuMemoryHost _gpuMemory = new(null);
+
+    // Auto or Manual, and the last manual choices, read once as the service starts.
+    private readonly TdpEngineSettings _engine = new();
     private FrameCounter? _frames;
     private string? _error;
 
@@ -167,6 +170,8 @@ internal sealed partial class AutoTdpService : ServiceBase
                 RestoreAfterCrash();
             }
 
+            RestoreBoostAfterCrash();
+
             // Frames are counted on any device, for the overlay, even where the power limit cannot be set.
             try
             {
@@ -262,6 +267,19 @@ internal sealed partial class AutoTdpService : ServiceBase
         var restored = _power!.SetVendorMode(mode);
         Log.Write($"The last run ended while holding a game. Operating mode {mode} {(restored ? "put back" : "was refused")}");
         MarkHolding(null);
+    }
+
+    /// <summary>The last run ended while an Auto session held the processor's boost: the player's own goes back.</summary>
+    private static void RestoreBoostAfterCrash()
+    {
+        if (TdpEngineSettings.SavedPlayerBoost() is not { } on)
+        {
+            return;
+        }
+
+        var problem = CpuBoost.Set(on);
+        Log.Write($"The last run ended while Auto held CPU boost. The player's own ({(on ? "on" : "off")}) {(problem is null ? "put back" : $"was refused: {problem}")}");
+        TdpEngineSettings.SavePlayerBoost(null);
     }
 
     private static int? HeldMode()
@@ -364,6 +382,11 @@ internal sealed partial class AutoTdpService : ServiceBase
             Apply(control, fixedWatts);
         }
 
+        if (control.Auto)
+        {
+            control = TickAuto(control, now, fps, temperature);
+        }
+
         if (control.Dynamic is { } dynamic && control.Curve is not null)
         {
             var pick = dynamic.Pick(now, temperature, WattsNow(control), TopWatts(control), TemperatureLimit(control));
@@ -405,6 +428,175 @@ internal sealed partial class AutoTdpService : ServiceBase
         control.Curve = FanCurves.For(control.DynamicPick);
     }
 
+    // ----- Auto -----
+
+    /// <summary>
+    /// Makes a session an Auto one: fans in fine steps, boost decided by TDP Engine, and the player's own boost
+    /// kept, and saved for a crash, to give back. The first fan step is picked here; <see cref="Set"/> writes it.
+    /// </summary>
+    /// <param name="playerBoost">The player's own boost, or null when it could not be read.</param>
+    private static void StartAuto(Control control, bool? playerBoost, bool onBattery, int? temperature)
+    {
+        control.Auto = true;
+        control.OnBattery = onBattery;
+        control.FanCurve = AutoTdpProtocol.DynamicFans;
+        control.Dynamic = null;
+        control.DynamicPick = null;
+        control.PlayerBoost = playerBoost;
+        TdpEngineSettings.SavePlayerBoost(playerBoost);
+        control.BoostOn = CpuBoost.Read() ?? false;
+        control.Boost = new AutoBoost(control.BoostOn);
+        control.Fine = new FineFans();
+        control.FineStep = null;
+        PickFans(control, DateTime.UtcNow, temperature);
+    }
+
+    /// <summary>
+    /// A session made Auto, or kept Auto, for this frame rate (0 for none): TDP Engine's range for the power
+    /// source, its controller kept where the settings are the same, as <see cref="Update"/> keeps it.
+    /// </summary>
+    private Control ToAuto(Control old, int targetFps)
+    {
+        var onBattery = CpuBoost.OnBattery();
+        var settings = AutoMode.Settings(targetFps, old.Settings?.TemperatureLimit ?? 0, onBattery);
+        var controller = old.Controller is { } running && old.Settings == settings ? running
+            : new AutoTdpController(settings, Math.Clamp(WattsNow(old) ?? (settings.MinWatts + settings.MaxWatts + 1) / 2,
+                settings.MinWatts, settings.MaxWatts));
+
+        var control = old with { Settings = settings, Controller = controller };
+        control.AutoSettings = settings;
+        control.PowerLimit = 0;
+        control.FixedWatts = null;
+        if (!old.Auto)
+        {
+            StartAuto(control, CpuBoost.Read(), onBattery, _power!.ReadTemperature());
+        }
+
+        return control;
+    }
+
+    /// <summary>
+    /// One second of an Auto session: the power range follows the power source, boost follows what the game
+    /// needs, and the fans follow both.
+    /// </summary>
+    /// <returns>The session, rebuilt when the power source changed.</returns>
+    private Control TickAuto(Control control, DateTime now, double fps, int? temperature)
+    {
+        var onBattery = CpuBoost.OnBattery();
+        if (onBattery != control.OnBattery && control.Settings is { } old && control.Controller is { } running)
+        {
+            var settings = old with { MaxWatts = AutoMode.TopWatts(onBattery) };
+            var from = Math.Clamp(running.Watts, settings.MinWatts, settings.MaxWatts);
+            control = control with { Settings = settings, Controller = new AutoTdpController(settings, from) };
+            control.AutoSettings = settings;
+            control.OnBattery = onBattery;
+            _control = control;
+            Apply(control, from);
+            Log.Write($"Auto: {(onBattery ? "on battery" : "plugged in")}, so up to {settings.MaxWatts} W, from {from} W");
+        }
+
+        var watts = WattsNow(control) ?? 0;
+        var top = TopWatts(control);
+        var target = AutoMode.ShownTarget(control.Settings?.TargetFps ?? 0);
+        if (control.Boost is { } boost && boost.Decide(now, onBattery, fps, target, watts, top) is { } on)
+        {
+            if (CpuBoost.Set(on) is { } problem)
+            {
+                // Not asked again this session: what Windows refused once it refuses again.
+                Log.Write($"Auto: CPU boost {(on ? "on" : "off")} was refused, so it is left alone: {problem}");
+                control.Boost = null;
+            }
+            else
+            {
+                control.BoostOn = on;
+                var why = on
+                    ? target > 0 ? $"{fps:0} fps, short of {target}" : $"at the top, {watts} W"
+                    : onBattery ? "on battery" : $"{watts} W of {top}, frames held";
+                Log.Write($"Auto: CPU boost {(on ? "on" : "off")}, {why}");
+            }
+        }
+
+        if (PickFans(control, now, temperature))
+        {
+            ApplyFans(control);
+            Log.Write($"Auto: fans step {control.FineStep} of {FineFans.Steps}, {temperature?.ToString() ?? "?"} °C, {watts} W, boost {(control.BoostOn ? "on" : "off")}");
+        }
+
+        return control;
+    }
+
+    /// <summary>Picks the fans' step in Auto, and sets its curve when the step changed.</summary>
+    /// <returns>Whether the step changed, so the curve needs writing.</returns>
+    private static bool PickFans(Control control, DateTime now, int? temperature)
+    {
+        if (control.Fine is not { } fine)
+        {
+            return false;
+        }
+
+        var step = fine.Pick(now, temperature, WattsNow(control), TopWatts(control), TemperatureLimit(control), control.BoostOn);
+        if (step == control.FineStep)
+        {
+            return false;
+        }
+
+        control.FineStep = step;
+        control.Curve = FanCurves.Blend(step);
+        return true;
+    }
+
+    /// <summary>Gives the player their own boost back as an Auto session ends or turns Manual, and clears the crash note.</summary>
+    private static void GiveBoostBack(Control control)
+    {
+        if (control.PlayerBoost is { } on && on != control.BoostOn)
+        {
+            var problem = CpuBoost.Set(on);
+            Log.Write($"Auto: the player's own CPU boost ({(on ? "on" : "off")}) {(problem is null ? "put back" : $"was refused: {problem}")}");
+        }
+
+        TdpEngineSettings.SavePlayerBoost(null);
+        control.Auto = false;
+        control.Boost = null;
+        control.Fine = null;
+        control.FineStep = null;
+    }
+
+    /// <summary>
+    /// Auto or Manual, from the widget: saved, and applied at once to a running session. Back to Manual, the
+    /// session takes the manual choices as the widget would send them, which ends it when there are none.
+    /// Called under the gate.
+    /// </summary>
+    private AutoTdpStatus SetMode(AutoTdpRequest request, int client)
+    {
+        var auto = AutoMode.IsAuto(request.Mode);
+        _idleSince = DateTime.UtcNow;
+        if (auto != _engine.Auto)
+        {
+            _engine.SetMode(auto);
+            Log.Write($"Mode set to {(auto ? "Auto" : "Manual")}");
+
+            if (_control is { } control && _power is not null)
+            {
+                var target = AutoMode.ShownTarget(control.Settings?.TargetFps ?? 0);
+                if (auto)
+                {
+                    _control = ToAuto(control, target);
+                    Set(_control);
+                    Log.Write($"{Describe(_control)}, changed to Auto in Game Bar");
+                    _last = Status(_control, null, _power.ReadTemperature());
+                }
+                else
+                {
+                    GiveBoostBack(control);
+                    return Update(new AutoTdpRequest(AutoTdpProtocol.Update, target, PowerLimit: _engine.ManualPowerLimit,
+                        FanCurve: _engine.ManualFans), client);
+                }
+            }
+        }
+
+        return _error is not null && _control is null ? new AutoTdpStatus(false, Error: _error) : _last;
+    }
+
     // With fans only there are no settings, so Dynamic measures from the default limit.
     private static int TemperatureLimit(Control control) =>
         control.Settings?.TemperatureLimit ?? AutoTdpProtocol.DefaultTemperature;
@@ -438,12 +630,13 @@ internal sealed partial class AutoTdpService : ServiceBase
         Log.Write($"The firmware refused the {control.FanCurve} fan curve, so the fans are left as they were");
         control.Curve = null;
         control.Dynamic = null;
+        control.Fine = null;
     }
 
     private static AutoTdpStatus Status(Control control, double? fps, int? temperature) =>
         new(true, fps, WattsNow(control), temperature,
             control.Controller?.State.ToString() ?? (control.FixedWatts is null ? null : AutoTdpProtocol.FixedState),
-            TargetFps: control.Settings?.TargetFps ?? 0, FanCurve: control.Curve is null ? null : control.FanCurve,
+            TargetFps: AutoMode.ShownTarget(control.Settings?.TargetFps ?? 0), FanCurve: control.Curve is null ? null : control.FanCurve,
             PowerLimit: control.PowerLimit);
 
     /// <summary>
@@ -566,6 +759,7 @@ internal sealed partial class AutoTdpService : ServiceBase
                     AutoTdpProtocol.Stop => End(),
                     AutoTdpProtocol.SetOverlay => SetOverlay(request),
                     AutoTdpProtocol.SetScreenStats => SetScreenStats(request),
+                    AutoTdpProtocol.SetMode => SetMode(request, client),
                     AutoTdpProtocol.Overlay => OverlayStatus(request),
                     _ => _error is not null ? new AutoTdpStatus(false, Error: _error) : _last
                 };
@@ -579,7 +773,10 @@ internal sealed partial class AutoTdpService : ServiceBase
             OverlayLevel = _overlay.Level,
             OverlayCorner = _overlay.Corner,
             OverlayLayout = _overlay.Layout,
-            ScreenStats = _screenStats.On
+            ScreenStats = _screenStats.On,
+            Mode = _engine.ModeName,
+            ManualPowerLimit = _engine.ManualPowerLimit,
+            ManualFans = _engine.ManualFans
         };
         status = _gpuMemory.AddTo(status);
         await writer.WriteLineAsync(AutoTdpProtocol.Write(status).AsMemory(), cancel).ConfigureAwait(false);
@@ -755,6 +952,23 @@ internal sealed partial class AutoTdpService : ServiceBase
         var settings = auto is null ? null : PowerLimits.WithTop(auto, power);
         var fixedWatts = PowerLimits.Fixed(request.TargetFps, power);
         var fans = FanCurve(request.FanCurve);
+
+        // In Auto, TDP Engine's own range and fans, whatever the library's profile or the widget named, and a
+        // frame rate is optional. In Manual, what the widget chose is kept for next time.
+        var onBattery = CpuBoost.OnBattery();
+        if (_engine.Auto)
+        {
+            auto = AutoMode.Settings(request.TargetFps, request.TemperatureLimit, onBattery);
+            settings = auto;
+            power = 0;
+            fixedWatts = null;
+            fans = AutoTdpProtocol.DynamicFans;
+        }
+        else if (fromWidget)
+        {
+            _engine.SaveManual(power, fans);
+        }
+
         if (settings is null && fixedWatts is null && fans is null)
         {
             clientProcess?.Dispose();
@@ -773,7 +987,9 @@ internal sealed partial class AutoTdpService : ServiceBase
             controller = new AutoTdpController(settings, start);
         }
 
-        // A new game keeps the operating mode saved for the first, which is the player's own.
+        // A new game keeps the operating mode saved for the first, which is the player's own, and in Auto the
+        // player's own boost, as the first may have changed it since.
+        var previous = _control;
         var restoreMode = _control?.RestoreMode ?? _power.ReadVendorMode();
         _control?.ClientProcess?.Dispose();
         _control = new Control(settings, controller, folder, clientProcess, restoreMode, fromWidget)
@@ -785,7 +1001,20 @@ internal sealed partial class AutoTdpService : ServiceBase
             LibraryFolders = folder is null && fromWidget ? ClientGameFolders(client) : null,
             LastFrames = DateTime.UtcNow
         };
-        ChooseFans(_control, fans, _power.ReadTemperature());
+
+        if (_engine.Auto)
+        {
+            StartAuto(_control, previous is { Auto: true } ? previous.PlayerBoost : CpuBoost.Read(), onBattery, _power.ReadTemperature());
+        }
+        else
+        {
+            if (previous is { Auto: true })
+            {
+                GiveBoostBack(previous);
+            }
+
+            ChooseFans(_control, fans, _power.ReadTemperature());
+        }
 
         // Saved before the limit is first set, so a crash from here on still gets the mode put back.
         MarkHolding(restoreMode ?? _power.DefaultVendorMode);
@@ -813,6 +1042,16 @@ internal sealed partial class AutoTdpService : ServiceBase
             return Begin(request with { GameFolder = null, StartWatts = 0 }, client, fromWidget: true);
         }
 
+        // In Auto only the frame rate is the widget's, and none is a target too, not off.
+        if (_engine.Auto)
+        {
+            _control = ToAuto(old, request.TargetFps);
+            Set(_control);
+            Log.Write($"{Describe(_control)}, changed in Game Bar");
+            _last = Status(_control, null, _power.ReadTemperature());
+            return _last;
+        }
+
         var target = request.TargetFps > 0 ? Math.Clamp(request.TargetFps, AutoTdpProtocol.LowestFps, AutoTdpProtocol.HighestFps) : 0;
         var power = PowerLimit(request);
         var fixedWatts = PowerLimits.Fixed(target, power);
@@ -822,6 +1061,8 @@ internal sealed partial class AutoTdpService : ServiceBase
             Release("TDP Engine was turned off in Game Bar");
             return _last;
         }
+
+        _engine.SaveManual(power, fans);
 
         // The range the library asked for stays, with the widget's power limit as its top when one is chosen.
         var auto = target == 0 ? null
@@ -898,14 +1139,19 @@ internal sealed partial class AutoTdpService : ServiceBase
         var parts = new List<string>();
         if (control.Settings is { } settings)
         {
-            parts.Add($"Holding {settings.TargetFps} fps between {settings.MinWatts} and {settings.MaxWatts} W, under {settings.TemperatureLimit} °C, from {control.Controller!.Watts} W");
+            var aim = settings.TargetFps == AutoTdpProtocol.NoTargetFps ? "Most frames for the power" : $"Holding {settings.TargetFps} fps";
+            parts.Add($"{(control.Auto ? "Auto: " : string.Empty)}{aim} between {settings.MinWatts} and {settings.MaxWatts} W, under {settings.TemperatureLimit} °C, from {control.Controller!.Watts} W");
         }
         else if (control.FixedWatts is { } fixedWatts)
         {
             parts.Add($"Fixed at {fixedWatts} W");
         }
 
-        if (control.DynamicPick is { } pick)
+        if (control.FineStep is { } step)
+        {
+            parts.Add($"fans step {step} of {FineFans.Steps}, boost {(control.BoostOn ? "on" : "off")}");
+        }
+        else if (control.DynamicPick is { } pick)
         {
             parts.Add($"dynamic fans, on {pick}");
         }
@@ -935,6 +1181,10 @@ internal sealed partial class AutoTdpService : ServiceBase
         _idleSince = DateTime.UtcNow;
         _last = _last with { Running = false };
         control.ClientProcess?.Dispose();
+        if (control.Auto)
+        {
+            GiveBoostBack(control);
+        }
 
         // Setting the mode again brings back its own power limits. When it could not be read, the maker's own
         // default (Performance, on the Ally) is put back instead.
@@ -1132,6 +1382,23 @@ internal sealed partial class AutoTdpService : ServiceBase
 
         /// <summary>The fixed curve Dynamic is on now, so a change can be written and logged once.</summary>
         public string? DynamicPick { get; set; }
+
+        /// <summary>Whether this is an Auto session: TDP Engine's own power range, fans in fine steps and boost.</summary>
+        public bool Auto { get; set; }
+
+        /// <summary>What picks the fans' step in Auto, and the step written last, or null before the first.</summary>
+        public FineFans? Fine { get; set; }
+        public int? FineStep { get; set; }
+
+        /// <summary>What turns boost on and off in Auto, and whether it is on now as far as this session set it.</summary>
+        public AutoBoost? Boost { get; set; }
+        public bool BoostOn { get; set; }
+
+        /// <summary>The player's own boost from before Auto took it, to give back; null when it could not be read.</summary>
+        public bool? PlayerBoost { get; set; }
+
+        /// <summary>Whether the power source was the battery at the last tick, so a change of it is seen.</summary>
+        public bool OnBattery { get; set; }
 
         public DateTime LastSet { get; set; }
         public DateTime LastFans { get; set; }
