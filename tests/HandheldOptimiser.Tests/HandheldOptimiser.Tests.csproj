@@ -41,6 +41,7 @@
     <Compile Include="..\..\src\HandheldOptimiser.PowerService\FanCurves.cs" Link="FanCurves.cs" />
     <Compile Include="..\..\src\HandheldOptimiser.PowerService\DynamicFans.cs" Link="DynamicFans.cs" />
     <Compile Include="..\..\src\HandheldOptimiser.PowerService\GameLock.cs" Link="GameLock.cs" />
+    <Compile Include="..\..\src\HandheldOptimiser.PowerService\GpuMemory.cs" Link="GpuMemory.cs" />
     <Compile Include="..\..\src\HandheldOptimiser.PowerService\PowerLimits.cs" Link="PowerLimits.cs" />
   </ItemGroup>
 
