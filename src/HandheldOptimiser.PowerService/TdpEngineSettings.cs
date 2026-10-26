@@ -14,7 +14,8 @@ internal sealed class TdpEngineSettings
     private const string ModeValue = "Mode";
     private const string ManualPowerLimitValue = "ManualPowerLimit";
     private const string ManualFansValue = "ManualFans";
-    private const string PlayerBoostValue = "PlayerBoost";
+    private const string PlayerBoostPluggedInValue = "PlayerBoostPluggedIn";
+    private const string PlayerBoostOnBatteryValue = "PlayerBoostOnBattery";
 
     public TdpEngineSettings()
     {
@@ -66,13 +67,15 @@ internal sealed class TdpEngineSettings
         });
     }
 
-    /// <summary>The player's own boost, saved while an Auto session holds it, or null when none is saved.</summary>
-    public static bool? SavedPlayerBoost()
+    /// <summary>The player's own boost modes, saved while an Auto session holds them, or null when none are saved.</summary>
+    public static BoostModes? SavedPlayerBoost()
     {
         try
         {
             using var key = Registry.LocalMachine.OpenSubKey(Key);
-            return key?.GetValue(PlayerBoostValue) is int on ? on != 0 : null;
+            return key?.GetValue(PlayerBoostPluggedInValue) is int pluggedIn && key.GetValue(PlayerBoostOnBatteryValue) is int onBattery
+                ? new BoostModes((uint)pluggedIn, (uint)onBattery)
+                : null;
         }
         catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
         {
@@ -80,16 +83,21 @@ internal sealed class TdpEngineSettings
         }
     }
 
-    /// <summary>Saves the player's own boost while an Auto session holds it, or with null, clears it.</summary>
-    public static void SavePlayerBoost(bool? on) => Write(key =>
+    /// <summary>
+    /// Saves the player's own boost modes, plugged in and on battery, while an Auto session holds them, so
+    /// exactly those come back; with null, clears them.
+    /// </summary>
+    public static void SavePlayerBoost(BoostModes? modes) => Write(key =>
     {
-        if (on is { } value)
+        if (modes is { } saved)
         {
-            key.SetValue(PlayerBoostValue, value ? 1 : 0, RegistryValueKind.DWord);
+            key.SetValue(PlayerBoostPluggedInValue, (int)saved.PluggedIn, RegistryValueKind.DWord);
+            key.SetValue(PlayerBoostOnBatteryValue, (int)saved.OnBattery, RegistryValueKind.DWord);
         }
         else
         {
-            key.DeleteValue(PlayerBoostValue, throwOnMissingValue: false);
+            key.DeleteValue(PlayerBoostPluggedInValue, throwOnMissingValue: false);
+            key.DeleteValue(PlayerBoostOnBatteryValue, throwOnMissingValue: false);
         }
     });
 

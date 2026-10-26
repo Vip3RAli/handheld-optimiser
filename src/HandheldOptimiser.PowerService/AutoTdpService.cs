@@ -277,8 +277,8 @@ internal sealed partial class AutoTdpService : ServiceBase
             return;
         }
 
-        var problem = CpuBoost.Set(on);
-        Log.Write($"The last run ended while Auto held CPU boost. The player's own ({(on ? "on" : "off")}) {(problem is null ? "put back" : $"was refused: {problem}")}");
+        var problem = CpuBoost.Restore(on);
+        Log.Write($"The last run ended while Auto held CPU boost. The player's own {(problem is null ? "put back" : $"was refused: {problem}")}");
         TdpEngineSettings.SavePlayerBoost(null);
     }
 
@@ -434,8 +434,8 @@ internal sealed partial class AutoTdpService : ServiceBase
     /// Makes a session an Auto one: fans in fine steps, boost decided by TDP Engine, and the player's own boost
     /// kept, and saved for a crash, to give back. The first fan step is picked here; <see cref="Set"/> writes it.
     /// </summary>
-    /// <param name="playerBoost">The player's own boost, or null when it could not be read.</param>
-    private static void StartAuto(Control control, bool? playerBoost, bool onBattery, int? temperature)
+    /// <param name="playerBoost">The player's own boost modes, or null when they could not be read.</param>
+    private static void StartAuto(Control control, BoostModes? playerBoost, bool onBattery, int? temperature)
     {
         control.Auto = true;
         control.OnBattery = onBattery;
@@ -445,6 +445,7 @@ internal sealed partial class AutoTdpService : ServiceBase
         control.PlayerBoost = playerBoost;
         TdpEngineSettings.SavePlayerBoost(playerBoost);
         control.BoostOn = CpuBoost.Read() ?? false;
+        control.BoostChanged = false;
         control.Boost = new AutoBoost(control.BoostOn);
         control.Fine = new FineFans();
         control.FineStep = null;
@@ -469,7 +470,7 @@ internal sealed partial class AutoTdpService : ServiceBase
         control.FixedWatts = null;
         if (!old.Auto)
         {
-            StartAuto(control, CpuBoost.Read(), onBattery, _power!.ReadTemperature());
+            StartAuto(control, CpuBoost.Modes(), onBattery, _power!.ReadTemperature());
         }
 
         return control;
@@ -509,6 +510,7 @@ internal sealed partial class AutoTdpService : ServiceBase
             else
             {
                 control.BoostOn = on;
+                control.BoostChanged = true;
                 var why = on
                     ? target > 0 ? $"{fps:0} fps, short of {target}" : $"at the top, {watts} W"
                     : onBattery ? "on battery" : $"{watts} W of {top}, frames held";
@@ -548,10 +550,11 @@ internal sealed partial class AutoTdpService : ServiceBase
     /// <summary>Gives the player their own boost back as an Auto session ends or turns Manual, and clears the crash note.</summary>
     private static void GiveBoostBack(Control control)
     {
-        if (control.PlayerBoost is { } on && on != control.BoostOn)
+        // Exactly the player's modes, plugged in and on battery, and only when Auto changed them.
+        if (control.PlayerBoost is { } modes && control.BoostChanged)
         {
-            var problem = CpuBoost.Set(on);
-            Log.Write($"Auto: the player's own CPU boost ({(on ? "on" : "off")}) {(problem is null ? "put back" : $"was refused: {problem}")}");
+            var problem = CpuBoost.Restore(modes);
+            Log.Write($"Auto: the player's own CPU boost {(problem is null ? "put back" : $"was refused: {problem}")}");
         }
 
         TdpEngineSettings.SavePlayerBoost(null);
@@ -1004,7 +1007,8 @@ internal sealed partial class AutoTdpService : ServiceBase
 
         if (_engine.Auto)
         {
-            StartAuto(_control, previous is { Auto: true } ? previous.PlayerBoost : CpuBoost.Read(), onBattery, _power.ReadTemperature());
+            StartAuto(_control, previous is { Auto: true } ? previous.PlayerBoost : CpuBoost.Modes(), onBattery, _power.ReadTemperature());
+            _control.BoostChanged = previous is { Auto: true, BoostChanged: true };
         }
         else
         {
@@ -1394,8 +1398,11 @@ internal sealed partial class AutoTdpService : ServiceBase
         public AutoBoost? Boost { get; set; }
         public bool BoostOn { get; set; }
 
-        /// <summary>The player's own boost from before Auto took it, to give back; null when it could not be read.</summary>
-        public bool? PlayerBoost { get; set; }
+        /// <summary>The player's own boost modes from before Auto took them, to give back; null when they could not be read.</summary>
+        public BoostModes? PlayerBoost { get; set; }
+
+        /// <summary>Whether Auto changed boost this session, so there is something to give back.</summary>
+        public bool BoostChanged { get; set; }
 
         /// <summary>Whether the power source was the battery at the last tick, so a change of it is seen.</summary>
         public bool OnBattery { get; set; }

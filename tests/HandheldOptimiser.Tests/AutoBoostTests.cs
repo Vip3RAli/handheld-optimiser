@@ -52,6 +52,27 @@ public class AutoBoostTests
     }
 
     [Fact]
+    public void A_loading_screen_does_not_count_as_short()
+    {
+        // Under 5 fps is a loading screen, a pause or no game yet, not a game that needs boost.
+        var boost = new AutoBoost(startsOn: false);
+        for (var second = 0; second <= 30; second++)
+        {
+            Assert.Null(boost.Decide(At(second), onBattery: false, 2, 60, Top, Top));
+        }
+    }
+
+    [Fact]
+    public void A_loading_screen_does_not_count_as_headroom_either()
+    {
+        var boost = TurnedOn();
+        for (var second = 6; second <= 90; second++)
+        {
+            Assert.Null(boost.Decide(At(second), onBattery: false, 0, 0, 10, Top));
+        }
+    }
+
+    [Fact]
     public void Two_fps_short_is_not_short_enough()
     {
         var boost = new AutoBoost(startsOn: false);

@@ -19,6 +19,9 @@ internal sealed class AutoBoost(bool startsOn)
     private const int AtTopWatts = 1;
     private static readonly TimeSpan NeedFor = TimeSpan.FromSeconds(5);
 
+    // Below this many frames a second nothing is judged, as in the power controller.
+    private const double MinFrames = 5;
+
     // This many watts under the top, with the target held within this many frames, for this long: off.
     private const int HeadroomWatts = 3;
     private const double HeldFps = 1;
@@ -54,8 +57,10 @@ internal sealed class AutoBoost(bool startsOn)
             return Change(now, false);
         }
 
-        var needed = targetFps > 0 ? fps <= targetFps - ShortFps : watts >= topWatts - AtTopWatts;
-        var headroom = watts <= topWatts - HeadroomWatts && (targetFps <= 0 || fps >= targetFps - HeldFps);
+        // Under a few frames is a loading screen, a pause or no game yet: it says nothing either way.
+        var playing = fps >= MinFrames;
+        var needed = playing && (targetFps > 0 ? fps <= targetFps - ShortFps : watts >= topWatts - AtTopWatts);
+        var headroom = playing && watts <= topWatts - HeadroomWatts && (targetFps <= 0 || fps >= targetFps - HeldFps);
         _needSince = needed ? _needSince ?? now : null;
         _headroomSince = headroom ? _headroomSince ?? now : null;
 

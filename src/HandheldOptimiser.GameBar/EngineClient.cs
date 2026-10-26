@@ -87,7 +87,8 @@ namespace HandheldOptimiser.GameBar
         /// range, without one it is held as it is) and a fan curve (null for the Ally's own), starting the
         /// service if need be.
         /// </summary>
-        public static EngineStatus Update(int targetFps, int powerLimit, string fanCurve)
+        /// <param name="start">Start the service even for all zeros: in Auto that is None, a frame rate of its own, not off.</param>
+        public static EngineStatus Update(int targetFps, int powerLimit, string fanCurve, bool start = false)
         {
             var request = new JsonObject
             {
@@ -101,7 +102,7 @@ namespace HandheldOptimiser.GameBar
             if (answer == null)
             {
                 // Turning off what is not running needs nothing.
-                if (targetFps == 0 && powerLimit == 0 && string.IsNullOrEmpty(fanCurve))
+                if (!start && targetFps == 0 && powerLimit == 0 && string.IsNullOrEmpty(fanCurve))
                 {
                     return EngineStatus.Off;
                 }

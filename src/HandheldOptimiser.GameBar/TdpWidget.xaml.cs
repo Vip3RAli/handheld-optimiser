@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using HandheldOptimiser.PowerService;
+using Windows.Storage;
 using Windows.System.Power;
 using Windows.UI.Core;
 using Windows.UI.Xaml;
@@ -31,7 +32,15 @@ namespace HandheldOptimiser.GameBar
         private bool _placingBoost;
         private bool _placingScreenStats;
         private bool _placingGpuMemory;
-        private string _mode = AutoTdpProtocol.AutoModeName;
+        // TDP Engine's mode and the last manual choices, from its last answer, kept in the widget's own settings
+        // so they are right while TDP Engine is not running, which is most of the time between games.
+        private const string ModeSetting = "Mode";
+        private const string ManualPowerSetting = "ManualPowerLimit";
+        private const string ManualFansSetting = "ManualFans";
+        private readonly ApplicationDataContainer _saved = ApplicationData.Current.LocalSettings;
+        private string _mode;
+        private int _manualPower;
+        private string _manualFans;
 
         // Whether the GPU memory row is open, and whether the player just picked a size, which asks to restart.
         private bool _gpuMemoryOpen;
@@ -43,6 +52,9 @@ namespace HandheldOptimiser.GameBar
         public TdpWidget()
         {
             InitializeComponent();
+            _mode = _saved.Values[ModeSetting] as string ?? AutoTdpProtocol.AutoModeName;
+            _manualPower = _saved.Values[ManualPowerSetting] as int? ?? 0;
+            _manualFans = _saved.Values[ManualFansSetting] as string;
             _timer.Tick += (sender, e) => Refresh();
             _sliderPause.Tick += (sender, e) => SendSlider();
             Loaded += (sender, e) =>
@@ -86,7 +98,7 @@ namespace HandheldOptimiser.GameBar
             var target = int.Parse((string)((FrameworkElement)sender).Tag);
             if (Auto)
             {
-                Change(target, 0, null);
+                Change(target, 0, null, start: true);
             }
             else
             {
@@ -345,11 +357,11 @@ namespace HandheldOptimiser.GameBar
         private int CurrentFps => _status.Running ? _status.TargetFps : 0;
 
         // With nothing running, Manual offers what was chosen in it last.
-        private int CurrentPower => _status.Running ? _status.PowerLimit : _status.ManualPowerLimit;
+        private int CurrentPower => _status.Running ? _status.PowerLimit : _manualPower;
 
-        private string CurrentFans => _status.Running ? _status.FanCurve : _status.ManualFans;
+        private string CurrentFans => _status.Running ? _status.FanCurve : _manualFans;
 
-        private async void Change(int targetFps, int powerLimit, string fanCurve)
+        private async void Change(int targetFps, int powerLimit, string fanCurve, bool start = false)
         {
             if (_busy)
             {
@@ -361,7 +373,7 @@ namespace HandheldOptimiser.GameBar
             SetState("", _status.Running ? "Applying…" : "Starting TDP Engine…");
             try
             {
-                Show(await Task.Run(() => EngineClient.Update(targetFps, powerLimit, fanCurve)));
+                Show(await Task.Run(() => EngineClient.Update(targetFps, powerLimit, fanCurve, start)));
             }
             finally
             {
@@ -375,6 +387,11 @@ namespace HandheldOptimiser.GameBar
             if (status.Reachable && status.Mode != null)
             {
                 _mode = status.Mode;
+                _manualPower = status.ManualPowerLimit;
+                _manualFans = status.ManualFans;
+                _saved.Values[ModeSetting] = _mode;
+                _saved.Values[ManualPowerSetting] = _manualPower;
+                _saved.Values[ManualFansSetting] = _manualFans;
             }
 
             // Auto hides what TDP Engine picks itself: the power limit, CPU boost and the fans.
