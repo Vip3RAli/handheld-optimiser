@@ -40,6 +40,19 @@ namespace HandheldOptimiser.PowerService
         /// <summary>From the widget, which cannot itself: restart Windows now, to use a new GPU memory size.</summary>
         public const string Restart = "restart";
 
+        /// <summary>From the widget: Auto or Manual, named by the request's Mode, saved and applied at once.</summary>
+        public const string SetMode = "set-mode";
+
+        /// <summary>
+        /// The modes. In Auto, TDP Engine picks the power limit, fans and boost for every session, and a frame
+        /// rate is optional. In Manual, the player picks them.
+        /// </summary>
+        public const string AutoModeName = "auto";
+        public const string ManualMode = "manual";
+
+        /// <summary>The frame rate an Auto session with none runs to, which no game reaches. A status shows it as 0.</summary>
+        public const int NoTargetFps = 1000;
+
         /// <summary>The overlay's levels: how much it shows, or Off.</summary>
         public const string OverlayOff = "off";
         public const string OverlaySmall = "small";
@@ -113,6 +126,9 @@ namespace HandheldOptimiser.PowerService
             public const string GpuMemoryNow = "GpuMemoryNow";
             public const string GpuMemoryNext = "GpuMemoryNext";
             public const string GpuMemoryOffered = "GpuMemoryOffered";
+            public const string Mode = "Mode";
+            public const string ManualPowerLimit = "ManualPowerLimit";
+            public const string ManualFans = "ManualFans";
         }
     }
 

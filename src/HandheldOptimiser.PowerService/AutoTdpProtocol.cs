@@ -82,11 +82,12 @@ internal static partial class AutoTdpProtocol
 /// <param name="OverlayLayout">With set-overlay: one of <see cref="AutoTdpProtocol.OverlayLayouts"/>, or null to keep it.</param>
 /// <param name="ScreenStats">With set-screen-stats: true to show the stats on the Ally's screen while docked, false to stop.</param>
 /// <param name="GpuMemory">With set-gpu-memory: the size in GB, 0 for Auto, one of GpuMemory.Sizes.</param>
+/// <param name="Mode">With set-mode: AutoTdpProtocol.AutoModeName or AutoTdpProtocol.ManualMode.</param>
 internal sealed record AutoTdpRequest(string Command, int TargetFps = 0, int MinWatts = 0, int MaxWatts = 0,
     int TemperatureLimit = 0, int StartWatts = 0, string? GameFolder = null, string? FanCurve = null, int PowerLimit = 0,
     string? ControllerMode = null, bool Temporary = false, bool? CpuBoost = null, string? OverlayLevel = null,
     string? OverlayCorner = null, int ProcessId = 0, string? OverlayLayout = null, bool? ScreenStats = null,
-    int? GpuMemory = null);
+    int? GpuMemory = null, string? Mode = null);
 
 /// <param name="Running">Whether it is setting the power limit or the fans right now.</param>
 /// <param name="State">One of the AutoTdpState names.</param>
@@ -106,8 +107,12 @@ internal sealed record AutoTdpRequest(string Command, int TargetFps = 0, int Min
 /// <param name="GpuMemoryNow">The GPU memory Windows has now, in GB, 0 for Auto, or null when not known.</param>
 /// <param name="GpuMemoryNext">The size waiting for a restart, or null when nothing waits.</param>
 /// <param name="GpuMemoryOffered">The sizes that can be set, empty when this device cannot set it, or null from an older service.</param>
+/// <param name="Mode">TDP Engine's mode, AutoTdpProtocol.AutoModeName or AutoTdpProtocol.ManualMode, or null from an older service.</param>
+/// <param name="ManualPowerLimit">The power limit last chosen in Manual, or 0 for Auto.</param>
+/// <param name="ManualFans">The fans last chosen in Manual, or null for the Ally's own.</param>
 internal sealed record AutoTdpStatus(bool Running, double? Fps = null, int? Watts = null, int? Temperature = null,
     string? State = null, string? Error = null, int TargetFps = 0, string? FanCurve = null, int PowerLimit = 0,
     bool Replacing = false, bool ControllerConnected = false, string? ControllerMode = null, bool? CpuBoost = null,
     string? OverlayLevel = null, string? OverlayCorner = null, string? OverlayLayout = null, bool ScreenStats = false,
-    int? GpuMemoryNow = null, int? GpuMemoryNext = null, int[]? GpuMemoryOffered = null);
+    int? GpuMemoryNow = null, int? GpuMemoryNext = null, int[]? GpuMemoryOffered = null, string? Mode = null,
+    int ManualPowerLimit = 0, string? ManualFans = null);
