@@ -45,6 +45,13 @@ namespace HandheldOptimiser.GameBar
         /// <summary>Whether the stats screen on the Ally's own panel is switched on.</summary>
         public bool ScreenStats;
 
+        /// <summary>"auto" or "manual", or null when TDP Engine did not say, as when it is not running.</summary>
+        public string Mode;
+
+        /// <summary>The power limit and fans last chosen in Manual, offered again with no session running.</summary>
+        public int ManualPowerLimit;
+        public string ManualFans;
+
         /// <summary>The GPU memory Windows has now, in GB with 0 for Auto, or null when not known.</summary>
         public int? GpuMemoryNow;
 
@@ -152,6 +159,13 @@ namespace HandheldOptimiser.GameBar
         /// Switches the stats screen on the Ally's own panel on or off, starting the service if need be. The
         /// service starts it and keeps it running; it shows only while a monitor is in use.
         /// </summary>
+        public static EngineStatus SetMode(string mode) =>
+            SendStarting(new JsonObject
+            {
+                [AutoTdpProtocol.Fields.Command] = JsonValue.CreateStringValue(AutoTdpProtocol.SetMode),
+                [AutoTdpProtocol.Fields.Mode] = JsonValue.CreateStringValue(mode)
+            }.Stringify());
+
         public static EngineStatus SetScreenStats(bool on)
         {
             var request = new JsonObject
@@ -261,7 +275,10 @@ namespace HandheldOptimiser.GameBar
                 ScreenStats = json.GetNamedBoolean(AutoTdpProtocol.Fields.ScreenStats, false),
                 GpuMemoryNow = (int?)Number(json, AutoTdpProtocol.Fields.GpuMemoryNow),
                 GpuMemoryNext = (int?)Number(json, AutoTdpProtocol.Fields.GpuMemoryNext),
-                GpuMemoryOffered = Numbers(json, AutoTdpProtocol.Fields.GpuMemoryOffered)
+                GpuMemoryOffered = Numbers(json, AutoTdpProtocol.Fields.GpuMemoryOffered),
+                Mode = Text(json, AutoTdpProtocol.Fields.Mode),
+                ManualPowerLimit = (int)(Number(json, AutoTdpProtocol.Fields.ManualPowerLimit) ?? 0),
+                ManualFans = Text(json, AutoTdpProtocol.Fields.ManualFans)
             };
         }
 

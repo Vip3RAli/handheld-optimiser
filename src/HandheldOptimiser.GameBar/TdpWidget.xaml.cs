@@ -31,6 +31,7 @@ namespace HandheldOptimiser.GameBar
         private bool _placingBoost;
         private bool _placingScreenStats;
         private bool _placingGpuMemory;
+        private string _mode = AutoTdpProtocol.AutoModeName;
 
         // Whether the GPU memory row is open, and whether the player just picked a size, which asks to restart.
         private bool _gpuMemoryOpen;
@@ -79,8 +80,28 @@ namespace HandheldOptimiser.GameBar
             }
         }
 
-        private void OnFrameRate(object sender, RoutedEventArgs e) =>
-            Change(int.Parse((string)((FrameworkElement)sender).Tag), CurrentPower, CurrentFans);
+        // In Auto only the frame rate is sent: TDP Engine picks the rest, and 0 is None, not off.
+        private void OnFrameRate(object sender, RoutedEventArgs e)
+        {
+            var target = int.Parse((string)((FrameworkElement)sender).Tag);
+            if (Auto)
+            {
+                Change(target, 0, null);
+            }
+            else
+            {
+                Change(target, CurrentPower, CurrentFans);
+            }
+        }
+
+        private void OnMode(object sender, RoutedEventArgs e)
+        {
+            var mode = (string)((FrameworkElement)sender).Tag;
+            Send(() => EngineClient.SetMode(mode));
+        }
+
+        /// <summary>Auto unless TDP Engine said Manual. Kept from its last answer while it is not running.</summary>
+        private bool Auto => _mode != AutoTdpProtocol.ManualMode;
 
         private void OnPowerLimit(object sender, RoutedEventArgs e)
         {
@@ -323,9 +344,10 @@ namespace HandheldOptimiser.GameBar
 
         private int CurrentFps => _status.Running ? _status.TargetFps : 0;
 
-        private int CurrentPower => _status.Running ? _status.PowerLimit : 0;
+        // With nothing running, Manual offers what was chosen in it last.
+        private int CurrentPower => _status.Running ? _status.PowerLimit : _status.ManualPowerLimit;
 
-        private string CurrentFans => _status.Running ? _status.FanCurve : null;
+        private string CurrentFans => _status.Running ? _status.FanCurve : _status.ManualFans;
 
         private async void Change(int targetFps, int powerLimit, string fanCurve)
         {
@@ -350,7 +372,22 @@ namespace HandheldOptimiser.GameBar
         private void Show(EngineStatus status)
         {
             _status = status;
-            Check(FrameRates, CurrentFps.ToString());
+            if (status.Reachable && status.Mode != null)
+            {
+                _mode = status.Mode;
+            }
+
+            // Auto hides what TDP Engine picks itself: the power limit, CPU boost and the fans.
+            var manual = Auto ? Visibility.Collapsed : Visibility.Visible;
+            Check(Modes, Auto ? AutoTdpProtocol.AutoModeName : AutoTdpProtocol.ManualMode);
+            PowerLabel.Visibility = manual;
+            PowerRow.Visibility = manual;
+            BoostRow.Visibility = manual;
+            CoolingCard.Visibility = manual;
+            FrameRateOff.Content = Auto ? "None" : "Off";
+
+            // In Auto, None is lit only while TDP Engine runs with no target: stopped, nothing is.
+            Check(FrameRates, Auto && !status.Running ? "" : CurrentFps.ToString());
             ShowPower(CurrentPower);
             Check(Fans, CurrentFans ?? "");
 
@@ -382,7 +419,7 @@ namespace HandheldOptimiser.GameBar
 
             if (!status.Running)
             {
-                SetState("Off", ". Choose a frame rate, power limit or fan setting to start it.");
+                SetState("Off", Auto ? ". Choose a frame rate, or None, to start it." : ". Choose a frame rate, power limit or fan setting to start it.");
                 return;
             }
 
@@ -392,7 +429,12 @@ namespace HandheldOptimiser.GameBar
             SetReadout(FpsValue, FpsUnit, "fps", status.Fps is double fps ? Math.Round(fps).ToString() : "?", status.Fps != null);
             SetReadout(TemperatureValue, TemperatureUnit, "°C", status.Temperature?.ToString() ?? "?", status.Temperature != null);
 
-            if (status.Watts == null)
+            if (Auto)
+            {
+                SetState(status.TargetFps > 0 ? "Holding " + status.TargetFps + " fps" : "Most frames for the power",
+                    ". " + (status.Watts?.ToString() ?? "?") + " W, boost " + (status.CpuBoost == true ? "on" : "off") + ".");
+            }
+            else if (status.Watts == null)
             {
                 SetState(status.FanCurve == AutoTdpProtocol.DynamicFans ? "Fans controlled automatically" : FanName(status.FanCurve) + " fans",
                     ". Power controlled automatically.");

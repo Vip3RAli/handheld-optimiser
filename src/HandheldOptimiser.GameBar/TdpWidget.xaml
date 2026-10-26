@@ -212,9 +212,22 @@
                         </Grid>
                     </Border>
 
+                    <!-- Auto: TDP Engine picks the power limit, fans and CPU boost, and only the frame rate is the
+                         player's. Manual: the player picks them. Saved by TDP Engine, for every game. -->
+                    <Border Style="{StaticResource Bar}" Margin="0,0,0,14">
+                        <Grid x:Name="Modes">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <ToggleButton Style="{StaticResource Tile}" FontSize="13" Tag="auto" Click="OnMode" Content="Auto" />
+                            <ToggleButton Grid.Column="1" Style="{StaticResource Tile}" FontSize="13" Tag="manual" Click="OnMode" Content="Manual" />
+                        </Grid>
+                    </Border>
+
                     <TextBlock Style="{StaticResource Label}" Text="Frame rate (fps)" />
                     <Border Style="{StaticResource Bar}">
-                        <!-- The Tag is the frame rate sent to the service. -->
+                        <!-- The Tag is the frame rate sent to the service. In Auto, 0 is None: no target, not off. -->
                         <Grid x:Name="FrameRates">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -223,7 +236,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <ToggleButton Style="{StaticResource Tile}" Tag="0" Click="OnFrameRate" Content="Off" />
+                            <ToggleButton x:Name="FrameRateOff" Style="{StaticResource Tile}" Tag="0" Click="OnFrameRate" Content="Off" />
                             <ToggleButton Grid.Column="1" Style="{StaticResource Tile}" Tag="30" Click="OnFrameRate" Content="30" />
                             <ToggleButton Grid.Column="2" Style="{StaticResource Tile}" Tag="40" Click="OnFrameRate" Content="40" />
                             <ToggleButton Grid.Column="3" Style="{StaticResource Tile}" Tag="45" Click="OnFrameRate" Content="45" />
@@ -232,8 +245,8 @@
                     </Border>
 
                     <!-- With a frame rate, the most TDP Engine may use; with frame rate Off, a limit held as it is. -->
-                    <TextBlock Style="{StaticResource Label}" Text="Power limit" Margin="0,14,0,8" />
-                    <Grid>
+                    <TextBlock x:Name="PowerLabel" Style="{StaticResource Label}" Text="Power limit" Margin="0,14,0,8" />
+                    <Grid x:Name="PowerRow">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="72" />
                             <ColumnDefinition Width="*" />
@@ -269,8 +282,8 @@
                     </Grid>
 
                     <!-- On or off for the power source in use. Not known while TDP Engine is not running: the switch
-                         then shows off with a line saying so, and turning it on starts TDP Engine. -->
-                    <Border Style="{StaticResource Bar}" Margin="0,14,0,0" Padding="12,6,6,6">
+                         then shows off with a line saying so, and turning it on starts TDP Engine. Manual only. -->
+                    <Border x:Name="BoostRow" Style="{StaticResource Bar}" Margin="0,14,0,0" Padding="12,6,6,6">
                         <Grid>
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock Style="{StaticResource Label}" Margin="0" Text="CPU boost" />
@@ -332,8 +345,8 @@
                 </StackPanel>
             </Border>
 
-            <!-- ===== Cooling ===== -->
-            <Border Style="{StaticResource Card}">
+            <!-- ===== Cooling: Manual only, as TDP Engine runs the fans in Auto ===== -->
+            <Border x:Name="CoolingCard" Style="{StaticResource Card}">
                 <StackPanel>
                     <Border Style="{StaticResource HeaderLine}">
                         <StackPanel Orientation="Horizontal">
