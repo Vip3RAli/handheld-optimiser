@@ -178,16 +178,15 @@ namespace HandheldOptimiser.GameBar
                 [AutoTdpProtocol.Fields.GpuMemory] = JsonValue.CreateNumberValue(size)
             }.Stringify());
 
-        /// <summary>Asks TDP Engine to restart Windows now, as Game Bar cannot. Only offered once a size was just set, so the service is running.</summary>
-        public static EngineStatus Restart()
-        {
-            var answer = Send(new JsonObject
+        /// <summary>
+        /// Asks TDP Engine to restart Windows now, as Game Bar cannot. Starting it if need be: it ends itself a
+        /// minute after it was last needed, which can pass while the question waits.
+        /// </summary>
+        public static EngineStatus Restart() =>
+            SendStarting(new JsonObject
             {
                 [AutoTdpProtocol.Fields.Command] = JsonValue.CreateStringValue(AutoTdpProtocol.Restart)
             }.Stringify());
-
-            return answer == null ? EngineStatus.Failed("TDP Engine is not responding. Try again in a moment.") : Read(answer);
-        }
 
         private static JsonValue TextOrNull(string text) =>
             text == null ? JsonValue.CreateNullValue() : JsonValue.CreateStringValue(text);

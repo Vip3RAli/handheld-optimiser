@@ -9,8 +9,6 @@ namespace HandheldOptimiser.Tests;
 /// </summary>
 public class GpuMemoryTests
 {
-    private static readonly DateTime Started = new(2026, 10, 26, 8, 0, 0, DateTimeKind.Utc);
-
     // ----- The sizes and their codes -----
 
     [Theory]
@@ -46,36 +44,50 @@ public class GpuMemoryTests
     public void A_size_not_on_offer_has_no_code(int size) =>
         Assert.Null(GpuMemory.CodeOf(size));
 
+    // ----- What the firmware answers -----
+
+    [Fact]
+    public void A_firmware_answer_with_the_presence_bit_gives_its_code() =>
+        Assert.Equal(0x108, GpuMemory.CodeFromStatus(0x00010108));
+
+    [Theory]
+    [InlineData(0x00000108)]
+    [InlineData(unchecked((int)0xFFFFFFFE))]
+    [InlineData(int.MinValue)]
+    public void A_model_without_it_answers_no_code(int answer) =>
+        Assert.Null(GpuMemory.CodeFromStatus(answer));
+
+    // ----- The size Windows has, from the graphics driver -----
+
+    [Theory]
+    [InlineData(6442450944L, 6)]
+    [InlineData(1073741824L, 1)]
+    [InlineData(8589934592L, 8)]
+    [InlineData(536870912L, 0)]
+    public void The_driver_reading_gives_the_size_Windows_has(long bytes, int size) =>
+        Assert.Equal(size, GpuMemory.SizeFromBytes(bytes));
+
+    [Fact]
+    public void No_driver_reading_is_not_known() =>
+        Assert.Null(GpuMemory.SizeFromBytes(null));
+
     // ----- What waits for a restart -----
 
     [Fact]
-    public void Nothing_waits_when_the_firmware_has_what_Windows_started_with() =>
-        Assert.Equal((6, (int?)null), GpuMemory.Describe(0x108, 0x108));
+    public void Nothing_waits_when_the_firmware_has_what_Windows_has() =>
+        Assert.Equal((6, (int?)null), GpuMemory.Describe(6, 0x108));
 
     [Fact]
     public void A_change_waits_for_a_restart() =>
-        Assert.Equal((6, 4), GpuMemory.Describe(0x108, 0x105));
+        Assert.Equal((6, 4), GpuMemory.Describe(6, 0x105));
+
+    [Fact]
+    public void Auto_waits_for_a_restart_too() =>
+        Assert.Equal((6, 0), GpuMemory.Describe(6, 0x100));
 
     [Fact]
     public void An_unknown_size_now_is_null_not_a_guess() =>
-        Assert.Equal(((int?)null, 4), GpuMemory.Describe(0x10A, 0x105));
-
-    // ----- The note of the size Windows started with -----
-
-    [Fact]
-    public void A_note_from_this_start_is_used() =>
-        Assert.Equal(0x108, GpuMemory.BootCode(0x108, Started.AddSeconds(30).Ticks, Started));
-
-    [Fact]
-    public void A_note_from_before_a_restart_is_not_used() =>
-        Assert.Null(GpuMemory.BootCode(0x108, Started.AddHours(-5).Ticks, Started));
-
-    [Fact]
-    public void A_note_missing_its_code_or_its_time_is_not_used()
-    {
-        Assert.Null(GpuMemory.BootCode(null, Started.Ticks, Started));
-        Assert.Null(GpuMemory.BootCode(0x108, null, Started));
-    }
+        Assert.Equal(((int?)null, 4), GpuMemory.Describe(null, 0x105));
 
     // ----- What the app's row says -----
 

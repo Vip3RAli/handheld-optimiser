@@ -208,9 +208,9 @@ namespace HandheldOptimiser.GameBar
             }
         }
 
-        private void OnGpuMemoryPicked(object sender, SelectionChangedEventArgs e)
+        private void OnGpuMemoryPicked(object sender, object e)
         {
-            // Set from TDP Engine's answer, not by the player: nothing to send.
+            // Closed on the size it already had: nothing to send.
             if (_placingGpuMemory || !(GpuMemorySizes.SelectedItem is ComboBoxItem item) || !(item.Tag is int size)
                 || size == (_status.GpuMemoryNext ?? _status.GpuMemoryNow))
             {
@@ -219,6 +219,27 @@ namespace HandheldOptimiser.GameBar
 
             _askRestart = true;
             Send(() => EngineClient.SetGpuMemory(size));
+        }
+
+        /// <summary>Up and down on the closed box move to the next control, as everywhere else in the widget, instead of changing the size.</summary>
+        private void OnGpuMemoryKey(object sender, Windows.UI.Xaml.Input.KeyRoutedEventArgs e)
+        {
+            if (GpuMemorySizes.IsDropDownOpen)
+            {
+                return;
+            }
+
+            var direction = e.Key == Windows.System.VirtualKey.Up || e.Key == Windows.System.VirtualKey.GamepadDPadUp
+                ? Windows.UI.Xaml.Input.FocusNavigationDirection.Up
+                : e.Key == Windows.System.VirtualKey.Down || e.Key == Windows.System.VirtualKey.GamepadDPadDown
+                    ? Windows.UI.Xaml.Input.FocusNavigationDirection.Down
+                    : Windows.UI.Xaml.Input.FocusNavigationDirection.None;
+
+            if (direction != Windows.UI.Xaml.Input.FocusNavigationDirection.None)
+            {
+                Windows.UI.Xaml.Input.FocusManager.TryMoveFocus(direction);
+                e.Handled = true;
+            }
         }
 
         private void OnGpuMemoryRestart(object sender, RoutedEventArgs e)

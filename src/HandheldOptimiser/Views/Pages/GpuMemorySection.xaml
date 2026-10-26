@@ -16,7 +16,8 @@
             <ComboBox Grid.Column="1" MinWidth="140" MinHeight="36" Margin="12,0,0,0"
                       ItemsSource="{Binding Choices}" DisplayMemberPath="Name"
                       SelectedItem="{Binding Selected, Mode=TwoWay}" IsEnabled="{Binding IsReachable}"
-                      FocusVisualStyle="{StaticResource FocusRing}" AutomationProperties.Name="GPU memory" />
+                      FocusVisualStyle="{StaticResource FocusRing}" AutomationProperties.Name="GPU memory"
+                      PreviewKeyDown="OnKey" DropDownClosed="OnClosed" />
         </Grid>
     </ui:Card>
 </UserControl>

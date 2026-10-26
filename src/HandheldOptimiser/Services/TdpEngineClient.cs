@@ -17,7 +17,9 @@ internal sealed class TdpEngineClient(LogService log)
 {
     private const string ServiceExeName = "HandheldOptimiser.PowerService";
 
-    private static readonly TimeSpan ConnectWait = TimeSpan.FromSeconds(5);
+    // Short, as a pipe that is not there is waited for in full, and the service is usually stopped when the
+    // app starts: it ends itself when idle. A busy pipe is tried again in the loop below.
+    private static readonly TimeSpan ConnectWait = TimeSpan.FromMilliseconds(300);
     private static readonly TimeSpan ReplyWait = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan StartWait = TimeSpan.FromSeconds(6);
 

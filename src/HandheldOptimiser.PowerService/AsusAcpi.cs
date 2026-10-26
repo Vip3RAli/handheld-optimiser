@@ -35,9 +35,6 @@ internal sealed partial class AsusAcpi : IPowerBackend
     private const uint CpuFanCurve = 0x00110024;
     private const uint GpuFanCurve = 0x00110025;
 
-    // Set in a status read when this model has the device.
-    private const int PresenceBit = 0x00010000;
-
     private const uint GenericRead = 0x80000000;
     private const uint GenericWrite = 0x40000000;
     private const uint ShareReadWrite = 3;
@@ -124,8 +121,7 @@ internal sealed partial class AsusAcpi : IPowerBackend
     {
         Span<byte> args = stackalloc byte[8];
         BitConverter.TryWriteBytes(args, GpuMemory.Device);
-        var answer = Call(Dsts, args);
-        return answer != int.MinValue && (answer & PresenceBit) != 0 ? answer & ~PresenceBit : null;
+        return GpuMemory.CodeFromStatus(Call(Dsts, args));
     }
 
     /// <summary>Sets the GPU memory code, used from the next restart.</summary>

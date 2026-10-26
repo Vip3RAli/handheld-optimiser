@@ -10,8 +10,10 @@ internal static class GpuMemory
     /// <summary>The firmware's device number for it, read and set through ATKACPI.</summary>
     public const uint Device = 0x000600C1;
 
-    // How far apart two readings of when Windows started can be and still be the same start, as the clock is corrected now and then.
-    private static readonly TimeSpan SameStart = TimeSpan.FromMinutes(2);
+    // Set in a status read when this model has the device.
+    private const int PresenceBit = 0x00010000;
+
+    private const long Gibibyte = 1L << 30;
 
     // In the order offered. 8 GB's code comes between 4 and 5 GB's, out of order in the firmware too.
     private static readonly (int Size, int Code)[] Table =
@@ -36,16 +38,24 @@ internal static class GpuMemory
     /// <summary>The firmware code for a size, or null for a size not on offer.</summary>
     public static int? CodeOf(int size) => Table.Where(t => t.Size == size).Select(t => (int?)t.Code).FirstOrDefault();
 
-    /// <summary>The size Windows has now, and the size waiting for a restart, which is null when nothing waits.</summary>
-    /// <param name="bootCode">The firmware's code when Windows started.</param>
-    /// <param name="firmwareCode">The firmware's code now.</param>
-    public static (int? Now, int? Next) Describe(int bootCode, int firmwareCode) =>
-        (SizeOf(bootCode), firmwareCode == bootCode ? null : SizeOf(firmwareCode));
+    /// <summary>
+    /// The code in the firmware's answer to a status read, or null when this model does not have the device. A
+    /// model without it answers 0xFFFFFFFE, which has the presence bit set too, so a negative answer counts as none.
+    /// </summary>
+    public static int? CodeFromStatus(int answer) => answer >= 0 && (answer & PresenceBit) != 0 ? answer & ~PresenceBit : null;
 
-    /// <summary>The saved code Windows started with, when the note is from since Windows last started, or else null.</summary>
-    /// <param name="savedStarted">When Windows had started as the note was saved, in UTC ticks.</param>
-    public static int? BootCode(int? savedCode, long? savedStarted, DateTime started) =>
-        savedCode is { } code && savedStarted is { } ticks && (new DateTime(ticks, DateTimeKind.Utc) - started).Duration() < SameStart
-            ? code
-            : null;
+    /// <summary>
+    /// The size Windows has now, from the memory the graphics driver reports as its own as it starts. Under 1 GB
+    /// is Auto, which sets a little aside and shares more as games ask, as the Dashboard's tile reads it too.
+    /// </summary>
+    /// <returns>The size in GB, 0 for Auto, or null when the driver reported nothing.</returns>
+    public static int? SizeFromBytes(long? bytes) => bytes is not { } reported
+        ? null
+        : reported < Gibibyte ? 0 : (int)Math.Round((double)reported / Gibibyte);
+
+    /// <summary>The size Windows has now, and the size waiting for a restart, which is null when nothing waits.</summary>
+    /// <param name="now">The size Windows has now, from <see cref="SizeFromBytes"/>, or null when not known.</param>
+    /// <param name="firmwareCode">The firmware's code now, used from the next restart.</param>
+    public static (int? Now, int? Next) Describe(int? now, int firmwareCode) =>
+        (now, SizeOf(firmwareCode) is { } next && next != now ? next : null);
 }

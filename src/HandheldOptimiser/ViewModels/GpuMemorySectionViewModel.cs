@@ -42,7 +42,7 @@ public sealed partial class GpuMemorySectionViewModel : SectionViewModel
     /// <summary>Every size on offer, Auto first.</summary>
     public IReadOnlyList<GpuMemoryChoice> Choices { get; } = [.. GpuMemory.Sizes.Select(s => new GpuMemoryChoice(s, GpuMemoryText.Name(s)))];
 
-    /// <summary>The size Windows will have after the next restart. Changed by the player, it sets it.</summary>
+    /// <summary>The size Windows will have after the next restart. Picked by the player, it is set by <see cref="ApplyAsync"/>.</summary>
     [ObservableProperty]
     private GpuMemoryChoice? _selected;
 
@@ -69,19 +69,18 @@ public sealed partial class GpuMemorySectionViewModel : SectionViewModel
     public override Task RefreshAsync() => Shell.RunScanAsync("GPU memory", async ct =>
         Show(await _engine.SendAsync(new AutoTdpRequest(AutoTdpProtocol.GpuMemoryRequest), ct)));
 
-    partial void OnSelectedChanged(GpuMemoryChoice? value)
+    /// <summary>
+    /// Sets the size picked, once the dropdown has closed on it, then asks to restart. Not on every change of
+    /// the selection: an open WPF dropdown changes it at each arrow press.
+    /// </summary>
+    public async Task ApplyAsync()
     {
-        // Set from TDP Engine's answer, not by the player: nothing to send.
-        if (_placing || value is null || value.Size == (_next ?? _now))
+        if (_placing || Selected is not { } picked || picked.Size == (_next ?? _now))
         {
             return;
         }
 
-        _ = SetAsync(value.Size);
-    }
-
-    private async Task SetAsync(int size)
-    {
+        var size = picked.Size;
         AutoTdpStatus? answer = null;
         await Shell.RunExclusiveAsync("Setting GPU memory", async (_, ct) =>
             answer = await _engine.SendAsync(new AutoTdpRequest(AutoTdpProtocol.SetGpuMemory, GpuMemory: size), ct));
