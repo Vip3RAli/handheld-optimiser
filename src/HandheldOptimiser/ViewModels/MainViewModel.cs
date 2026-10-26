@@ -110,6 +110,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         // What each kind of section in the map is made of.
         SectionViewModel Build(SectionSpec spec, OpenTile open) => spec.Kind switch
         {
+            SectionKind.GpuMemory => new GpuMemorySectionViewModel(log, this) { Heading = spec.Heading },
             SectionKind.Tweaks => new TweakSectionViewModel(spec.Category!.Value, engine, states, this, open) { Heading = spec.Heading },
             SectionKind.HomeApp => new HomeAppPickerViewModel(log, this) { Heading = spec.Heading },
             SectionKind.Startup => new StartupViewModel(startupService, this, open) { Heading = spec.Heading },
@@ -420,14 +421,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         }
 
         Log.Warning("Restarting Windows at the user's request.");
-
-        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-        {
-            FileName = System.IO.Path.Combine(Environment.SystemDirectory, "shutdown.exe"),
-            Arguments = "/r /t 5 /c \"Handheld Optimiser: applying changes\"",
-            CreateNoWindow = true,
-            UseShellExecute = false
-        });
+        WindowsRestart.Start();
     }
 
     /// <summary>

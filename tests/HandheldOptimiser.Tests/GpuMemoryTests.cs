@@ -77,6 +77,17 @@ public class GpuMemoryTests
         Assert.Null(GpuMemory.BootCode(0x108, null, Started));
     }
 
+    // ----- What the app's row says -----
+
+    [Theory]
+    [InlineData(0, null, "Auto")]
+    [InlineData(6, null, "6 GB")]
+    [InlineData(6, 4, "6 GB, 4 GB after restart")]
+    [InlineData(6, 0, "6 GB, Auto after restart")]
+    [InlineData(null, null, "Unknown")]
+    public void The_row_says_what_Windows_has_and_what_waits(int? now, int? next, string text) =>
+        Assert.Equal(text, HandheldOptimiser.ViewModels.GpuMemoryText.Describe(now, next));
+
     // ----- The requests the widget and the app send -----
 
     [Fact]

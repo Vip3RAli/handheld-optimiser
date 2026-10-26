@@ -14,6 +14,9 @@ public abstract partial class SectionViewModel(IShell shell) : ObservableObject
     /// <summary>The heading drawn over the section. Empty where the page draws none.</summary>
     public string Heading { get; init; } = string.Empty;
 
+    /// <summary>Whether the section and its heading show at all. False only for one that does not apply to this device.</summary>
+    public virtual bool IsShown => true;
+
     /// <summary>Said at the right of the heading, such as "4 of 4 on".</summary>
     public virtual string Summary => string.Empty;
 
