@@ -90,6 +90,15 @@ internal static class ScreenStatsApp
                     return;
                 }
 
+                // Locked, the Ally's screen is turned off, and turned on again once unlocked.
+                if (SessionLock.IsLocked())
+                {
+                    guard.Stop();
+                    window.HideAway();
+                    panel.TurnOffWhileLocked();
+                    return;
+                }
+
                 if (panel.Keep() is not { } bounds)
                 {
                     guard.Stop();
@@ -109,6 +118,9 @@ internal static class ScreenStatsApp
         };
 
         app.Startup += (_, _) => timer.Start();
+
+        // Signing out or shutting down: the screens are put back before Windows ends this program.
+        app.SessionEnding += (_, _) => End("signing out or shutting down");
         Program.Log("Stats screen started");
         try
         {

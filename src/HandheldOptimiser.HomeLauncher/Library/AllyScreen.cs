@@ -329,6 +329,9 @@ internal sealed class PanelKeeper
     private PanelState? _changedFrom;
     private bool _tried;
 
+    // Whether the panel was turned off here while the screen is locked, to be turned on again when unlocked.
+    private bool _offWhileLocked;
+
     /// <summary>Where the stats go, in desktop pixels, or null when there is nowhere for them now.</summary>
     public ScreenRect? Keep()
     {
@@ -339,7 +342,15 @@ internal sealed class PanelKeeper
         {
             _tried = false;
             _changedFrom = null;
+            _offWhileLocked = false;
             return null;
+        }
+
+        // Unlocked again: the panel is turned back on, once, as when the Ally is docked.
+        if (_offWhileLocked)
+        {
+            _offWhileLocked = false;
+            _tried = false;
         }
 
         if (now.Panel == PanelState.Own)
@@ -353,17 +364,36 @@ internal sealed class PanelKeeper
         }
 
         _tried = true;
+
+        // Turned on again after the lock screen, it still goes back to what the player had at first.
         if (AllyScreen.ShowBesideMonitor())
         {
-            _changedFrom = now.Panel;
+            _changedFrom ??= now.Panel;
         }
 
         return AllyScreen.Read() is { MonitorOn: true, Panel: PanelState.Own } after ? after.PanelBounds : null;
     }
 
+    /// <summary>
+    /// Turns the panel off while the screen is locked, rather than leave it lit beside the lock screen. Only
+    /// when it was turned on here and is on now: a panel the player turned off, as with Win+P, stays off.
+    /// </summary>
+    public void TurnOffWhileLocked()
+    {
+        if (_changedFrom is null || _offWhileLocked || AllyScreen.Read() is not { MonitorOn: true, Panel: PanelState.Own })
+        {
+            return;
+        }
+
+        _offWhileLocked = true;
+        Program.Log("Stats screen: the screen is locked, so the Ally's screen is turned off until it is unlocked");
+        AllyScreen.PutBack(PanelState.Off);
+    }
+
     /// <summary>Puts the screens back when they were changed here.</summary>
     public void PutBack()
     {
+        _offWhileLocked = false;
         if (_changedFrom is { } before)
         {
             _changedFrom = null;
