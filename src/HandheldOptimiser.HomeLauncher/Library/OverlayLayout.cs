@@ -13,6 +13,8 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 /// <param name="MemoryTotalGb">All the memory there is, in GB.</param>
 /// <param name="Battery">The battery's charge, 0 to 100, or null with no battery.</param>
 /// <param name="Charging">Whether the charger is plugged in.</param>
+/// <param name="CpuGhz">The processor's clock now, in GHz, as Task Manager's speed figure.</param>
+/// <param name="PowerDrawn">The power the processor and graphics draw now, in watts, from Windows' energy meter.</param>
 internal sealed record OverlayReading(
     double? Fps = null,
     int? Watts = null,
@@ -22,7 +24,9 @@ internal sealed record OverlayReading(
     double? MemoryUsedGb = null,
     double? MemoryTotalGb = null,
     int? Battery = null,
-    bool Charging = false);
+    bool Charging = false,
+    double? CpuGhz = null,
+    double? PowerDrawn = null);
 
 /// <summary>One row of the overlay: a short name and its value.</summary>
 internal sealed record OverlayLine(string Label, string Value);
