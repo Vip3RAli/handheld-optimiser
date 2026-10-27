@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using HandheldOptimiser.PowerService;
+using Microsoft.Gaming.XboxGameBar;
 using Windows.Storage;
 using Windows.System.Power;
 using Windows.UI.Core;
@@ -9,6 +10,7 @@ using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
 using Windows.UI.Xaml.Documents;
+using Windows.UI.Xaml.Navigation;
 
 namespace HandheldOptimiser.GameBar
 {
@@ -63,11 +65,11 @@ namespace HandheldOptimiser.GameBar
                 PowerManager.PowerSupplyStatusChanged += OnPowerSupply;
                 ShowPowerSupply();
                 Show(_status);
-                Refresh();
-                _timer.Start();
+                UpdatePolling();
             };
             Unloaded += (sender, e) =>
             {
+                _loaded = false;
                 PowerManager.PowerSupplyStatusChanged -= OnPowerSupply;
                 _timer.Stop();
                 if (_sliding)
@@ -76,6 +78,52 @@ namespace HandheldOptimiser.GameBar
                     SendSlider();
                 }
             };
+        }
+
+        // Game Bar keeps the widget loaded after it closes, so without this it would ask TDP Engine every two
+        // seconds for as long as the player is signed in. Null when opened on its own, outside Game Bar.
+        private XboxGameBarWidget _widget;
+
+        protected override void OnNavigatedTo(NavigationEventArgs e)
+        {
+            _widget = e.Parameter as XboxGameBarWidget;
+            if (_widget != null)
+            {
+                _widget.VisibleChanged += OnVisibleChanged;
+            }
+        }
+
+        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        {
+            if (_widget != null)
+            {
+                _widget.VisibleChanged -= OnVisibleChanged;
+                _widget = null;
+            }
+        }
+
+        /// <summary>Game Bar may say so on another thread, and the timer belongs to the window's.</summary>
+        private async void OnVisibleChanged(XboxGameBarWidget sender, object args) =>
+            await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, UpdatePolling);
+
+        /// <summary>
+        /// Asks TDP Engine for news only while the widget can be seen: Game Bar is open, or the widget is
+        /// pinned over the game. Shown again, it asks at once rather than showing stale readings.
+        /// </summary>
+        private void UpdatePolling()
+        {
+            if (_loaded && (_widget == null || _widget.Visible))
+            {
+                if (!_timer.IsEnabled)
+                {
+                    Refresh();
+                    _timer.Start();
+                }
+            }
+            else
+            {
+                _timer.Stop();
+            }
         }
 
         private async void Refresh()
