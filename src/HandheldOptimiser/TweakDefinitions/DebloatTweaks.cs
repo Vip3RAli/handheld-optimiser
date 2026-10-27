@@ -732,9 +732,10 @@ public static class DebloatTweaks
         RequiresReboot = false,
         ScriptDetect = async (ctx, ct) =>
         {
+            // With none of it installed, nothing is collecting, which is what this tweak is for. Unknown
+            // would also leave the switch unable to stay on, since it only shows on for Applied.
             var found = await FindAmdTelemetryAsync(ctx, ct);
-            return found.Count == 0 ? TweakState.Unknown
-                : found.All(f => f.Off) ? TweakState.Applied
+            return found.All(f => f.Off) ? TweakState.Applied
                 : found.Any(f => f.Off) ? TweakState.Partial
                 : TweakState.NotApplied;
         },
@@ -742,7 +743,15 @@ public static class DebloatTweaks
         {
             // Only what is on now is changed and journalled, each with how it was found, so undo puts
             // back exactly that and nothing it never touched.
-            var toChange = (await FindAmdTelemetryAsync(ctx, ct)).Where(f => !f.Off).ToList();
+            var found = await FindAmdTelemetryAsync(ctx, ct);
+            if (found.Count == 0)
+            {
+                const string none = "AMD's User Experience Program is not installed on this device, so there is nothing to turn off.";
+                ctx.Log.Info(none);
+                return TweakResult.NoChange("debloat.amd_telemetry", none);
+            }
+
+            var toChange = found.Where(f => !f.Off).ToList();
             if (toChange.Count == 0)
             {
                 return TweakResult.NoChange("debloat.amd_telemetry");
@@ -803,7 +812,7 @@ public static class DebloatTweaks
     /// <summary>
     /// The AMD User Experience Program's services and scheduled tasks, found by the AUEP in their names.
     /// It comes with the full Adrenalin package, so a handheld with only AMD's base drivers has none,
-    /// and the tweak then reads as Unknown rather than applied.
+    /// and the tweak then reads as applied, as there is nothing collecting.
     /// </summary>
     private static async Task<List<AmdTelemetryItem>> FindAmdTelemetryAsync(TweakContext ctx, CancellationToken ct)
     {
