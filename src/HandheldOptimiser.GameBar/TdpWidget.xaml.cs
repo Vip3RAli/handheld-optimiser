@@ -34,6 +34,16 @@ namespace HandheldOptimiser.GameBar
         private bool _placingBoost;
         private bool _placingScreenStats;
         private bool _placingGpuMemory;
+        private bool _placingMode;
+        private bool _placingController;
+        private bool _placingFrameRate;
+
+        // The frame rate slider's five stops. In Auto the first is None, no target; in Manual it is Off.
+        private static readonly int[] FrameRateStops = { 0, 30, 40, 45, 60 };
+
+        // The frame rate is sent once the slider has stopped moving for this long, as the power limit is.
+        private readonly DispatcherTimer _frameRatePause = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
+        private bool _frameRateSliding;
         // TDP Engine's mode and the last manual choices, from its last answer, kept in the widget's own settings
         // so they are right while TDP Engine is not running, which is most of the time between games.
         private const string ModeSetting = "Mode";
@@ -44,8 +54,7 @@ namespace HandheldOptimiser.GameBar
         private int _manualPower;
         private string _manualFans;
 
-        // Whether the GPU memory row is open, and whether the player just picked a size, which asks to restart.
-        private bool _gpuMemoryOpen;
+        // Whether the player just picked a GPU memory size, which asks to restart.
         private bool _askRestart;
         private bool _sliding;
         private EngineStatus _status = EngineStatus.Off;
@@ -59,6 +68,7 @@ namespace HandheldOptimiser.GameBar
             _manualFans = _saved.Values[ManualFansSetting] as string;
             _timer.Tick += (sender, e) => Refresh();
             _sliderPause.Tick += (sender, e) => SendSlider();
+            _frameRatePause.Tick += (sender, e) => SendFrameRate();
             Loaded += (sender, e) =>
             {
                 _loaded = true;
@@ -76,6 +86,11 @@ namespace HandheldOptimiser.GameBar
                 {
                     _sliderPause.Stop();
                     SendSlider();
+                }
+
+                if (_frameRateSliding)
+                {
+                    SendFrameRate();
                 }
             };
         }
@@ -128,22 +143,47 @@ namespace HandheldOptimiser.GameBar
 
         private async void Refresh()
         {
-            if (_busy || _sliding)
+            if (_busy || _sliding || _frameRateSliding)
             {
                 return;
             }
 
             var status = await Task.Run(() => EngineClient.Status());
-            if (!_busy && !_sliding)
+            if (!_busy && !_sliding && !_frameRateSliding)
             {
                 Show(status);
             }
         }
 
-        // In Auto only the frame rate is sent: TDP Engine picks the rest, and 0 is None, not off.
-        private void OnFrameRate(object sender, RoutedEventArgs e)
+        private void OnFrameRateSlider(object sender, RangeBaseValueChangedEventArgs e)
         {
-            var target = int.Parse((string)((FrameworkElement)sender).Tag);
+            if (!_loaded || _placingFrameRate)
+            {
+                return;
+            }
+
+            // Held back until it stops, so a sweep from None to 60 is one change rather than four.
+            _frameRateSliding = true;
+            FrameRateValue.Text = FrameRateName(SliderFrameRate, running: true);
+            _frameRatePause.Stop();
+            _frameRatePause.Start();
+        }
+
+        private int SliderFrameRate => FrameRateStops[Math.Max(0, Math.Min(FrameRateStops.Length - 1, (int)Math.Round(FrameRateSlider.Value)))];
+
+        // In Auto only the frame rate is sent: TDP Engine picks the rest, and 0 is None, not off. Stopped,
+        // the slider rests on None, so None is reached by moving off it and back within the pause.
+        private void SendFrameRate()
+        {
+            _frameRatePause.Stop();
+            _frameRateSliding = false;
+            var target = SliderFrameRate;
+            if (_status.Running && target == CurrentFps)
+            {
+                Show(_status);
+                return;
+            }
+
             if (Auto)
             {
                 Change(target, 0, null, start: true);
@@ -154,9 +194,19 @@ namespace HandheldOptimiser.GameBar
             }
         }
 
+        /// <summary>What the frame rate stop says: a number, None in Auto, Off in Manual or while TDP Engine is stopped.</summary>
+        private string FrameRateName(int fps, bool running) =>
+            fps > 0 ? fps + " fps" : running && Auto ? "None" : "Off";
+
         private void OnMode(object sender, RoutedEventArgs e)
         {
-            var mode = (string)((FrameworkElement)sender).Tag;
+            // Set from TDP Engine's answer, not by the player: nothing to send.
+            if (_placingMode)
+            {
+                return;
+            }
+
+            var mode = ModeSwitch.IsOn ? AutoTdpProtocol.AutoModeName : AutoTdpProtocol.ManualMode;
             Send(() => EngineClient.SetMode(mode));
         }
 
@@ -228,7 +278,13 @@ namespace HandheldOptimiser.GameBar
 
         private void OnControllerMode(object sender, RoutedEventArgs e)
         {
-            var mode = (string)((FrameworkElement)sender).Tag;
+            // Set from TDP Engine's answer, not by the player: nothing to send.
+            if (_placingController)
+            {
+                return;
+            }
+
+            var mode = ControllerSwitch.IsOn ? AutoTdpProtocol.GamepadMode : AutoTdpProtocol.DesktopMode;
             Send(() => EngineClient.SetControllerMode(mode));
         }
 
@@ -274,16 +330,13 @@ namespace HandheldOptimiser.GameBar
             Send(() => EngineClient.SetOverlay(null, null, layout));
         }
 
-        private void OnGpuMemoryToggle(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// While TDP Engine runs, every answer carries the GPU memory. Stopped, the list shows the sizes from
+        /// the last answer, and opening it asks again, starting TDP Engine, so they are current.
+        /// </summary>
+        private void OnGpuMemoryOpened(object sender, object e)
         {
-            _gpuMemoryOpen = !_gpuMemoryOpen;
-            _askRestart = false;
-            GpuMemoryPanel.Visibility = _gpuMemoryOpen ? Visibility.Visible : Visibility.Collapsed;
-            GpuMemoryRestart.Visibility = Visibility.Collapsed;
-            GpuMemoryChevron.Text = _gpuMemoryOpen ? "" : "";
-
-            // Read when opened, starting TDP Engine if need be, so the sizes are there to pick from.
-            if (_gpuMemoryOpen)
+            if (!_status.Running)
             {
                 Send(() => EngineClient.GpuMemory());
             }
@@ -352,9 +405,9 @@ namespace HandheldOptimiser.GameBar
                 return;
             }
 
-            GpuMemoryValue.Text = status.GpuMemoryNow is int now
-                ? SizeName(now) + (status.GpuMemoryNext is int next ? ", " + SizeName(next) + " after restart" : "")
-                : "Unknown";
+            // The list shows the size from the next restart; while one waits, the line under the name says what Windows has now.
+            GpuMemoryNote.Text = status.GpuMemoryNext != null && status.GpuMemoryNow is int now ? SizeName(now) + " until restart" : "";
+            GpuMemoryNote.Visibility = GpuMemoryNote.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
 
             _placingGpuMemory = true;
             if (GpuMemorySizes.Items.Count != offered.Length)
@@ -444,22 +497,29 @@ namespace HandheldOptimiser.GameBar
 
             // Auto hides what TDP Engine picks itself: the power limit, CPU boost and the fans.
             var manual = Auto ? Visibility.Collapsed : Visibility.Visible;
-            Check(Modes, Auto ? AutoTdpProtocol.AutoModeName : AutoTdpProtocol.ManualMode);
+            _placingMode = true;
+            ModeSwitch.IsOn = Auto;
+            _placingMode = false;
+            ModeNote.Text = Auto ? "TDP Engine sets power, fans and boost" : "You set power, fans and boost";
             PowerLabel.Visibility = manual;
             PowerRow.Visibility = manual;
             BoostRow.Visibility = manual;
             CoolingCard.Visibility = manual;
-            FrameRateOff.Content = Auto ? "None" : "Off";
+            FrameRateLowest.Text = Auto ? "None" : "Off";
 
-            // In Auto, None is lit only while TDP Engine runs with no target: stopped, nothing is.
-            Check(FrameRates, Auto && !status.Running ? "" : CurrentFps.ToString());
+            ShowFrameRate(status);
             ShowPower(CurrentPower);
             Check(Fans, CurrentFans ?? "");
 
-            // The controller is TDP Engine's only while it replaces Armoury Crate. Neither button is lit when
-            // the mode is not known, so the player is not told something that may be wrong.
-            ControllerCard.Visibility = status.Replacing ? Visibility.Visible : Visibility.Collapsed;
-            Check(ControllerModes, status.ControllerMode ?? "");
+            // The controller is TDP Engine's only while it replaces Armoury Crate. A switch has no "not known",
+            // so while the mode is not known it shows off and the line under it says so.
+            ControllerRow.Visibility = status.Replacing ? Visibility.Visible : Visibility.Collapsed;
+            _placingController = true;
+            ControllerSwitch.IsOn = status.ControllerMode == AutoTdpProtocol.GamepadMode;
+            _placingController = false;
+            ControllerNote.Text = status.ControllerMode == AutoTdpProtocol.GamepadMode ? "On: the controller plays games"
+                : status.ControllerMode == AutoTdpProtocol.DesktopMode ? "Off: the controller works the mouse"
+                : "Not known yet";
             ShowBoost(status.CpuBoost);
             Check(OverlayLevels, status.OverlayLevel ?? "");
             Check(OverlayCorners, status.OverlayCorner ?? "");
@@ -484,7 +544,7 @@ namespace HandheldOptimiser.GameBar
 
             if (!status.Running)
             {
-                SetState("Off", Auto ? ". Choose a frame rate, or None, to start it." : ". Choose a frame rate, power limit or fan setting to start it.");
+                SetState("Off", Auto ? ". Move the frame rate slider to start it." : ". Choose a frame rate, power limit or fan setting to start it.");
                 return;
             }
 
@@ -518,6 +578,31 @@ namespace HandheldOptimiser.GameBar
                     StateDetail.Text += " Using up to " + status.PowerLimit + " W.";
                 }
             }
+        }
+
+        /// <summary>
+        /// The frame rate slider at the target in force, left alone while the player moves it. Stopped, it rests
+        /// on the first stop and says Off.
+        /// </summary>
+        private void ShowFrameRate(EngineStatus status)
+        {
+            if (_frameRateSliding)
+            {
+                return;
+            }
+
+            var fps = CurrentFps;
+            var stop = Array.IndexOf(FrameRateStops, fps);
+            if (stop < 0)
+            {
+                // A target from elsewhere that is not one of the stops: the nearest stop below it.
+                stop = FrameRateStops.Count(s => s <= fps) - 1;
+            }
+
+            _placingFrameRate = true;
+            FrameRateSlider.Value = Math.Max(0, stop);
+            _placingFrameRate = false;
+            FrameRateValue.Text = FrameRateName(fps, status.Running);
         }
 
         /// <summary>Auto lit, or the slider at the limit in force. The slider stays where it was under Auto.</summary>
