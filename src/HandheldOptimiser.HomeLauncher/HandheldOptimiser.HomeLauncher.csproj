@@ -64,6 +64,7 @@
     <!-- How the library talks to the TDP Engine service, shared with it so the two always agree. -->
     <Compile Include="..\HandheldOptimiser.PowerService\AutoTdpProtocol.cs" Link="Library\AutoTdpProtocol.cs" />
     <Compile Include="..\HandheldOptimiser.PowerService\AutoTdpProtocol.Names.cs" Link="Library\AutoTdpProtocol.Names.cs" />
+    <Compile Include="..\HandheldOptimiser.PowerService\Monitors.cs" Link="Library\Monitors.cs" />
   </ItemGroup>
 
   <ItemGroup>

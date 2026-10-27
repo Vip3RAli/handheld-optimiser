@@ -63,10 +63,13 @@ internal sealed class ScreenStatsHost
         Keep();
     }
 
-    /// <summary>Each second: starts the stats screen when it is on and not running.</summary>
+    /// <summary>
+    /// Each second: starts the stats screen when it is on, a monitor is plugged in and it is not running.
+    /// Undocked it has nothing to show, and closes itself (see <see cref="Monitors"/>).
+    /// </summary>
     public void Keep()
     {
-        if (On)
+        if (On && Monitors.Docked())
         {
             _program.Keep();
         }

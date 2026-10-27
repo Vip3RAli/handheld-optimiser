@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Threading;
+using HandheldOptimiser.PowerService;
 
 namespace HandheldOptimiser.HomeLauncher.Library;
 
@@ -22,6 +23,10 @@ internal static class ScreenStatsApp
 
     // Seconds without an answer before it gives up.
     private const int MissesToEnd = 5;
+
+    // Seconds undocked before it closes, so a monitor that drops for a moment as it wakes does not end it.
+    // TDP Engine starts it again once a monitor is plugged in.
+    private const int UndockedToEnd = 5;
 
     public static void Run()
     {
@@ -50,9 +55,11 @@ internal static class ScreenStatsApp
         var misses = 0;
         var busy = false;
         var hidden = false;
+        var undocked = 0;
 
-        // Hidden, undocked or locked, it can wait for hours, so its memory is handed back once as it hides,
-        // as the library does behind a game. The next reading after that brings back only what it uses.
+        // Hidden while locked, or while a monitor is plugged in but the panel cannot be had, it can wait for
+        // hours, so its memory is handed back once as it hides, as the library does behind a game. The next
+        // reading after that brings back only what it uses.
         void Hide()
         {
             guard.Stop();
@@ -115,10 +122,22 @@ internal static class ScreenStatsApp
                 if (panel.Keep() is not { } bounds)
                 {
                     Hide();
+
+                    // The same test TDP Engine starts it by, so the two never take turns starting and ending it.
+                    if (Monitors.Docked())
+                    {
+                        undocked = 0;
+                    }
+                    else if (++undocked >= UndockedToEnd)
+                    {
+                        End("undocked");
+                    }
+
                     return;
                 }
 
                 hidden = false;
+                undocked = 0;
 
                 var reading = readings.Read(status) with { Fps = fps.Add(process, status.Fps) };
                 window.ShowReadings(ScreenStatsLayout.Tiles(reading), DateTime.Now);
