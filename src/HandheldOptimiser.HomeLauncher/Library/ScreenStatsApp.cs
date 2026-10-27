@@ -49,6 +49,20 @@ internal static class ScreenStatsApp
         var timer = new DispatcherTimer { Interval = Every };
         var misses = 0;
         var busy = false;
+        var hidden = false;
+
+        // Hidden, undocked or locked, it can wait for hours, so its memory is handed back once as it hides,
+        // as the library does behind a game. The next reading after that brings back only what it uses.
+        void Hide()
+        {
+            guard.Stop();
+            window.HideAway();
+            if (!hidden)
+            {
+                hidden = true;
+                Native.TrimWorkingSet();
+            }
+        }
 
         void End(string why)
         {
@@ -93,18 +107,18 @@ internal static class ScreenStatsApp
                 // Locked, the Ally's screen is turned off, and turned on again once unlocked.
                 if (SessionLock.IsLocked())
                 {
-                    guard.Stop();
-                    window.HideAway();
+                    Hide();
                     panel.TurnOffWhileLocked();
                     return;
                 }
 
                 if (panel.Keep() is not { } bounds)
                 {
-                    guard.Stop();
-                    window.HideAway();
+                    Hide();
                     return;
                 }
+
+                hidden = false;
 
                 var reading = readings.Read(status) with { Fps = fps.Add(process, status.Fps) };
                 window.ShowReadings(ScreenStatsLayout.Tiles(reading), DateTime.Now);
