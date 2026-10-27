@@ -155,7 +155,16 @@ public sealed class ResearchedTweakTests
         Assert.Contains("On battery", tweak.Description);
     }
 
-    public static TheoryData<string> NewTweakIds => ["debloat.shell_ads", "debloat.windows_ai", "storage.crashdump"];
+    public static TheoryData<string> NewTweakIds =>
+    [
+        "debloat.shell_ads",
+        "debloat.windows_ai",
+        "storage.crashdump",
+        "ux.classiccontextmenu",
+        "ux.hidegallery",
+        "usability.mouseacceleration",
+        "debloat.spotlight"
+    ];
 
     [Theory]
     [MemberData(nameof(NewTweakIds))]
@@ -174,6 +183,73 @@ public sealed class ResearchedTweakTests
     public void The_safety_guard_lets_the_AI_service_be_changed()
     {
         Assert.False(SafetyGuard.IsServiceProtected(DebloatTweaks.AiService, out var reason), reason);
+    }
+
+    [Fact]
+    public void Edge_uninstall_warns_and_is_not_one_click()
+    {
+        var tweak = DebloatTweaks.UninstallEdge;
+        Assert.Equal("debloat.edge_uninstall", tweak.Id);
+        Assert.Equal(TweakCategory.AdsAndAssistants, tweak.Category);
+        Assert.False(tweak.IncludeInOneClick);
+        Assert.NotNull(tweak.Warning);
+        Assert.Contains("reinstalls Edge", tweak.Warning);
+        Assert.Contains("WebView2", tweak.Description);
+    }
+
+    [Fact]
+    public void Device_encryption_warns_and_is_not_one_click()
+    {
+        var tweak = StorageTweaks.DeviceEncryption;
+        Assert.Equal("storage.deviceencryption", tweak.Id);
+        Assert.Equal(TweakCategory.Storage, tweak.Category);
+        Assert.False(tweak.IncludeInOneClick);
+        Assert.NotNull(tweak.Warning);
+        Assert.Contains("not be encrypted", tweak.Warning);
+    }
+
+    [Fact]
+    public void Classic_context_menu_writes_InprocServer32()
+    {
+        var tweak = InterfaceTweaks.ClassicContextMenu;
+        Assert.Equal("ux.classiccontextmenu", tweak.Id);
+        Assert.Equal(TweakCategory.TouchAndDesktop, tweak.Category);
+        Assert.True(tweak.IncludeInOneClick);
+        var spec = Assert.Single(tweak.RegistryValues);
+        Assert.Equal(RegistryRoot.CurrentUser, spec.Root);
+        Assert.Contains("{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}", spec.SubKey);
+    }
+
+    [Fact]
+    public void Hide_gallery_writes_System_IsPinnedToNameSpaceTree()
+    {
+        var tweak = InterfaceTweaks.HideGallery;
+        Assert.Equal("ux.hidegallery", tweak.Id);
+        Assert.Equal(TweakCategory.TouchAndDesktop, tweak.Category);
+        Assert.True(tweak.IncludeInOneClick);
+        var spec = Assert.Single(tweak.RegistryValues);
+        Assert.Equal("System.IsPinnedToNameSpaceTree", spec.ValueName);
+        Assert.Equal(0, spec.DesiredValue);
+    }
+
+    [Fact]
+    public void Pointer_acceleration_disables_thresholds()
+    {
+        var tweak = UsabilityTweaks.MouseAcceleration;
+        Assert.Equal("usability.mouseacceleration", tweak.Id);
+        Assert.Equal(TweakCategory.TouchAndDesktop, tweak.Category);
+        Assert.True(tweak.IncludeInOneClick);
+        Assert.Equal(3, tweak.RegistryValues.Count);
+        Assert.Contains(tweak.RegistryValues, s => s.ValueName == "MouseSpeed" && (string)s.DesiredValue == "0");
+    }
+
+    [Fact]
+    public void Amd_telemetry_tweak_has_correct_metadata()
+    {
+        var tweak = DebloatTweaks.AmdTelemetry;
+        Assert.Equal("debloat.amd_telemetry", tweak.Id);
+        Assert.Equal(TweakCategory.Privacy, tweak.Category);
+        Assert.True(tweak.IncludeInOneClick);
     }
 
     [Fact]

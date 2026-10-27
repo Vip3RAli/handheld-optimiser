@@ -761,7 +761,7 @@ internal sealed class OldSchoolPresenter
         {
             case CategoryKind.NotInstalled:
                 var owned = _state.Shown(_options.ShowHidden).Count(t => !t.IsInstalled);
-                cards.Add(new ActionCard("", "Not installed",
+                cards.Add(new ActionCard("", "Ready to Install",
                     owned == 1 ? "1 game you own, ready to install" : $"{owned} games you own, ready to install", BrowseNotInstalled));
                 break;
 

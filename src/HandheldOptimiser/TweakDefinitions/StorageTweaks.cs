@@ -1,5 +1,6 @@
 using Microsoft.Win32;
 using HandheldOptimiser.Models;
+using HandheldOptimiser.Services;
 
 namespace HandheldOptimiser.TweakDefinitions;
 
@@ -16,8 +17,100 @@ public static class StorageTweaks
         DisableLastAccess,
         Disable8dot3Names,
         ReservedStorage,
-        SmallCrashDumps
+        SmallCrashDumps,
+        DeviceEncryption
     ];
+
+    public static Tweak DeviceEncryption => new()
+    {
+        Id = "storage.deviceencryption",
+        Name = "Turn off Device Encryption (BitLocker)",
+        Description =
+            "Turns off automatic device encryption on the system drive. Prevents BitLocker recovery key " +
+            "lockouts after handheld BIOS updates and eliminates encryption write overhead.",
+        Category = TweakCategory.Storage,
+        Risk = RiskLevel.Moderate,
+        IncludeInOneClick = false,
+        Warning =
+            "If your handheld is physically lost or stolen, data on the drive will not be encrypted. " +
+            "Ensure game saves and important files are backed up to the cloud. Decrypting the SSD runs " +
+            "in the background and may take some time.",
+
+        ScriptDetect = async (ctx, ct) => await ReadBitLockerStateAsync(ctx, ct) switch
+        {
+            "Disabled" => TweakState.Applied,
+            "Enabled" => TweakState.NotApplied,
+            _ => TweakState.Unknown
+        },
+
+        ScriptApply = async (ctx, journal, ct) =>
+        {
+            var state = await ReadBitLockerStateAsync(ctx, ct);
+            if (state == "Disabled")
+            {
+                return TweakResult.NoChange("storage.deviceencryption");
+            }
+
+            if (state != "Enabled")
+            {
+                return TweakResult.Fail("storage.deviceencryption", "Could not read the Device Encryption status. The console has the detail.");
+            }
+
+            journal.CapturedState["bitlocker.state"] = state;
+
+            var outcome = await ctx.Runner.RunScriptAsync("manage-bde.exe -off $env:SystemDrive", "Turn off Device Encryption", ct);
+            return outcome.Succeeded
+                ? TweakResult.Ok("storage.deviceencryption", "Device encryption turned off. The drive is decrypting in the background.")
+                : TweakResult.Fail("storage.deviceencryption", "Could not turn off device encryption. The console has the detail.");
+        },
+
+        // Encryption is turned back on from Settings, not with manage-bde. The Settings switch saves the
+        // recovery key to the Microsoft account; manage-bde would encrypt the drive with no key saved
+        // anywhere, and a BIOS update could then lock the player out for good.
+        ScriptRevert = (ctx, journal, _) =>
+        {
+            if (!journal.CapturedState.TryGetValue("bitlocker.state", out var was) || was != "Enabled")
+            {
+                return Task.FromResult(TweakResult.NoChange("storage.deviceencryption"));
+            }
+
+            return Task.FromResult(ShellLinks.Open(DeviceEncryptionSettings, ctx.Log)
+                ? TweakResult.Ok("storage.deviceencryption",
+                    "Settings is open at Device encryption. Turn it on there, which also saves the recovery key to your Microsoft account.")
+                : TweakResult.Fail("storage.deviceencryption",
+                    "Could not open Settings. Turn Device encryption on in Settings, Privacy & security."));
+        }
+    };
+
+    private const string DeviceEncryptionSettings = "ms-settings:deviceencryption";
+
+    /// <summary>
+    /// "Disabled" once the system drive is decrypted or decrypting, "Enabled" while it holds encrypted
+    /// data (suspended protection included, as the data is still encrypted), and "Unknown" when the
+    /// status cannot be read, so a failed read never shows the tweak as applied.
+    /// </summary>
+    private static async Task<string> ReadBitLockerStateAsync(TweakContext ctx, CancellationToken ct)
+    {
+        var outcome = await ctx.Runner.RunScriptAsync(
+            """
+            try {
+                $v = Get-BitLockerVolume -MountPoint $env:SystemDrive -ErrorAction Stop
+                if ($v.VolumeStatus -eq 'FullyDecrypted' -or $v.VolumeStatus -eq 'DecryptionInProgress') {
+                    Write-Output 'BITLOCKER=Disabled'
+                } else {
+                    Write-Output 'BITLOCKER=Enabled'
+                }
+            } catch {
+                Write-Output 'BITLOCKER=Unknown'
+            }
+            """,
+            "Read BitLocker volume status",
+            ct,
+            echoScript: false);
+
+        var line = outcome.OutputLines.FirstOrDefault(l => l.StartsWith("BITLOCKER=", StringComparison.Ordinal));
+        return line is not null ? line[10..] : "Unknown";
+    }
 
     /// <summary>
     /// 3 is a small dump, 7 the automatic one Windows defaults to. With the automatic setting, a second

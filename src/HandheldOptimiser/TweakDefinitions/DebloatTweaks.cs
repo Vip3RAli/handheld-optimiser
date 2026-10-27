@@ -1,5 +1,7 @@
+using System.IO;
 using Microsoft.Win32;
 using HandheldOptimiser.Models;
+using HandheldOptimiser.Services;
 
 namespace HandheldOptimiser.TweakDefinitions;
 
@@ -32,7 +34,10 @@ public static class DebloatTweaks
         ActivityHistory,
         ErrorReporting,
         OneDrive,
-        BackgroundApps
+        BackgroundApps,
+        Spotlight,
+        AmdTelemetry,
+        UninstallEdge
     ];
 
     /// <summary>
@@ -696,4 +701,226 @@ public static class DebloatTweaks
             if ($failed) { exit 1 }
             """;
     }
+
+    public static Tweak Spotlight => new()
+    {
+        Id = "debloat.spotlight",
+        Name = "Turn off Windows Spotlight and lock screen suggestions",
+        Description =
+            "Stops Windows downloading dynamic wallpapers, rotating lock screen advertisements, and " +
+            "promotional tips in the background.",
+        Category = TweakCategory.BackgroundActivity,
+        Risk = RiskLevel.Safe,
+        RegistryValues =
+        [
+            new(RegistryRoot.CurrentUser, ContentDelivery, "RotatingLockScreenEnabled", 0, RegistryValueKind.DWord),
+            new(RegistryRoot.CurrentUser, ContentDelivery, "RotatingLockScreenOverlayEnabled", 0, RegistryValueKind.DWord),
+            new(RegistryRoot.CurrentUser, ContentDelivery, "SubscribedContent-338387Enabled", 0, RegistryValueKind.DWord),
+            new(RegistryRoot.LocalMachine, CloudContent, "DisableWindowsSpotlightFeatures", 1, RegistryValueKind.DWord)
+        ]
+    };
+
+    public static Tweak AmdTelemetry => new()
+    {
+        Id = "debloat.amd_telemetry",
+        Name = "Turn off AMD User Experience telemetry",
+        Description =
+            "Stops the AMD User Experience Program (AUEP) background service and scheduled tasks from " +
+            "collecting hardware telemetry on AMD handhelds.",
+        Category = TweakCategory.Privacy,
+        Risk = RiskLevel.Safe,
+        RequiresReboot = false,
+        ScriptDetect = async (ctx, ct) =>
+        {
+            var found = await FindAmdTelemetryAsync(ctx, ct);
+            return found.Count == 0 ? TweakState.Unknown
+                : found.All(f => f.Off) ? TweakState.Applied
+                : found.Any(f => f.Off) ? TweakState.Partial
+                : TweakState.NotApplied;
+        },
+        ScriptApply = async (ctx, journal, ct) =>
+        {
+            // Only what is on now is changed and journalled, each with how it was found, so undo puts
+            // back exactly that and nothing it never touched.
+            var toChange = (await FindAmdTelemetryAsync(ctx, ct)).Where(f => !f.Off).ToList();
+            if (toChange.Count == 0)
+            {
+                return TweakResult.NoChange("debloat.amd_telemetry");
+            }
+
+            foreach (var item in toChange)
+            {
+                journal.CapturedState[$"amd.{item.Kind}.{item.Name}"] = item.State;
+            }
+
+            var lines = toChange.Select(f => f.Kind == "svc"
+                ? $"Set-Service -Name {PsQuote.Literal(f.Name)} -StartupType Disabled; Stop-Service -Name {PsQuote.Literal(f.Name)} -Force -ErrorAction SilentlyContinue"
+                : $"Get-ScheduledTask | Where-Object {{ ($_.TaskPath + $_.TaskName) -eq {PsQuote.Literal(f.Name)} }} | Disable-ScheduledTask | Out-Null");
+
+            var outcome = await ctx.Runner.RunScriptAsync(
+                "$ErrorActionPreference = 'Stop'\n" + string.Join("\n", lines),
+                "Turn off AMD User Experience telemetry",
+                ct);
+
+            return outcome.Succeeded
+                ? TweakResult.Ok("debloat.amd_telemetry", "AMD telemetry service and tasks turned off.")
+                : TweakResult.Fail("debloat.amd_telemetry", "Could not turn off AMD telemetry. The console has the detail.");
+        },
+        ScriptRevert = async (ctx, journal, ct) =>
+        {
+            var lines = new List<string>();
+            foreach (var (key, state) in journal.CapturedState)
+            {
+                if (key.StartsWith("amd.svc.", StringComparison.Ordinal))
+                {
+                    lines.Add($"Set-Service -Name {PsQuote.Literal(key[8..])} -StartupType {PsQuote.Literal(state)}");
+                }
+                else if (key.StartsWith("amd.task.", StringComparison.Ordinal))
+                {
+                    lines.Add($"Get-ScheduledTask | Where-Object {{ ($_.TaskPath + $_.TaskName) -eq {PsQuote.Literal(key[9..])} }} | Enable-ScheduledTask | Out-Null");
+                }
+            }
+
+            if (lines.Count == 0)
+            {
+                return TweakResult.NoChange("debloat.amd_telemetry");
+            }
+
+            var outcome = await ctx.Runner.RunScriptAsync(
+                "$ErrorActionPreference = 'Stop'\n" + string.Join("\n", lines),
+                "Restore AMD User Experience telemetry",
+                ct);
+
+            return outcome.Succeeded
+                ? TweakResult.Ok("debloat.amd_telemetry", "AMD telemetry restored.")
+                : TweakResult.Fail("debloat.amd_telemetry", "Could not restore AMD telemetry. The console has the detail.");
+        }
+    };
+
+    /// <summary>One AMD User Experience Program service or scheduled task, and how it is set now.</summary>
+    private sealed record AmdTelemetryItem(string Kind, string Name, string State, bool Off);
+
+    /// <summary>
+    /// The AMD User Experience Program's services and scheduled tasks, found by the AUEP in their names.
+    /// It comes with the full Adrenalin package, so a handheld with only AMD's base drivers has none,
+    /// and the tweak then reads as Unknown rather than applied.
+    /// </summary>
+    private static async Task<List<AmdTelemetryItem>> FindAmdTelemetryAsync(TweakContext ctx, CancellationToken ct)
+    {
+        var outcome = await ctx.Runner.RunScriptAsync(
+            """
+            $ErrorActionPreference = 'SilentlyContinue'
+            Get-Service -Name '*AUEP*' | ForEach-Object { Write-Output "AUEP|svc|$($_.Name)|$($_.StartType)" }
+            Get-ScheduledTask | Where-Object { $_.TaskName -like '*AUEP*' -or $_.TaskPath -like '*AUEP*' } |
+                ForEach-Object { Write-Output "AUEP|task|$($_.TaskPath)$($_.TaskName)|$($_.State)" }
+            """,
+            "Find AMD User Experience telemetry",
+            ct,
+            echoScript: false);
+
+        var found = new List<AmdTelemetryItem>();
+        foreach (var line in outcome.OutputLines.Where(l => l.StartsWith("AUEP|", StringComparison.Ordinal)))
+        {
+            var parts = line.Split('|');
+            if (parts.Length == 4 && parts[1] is "svc" or "task")
+            {
+                found.Add(new AmdTelemetryItem(parts[1], parts[2], parts[3], parts[3] == "Disabled"));
+            }
+        }
+
+        return found;
+    }
+
+    private static readonly RegistryValueSpec EdgeUpdateBlockPolicy =
+        new(RegistryRoot.LocalMachine, @"SOFTWARE\Microsoft\EdgeUpdate", "DoNotUpdateToEdgeWithChromium", 1, RegistryValueKind.DWord);
+
+    public static Tweak UninstallEdge => new()
+    {
+        Id = "debloat.edge_uninstall",
+        Name = "Uninstall Microsoft Edge (leaves WebView2 intact)",
+        Description =
+            "Uninstalls the Microsoft Edge browser to free disk space and stop background updater tasks. " +
+            "Leaves the WebView2 runtime intact so the Xbox app, launchers, and web logins continue to work.",
+        Category = TweakCategory.AdsAndAssistants,
+        Risk = RiskLevel.Moderate,
+        IncludeInOneClick = false,
+        Warning =
+            "Edge will be uninstalled. To browse the web, use another browser such as Chrome, Firefox, or " +
+            "Brave. Undoing this tweak reinstalls Edge from Microsoft.",
+        ScriptRegistryValues = [EdgeUpdateBlockPolicy],
+        ScriptDetect = (ctx, _) =>
+        {
+            var p86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+            var p64 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+
+            var edgeInstalled = File.Exists(Path.Combine(p86, "Microsoft", "Edge", "Application", "msedge.exe"))
+                || File.Exists(Path.Combine(p64, "Microsoft", "Edge", "Application", "msedge.exe"));
+
+            return Task.FromResult(edgeInstalled ? TweakState.NotApplied : TweakState.Applied);
+        },
+        ScriptApply = async (ctx, journal, ct) =>
+        {
+            var p86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+            var p64 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+
+            var edgeExe = Path.Combine(p86, "Microsoft", "Edge", "Application", "msedge.exe");
+            if (!File.Exists(edgeExe))
+            {
+                edgeExe = Path.Combine(p64, "Microsoft", "Edge", "Application", "msedge.exe");
+            }
+
+            if (!File.Exists(edgeExe))
+            {
+                return TweakResult.NoChange("debloat.edge_uninstall");
+            }
+
+            journal.CapturedState["edge.uninstalled"] = "1";
+
+            var outcome = await ctx.Runner.RunScriptAsync(
+                """
+                $ErrorActionPreference = 'Continue'
+                $paths = @(
+                    "$env:ProgramFiles (x86)\Microsoft\Edge\Application\*\Installer\setup.exe",
+                    "$env:ProgramFiles\Microsoft\Edge\Application\*\Installer\setup.exe"
+                )
+                $installer = Resolve-Path $paths -ErrorAction SilentlyContinue | Select-Object -Last 1 -ExpandProperty Path
+                if ($installer -and (Test-Path $installer)) {
+                    $stubDir = "$env:SystemRoot\SystemApps\Microsoft.MicrosoftEdge_8wekyb3d8bbwe"
+                    if (-not (Test-Path $stubDir)) { New-Item -Path $stubDir -ItemType Directory -Force | Out-Null }
+                    New-Item -Path "$stubDir\MicrosoftEdge.exe" -ItemType File -Force | Out-Null
+                    Start-Process -FilePath $installer -ArgumentList '--uninstall', '--system-level', '--force-uninstall', '--delete-profile' -Wait
+                    Write-Output 'RESULT=UNINSTALLED'
+                } else {
+                    Write-Output 'RESULT=NOT_FOUND'
+                }
+                """,
+                "Uninstall Microsoft Edge browser",
+                ct);
+
+            ctx.Registry.WriteValue(EdgeUpdateBlockPolicy);
+
+            return outcome.Succeeded
+                ? TweakResult.Ok("debloat.edge_uninstall", "Microsoft Edge uninstalled. WebView2 was left intact.")
+                : TweakResult.Fail("debloat.edge_uninstall", "Edge uninstaller did not complete cleanly. The console has the detail.");
+        },
+        ScriptRevert = async (ctx, journal, ct) =>
+        {
+            if (!journal.CapturedState.TryGetValue("edge.uninstalled", out var was) || was != "1")
+            {
+                return TweakResult.NoChange("debloat.edge_uninstall");
+            }
+
+            var outcome = await ctx.Runner.RunScriptAsync(
+                """
+                Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\EdgeUpdate' -Name 'DoNotUpdateToEdgeWithChromium' -ErrorAction SilentlyContinue
+                winget install Microsoft.Edge --source winget --accept-source-agreements --accept-package-agreements
+                """,
+                "Reinstall Microsoft Edge browser",
+                ct);
+
+            return outcome.Succeeded
+                ? TweakResult.Ok("debloat.edge_uninstall", "Microsoft Edge reinstalled.")
+                : TweakResult.Fail("debloat.edge_uninstall", "Could not reinstall Edge via winget. You can install it manually from microsoft.com/edge.");
+        }
+    };
 }

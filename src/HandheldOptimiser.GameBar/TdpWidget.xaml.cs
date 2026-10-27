@@ -509,7 +509,7 @@ namespace HandheldOptimiser.GameBar
             unit.Text = known ? unitText : "";
         }
 
-        /// <summary>The line under the readouts: the state's name in cyan, then the rest of the sentence.</summary>
+        /// <summary>The line under the readouts: the state's name in green, then the rest of the sentence.</summary>
         private void SetState(string name, string detail)
         {
             StateName.Text = name;

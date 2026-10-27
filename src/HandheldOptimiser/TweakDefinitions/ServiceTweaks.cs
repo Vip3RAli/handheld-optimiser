@@ -204,23 +204,16 @@ public static class ServiceTweaks
 
             var list = string.Join(",", toChange.Select(s => $"'{s}'"));
 
-            var status = await ctx.Runner.RunScriptAsync(
-                $$"""
-                foreach ($n in @({{list}})) {
-                    $s = Get-Service -Name $n -ErrorAction SilentlyContinue
-                    if ($s) { Write-Output "SVC=$n=$($s.Status)" }
-                }
-                """,
-                "Capture service run state before changing it",
-                ct,
-                echoScript: false);
-
-            foreach (var line in status.OutputLines.Where(l => l.StartsWith("SVC=", StringComparison.Ordinal)))
+            foreach (var service in toChange)
             {
-                var parts = line.Split('=', 3);
-                if (parts.Length == 3)
+                try
                 {
-                    journal.CapturedState[$"service.{parts[1]}.status"] = parts[2];
+                    using var sc = new System.ServiceProcess.ServiceController(service);
+                    journal.CapturedState[$"service.{service}.status"] = sc.Status.ToString();
+                }
+                catch
+                {
+                    // Service might not exist or could not be queried
                 }
             }
 

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace HandheldOptimiser.PowerService;
 
@@ -44,8 +45,20 @@ internal static partial class AutoTdpProtocol
 
     /// <summary>The overlay's layouts. The first is how it starts.</summary>
     public static readonly string[] OverlayLayouts = [OverlayVertical, OverlayHorizontal];
+    public static string Write<T>(T message)
+    {
+        if (message is AutoTdpStatus status)
+        {
+            return JsonSerializer.Serialize(status, AutoTdpJsonContext.Default.AutoTdpStatus);
+        }
 
-    public static string Write<T>(T message) => JsonSerializer.Serialize(message);
+        if (message is AutoTdpRequest request)
+        {
+            return JsonSerializer.Serialize(request, AutoTdpJsonContext.Default.AutoTdpRequest);
+        }
+
+        return JsonSerializer.Serialize(message);
+    }
 
     public static T? Read<T>(string? line) where T : class
     {
@@ -56,6 +69,16 @@ internal static partial class AutoTdpProtocol
 
         try
         {
+            if (typeof(T) == typeof(AutoTdpStatus))
+            {
+                return (T?)(object?)JsonSerializer.Deserialize(line, AutoTdpJsonContext.Default.AutoTdpStatus);
+            }
+
+            if (typeof(T) == typeof(AutoTdpRequest))
+            {
+                return (T?)(object?)JsonSerializer.Deserialize(line, AutoTdpJsonContext.Default.AutoTdpRequest);
+            }
+
             return JsonSerializer.Deserialize<T>(line);
         }
         catch (JsonException)
@@ -63,6 +86,12 @@ internal static partial class AutoTdpProtocol
             return null;
         }
     }
+}
+
+[JsonSerializable(typeof(AutoTdpRequest))]
+[JsonSerializable(typeof(AutoTdpStatus))]
+internal partial class AutoTdpJsonContext : JsonSerializerContext
+{
 }
 
 /// <param name="Command">Start, Status, Stop or Update.</param>

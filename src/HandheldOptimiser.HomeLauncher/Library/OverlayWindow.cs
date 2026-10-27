@@ -25,12 +25,24 @@ internal sealed partial class OverlayWindow : Window
     private const uint NoMove = 0x0002;
     private const uint NoActivate = 0x0010;
 
-    private static readonly Brush LabelBrush = new SolidColorBrush(Color.FromRgb(0xA8, 0xB0, 0xBC));
+    private static readonly Brush LabelBrush = CreateFrozenBrush(Color.FromRgb(0xA8, 0xB0, 0xBC));
     private static readonly Brush ValueBrush = Brushes.White;
-    private static readonly Brush DividerBrush = new SolidColorBrush(Color.FromRgb(0x45, 0x4D, 0x5E));
+    private static readonly Brush DividerBrush = CreateFrozenBrush(Color.FromRgb(0x45, 0x4D, 0x5E));
+    private static readonly Brush BoxBrush = CreateFrozenBrush(Color.FromArgb(0xD0, 0x10, 0x12, 0x16));
+    private static readonly FontFamily DefaultFontFamily = new("Segoe UI");
+
+    private static SolidColorBrush CreateFrozenBrush(Color color)
+    {
+        var brush = new SolidColorBrush(color);
+        brush.Freeze();
+        return brush;
+    }
 
     private readonly Grid _rows = new();
     private readonly Border _box;
+    private readonly List<(TextBlock Label, TextBlock Value)> _lineBlocks = [];
+    private bool? _cachedHorizontal;
+    private int _cachedCount;
     private string _corner = AutoTdpProtocol.TopLeft;
 
     public OverlayWindow()
@@ -49,7 +61,7 @@ internal sealed partial class OverlayWindow : Window
 
         _box = new Border
         {
-            Background = new SolidColorBrush(Color.FromArgb(0xD0, 0x10, 0x12, 0x16)),
+            Background = BoxBrush,
             CornerRadius = new CornerRadius(6),
             Padding = new Thickness(10, 6, 12, 6),
             Child = _rows,
@@ -68,35 +80,59 @@ internal sealed partial class OverlayWindow : Window
     public void ShowLines(IReadOnlyList<OverlayLine> lines, string corner, bool horizontal)
     {
         _corner = corner;
-        _rows.Children.Clear();
-        _rows.RowDefinitions.Clear();
-        _rows.ColumnDefinitions.Clear();
 
-        if (horizontal)
+        if (_cachedHorizontal == horizontal && _cachedCount == lines.Count)
         {
             for (var i = 0; i < lines.Count; i++)
             {
-                if (i > 0)
+                var (lbl, val) = _lineBlocks[i];
+                if (lbl.Text != lines[i].Label)
                 {
-                    AddDivider(_rows.ColumnDefinitions.Count);
+                    lbl.Text = lines[i].Label;
                 }
-
-                var label = _rows.ColumnDefinitions.Count;
-                _rows.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                _rows.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                AddText(lines[i].Label, 0, label, LabelBrush, FontWeights.Normal, new Thickness(0, 0, 6, 0));
-                AddText(lines[i].Value, 0, label + 1, ValueBrush, FontWeights.SemiBold, default);
+                if (val.Text != lines[i].Value)
+                {
+                    val.Text = lines[i].Value;
+                }
             }
         }
         else
         {
-            _rows.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            _rows.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            for (var i = 0; i < lines.Count; i++)
+            _cachedHorizontal = horizontal;
+            _cachedCount = lines.Count;
+            _lineBlocks.Clear();
+            _rows.Children.Clear();
+            _rows.RowDefinitions.Clear();
+            _rows.ColumnDefinitions.Clear();
+
+            if (horizontal)
             {
-                _rows.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                AddText(lines[i].Label, i, 0, LabelBrush, FontWeights.Normal, new Thickness(0, 0, 12, 0));
-                AddText(lines[i].Value, i, 1, ValueBrush, FontWeights.SemiBold, default);
+                for (var i = 0; i < lines.Count; i++)
+                {
+                    if (i > 0)
+                    {
+                        AddDivider(_rows.ColumnDefinitions.Count);
+                    }
+
+                    var label = _rows.ColumnDefinitions.Count;
+                    _rows.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                    _rows.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                    var lbl = AddText(lines[i].Label, 0, label, LabelBrush, FontWeights.Normal, new Thickness(0, 0, 6, 0));
+                    var val = AddText(lines[i].Value, 0, label + 1, ValueBrush, FontWeights.SemiBold, default);
+                    _lineBlocks.Add((lbl, val));
+                }
+            }
+            else
+            {
+                _rows.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                _rows.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                for (var i = 0; i < lines.Count; i++)
+                {
+                    _rows.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                    var lbl = AddText(lines[i].Label, i, 0, LabelBrush, FontWeights.Normal, new Thickness(0, 0, 12, 0));
+                    var val = AddText(lines[i].Value, i, 1, ValueBrush, FontWeights.SemiBold, default);
+                    _lineBlocks.Add((lbl, val));
+                }
             }
         }
 
@@ -135,13 +171,13 @@ internal sealed partial class OverlayWindow : Window
         _rows.Children.Add(line);
     }
 
-    private void AddText(string text, int row, int column, Brush brush, FontWeight weight, Thickness margin)
+    private TextBlock AddText(string text, int row, int column, Brush brush, FontWeight weight, Thickness margin)
     {
         var block = new TextBlock
         {
             Text = text,
             Foreground = brush,
-            FontFamily = new FontFamily("Segoe UI"),
+            FontFamily = DefaultFontFamily,
             FontSize = 14,
             FontWeight = weight,
             Margin = margin,
@@ -151,6 +187,7 @@ internal sealed partial class OverlayWindow : Window
         Grid.SetRow(block, row);
         Grid.SetColumn(block, column);
         _rows.Children.Add(block);
+        return block;
     }
 
     /// <summary>Puts the box in its corner of the main screen, the whole screen, as a game covers the taskbar.</summary>

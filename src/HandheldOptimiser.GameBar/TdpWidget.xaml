@@ -4,45 +4,45 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Background="#111318">
 
-    <!-- Flat and dark, to sit in Game Bar: each group a rounded card with a small header, choices in one
-         segmented bar per row, the chosen one solid cyan with dark text. No gradients or glows, at the
-         user's request (2026-10-22). Icons are from Segoe MDL2 Assets, which every Windows 10 and 11 has. -->
+    <!-- NXE Evolution: Xbox Emerald Green & Dimensional Charcoal Cards. -->
     <Page.Resources>
-        <SolidColorBrush x:Key="Cyan" Color="#22D3EE" />
-        <SolidColorBrush x:Key="CyanHover" Color="#67E8F9" />
-        <SolidColorBrush x:Key="OnCyan" Color="#062229" />
-        <SolidColorBrush x:Key="CardFill" Color="#1C2028" />
-        <SolidColorBrush x:Key="CardEdge" Color="#2E3440" />
-        <SolidColorBrush x:Key="BarFill" Color="#12151A" />
-        <SolidColorBrush x:Key="BarEdge" Color="#2A2F38" />
-        <SolidColorBrush x:Key="SegmentHover" Color="#262C36" />
-        <SolidColorBrush x:Key="Text" Color="#F2F3F5" />
-        <SolidColorBrush x:Key="Muted" Color="#A9B0BC" />
+        <SolidColorBrush x:Key="Accent" Color="#107C10" />
+        <SolidColorBrush x:Key="AccentBright" Color="#1ED760" />
+        <SolidColorBrush x:Key="OnAccent" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="CardFill" Color="#161A22" />
+        <SolidColorBrush x:Key="CardEdge" Color="#2A3242" />
+        <SolidColorBrush x:Key="PodFill" Color="#0E1117" />
+        <SolidColorBrush x:Key="PodEdge" Color="#202634" />
+        <SolidColorBrush x:Key="BarFill" Color="#0A0C11" />
+        <SolidColorBrush x:Key="BarEdge" Color="#1E2430" />
+        <SolidColorBrush x:Key="SegmentHover" Color="#252C3A" />
+        <SolidColorBrush x:Key="Text" Color="#F3F4F6" />
+        <SolidColorBrush x:Key="Muted" Color="#9CA3AF" />
         <SolidColorBrush x:Key="Transparent" Color="Transparent" />
 
-        <!-- A group: a rounded card, a gap under the one before. -->
+        <!-- NXE Card: 14px rounded corners, 1.5px border, dimensional depth. -->
         <Style x:Key="Card" TargetType="Border">
             <Setter Property="Background" Value="{StaticResource CardFill}" />
             <Setter Property="BorderBrush" Value="{StaticResource CardEdge}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="12" />
-            <Setter Property="Padding" Value="14,12,14,14" />
+            <Setter Property="BorderThickness" Value="1.5" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="Padding" Value="15,13,15,15" />
             <Setter Property="Margin" Value="0,0,0,10" />
         </Style>
 
         <Style x:Key="CardIcon" TargetType="TextBlock">
             <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
-            <Setter Property="FontSize" Value="14" />
-            <Setter Property="Foreground" Value="{StaticResource Cyan}" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{StaticResource AccentBright}" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="Margin" Value="0,0,8,0" />
         </Style>
 
         <Style x:Key="CardTitle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontSize" Value="11.5" />
             <Setter Property="FontWeight" Value="Bold" />
-            <Setter Property="CharacterSpacing" Value="60" />
-            <Setter Property="Foreground" Value="{StaticResource Muted}" />
+            <Setter Property="CharacterSpacing" Value="70" />
+            <Setter Property="Foreground" Value="{StaticResource Text}" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
@@ -50,7 +50,7 @@
         <Style x:Key="HeaderLine" TargetType="Border">
             <Setter Property="BorderBrush" Value="{StaticResource CardEdge}" />
             <Setter Property="BorderThickness" Value="0,0,0,1" />
-            <Setter Property="Padding" Value="0,0,0,9" />
+            <Setter Property="Padding" Value="0,0,0,8" />
             <Setter Property="Margin" Value="0,0,0,12" />
         </Style>
 
@@ -62,13 +62,14 @@
         </Style>
 
         <Style x:Key="ReadoutValue" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="26" />
-            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="24" />
+            <Setter Property="FontWeight" Value="Bold" />
             <Setter Property="Foreground" Value="{StaticResource Text}" />
         </Style>
 
         <Style x:Key="ReadoutName" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{StaticResource Muted}" />
         </Style>
 
@@ -81,18 +82,18 @@
             <Setter Property="Padding" Value="3" />
         </Style>
 
-        <!-- One choice in a bar. Text inherits the foreground, so it turns dark on the cyan fill. -->
+        <!-- One choice in a bar. Styled with NXE tactile pill feel and bright Xbox Green glow on selection. -->
         <Style x:Key="Tile" TargetType="ToggleButton">
             <Setter Property="Background" Value="{StaticResource Transparent}" />
             <Setter Property="Foreground" Value="{StaticResource Muted}" />
-            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontSize" Value="13" />
             <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="CornerRadius" Value="7" />
-            <Setter Property="Height" Value="40" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Height" Value="38" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="Margin" Value="1.5,0" />
             <Setter Property="UseSystemFocusVisuals" Value="True" />
-            <Setter Property="FocusVisualPrimaryBrush" Value="{StaticResource Cyan}" />
+            <Setter Property="FocusVisualPrimaryBrush" Value="{StaticResource AccentBright}" />
             <Setter Property="FocusVisualPrimaryThickness" Value="2" />
             <Setter Property="FocusVisualSecondaryThickness" Value="0" />
             <Setter Property="Template">
@@ -116,20 +117,20 @@
                                     </VisualState>
                                     <VisualState x:Name="Checked">
                                         <VisualState.Setters>
-                                            <Setter Target="Root.Background" Value="{StaticResource Cyan}" />
-                                            <Setter Target="Content.Foreground" Value="{StaticResource OnCyan}" />
+                                            <Setter Target="Root.Background" Value="{StaticResource Accent}" />
+                                            <Setter Target="Content.Foreground" Value="{StaticResource OnAccent}" />
                                         </VisualState.Setters>
                                     </VisualState>
                                     <VisualState x:Name="CheckedPointerOver">
                                         <VisualState.Setters>
-                                            <Setter Target="Root.Background" Value="{StaticResource CyanHover}" />
-                                            <Setter Target="Content.Foreground" Value="{StaticResource OnCyan}" />
+                                            <Setter Target="Root.Background" Value="{StaticResource AccentBright}" />
+                                            <Setter Target="Content.Foreground" Value="{StaticResource OnAccent}" />
                                         </VisualState.Setters>
                                     </VisualState>
                                     <VisualState x:Name="CheckedPressed">
                                         <VisualState.Setters>
-                                            <Setter Target="Root.Background" Value="{StaticResource Cyan}" />
-                                            <Setter Target="Content.Foreground" Value="{StaticResource OnCyan}" />
+                                            <Setter Target="Root.Background" Value="{StaticResource Accent}" />
+                                            <Setter Target="Content.Foreground" Value="{StaticResource OnAccent}" />
                                         </VisualState.Setters>
                                     </VisualState>
                                 </VisualStateGroup>
@@ -160,39 +161,60 @@
             <Border Style="{StaticResource Card}">
                 <StackPanel>
                     <Border Style="{StaticResource HeaderLine}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Style="{StaticResource CardIcon}" Text="&#xE9D9;" />
-                            <TextBlock Style="{StaticResource CardTitle}" Text="NOW" />
-                        </StackPanel>
+                        <Grid>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE9D9;" />
+                                <TextBlock Style="{StaticResource CardTitle}" Text="NOW" />
+                            </StackPanel>
+                            <Border HorizontalAlignment="Right" VerticalAlignment="Center" Background="#142B1A"
+                                    BorderBrush="#1E472B" BorderThickness="1" CornerRadius="10" Padding="8,2">
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="6" Height="6" CornerRadius="3" Background="{StaticResource AccentBright}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="LIVE" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource AccentBright}" CharacterSpacing="50" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
                     </Border>
                     <Grid x:Name="Readouts">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="6" />
                             <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="6" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource ReadoutValue}">
-                                <Run x:Name="WattsValue" /><Run x:Name="WattsUnit" Text="W" FontSize="13" FontWeight="Normal" Foreground="{StaticResource Muted}" />
-                            </TextBlock>
-                            <TextBlock Style="{StaticResource ReadoutName}" Text="Power limit" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="1">
-                            <TextBlock Style="{StaticResource ReadoutValue}">
-                                <Run x:Name="FpsValue" /><Run x:Name="FpsUnit" Text="fps" FontSize="13" FontWeight="Normal" Foreground="{StaticResource Muted}" />
-                            </TextBlock>
-                            <TextBlock Style="{StaticResource ReadoutName}" Text="Frame rate" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Style="{StaticResource ReadoutValue}">
-                                <Run x:Name="TemperatureValue" /><Run x:Name="TemperatureUnit" Text="°C" FontSize="13" FontWeight="Normal" Foreground="{StaticResource Muted}" />
-                            </TextBlock>
-                            <TextBlock Style="{StaticResource ReadoutName}" Text="Temperature" />
-                        </StackPanel>
+                        <Border Background="{StaticResource PodFill}" BorderBrush="{StaticResource PodEdge}" BorderThickness="1"
+                                CornerRadius="10" Padding="10,8,8,8">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource ReadoutName}" Text="POWER" CharacterSpacing="30" Margin="0,0,0,2" />
+                                <TextBlock Style="{StaticResource ReadoutValue}">
+                                    <Run x:Name="WattsValue" /><Run x:Name="WattsUnit" Text="W" FontSize="12.5" FontWeight="Normal" Foreground="{StaticResource Muted}" />
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="2" Background="{StaticResource PodFill}" BorderBrush="{StaticResource PodEdge}" BorderThickness="1"
+                                CornerRadius="10" Padding="10,8,8,8">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource ReadoutName}" Text="FPS" CharacterSpacing="30" Margin="0,0,0,2" />
+                                <TextBlock Style="{StaticResource ReadoutValue}" Foreground="{StaticResource AccentBright}">
+                                    <Run x:Name="FpsValue" /><Run x:Name="FpsUnit" Text="fps" FontSize="12.5" FontWeight="Normal" Foreground="{StaticResource Muted}" />
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="4" Background="{StaticResource PodFill}" BorderBrush="{StaticResource PodEdge}" BorderThickness="1"
+                                CornerRadius="10" Padding="10,8,8,8">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource ReadoutName}" Text="TEMP" CharacterSpacing="30" Margin="0,0,0,2" />
+                                <TextBlock Style="{StaticResource ReadoutValue}">
+                                    <Run x:Name="TemperatureValue" /><Run x:Name="TemperatureUnit" Text="°C" FontSize="12.5" FontWeight="Normal" Foreground="{StaticResource Muted}" />
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
                     </Grid>
-                    <Border x:Name="StateLine" Margin="0,10,0,0">
-                        <TextBlock TextWrapping="Wrap" FontSize="13" Foreground="{StaticResource Muted}">
-                            <Run x:Name="StateName" Foreground="{StaticResource Cyan}" FontWeight="SemiBold" /><Run x:Name="StateDetail" />
+                    <Border x:Name="StateLine" Margin="0,10,0,0" Background="{StaticResource PodFill}" BorderBrush="{StaticResource PodEdge}"
+                            BorderThickness="1" CornerRadius="8" Padding="10,6">
+                        <TextBlock TextWrapping="Wrap" FontSize="12.5" Foreground="{StaticResource Muted}">
+                            <Run x:Name="StateName" Foreground="{StaticResource AccentBright}" FontWeight="SemiBold" /><Run x:Name="StateDetail" />
                         </TextBlock>
                     </Border>
                 </StackPanel>
@@ -208,7 +230,7 @@
                                 <TextBlock Style="{StaticResource CardTitle}" Text="PERFORMANCE &amp; POWER" />
                             </StackPanel>
                             <TextBlock x:Name="PowerValue" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="13"
-                                       FontWeight="Bold" Foreground="{StaticResource Cyan}" Text="Auto" />
+                                       FontWeight="Bold" Foreground="{StaticResource AccentBright}" Text="Auto" />
                         </Grid>
                     </Border>
 
@@ -260,18 +282,18 @@
                         <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                             <Slider x:Name="PowerSlider" Minimum="7" Maximum="30" StepFrequency="1" SmallChange="1" LargeChange="5"
                                     TickFrequency="5" TickPlacement="None" Value="15" IsThumbToolTipEnabled="False"
-                                    ValueChanged="OnPowerSlider" Foreground="{StaticResource Cyan}" Background="{StaticResource BarEdge}"
-                                    FocusVisualPrimaryBrush="{StaticResource Cyan}">
+                                    ValueChanged="OnPowerSlider" Foreground="{StaticResource Accent}" Background="{StaticResource BarEdge}"
+                                    FocusVisualPrimaryBrush="{StaticResource Accent}">
                                 <Slider.Resources>
-                                    <SolidColorBrush x:Key="SliderTrackValueFill" Color="#22D3EE" />
-                                    <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="#22D3EE" />
-                                    <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="#22D3EE" />
-                                    <SolidColorBrush x:Key="SliderTrackFill" Color="#2A2F38" />
-                                    <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="#2A2F38" />
-                                    <SolidColorBrush x:Key="SliderTrackFillPressed" Color="#2A2F38" />
-                                    <SolidColorBrush x:Key="SliderThumbBackground" Color="#22D3EE" />
-                                    <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="#67E8F9" />
-                                    <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#F2F3F5" />
+                                    <SolidColorBrush x:Key="SliderTrackValueFill" Color="#107C10" />
+                                    <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="#1ED760" />
+                                    <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="#107C10" />
+                                    <SolidColorBrush x:Key="SliderTrackFill" Color="#202634" />
+                                    <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="#2A3242" />
+                                    <SolidColorBrush x:Key="SliderTrackFillPressed" Color="#202634" />
+                                    <SolidColorBrush x:Key="SliderThumbBackground" Color="#FFFFFF" />
+                                    <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="#1ED760" />
+                                    <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#E5E7EB" />
                                 </Slider.Resources>
                             </Slider>
                             <Grid>
@@ -291,16 +313,16 @@
                             </StackPanel>
                             <!-- The switch's own template keeps room for a label beside it; a fixed width leaves only the switch. -->
                             <ToggleSwitch x:Name="BoostSwitch" HorizontalAlignment="Right" MinWidth="0" Width="52" OnContent="" OffContent=""
-                                          Toggled="OnCpuBoost" FocusVisualPrimaryBrush="{StaticResource Cyan}">
+                                          Toggled="OnCpuBoost" FocusVisualPrimaryBrush="{StaticResource Accent}">
                                 <ToggleSwitch.Resources>
-                                    <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#22D3EE" />
-                                    <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#67E8F9" />
-                                    <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#22D3EE" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#062229" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#062229" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#062229" />
-                                    <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="#5A6272" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#A9B0BC" />
+                                    <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#107C10" />
+                                    <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#1ED760" />
+                                    <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#107C10" />
+                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#FFFFFF" />
+                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#FFFFFF" />
+                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#E5E7EB" />
+                                    <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="#4B5563" />
+                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#9CA3AF" />
                                 </ToggleSwitch.Resources>
                             </ToggleSwitch>
                         </Grid>
@@ -311,12 +333,12 @@
                     <StackPanel x:Name="GpuMemoryRow" Margin="0,14,0,0">
                         <Button x:Name="GpuMemoryToggle" Click="OnGpuMemoryToggle" HorizontalAlignment="Stretch"
                                 HorizontalContentAlignment="Stretch" Background="{StaticResource Transparent}" BorderThickness="0"
-                                Padding="0,6" UseSystemFocusVisuals="True" FocusVisualPrimaryBrush="{StaticResource Cyan}"
+                                Padding="0,6" UseSystemFocusVisuals="True" FocusVisualPrimaryBrush="{StaticResource Accent}"
                                 FocusVisualPrimaryThickness="2" FocusVisualSecondaryThickness="0">
                             <Grid>
                                 <TextBlock Style="{StaticResource Label}" Margin="0" Text="GPU memory" VerticalAlignment="Center" />
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                    <TextBlock x:Name="GpuMemoryValue" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Cyan}" />
+                                    <TextBlock x:Name="GpuMemoryValue" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource AccentBright}" />
                                     <TextBlock x:Name="GpuMemoryChevron" FontFamily="Segoe MDL2 Assets" Text="&#xE70D;" FontSize="10"
                                                Margin="8,0,0,0" Foreground="{StaticResource Muted}" VerticalAlignment="Center" />
                                 </StackPanel>
@@ -424,25 +446,24 @@
                         </StackPanel>
                     </Grid>
 
-                    <!-- Big stats and the time on the Ally's own screen while it sits under a monitor. Turning it on
-                         turns the Ally's screen on beside the monitor at 720p; off puts the screens back. -->
-                    <Border Style="{StaticResource Bar}" Margin="0,14,0,0" Padding="12,6,6,6">
+                    <!-- Big stats and the time on the handheld's own screen while it sits under a monitor. -->
+                    <Border Style="{StaticResource Bar}" Margin="0,14,0,0" Padding="12,8,8,8">
                         <Grid>
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Style="{StaticResource Label}" Margin="0" Text="Stats on Ally screen" />
+                                <TextBlock Style="{StaticResource Label}" Margin="0" Text="Show stats on handheld screen" />
                                 <TextBlock Style="{StaticResource ReadoutName}" Text="While docked to a monitor" />
                             </StackPanel>
                             <ToggleSwitch x:Name="ScreenStatsSwitch" HorizontalAlignment="Right" MinWidth="0" Width="52" OnContent="" OffContent=""
-                                          Toggled="OnScreenStats" FocusVisualPrimaryBrush="{StaticResource Cyan}">
+                                          Toggled="OnScreenStats" FocusVisualPrimaryBrush="{StaticResource AccentBright}">
                                 <ToggleSwitch.Resources>
-                                    <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#22D3EE" />
-                                    <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#67E8F9" />
-                                    <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#22D3EE" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#062229" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#062229" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#062229" />
-                                    <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="#5A6272" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#A9B0BC" />
+                                    <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#107C10" />
+                                    <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#1ED760" />
+                                    <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#107C10" />
+                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#FFFFFF" />
+                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#FFFFFF" />
+                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#E5E7EB" />
+                                    <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="#4B5563" />
+                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#9CA3AF" />
                                 </ToggleSwitch.Resources>
                             </ToggleSwitch>
                         </Grid>

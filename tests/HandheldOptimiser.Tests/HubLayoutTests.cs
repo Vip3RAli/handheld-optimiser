@@ -37,9 +37,9 @@ public sealed class HubLayoutTests
     [Theory]
     [InlineData("Performance", 11, 8)]
     [InlineData("Battery & sleep", 6, 0)]
-    [InlineData("Clean up", 19, 12)]
-    [InlineData("Full screen", 8, 3)]
-    [InlineData("Maintenance & backup", 4, 1)]
+    [InlineData("Clean up", 22, 14)]
+    [InlineData("Full screen", 11, 6)]
+    [InlineData("Maintenance & backup", 5, 1)]
     [InlineData("Apps", 0, 0)]
     public void A_goal_holds_the_tweaks_the_map_gives_it(string title, int tweaks, int recommended)
     {
@@ -58,10 +58,17 @@ public sealed class HubLayoutTests
     [InlineData("Turn off Widgets", TweakCategory.AdsAndAssistants)]
     [InlineData("Turn off Windows Error Reporting", TweakCategory.Privacy)]
     [InlineData("Turn off reserved storage", TweakCategory.Storage)]
+    [InlineData("Use classic right-click context menu", TweakCategory.TouchAndDesktop)]
+    [InlineData("Hide Gallery from File Explorer", TweakCategory.TouchAndDesktop)]
+    [InlineData("Turn off pointer acceleration for thumbsticks", TweakCategory.TouchAndDesktop)]
+    [InlineData("Turn off Windows Spotlight and lock screen suggestions", TweakCategory.BackgroundActivity)]
+    [InlineData("Turn off AMD User Experience telemetry", TweakCategory.Privacy)]
+    [InlineData("Uninstall Microsoft Edge (leaves WebView2 intact)", TweakCategory.AdsAndAssistants)]
+    [InlineData("Turn off Device Encryption (BitLocker)", TweakCategory.Storage)]
     public void A_tweak_sits_under_its_heading(string name, TweakCategory category) =>
         Assert.Equal(category, TweakCatalog.All.Single(t => t.Name == name).Category);
 
     [Fact]
-    public void The_catalog_holds_all_48_tweaks_once() =>
-        Assert.Equal(48, TweakCatalog.All.Select(t => t.Id).Distinct().Count());
+    public void The_catalog_holds_all_55_tweaks_once() =>
+        Assert.Equal(55, TweakCatalog.All.Select(t => t.Id).Distinct().Count());
 }

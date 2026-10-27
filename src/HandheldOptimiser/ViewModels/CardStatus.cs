@@ -17,7 +17,7 @@ public enum CardLevel
     /// <summary>Something is wrong. Red.</summary>
     Bad,
 
-    /// <summary>A fact that is neither good nor bad, such as which home app is chosen. Cyan.</summary>
+    /// <summary>A fact that is neither good nor bad, such as which home app is chosen. Blue.</summary>
     Neutral
 }
 

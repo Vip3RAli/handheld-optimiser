@@ -576,6 +576,121 @@ public sealed class LibraryFeatureTests : IDisposable
     }
 
     [Fact]
+    public void OwnedGames_ParseLoginUsers_PrefersMostRecent()
+    {
+        const string vdf = """
+            "users"
+            {
+                "76561198000000001"
+                {
+                    "AccountName" "older_user"
+                    "MostRecent" "0"
+                    "Timestamp" "100"
+                }
+                "76561198000000002"
+                {
+                    "AccountName" "recent_user"
+                    "MostRecent" "1"
+                    "Timestamp" "200"
+                }
+            }
+            """;
+
+        Assert.Equal(76561198000000002UL, OwnedGames.ParseLoginUsers(vdf));
+    }
+
+    [Fact]
+    public void OwnedGames_ParseLoginUsers_FallsBackToAutoLoginUserRegistry()
+    {
+        const string vdf = """
+            "users"
+            {
+                "76561198000000001"
+                {
+                    "AccountName" "player_one"
+                    "Timestamp" "300"
+                }
+                "76561198000000002"
+                {
+                    "AccountName" "player_two"
+                    "Timestamp" "200"
+                }
+            }
+            """;
+
+        Assert.Equal(76561198000000002UL, OwnedGames.ParseLoginUsers(vdf, "player_two"));
+    }
+
+    [Fact]
+    public void OwnedGames_ParseLoginUsers_FallsBackToAutoLoginVdf()
+    {
+        const string vdf = """
+            "users"
+            {
+                "76561198000000001"
+                {
+                    "AccountName" "saved_user"
+                    "AutoLogin" "1"
+                    "Timestamp" "100"
+                }
+                "76561198000000002"
+                {
+                    "AccountName" "guest"
+                    "AutoLogin" "0"
+                    "Timestamp" "50"
+                }
+            }
+            """;
+
+        Assert.Equal(76561198000000001UL, OwnedGames.ParseLoginUsers(vdf));
+    }
+
+    [Fact]
+    public void OwnedGames_ParseLoginUsers_FallsBackToLatestTimestamp()
+    {
+        const string vdf = """
+            "users"
+            {
+                "76561198000000001"
+                {
+                    "AccountName" "old"
+                    "Timestamp" "1000"
+                }
+                "76561198000000002"
+                {
+                    "AccountName" "new"
+                    "Timestamp" "5000"
+                }
+            }
+            """;
+
+        Assert.Equal(76561198000000002UL, OwnedGames.ParseLoginUsers(vdf));
+    }
+
+    [Fact]
+    public void OwnedGames_ParseLoginUsers_ResolvesSingleUserWithoutMostRecent()
+    {
+        const string vdf = """
+            "users"
+            {
+                "76561198000000003"
+                {
+                    "AccountName"       "only_user"
+                    "PersonaName"       "Player"
+                    "RememberPassword"  "1"
+                    "WantsOfflineMode"  "0"
+                    "SkipOfflineModeWarning"    "0"
+                    "AutoLogin"         "1"
+                    "Timestamp"         "1792127315"
+                }
+            }
+            """;
+
+        Assert.Equal(76561198000000003UL, OwnedGames.ParseLoginUsers(vdf, "only_user"));
+        Assert.Equal(76561198000000003UL, OwnedGames.ParseLoginUsers(vdf, null));
+    }
+
+    [Fact]
     public void OwnedGames_ReadsGogGalaxyRows()
     {
         string?[][] rows =

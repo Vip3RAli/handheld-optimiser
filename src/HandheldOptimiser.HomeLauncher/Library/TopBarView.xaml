@@ -59,7 +59,7 @@
             </Grid>
             <Button x:Name="SearchButton" Style="{StaticResource IconButton}" Margin="0,-10,4,-10" VerticalAlignment="Center"
                     Focusable="True" Visibility="Collapsed"
-                    Content="&#xE721;" ToolTip="Search the games that are not installed" />
+                    Content="&#xE721;" ToolTip="Search games ready to install" />
 
             <!--
                 The library's settings, also on the controller's Menu button. Sized for a finger. Up from

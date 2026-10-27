@@ -209,9 +209,51 @@ internal static partial class Native
         }
     }
 
+    [LibraryImport("kernel32.dll", EntryPoint = "K32EnumProcesses", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static unsafe partial bool EnumProcesses(int* processIds, uint sizeBytes, out uint bytesReturned);
+
+    /// <summary>Process IDs for all running processes on the system, without allocating Process objects.</summary>
+    public static unsafe List<int> ProcessIds()
+    {
+        var ids = new int[1024];
+        while (true)
+        {
+            uint bytesReturned;
+            fixed (int* pIds = ids)
+            {
+                if (!EnumProcesses(pIds, (uint)(ids.Length * sizeof(int)), out bytesReturned))
+                {
+                    return [];
+                }
+            }
+
+            var count = (int)(bytesReturned / sizeof(int));
+            if (count < ids.Length)
+            {
+                var result = new List<int>(count);
+                for (var i = 0; i < count; i++)
+                {
+                    if (ids[i] > 0)
+                    {
+                        result.Add(ids[i]);
+                    }
+                }
+
+                return result;
+            }
+
+            ids = new int[ids.Length * 2];
+        }
+    }
+
     [LibraryImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static partial bool SetProcessWorkingSetSize(nint process, nint minimum, nint maximum);
+
+    [LibraryImport("psapi.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool EmptyWorkingSet(nint process);
 
     [LibraryImport("kernel32.dll")]
     private static partial nint GetCurrentProcess();
@@ -757,9 +799,10 @@ internal static partial class Native
     /// </summary>
     public static void TrimWorkingSet()
     {
-        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
+        System.Runtime.GCSettings.LargeObjectHeapCompactionMode = System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
         GC.WaitForPendingFinalizers();
-        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
         SetProcessWorkingSetSize(GetCurrentProcess(), -1, -1);
     }
 }

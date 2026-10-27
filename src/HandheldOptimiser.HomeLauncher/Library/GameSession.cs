@@ -503,28 +503,33 @@ internal sealed class GameSession
 
     private static bool Any(string folder)
     {
-        var running = Find(folder);
-        foreach (var process in running)
+        foreach (var id in Native.ProcessIds())
         {
-            process.Dispose();
+            if (Native.ProcessPath(id) is { } path && path.StartsWith(folder, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
         }
 
-        return running.Count > 0;
+        return false;
     }
 
     /// <summary>Every process whose exe is inside the folder. The caller disposes them.</summary>
     private static List<Process> Find(string folder)
     {
         var found = new List<Process>();
-        foreach (var process in Process.GetProcesses())
+        foreach (var id in Native.ProcessIds())
         {
-            if (Native.ProcessPath(process.Id) is { } path && path.StartsWith(folder, StringComparison.OrdinalIgnoreCase))
+            if (Native.ProcessPath(id) is { } path && path.StartsWith(folder, StringComparison.OrdinalIgnoreCase))
             {
-                found.Add(process);
-            }
-            else
-            {
-                process.Dispose();
+                try
+                {
+                    found.Add(Process.GetProcessById(id));
+                }
+                catch (ArgumentException)
+                {
+                    // The process ended between enumerating and opening.
+                }
             }
         }
 
