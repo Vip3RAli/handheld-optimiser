@@ -28,7 +28,11 @@ internal static class Program
     private const string ArmouryCrateSe = @"shell:AppsFolder\B9ECED6F.ArmouryCrateSE_qmba6cd70vzyy!App";
     private const string XboxApp = @"shell:AppsFolder\Microsoft.GamingApp_8wekyb3d8bbwe!Microsoft.Xbox.App";
 
-    private static readonly string LogPath = Path.Combine(
+    /// <summary>
+    /// The library's log. The tests point it at a file of their own, since several feed in bad input on
+    /// purpose and their lines in the player's log read like faults (2026-10-28).
+    /// </summary>
+    internal static string LogPath { get; set; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "HandheldOptimiser", "logs", "home-launcher.log");
 

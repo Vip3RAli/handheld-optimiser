@@ -246,7 +246,6 @@ public sealed class ResearchedTweakTests
     [Theory]
     [InlineData("logi_lamparray_service")]
     [InlineData("midisrv")]
-    [InlineData("CoworkVMService")]
     public void The_safety_guard_lets_the_background_extras_through(string service) =>
         Assert.False(SafetyGuard.IsServiceProtected(service, out _), service);
 
