@@ -238,17 +238,34 @@ public sealed class ArmouryCrateTweakTests
     }
 
     /// <summary>
-    /// The player asked for no ASUS app to be removed: turning the switch off could not bring one back, and
-    /// Armoury Crate had to be found on ASUS's site.
+    /// The player asked for no ASUS app to be removed that cannot be brought back: on 2026-10-19 turning the
+    /// switch off could not bring the Command Center widget back. On 2026-10-28 they agreed to that one widget
+    /// going, for their account only and only when Windows keeps a provisioned copy. Nothing else is removed,
+    /// and the Apps page still cannot remove it.
     /// </summary>
     [Fact]
-    public void No_app_package_is_removed()
+    public void Only_the_Command_Center_widget_is_removed_and_only_when_Windows_can_put_it_back()
     {
         var all = ArmouryCrateTweaks.ServicesInStopOrder.Concat(ArmouryCrateTweaks.UpdateServices).ToArray();
         var apply = ArmouryCrateTweaks.BuildApplyScript(all, ArmouryCrateTweaks.ServicesInStopOrder, true, true);
 
-        Assert.DoesNotContain("Remove-AppxPackage", apply, StringComparison.OrdinalIgnoreCase);
-        Assert.True(SafetyGuard.IsAppxProtected("B9ECED6F.ASUSCommandCenter", out _));
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(apply, "Remove-AppxPackage"));
+        Assert.Contains("Get-AppxProvisionedPackage -Online", apply, StringComparison.Ordinal);
+        Assert.Contains("if ($kept.Count -gt 0)", apply, StringComparison.Ordinal);
+        Assert.DoesNotContain("-AllUsers", apply, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains($"Get-AppxPackage -Name '{ArmouryCrateTweaks.CommandCenterPackage}'", apply, StringComparison.Ordinal);
+        Assert.True(SafetyGuard.IsAppxProtected(ArmouryCrateTweaks.CommandCenterPackage, out _));
+    }
+
+    [Fact]
+    public void Undo_puts_the_widget_back_only_when_it_was_removed()
+    {
+        var removed = new Dictionary<string, string>(Journal("2", "0")) { ["widget.commandcenter"] = "removed" };
+
+        Assert.Contains(
+            $"Add-AppxPackage -RegisterByFamilyName -MainPackage '{ArmouryCrateTweaks.CommandCenterFamily}'",
+            ArmouryCrateTweaks.BuildRevertScript(removed), StringComparison.Ordinal);
+        Assert.DoesNotContain("Add-AppxPackage", ArmouryCrateTweaks.BuildRevertScript(Journal("2", "0")), StringComparison.Ordinal);
     }
 
     [Fact]

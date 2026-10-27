@@ -103,6 +103,23 @@ public static class ArmouryCrateTweaks
 
     private const string NotSupported = "This needs a ROG Ally or Ally X and TDP Engine installed.";
 
+    /// <summary>
+    /// ASUS's Command Center Game Bar widget. With ASUS's services off it only shows an error, Game Bar will not
+    /// let it be removed while Command Center is in Gaming Panel mode (as it ships), and Game Bar still starts it.
+    /// It is removed for this account only, and only when Windows keeps a provisioned copy to register it again
+    /// from: on 2026-10-19 a removal that could not be undone lost the widget, which is not in the Store. Every
+    /// other ASUS package is left alone, and <see cref="SafetyGuard.IsAppxProtected"/> still protects this one
+    /// everywhere else.
+    /// </summary>
+    public const string CommandCenterPackage = "B9ECED6F.ASUSCommandCenter";
+
+    /// <summary>The widget's package family, which registers it again from Windows' provisioned copy.</summary>
+    public const string CommandCenterFamily = "B9ECED6F.ASUSCommandCenter_qmba6cd70vzyy";
+
+    /// <summary>What the apply script prints once the widget is removed, and the journal key that remembers it.</summary>
+    private const string WidgetRemoved = "WIDGET=REMOVED";
+    private const string WidgetJournalKey = "widget.commandcenter";
+
     public static IReadOnlyList<Tweak> All => [ReplaceArmouryCrate];
 
     public static Tweak ReplaceArmouryCrate { get; } = new()
@@ -112,7 +129,9 @@ public static class ArmouryCrateTweaks
         Description =
             "Turns off Armoury Crate and ASUS's background services. Handheld Optimiser runs the Armoury Crate and " +
             "Command Center buttons and the controller mode instead, through the game library and its Game Bar widget. " +
-            "This replaces about a dozen ASUS services with one small one, using about 20 MB of memory instead of about 480 MB.",
+            "This replaces about a dozen ASUS services with one small one, using about 20 MB of memory instead of about 480 MB. " +
+            "ASUS's Command Center widget, which would only show an error, is taken out of Game Bar when Windows can put it back, " +
+            "and put back when this is undone.",
         Category = TweakCategory.FullScreen,
         Risk = RiskLevel.Moderate,
         Warning =
@@ -229,6 +248,13 @@ public static class ArmouryCrateTweaks
             $"{Name}: disable {string.Join(", ", present)}",
             ct);
 
+        // Remembered even when something else in the script failed, since the widget is gone either way and
+        // undo has to bring it back.
+        if (outcome.OutputLines.Any(l => l.Trim() == WidgetRemoved))
+        {
+            journal.CapturedState.TryAdd(WidgetJournalKey, "removed");
+        }
+
         return outcome.Succeeded
             ? TweakResult.Ok(Id, $"\"{Name}\" applied.")
             : TweakResult.Fail(Id, "Armoury Crate could not be fully replaced. The console has the detail.");
@@ -332,6 +358,18 @@ public static class ArmouryCrateTweaks
             }
             {{task}}
             {{run}}
+            $widget = @(Get-AppxPackage -Name {{Quote(CommandCenterPackage)}} -ErrorAction SilentlyContinue)
+            if ($widget.Count -gt 0) {
+                $kept = @(Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -eq {{Quote(CommandCenterPackage)}} })
+                if ($kept.Count -gt 0) {
+                    # Not counted as a failure: Armoury Crate is off either way, and the widget only shows an error.
+                    Write-Output "Removing ASUS Command Center from Game Bar for this account"
+                    try { Remove-AppxPackage -Package $widget[0].PackageFullName -ErrorAction Stop; Write-Output {{Quote(WidgetRemoved)}} }
+                    catch { Write-Output "  could not remove it: $($_.Exception.Message)" }
+                } else {
+                    Write-Output "Leaving ASUS Command Center in Game Bar: Windows keeps no copy to bring it back from"
+                }
+            }
             Write-Output "Telling TDP Engine to replace Armoury Crate"
             try {
                 $k = [Microsoft.Win32.Registry]::LocalMachine.CreateSubKey({{Quote(ControlsKey)}})
@@ -404,6 +442,14 @@ public static class ArmouryCrateTweaks
                 """
             : "Write-Output \"No scheduled task to enable\"";
 
+        var widget = captured.ContainsKey(WidgetJournalKey)
+            ? $$"""
+                Write-Output "Putting ASUS Command Center back in Game Bar"
+                try { Add-AppxPackage -RegisterByFamilyName -MainPackage {{Quote(CommandCenterFamily)}} -ErrorAction Stop }
+                catch { Write-Output "  failed: $($_.Exception.Message)"; $script:failed = $true }
+                """
+            : "Write-Output \"No widget to put back\"";
+
         var run = "Write-Output \"No startup entry to put back\"";
         if (captured.TryGetValue("run.screenmanager", out var flag))
         {
@@ -455,6 +501,7 @@ public static class ArmouryCrateTweaks
                 try { Start-Service -Name $n -ErrorAction Stop }
                 catch { Write-Output "  failed: $($_.Exception.Message)"; $script:failed = $true }
             }
+            {{widget}}
             if ($script:failed) { exit 1 }
             """;
     }
