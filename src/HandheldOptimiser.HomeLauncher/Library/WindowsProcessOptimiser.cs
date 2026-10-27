@@ -25,7 +25,14 @@ internal static class WindowsProcessOptimiser
         "PhoneExperienceHost",
         "SecurityHealthSystray",
         "GameBarPresenceWriter",
-        "StartMenuExperienceHost"
+        "StartMenuExperienceHost",
+
+        // The Radeon Software window, which sits open in the background (about 110 MB). Driver settings
+        // such as RSR, AFMF and Anti-Lag do not need it, and Alt+R opens it again.
+        "RadeonSoftware",
+
+        // AMD's recording and Instant Replay (about 70 MB). Instant Replay stops while a game runs.
+        "AMDRSSrcExt"
     ];
 
     /// <summary>

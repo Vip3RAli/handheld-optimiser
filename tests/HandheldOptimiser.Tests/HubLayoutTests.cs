@@ -37,7 +37,7 @@ public sealed class HubLayoutTests
     [Theory]
     [InlineData("Performance", 11, 8)]
     [InlineData("Battery & sleep", 6, 0)]
-    [InlineData("Clean up", 22, 14)]
+    [InlineData("Clean up", 23, 14)]
     [InlineData("Full screen", 11, 6)]
     [InlineData("Maintenance & backup", 5, 1)]
     [InlineData("Apps", 0, 0)]
@@ -69,6 +69,6 @@ public sealed class HubLayoutTests
         Assert.Equal(category, TweakCatalog.All.Single(t => t.Name == name).Category);
 
     [Fact]
-    public void The_catalog_holds_all_55_tweaks_once() =>
-        Assert.Equal(55, TweakCatalog.All.Select(t => t.Id).Distinct().Count());
+    public void The_catalog_holds_all_56_tweaks_once() =>
+        Assert.Equal(56, TweakCatalog.All.Select(t => t.Id).Distinct().Count());
 }

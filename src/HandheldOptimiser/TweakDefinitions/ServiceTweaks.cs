@@ -22,8 +22,28 @@ public static class ServiceTweaks
         PrintAndFax,
         CompatibilityAssistant,
         LinkTracking,
-        UnusedHandheldServices
+        UnusedHandheldServices,
+        BackgroundExtras
     ];
+
+    /// <summary>
+    /// Services from drivers and apps that run all the time but that a handheld seldom needs. Each is
+    /// only touched where it is installed. Measured running in Xbox mode on an Ally (2026-10-28):
+    /// about 17, 33 and 24 MB. Cowork belongs to the Claude desktop app, which may set it back to
+    /// automatic when it updates.
+    /// </summary>
+    public static Tweak BackgroundExtras => DisableServices(
+        id: "services.extras",
+        name: "Turn off Logitech lighting, MIDI and Claude Cowork services",
+        description:
+            "Turns off the Logitech LampArray service, the Windows MIDI Service and the Claude app's " +
+            "Cowork service, where they are installed.",
+        risk: RiskLevel.Moderate,
+        warning:
+            "Logitech Dynamic Lighting, MIDI instruments and controllers, and Cowork in the Claude app " +
+            "stop working until this is undone.",
+        includeInOneClick: false,
+        services: ["logi_lamparray_service", "midisrv", "CoworkVMService"]);
 
     public static Tweak CompatibilityAssistant => DisableServices(
         id: "services.pcasvc",
