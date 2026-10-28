@@ -44,6 +44,10 @@ namespace HandheldOptimiser.GameBar
         // The frame rate is sent once the slider has stopped moving for this long, as the power limit is.
         private readonly DispatcherTimer _frameRatePause = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
         private bool _frameRateSliding;
+
+        // The fan curve and overlay size, each a slider of named stops.
+        private readonly StepSlider _fans;
+        private readonly StepSlider _overlay;
         // TDP Engine's mode and the last manual choices, from its last answer, kept in the widget's own settings
         // so they are right while TDP Engine is not running, which is most of the time between games.
         private const string ModeSetting = "Mode";
@@ -69,6 +73,16 @@ namespace HandheldOptimiser.GameBar
             _timer.Tick += (sender, e) => Refresh();
             _sliderPause.Tick += (sender, e) => SendSlider();
             _frameRatePause.Tick += (sender, e) => SendFrameRate();
+
+            // The fan curves from TDP Engine's own Auto, through the quietest, to the loudest.
+            _fans = new StepSlider(FanSlider, FanValue,
+                new[] { AutoTdpProtocol.DynamicFans, AutoTdpProtocol.QuietFans, "", AutoTdpProtocol.CoolFans, AutoTdpProtocol.FullFans },
+                new[] { "Auto", "Quiet", "Default", "Cool", "Max" },
+                fans => Change(CurrentFps, CurrentPower, fans));
+            _overlay = new StepSlider(OverlaySlider, OverlayValue,
+                new[] { AutoTdpProtocol.OverlayOff, AutoTdpProtocol.OverlaySmall, AutoTdpProtocol.OverlayMedium, AutoTdpProtocol.OverlayFull },
+                new[] { "Off", "Small", "Medium", "Full" },
+                level => Send(() => EngineClient.SetOverlay(level, null, null)));
             Loaded += (sender, e) =>
             {
                 _loaded = true;
@@ -92,6 +106,9 @@ namespace HandheldOptimiser.GameBar
                 {
                     SendFrameRate();
                 }
+
+                _fans.Flush();
+                _overlay.Flush();
             };
         }
 
@@ -143,17 +160,20 @@ namespace HandheldOptimiser.GameBar
 
         private async void Refresh()
         {
-            if (_busy || _sliding || _frameRateSliding)
+            if (_busy || Moving)
             {
                 return;
             }
 
             var status = await Task.Run(() => EngineClient.Status());
-            if (!_busy && !_sliding && !_frameRateSliding)
+            if (!_busy && !Moving)
             {
                 Show(status);
             }
         }
+
+        /// <summary>True while the player moves any slider and the choice is not sent yet.</summary>
+        private bool Moving => _sliding || _frameRateSliding || _fans.Moving || _overlay.Moving;
 
         private void OnFrameRateSlider(object sender, RangeBaseValueChangedEventArgs e)
         {
@@ -273,9 +293,6 @@ namespace HandheldOptimiser.GameBar
             Change(CurrentFps, (int)PowerSlider.Value, CurrentFans);
         }
 
-        private void OnFans(object sender, RoutedEventArgs e) =>
-            Change(CurrentFps, CurrentPower, (string)((FrameworkElement)sender).Tag);
-
         private void OnControllerMode(object sender, RoutedEventArgs e)
         {
             // Set from TDP Engine's answer, not by the player: nothing to send.
@@ -298,12 +315,6 @@ namespace HandheldOptimiser.GameBar
 
             var on = BoostSwitch.IsOn;
             Send(() => EngineClient.SetCpuBoost(on));
-        }
-
-        private void OnOverlayLevel(object sender, RoutedEventArgs e)
-        {
-            var level = (string)((FrameworkElement)sender).Tag;
-            Send(() => EngineClient.SetOverlay(level, null, null));
         }
 
         private void OnScreenStats(object sender, RoutedEventArgs e)
@@ -509,7 +520,7 @@ namespace HandheldOptimiser.GameBar
 
             ShowFrameRate(status);
             ShowPower(CurrentPower);
-            Check(Fans, CurrentFans ?? "");
+            _fans.Show(CurrentFans ?? "");
 
             // The controller is TDP Engine's only while it replaces Armoury Crate. A switch has no "not known",
             // so while the mode is not known it shows off and the line under it says so.
@@ -521,7 +532,7 @@ namespace HandheldOptimiser.GameBar
                 : status.ControllerMode == AutoTdpProtocol.DesktopMode ? "Off: the controller works the mouse"
                 : "Not known yet";
             ShowBoost(status.CpuBoost);
-            Check(OverlayLevels, status.OverlayLevel ?? "");
+            _overlay.Show(status.OverlayLevel ?? AutoTdpProtocol.OverlayOff);
             Check(OverlayCorners, status.OverlayCorner ?? "");
             Check(OverlayLayouts, status.OverlayLayout ?? "");
             _placingScreenStats = true;

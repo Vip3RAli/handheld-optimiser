@@ -151,6 +151,26 @@
             <Setter Property="Margin" Value="1" />
             <Setter Property="FontSize" Value="14" />
         </Style>
+        <!-- Every slider's colours, picked up by each slider on the page. -->
+        <SolidColorBrush x:Key="SliderTrackValueFill" Color="#107C10" />
+        <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="#1ED760" />
+        <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="#107C10" />
+        <SolidColorBrush x:Key="SliderTrackFill" Color="#202634" />
+        <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="#2A3242" />
+        <SolidColorBrush x:Key="SliderTrackFillPressed" Color="#202634" />
+        <SolidColorBrush x:Key="SliderThumbBackground" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="#1ED760" />
+        <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#E5E7EB" />
+        <SolidColorBrush x:Key="SliderTickBarFill" Color="#4B5563" />
+
+        <!-- A slider of named stops (see StepSlider), its ticks one per stop. -->
+        <Style x:Key="Stops" TargetType="Slider">
+            <Setter Property="TickPlacement" Value="Outside" />
+            <Setter Property="IsThumbToolTipEnabled" Value="False" />
+            <Setter Property="Foreground" Value="{StaticResource Accent}" />
+            <Setter Property="Background" Value="{StaticResource BarEdge}" />
+            <Setter Property="FocusVisualPrimaryBrush" Value="{StaticResource Accent}" />
+        </Style>
     </Page.Resources>
 
     <!-- Game Bar draws its own frame and title bar, so the page starts with the first card. -->
@@ -281,22 +301,8 @@
                                    Foreground="{StaticResource AccentBright}" Text="Off" />
                     </Grid>
                     <Slider x:Name="FrameRateSlider" Minimum="0" Maximum="4" StepFrequency="1" SmallChange="1" LargeChange="1"
-                            TickFrequency="1" TickPlacement="Outside" Value="0" IsThumbToolTipEnabled="False"
-                            ValueChanged="OnFrameRateSlider" Foreground="{StaticResource Accent}" Background="{StaticResource BarEdge}"
-                            FocusVisualPrimaryBrush="{StaticResource Accent}">
-                        <Slider.Resources>
-                            <SolidColorBrush x:Key="SliderTrackValueFill" Color="#107C10" />
-                            <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="#1ED760" />
-                            <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="#107C10" />
-                            <SolidColorBrush x:Key="SliderTrackFill" Color="#202634" />
-                            <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="#2A3242" />
-                            <SolidColorBrush x:Key="SliderTrackFillPressed" Color="#202634" />
-                            <SolidColorBrush x:Key="SliderThumbBackground" Color="#FFFFFF" />
-                            <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="#1ED760" />
-                            <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#E5E7EB" />
-                            <SolidColorBrush x:Key="SliderTickBarFill" Color="#4B5563" />
-                        </Slider.Resources>
-                    </Slider>
+                            TickFrequency="1" Value="0" Style="{StaticResource Stops}"
+                            ValueChanged="OnFrameRateSlider" />
                     <Grid>
                         <TextBlock x:Name="FrameRateLowest" Style="{StaticResource ReadoutName}" Text="None" />
                         <TextBlock Style="{StaticResource ReadoutName}" Text="60" HorizontalAlignment="Right" />
@@ -319,19 +325,7 @@
                             <Slider x:Name="PowerSlider" Minimum="7" Maximum="30" StepFrequency="1" SmallChange="1" LargeChange="5"
                                     TickFrequency="5" TickPlacement="None" Value="15" IsThumbToolTipEnabled="False"
                                     ValueChanged="OnPowerSlider" Foreground="{StaticResource Accent}" Background="{StaticResource BarEdge}"
-                                    FocusVisualPrimaryBrush="{StaticResource Accent}">
-                                <Slider.Resources>
-                                    <SolidColorBrush x:Key="SliderTrackValueFill" Color="#107C10" />
-                                    <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="#1ED760" />
-                                    <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="#107C10" />
-                                    <SolidColorBrush x:Key="SliderTrackFill" Color="#202634" />
-                                    <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="#2A3242" />
-                                    <SolidColorBrush x:Key="SliderTrackFillPressed" Color="#202634" />
-                                    <SolidColorBrush x:Key="SliderThumbBackground" Color="#FFFFFF" />
-                                    <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="#1ED760" />
-                                    <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#E5E7EB" />
-                                </Slider.Resources>
-                            </Slider>
+                                    FocusVisualPrimaryBrush="{StaticResource Accent}" />
                             <Grid>
                                 <TextBlock Style="{StaticResource ReadoutName}" Text="7 W" />
                                 <TextBlock x:Name="PowerMax" Style="{StaticResource ReadoutName}" Text="30 W" HorizontalAlignment="Right" />
@@ -406,23 +400,13 @@
                         </StackPanel>
                     </Border>
 
-                    <TextBlock Style="{StaticResource Label}" Text="Fan curve" />
-                    <Border Style="{StaticResource Bar}">
-                        <Grid x:Name="Fans">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <ToggleButton Style="{StaticResource Tile}" FontSize="13" Tag="" Click="OnFans" Content="Default" />
-                            <ToggleButton Grid.Column="1" Style="{StaticResource Tile}" FontSize="13" Tag="quiet" Click="OnFans" Content="Quiet" />
-                            <ToggleButton Grid.Column="2" Style="{StaticResource Tile}" FontSize="13" Tag="cool" Click="OnFans" Content="Cool" />
-                            <ToggleButton Grid.Column="3" Style="{StaticResource Tile}" FontSize="13" Tag="full" Click="OnFans" Content="Max" />
-                            <ToggleButton Grid.Column="4" Style="{StaticResource Tile}" FontSize="13" Tag="dynamic" Click="OnFans" Content="Auto" />
-                        </Grid>
-                    </Border>
+                    <!-- Stops from left to right: Auto (TDP Engine's own), Quiet, Default (the Ally's own), Cool and Max. -->
+                    <Grid>
+                        <TextBlock Style="{StaticResource Label}" Text="Fan curve" />
+                        <TextBlock x:Name="FanValue" HorizontalAlignment="Right" FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{StaticResource AccentBright}" />
+                    </Grid>
+                    <Slider x:Name="FanSlider" Style="{StaticResource Stops}" />
                 </StackPanel>
             </Border>
 
@@ -436,22 +420,13 @@
                         </StackPanel>
                     </Border>
 
-                    <TextBlock Style="{StaticResource Label}" Text="Overlay" />
-                    <Border Style="{StaticResource Bar}">
-                        <!-- The Tag is the level sent to the service. Nothing is lit while TDP Engine is not running. -->
-                        <Grid x:Name="OverlayLevels">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <ToggleButton Style="{StaticResource Tile}" FontSize="13" Tag="off" Click="OnOverlayLevel" Content="Off" />
-                            <ToggleButton Grid.Column="1" Style="{StaticResource Tile}" FontSize="13" Tag="small" Click="OnOverlayLevel" Content="Small" />
-                            <ToggleButton Grid.Column="2" Style="{StaticResource Tile}" FontSize="13" Tag="medium" Click="OnOverlayLevel" Content="Medium" />
-                            <ToggleButton Grid.Column="3" Style="{StaticResource Tile}" FontSize="13" Tag="full" Click="OnOverlayLevel" Content="Full" />
-                        </Grid>
-                    </Border>
+                    <!-- Off, Small, Medium and Full. Off while TDP Engine is not running. -->
+                    <Grid>
+                        <TextBlock Style="{StaticResource Label}" Text="Overlay" />
+                        <TextBlock x:Name="OverlayValue" HorizontalAlignment="Right" FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{StaticResource AccentBright}" />
+                    </Grid>
+                    <Slider x:Name="OverlaySlider" Style="{StaticResource Stops}" />
 
                     <!-- One slim row: the label, the layout (rows one under another, or one strip), then four small
                          arrows. Each arrow points at its corner. The Tags are what is sent to the service. -->
