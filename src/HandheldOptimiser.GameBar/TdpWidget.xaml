@@ -151,6 +151,26 @@
             <Setter Property="Margin" Value="1" />
             <Setter Property="FontSize" Value="14" />
         </Style>
+        <!-- Every switch's colours, picked up by each switch on the page. -->
+        <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#107C10" />
+        <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#1ED760" />
+        <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#107C10" />
+        <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#E5E7EB" />
+        <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="#4B5563" />
+        <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#9CA3AF" />
+
+        <!-- A switch with its label beside it in the row: its own template keeps room for a label, which a fixed width leaves out. -->
+        <Style x:Key="RowSwitch" TargetType="ToggleSwitch">
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="Width" Value="52" />
+            <Setter Property="OnContent" Value="" />
+            <Setter Property="OffContent" Value="" />
+            <Setter Property="FocusVisualPrimaryBrush" Value="{StaticResource Accent}" />
+        </Style>
+
         <!-- Every slider's colours, picked up by each slider on the page. -->
         <SolidColorBrush x:Key="SliderTrackValueFill" Color="#107C10" />
         <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="#1ED760" />
@@ -238,18 +258,7 @@
                                 <TextBlock x:Name="ControllerNote" Style="{StaticResource ReadoutName}" Text="Off: the controller works the mouse" />
                             </StackPanel>
                             <ToggleSwitch x:Name="ControllerSwitch" HorizontalAlignment="Right" MinWidth="0" Width="52" OnContent="" OffContent=""
-                                          Toggled="OnControllerMode" FocusVisualPrimaryBrush="{StaticResource Accent}">
-                                <ToggleSwitch.Resources>
-                                    <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#107C10" />
-                                    <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#1ED760" />
-                                    <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#107C10" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#FFFFFF" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#FFFFFF" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#E5E7EB" />
-                                    <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="#4B5563" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#9CA3AF" />
-                                </ToggleSwitch.Resources>
-                            </ToggleSwitch>
+                                          Toggled="OnControllerMode" FocusVisualPrimaryBrush="{StaticResource Accent}" />
                         </Grid>
                     </Border>
                 </StackPanel>
@@ -278,18 +287,7 @@
                                 <TextBlock x:Name="ModeNote" Style="{StaticResource ReadoutName}" Text="TDP Engine sets power, fans and boost" />
                             </StackPanel>
                             <ToggleSwitch x:Name="ModeSwitch" HorizontalAlignment="Right" MinWidth="0" Width="52" OnContent="" OffContent=""
-                                          Toggled="OnMode" FocusVisualPrimaryBrush="{StaticResource Accent}">
-                                <ToggleSwitch.Resources>
-                                    <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#107C10" />
-                                    <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#1ED760" />
-                                    <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#107C10" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#FFFFFF" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#FFFFFF" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#E5E7EB" />
-                                    <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="#4B5563" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#9CA3AF" />
-                                </ToggleSwitch.Resources>
-                            </ToggleSwitch>
+                                          Toggled="OnMode" FocusVisualPrimaryBrush="{StaticResource Accent}" />
                         </Grid>
                     </Border>
 
@@ -343,18 +341,28 @@
                             </StackPanel>
                             <!-- The switch's own template keeps room for a label beside it; a fixed width leaves only the switch. -->
                             <ToggleSwitch x:Name="BoostSwitch" HorizontalAlignment="Right" MinWidth="0" Width="52" OnContent="" OffContent=""
-                                          Toggled="OnCpuBoost" FocusVisualPrimaryBrush="{StaticResource Accent}">
-                                <ToggleSwitch.Resources>
-                                    <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#107C10" />
-                                    <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#1ED760" />
-                                    <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#107C10" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#FFFFFF" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#FFFFFF" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#E5E7EB" />
-                                    <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="#4B5563" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#9CA3AF" />
-                                </ToggleSwitch.Resources>
-                            </ToggleSwitch>
+                                          Toggled="OnCpuBoost" FocusVisualPrimaryBrush="{StaticResource Accent}" />
+                        </Grid>
+                    </Border>
+
+                    <!-- Radeon Super Resolution and AMD Fluid Motion Frames, the same switches as in Radeon Software.
+                         Each shows only where the driver offers it, once TDP Engine has read them (see RadeonHost). -->
+                    <Border x:Name="RsrRow" Style="{StaticResource Bar}" Visibility="Collapsed" Margin="0,14,0,0" Padding="12,6,6,6">
+                        <Grid>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource Label}" Margin="0" Text="Radeon Super Resolution" />
+                                <TextBlock Style="{StaticResource ReadoutName}" Text="Sharper upscaling below full resolution" />
+                            </StackPanel>
+                            <ToggleSwitch x:Name="RsrSwitch" Style="{StaticResource RowSwitch}" Tag="rsr" Toggled="OnRadeon" />
+                        </Grid>
+                    </Border>
+                    <Border x:Name="AfmfRow" Style="{StaticResource Bar}" Visibility="Collapsed" Margin="0,8,0,0" Padding="12,6,6,6">
+                        <Grid>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource Label}" Margin="0" Text="Fluid Motion Frames" />
+                                <TextBlock Style="{StaticResource ReadoutName}" Text="Extra frames in DirectX 11 and 12 games" />
+                            </StackPanel>
+                            <ToggleSwitch x:Name="AfmfSwitch" Style="{StaticResource RowSwitch}" Tag="afmf" Toggled="OnRadeon" />
                         </Grid>
                     </Border>
 
@@ -458,18 +466,7 @@
                                 <TextBlock Style="{StaticResource ReadoutName}" Text="While docked to a monitor" />
                             </StackPanel>
                             <ToggleSwitch x:Name="ScreenStatsSwitch" HorizontalAlignment="Right" MinWidth="0" Width="52" OnContent="" OffContent=""
-                                          Toggled="OnScreenStats" FocusVisualPrimaryBrush="{StaticResource AccentBright}">
-                                <ToggleSwitch.Resources>
-                                    <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#107C10" />
-                                    <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#1ED760" />
-                                    <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#107C10" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#FFFFFF" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#FFFFFF" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#E5E7EB" />
-                                    <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="#4B5563" />
-                                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#9CA3AF" />
-                                </ToggleSwitch.Resources>
-                            </ToggleSwitch>
+                                          Toggled="OnScreenStats" FocusVisualPrimaryBrush="{StaticResource AccentBright}" />
                         </Grid>
                     </Border>
                 </StackPanel>

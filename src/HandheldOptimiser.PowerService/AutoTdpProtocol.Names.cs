@@ -43,6 +43,9 @@ namespace HandheldOptimiser.PowerService
         /// <summary>From the widget: Auto or Manual, named by the request's Mode, saved and applied at once.</summary>
         public const string SetMode = "set-mode";
 
+        /// <summary>From the widget: switch RadeonFeature (RSR or AFMF) on or off, as RadeonOn says.</summary>
+        public const string SetRadeon = "set-radeon";
+
         /// <summary>
         /// The modes. In Auto, TDP Engine picks the power limit, fans and boost for every session, and a frame
         /// rate is optional. In Manual, the player picks them.
@@ -129,6 +132,10 @@ namespace HandheldOptimiser.PowerService
             public const string Mode = "Mode";
             public const string ManualPowerLimit = "ManualPowerLimit";
             public const string ManualFans = "ManualFans";
+            public const string RadeonFeature = "RadeonFeature";
+            public const string RadeonOn = "RadeonOn";
+            public const string Rsr = "Rsr";
+            public const string Afmf = "Afmf";
         }
     }
 

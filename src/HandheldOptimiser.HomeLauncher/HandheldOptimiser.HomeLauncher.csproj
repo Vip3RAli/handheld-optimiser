@@ -65,6 +65,7 @@
     <Compile Include="..\HandheldOptimiser.PowerService\AutoTdpProtocol.cs" Link="Library\AutoTdpProtocol.cs" />
     <Compile Include="..\HandheldOptimiser.PowerService\AutoTdpProtocol.Names.cs" Link="Library\AutoTdpProtocol.Names.cs" />
     <Compile Include="..\HandheldOptimiser.PowerService\Monitors.cs" Link="Library\Monitors.cs" />
+    <Compile Include="..\HandheldOptimiser.PowerService\RadeonState.cs" Link="Library\RadeonState.cs" />
   </ItemGroup>
 
   <ItemGroup>

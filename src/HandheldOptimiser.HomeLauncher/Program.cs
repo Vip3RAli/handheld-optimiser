@@ -53,6 +53,12 @@ internal static class Program
             return 0;
         }
 
+        // RSR and AFMF for the widget, which TDP Engine starts as the player and reads from the exit code.
+        if (args.Length > 0 && string.Equals(args[0], PowerService.RadeonState.Argument, StringComparison.OrdinalIgnoreCase))
+        {
+            return RunRadeon(args);
+        }
+
         var action = ActionFor(args);
 
         // Game Bar is opened whatever the home app choice is, and the choice is not read or changed.
@@ -131,6 +137,28 @@ internal static class Program
     /// src\HandheldOptimiser.PowerService\ScreenStatsHost.cs, and the two must be kept in step.
     /// </summary>
     internal const string ScreenStatsArgument = "--screen-stats";
+
+    /// <summary>
+    /// --radeon alone reads RSR and AFMF; --radeon rsr on (or afmf, or off) switches one first. The exit code is
+    /// the state found, as RadeonState says, or 1 when AMD's ADLX could not be used.
+    /// </summary>
+    private static int RunRadeon(string[] args)
+    {
+        var feature = args.Length > 1 ? args[1].ToLowerInvariant() : null;
+        var on = args.Length > 2 && string.Equals(args[2], PowerService.RadeonState.OnName, StringComparison.OrdinalIgnoreCase);
+        if (feature is not (null or PowerService.RadeonState.RsrName or PowerService.RadeonState.AfmfName))
+        {
+            Log($"Radeon settings: {feature} is not a setting this knows");
+            return 1;
+        }
+
+        if (feature is not null)
+        {
+            Log($"Radeon settings: switching {feature} {(on ? "on" : "off")}");
+        }
+
+        return Library.RadeonSettings.Apply(feature, on)?.ToExitCode() ?? 1;
+    }
 
     private static void RunScreenStats()
     {

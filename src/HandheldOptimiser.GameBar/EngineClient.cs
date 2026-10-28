@@ -37,6 +37,12 @@ namespace HandheldOptimiser.GameBar
         /// <summary>Whether the processor's boost is on for the power source in use, or null when not known.</summary>
         public bool? CpuBoost;
 
+        /// <summary>Whether Radeon Super Resolution is on, or null where it is not offered or not read yet.</summary>
+        public bool? Rsr;
+
+        /// <summary>Whether AMD Fluid Motion Frames is on, or null where it is not offered or not read yet.</summary>
+        public bool? Afmf;
+
         /// <summary>The overlay's level, corner and layout, or null when not known.</summary>
         public string OverlayLevel;
         public string OverlayCorner;
@@ -128,6 +134,19 @@ namespace HandheldOptimiser.GameBar
         /// Turns the processor's boost on or off, starting the service if need be. Windows keeps the setting
         /// in the power plan, so it holds after the service ends.
         /// </summary>
+        /// <summary>A true or false field, or null when it is missing or null, as from an older service.</summary>
+        private static bool? Flag(JsonObject json, string name) =>
+            json.TryGetValue(name, out var value) && value.ValueType == JsonValueType.Boolean ? value.GetBoolean() : (bool?)null;
+
+        /// <summary>Switches RSR or AFMF (RadeonState's names, "rsr" or "afmf") on or off, starting the service if need be.</summary>
+        public static EngineStatus SetRadeon(string feature, bool on) =>
+            SendStarting(new JsonObject
+            {
+                [AutoTdpProtocol.Fields.Command] = JsonValue.CreateStringValue(AutoTdpProtocol.SetRadeon),
+                [AutoTdpProtocol.Fields.RadeonFeature] = JsonValue.CreateStringValue(feature),
+                [AutoTdpProtocol.Fields.RadeonOn] = JsonValue.CreateBooleanValue(on)
+            }.Stringify());
+
         public static EngineStatus SetCpuBoost(bool on)
         {
             var request = new JsonObject
@@ -267,9 +286,9 @@ namespace HandheldOptimiser.GameBar
                 Replacing = json.GetNamedBoolean(AutoTdpProtocol.Fields.Replacing, false),
                 ControllerConnected = json.GetNamedBoolean(AutoTdpProtocol.Fields.ControllerConnected, false),
                 ControllerMode = Text(json, AutoTdpProtocol.Fields.ControllerMode),
-                CpuBoost = json.TryGetValue(AutoTdpProtocol.Fields.CpuBoost, out var boost) && boost.ValueType == JsonValueType.Boolean
-                    ? boost.GetBoolean()
-                    : (bool?)null,
+                CpuBoost = Flag(json, AutoTdpProtocol.Fields.CpuBoost),
+                Rsr = Flag(json, AutoTdpProtocol.Fields.Rsr),
+                Afmf = Flag(json, AutoTdpProtocol.Fields.Afmf),
                 OverlayLevel = Text(json, AutoTdpProtocol.Fields.OverlayLevel),
                 OverlayCorner = Text(json, AutoTdpProtocol.Fields.OverlayCorner),
                 OverlayLayout = Text(json, AutoTdpProtocol.Fields.OverlayLayout),

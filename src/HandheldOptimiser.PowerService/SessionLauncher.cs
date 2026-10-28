@@ -43,9 +43,49 @@ internal static partial class SessionLauncher
     /// this app's own and in its own folder. Should Windows refuse it, the program starts without it.
     /// </param>
     /// <returns>Why it did not start, or null when it did.</returns>
-    public static unsafe string? Launch(string exePath, string arguments, out int processId, bool uiAccess = false)
+    public static string? Launch(string exePath, string arguments, out int processId, bool uiAccess = false) =>
+        Start(exePath, arguments, uiAccess, keepHandle: false, out processId, out _);
+
+    /// <summary>
+    /// Starts <paramref name="exePath"/> on the signed-in player's desktop as <see cref="Launch"/> does, and waits
+    /// up to <paramref name="timeout"/> for it to finish. For a short job that has to run as the player.
+    /// </summary>
+    /// <param name="exitCode">What it ended with, or null when it did not start or finish.</param>
+    /// <returns>Why there is no exit code, or null when there is.</returns>
+    public static string? Run(string exePath, string arguments, TimeSpan timeout, out int? exitCode)
+    {
+        exitCode = null;
+        if (Start(exePath, arguments, uiAccess: false, keepHandle: true, out _, out var handle) is { } refused)
+        {
+            return refused;
+        }
+
+        try
+        {
+            if (WaitForSingleObject(handle, (uint)timeout.TotalMilliseconds) != WaitObject0)
+            {
+                return "It did not finish in time.";
+            }
+
+            if (!GetExitCodeProcess(handle, out var code))
+            {
+                return $"Its result could not be read (error {Marshal.GetLastPInvokeError()}).";
+            }
+
+            exitCode = (int)code;
+            return null;
+        }
+        finally
+        {
+            CloseHandle(handle);
+        }
+    }
+
+    /// <param name="keepHandle">Hand back the process's handle, for the caller to wait on and close, rather than close it.</param>
+    private static unsafe string? Start(string exePath, string arguments, bool uiAccess, bool keepHandle, out int processId, out nint processHandle)
     {
         processId = 0;
+        processHandle = 0;
 
         var session = WTSGetActiveConsoleSessionId();
         if (session == NoSession)
@@ -105,7 +145,15 @@ internal static partial class SessionLauncher
             }
 
             CloseHandle(process.Thread);
-            CloseHandle(process.Process);
+            if (keepHandle)
+            {
+                processHandle = process.Process;
+            }
+            else
+            {
+                CloseHandle(process.Process);
+            }
+
             processId = process.ProcessId;
             return null;
         }
@@ -228,4 +276,13 @@ internal static partial class SessionLauncher
     [LibraryImport("kernel32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static partial bool CloseHandle(nint handle);
+
+    private const uint WaitObject0 = 0;
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    private static partial uint WaitForSingleObject(nint handle, uint milliseconds);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool GetExitCodeProcess(nint process, out uint exitCode);
 }

@@ -50,6 +50,7 @@ internal sealed partial class AutoTdpService : ServiceBase
 
     // The GPU memory, set through the same firmware. Made once the firmware is opened.
     private GpuMemoryHost _gpuMemory = new(null);
+    private readonly RadeonHost _radeon = new();
 
     // Auto or Manual, and the last manual choices, read once as the service starts.
     private readonly TdpEngineSettings _engine = new();
@@ -746,6 +747,11 @@ internal sealed partial class AutoTdpService : ServiceBase
             // Not under the gate either: it changes Windows' power plan, not anything the engine holds.
             status = SetBoost(request);
         }
+        else if (request?.Command == AutoTdpProtocol.SetRadeon)
+        {
+            // Not under the gate: it waits for a program run as the player, and the engine holds none of it.
+            status = SetRadeon(request);
+        }
         else if (request?.Command is AutoTdpProtocol.GpuMemoryRequest or AutoTdpProtocol.SetGpuMemory or AutoTdpProtocol.Restart)
         {
             // Not under the gate: the GPU memory is nothing the engine holds, and has its own lock.
@@ -782,6 +788,7 @@ internal sealed partial class AutoTdpService : ServiceBase
             ManualFans = _engine.ManualFans
         };
         status = _gpuMemory.AddTo(status);
+        status = _radeon.AddTo(status);
         await writer.WriteLineAsync(AutoTdpProtocol.Write(status).AsMemory(), cancel).ConfigureAwait(false);
 
         // Restarted only once the widget has its answer.
@@ -807,6 +814,19 @@ internal sealed partial class AutoTdpService : ServiceBase
         return request.Command == AutoTdpProtocol.SetGpuMemory && _gpuMemory.Set(request.GpuMemory) is { } problem
             ? last with { Error = problem }
             : last;
+    }
+
+    /// <summary>RSR or AFMF switched from the widget. Answered with the last status, its Error saying why not.</summary>
+    private AutoTdpStatus SetRadeon(AutoTdpRequest request)
+    {
+        AutoTdpStatus last;
+        lock (_gate)
+        {
+            last = _last;
+            _idleSince = DateTime.UtcNow;
+        }
+
+        return _radeon.Set(request.RadeonFeature, request.RadeonOn) is { } problem ? last with { Error = problem } : last;
     }
 
     private static void RestartWindows()

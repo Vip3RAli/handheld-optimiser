@@ -36,6 +36,7 @@ namespace HandheldOptimiser.GameBar
         private bool _placingGpuMemory;
         private bool _placingMode;
         private bool _placingController;
+        private bool _placingRadeon;
         private bool _placingFrameRate;
 
         // The frame rate slider's five stops. In Auto the first is None, no target; in Manual it is Off.
@@ -305,6 +306,21 @@ namespace HandheldOptimiser.GameBar
             Send(() => EngineClient.SetControllerMode(mode));
         }
 
+        /// <summary>RSR or AFMF, named by the switch's Tag. TDP Engine runs the change as the player and answers with both.</summary>
+        private void OnRadeon(object sender, RoutedEventArgs e)
+        {
+            // Set from TDP Engine's answer, not by the player: nothing to send.
+            if (_placingRadeon)
+            {
+                return;
+            }
+
+            var toggle = (ToggleSwitch)sender;
+            var feature = (string)toggle.Tag;
+            var on = toggle.IsOn;
+            Send(() => EngineClient.SetRadeon(feature, on));
+        }
+
         private void OnCpuBoost(object sender, RoutedEventArgs e)
         {
             // Set from TDP Engine's answer, not by the player: nothing to send.
@@ -532,6 +548,7 @@ namespace HandheldOptimiser.GameBar
                 : status.ControllerMode == AutoTdpProtocol.DesktopMode ? "Off: the controller works the mouse"
                 : "Not known yet";
             ShowBoost(status.CpuBoost);
+            ShowRadeon(status);
             _overlay.Show(status.OverlayLevel ?? AutoTdpProtocol.OverlayOff);
             Check(OverlayCorners, status.OverlayCorner ?? "");
             Check(OverlayLayouts, status.OverlayLayout ?? "");
@@ -644,6 +661,25 @@ namespace HandheldOptimiser.GameBar
             BoostSwitch.IsOn = on == true;
             _placingBoost = false;
             BoostNote.Text = on == null ? "Not known while TDP Engine is off" : "Faster bursts, more heat";
+        }
+
+        /// <summary>
+        /// The RSR and AFMF switches as TDP Engine last read them. Each is hidden until it is known, and where the
+        /// driver does not offer it. With no answer at all they stay as they were.
+        /// </summary>
+        private void ShowRadeon(EngineStatus status)
+        {
+            if (!status.Reachable)
+            {
+                return;
+            }
+
+            _placingRadeon = true;
+            RsrRow.Visibility = status.Rsr == null ? Visibility.Collapsed : Visibility.Visible;
+            RsrSwitch.IsOn = status.Rsr == true;
+            AfmfRow.Visibility = status.Afmf == null ? Visibility.Collapsed : Visibility.Visible;
+            AfmfSwitch.IsOn = status.Afmf == true;
+            _placingRadeon = false;
         }
 
         /// <summary>A readout's number, with its unit hidden when the value is a word such as Auto.</summary>
