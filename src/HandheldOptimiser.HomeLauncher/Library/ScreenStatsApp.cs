@@ -71,13 +71,23 @@ internal static class ScreenStatsApp
             }
         }
 
-        void End(string why)
+        // Switched off by the player, the Ally's screen goes off with it. Ended any other way, only what was
+        // changed here is put back.
+        void End(string why, bool switchedOff = false)
         {
             timer.Stop();
             Program.Log($"Stats screen closed: {why}");
             window.Close();
             guard.Stop();
-            panel.PutBack();
+            if (switchedOff)
+            {
+                panel.SwitchOff();
+            }
+            else
+            {
+                panel.PutBack();
+            }
+
             app.Shutdown();
         }
 
@@ -107,7 +117,7 @@ internal static class ScreenStatsApp
                 misses = 0;
                 if (!status.ScreenStats)
                 {
-                    End("switched off");
+                    End("switched off", switchedOff: true);
                     return;
                 }
 
