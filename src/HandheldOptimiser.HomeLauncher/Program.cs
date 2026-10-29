@@ -213,8 +213,8 @@ internal static class Program
     internal static bool IsFromButton(string[] args) => args.Contains(FromButtonArgument, StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Opens Xbox Game Bar, which is what the Command Center button shows. Win+G is pressed for the player:
-    /// the ms-gamebar: link Game Bar registers was tried first, and on the Ally it opens nothing.
+    /// Opens Xbox Game Bar on the TDP Engine widget, which is what the Command Center button shows, with
+    /// Win+G when that does not work. The plain ms-gamebar: link opens nothing on the Ally.
     /// </summary>
     private static void OpenGameBar() =>
         Log(Library.GameBarControls.Open() ? "Opened Game Bar" : "Could not open Game Bar: Windows would not take Win+G");
