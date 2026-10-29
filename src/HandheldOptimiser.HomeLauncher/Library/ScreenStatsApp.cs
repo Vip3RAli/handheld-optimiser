@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Threading;
+using HandheldOptimiser.PowerService;
 
 namespace HandheldOptimiser.HomeLauncher.Library;
 
@@ -22,6 +23,10 @@ internal static class ScreenStatsApp
 
     // Seconds without an answer before it gives up.
     private const int MissesToEnd = 5;
+
+    // Seconds undocked before it closes, so a monitor that drops for a moment as it wakes does not end it.
+    // TDP Engine starts it again once a monitor is plugged in.
+    private const int UndockedToEnd = 5;
 
     public static void Run()
     {
@@ -49,14 +54,40 @@ internal static class ScreenStatsApp
         var timer = new DispatcherTimer { Interval = Every };
         var misses = 0;
         var busy = false;
+        var hidden = false;
+        var undocked = 0;
 
-        void End(string why)
+        // Hidden while locked, or while a monitor is plugged in but the panel cannot be had, it can wait for
+        // hours, so its memory is handed back once as it hides, as the library does behind a game. The next
+        // reading after that brings back only what it uses.
+        void Hide()
+        {
+            guard.Stop();
+            window.HideAway();
+            if (!hidden)
+            {
+                hidden = true;
+                Native.TrimWorkingSet();
+            }
+        }
+
+        // Switched off by the player, the Ally's screen goes off with it. Ended any other way, only what was
+        // changed here is put back.
+        void End(string why, bool switchedOff = false)
         {
             timer.Stop();
             Program.Log($"Stats screen closed: {why}");
             window.Close();
             guard.Stop();
-            panel.PutBack();
+            if (switchedOff)
+            {
+                panel.SwitchOff();
+            }
+            else
+            {
+                panel.PutBack();
+            }
+
             app.Shutdown();
         }
 
@@ -86,25 +117,37 @@ internal static class ScreenStatsApp
                 misses = 0;
                 if (!status.ScreenStats)
                 {
-                    End("switched off");
+                    End("switched off", switchedOff: true);
                     return;
                 }
 
                 // Locked, the Ally's screen is turned off, and turned on again once unlocked.
                 if (SessionLock.IsLocked())
                 {
-                    guard.Stop();
-                    window.HideAway();
+                    Hide();
                     panel.TurnOffWhileLocked();
                     return;
                 }
 
                 if (panel.Keep() is not { } bounds)
                 {
-                    guard.Stop();
-                    window.HideAway();
+                    Hide();
+
+                    // The same test TDP Engine starts it by, so the two never take turns starting and ending it.
+                    if (Monitors.Docked())
+                    {
+                        undocked = 0;
+                    }
+                    else if (++undocked >= UndockedToEnd)
+                    {
+                        End("undocked");
+                    }
+
                     return;
                 }
+
+                hidden = false;
+                undocked = 0;
 
                 var reading = readings.Read(status) with { Fps = fps.Add(process, status.Fps) };
                 window.ShowReadings(ScreenStatsLayout.Tiles(reading), DateTime.Now);

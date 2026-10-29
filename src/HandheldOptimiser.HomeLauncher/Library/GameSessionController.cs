@@ -209,6 +209,19 @@ internal sealed class GameSessionController
         _session = session;
         _sessionStoreWasOpen = storeWasOpen;
 
+        var fullScreen = Native.IsFullScreenExperience();
+        var shouldOptimiseWindows = LibrarySettings.WindowsGameMode switch
+        {
+            WindowsGameMode.Always => true,
+            WindowsGameMode.XboxMode => fullScreen,
+            _ => false
+        };
+
+        if (shouldOptimiseWindows)
+        {
+            _ = Task.Run(WindowsProcessOptimiser.Optimise);
+        }
+
         if (closeApps)
         {
             _ = CloseAppsForAsync(session);

@@ -8,6 +8,9 @@ namespace HandheldOptimiser.PowerService;
 /// </summary>
 internal static class AllyControlsStore
 {
+    private const string GamingConfigurationKey = @"Software\Microsoft\Windows\CurrentVersion\GamingConfiguration";
+    private const string OemWidgetValue = "OEMGameBarWidget";
+
     /// <summary>Whether the app is standing in for Armoury Crate. Not set, or unreadable, counts as no.</summary>
     public static bool Replacing()
     {
@@ -20,6 +23,26 @@ internal static class AllyControlsStore
         {
             Log.Write($"Could not read whether the app replaces Armoury Crate: {ex.Message}");
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Names the TDP Engine widget as Game Bar's OEM widget in HKLM, so Game Bar puts it first on the
+    /// Compact Mode bar (before the Home button) as it did for ASUS Command Center.
+    /// </summary>
+    public static void SetOemWidget()
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.CreateSubKey(GamingConfigurationKey);
+            if (!string.Equals(key.GetValue(OemWidgetValue) as string, AutoTdpProtocol.WidgetPackage, StringComparison.Ordinal))
+            {
+                key.SetValue(OemWidgetValue, AutoTdpProtocol.WidgetPackage, RegistryValueKind.String);
+            }
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+        {
+            Log.Write($"Could not set the Game Bar OEM widget: {ex.Message}");
         }
     }
 

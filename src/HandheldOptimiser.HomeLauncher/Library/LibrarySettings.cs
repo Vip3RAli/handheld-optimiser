@@ -65,6 +65,14 @@ internal enum DockedLayout
     OldSchool
 }
 
+/// <summary>When to terminate non-essential Windows background processes and flush shell working sets.</summary>
+internal enum WindowsGameMode
+{
+    Off,
+    XboxMode,
+    Always
+}
+
 /// <summary>
 /// The library's own preferences, changed from its settings menu. They live in the per-user key the main
 /// app writes the home app choice to.
@@ -82,6 +90,7 @@ internal static class LibrarySettings
     private const string ShowHiddenValue = "ShowHiddenGames";
     private const string SortValue = "SortOrder";
     private const string GameModeValue = "GameMode";
+    private const string WindowsGameModeValue = "WindowsGameMode";
     private const string ReopenValue = "ReopenClosedApps";
     private const string StoreClosingValue = "CloseStoreApps";
     private const string LayoutValue = "Layout";
@@ -194,6 +203,18 @@ internal static class LibrarySettings
     {
         get => ReadSwitch(GameModeValue, on: false);
         set => WriteSwitch(GameModeValue, value);
+    }
+
+    /// <summary>
+    /// When to terminate non-essential Windows background processes and trim shell memory. Defaults to
+    /// XboxMode so it takes effect automatically when in the full screen experience.
+    /// </summary>
+    public static WindowsGameMode WindowsGameMode
+    {
+        get => Enum.TryParse<WindowsGameMode>(Read(WindowsGameModeValue), ignoreCase: true, out var mode) && Enum.IsDefined(mode)
+            ? mode
+            : WindowsGameMode.XboxMode;
+        set => Write(WindowsGameModeValue, value.ToString().ToLowerInvariant());
     }
 
     /// <summary>Start the programs closed for a game again once it has closed.</summary>

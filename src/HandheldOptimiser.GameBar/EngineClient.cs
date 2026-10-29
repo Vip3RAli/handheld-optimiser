@@ -37,6 +37,27 @@ namespace HandheldOptimiser.GameBar
         /// <summary>Whether the processor's boost is on for the power source in use, or null when not known.</summary>
         public bool? CpuBoost;
 
+        /// <summary>Whether Radeon Super Resolution is on, or null where it is not offered or not read yet.</summary>
+        public bool? Rsr;
+
+        /// <summary>Whether AMD Fluid Motion Frames is on, or null where it is not offered or not read yet.</summary>
+        public bool? Afmf;
+
+        /// <summary>
+        /// The other Radeon settings, each null where it is not offered or not read yet. A range is lowest,
+        /// highest and step, or null.
+        /// </summary>
+        public int? RsrSharpness;
+        public int[] RsrSharpnessRange;
+        public bool? AntiLag;
+        public bool? Chill;
+        public int? ChillMin;
+        public int? ChillMax;
+        public int[] ChillRange;
+        public bool? Sharpening;
+        public int? SharpeningStrength;
+        public int[] SharpeningRange;
+
         /// <summary>The overlay's level, corner and layout, or null when not known.</summary>
         public string OverlayLevel;
         public string OverlayCorner;
@@ -44,6 +65,13 @@ namespace HandheldOptimiser.GameBar
 
         /// <summary>Whether the stats screen on the Ally's own panel is switched on.</summary>
         public bool ScreenStats;
+
+        /// <summary>"auto" or "manual", or null when TDP Engine did not say, as when it is not running.</summary>
+        public string Mode;
+
+        /// <summary>The power limit and fans last chosen in Manual, offered again with no session running.</summary>
+        public int ManualPowerLimit;
+        public string ManualFans;
 
         /// <summary>The GPU memory Windows has now, in GB with 0 for Auto, or null when not known.</summary>
         public int? GpuMemoryNow;
@@ -80,7 +108,8 @@ namespace HandheldOptimiser.GameBar
         /// range, without one it is held as it is) and a fan curve (null for the Ally's own), starting the
         /// service if need be.
         /// </summary>
-        public static EngineStatus Update(int targetFps, int powerLimit, string fanCurve)
+        /// <param name="start">Start the service even for all zeros: in Auto that is None, a frame rate of its own, not off.</param>
+        public static EngineStatus Update(int targetFps, int powerLimit, string fanCurve, bool start = false)
         {
             var request = new JsonObject
             {
@@ -94,7 +123,7 @@ namespace HandheldOptimiser.GameBar
             if (answer == null)
             {
                 // Turning off what is not running needs nothing.
-                if (targetFps == 0 && powerLimit == 0 && string.IsNullOrEmpty(fanCurve))
+                if (!start && targetFps == 0 && powerLimit == 0 && string.IsNullOrEmpty(fanCurve))
                 {
                     return EngineStatus.Off;
                 }
@@ -120,6 +149,28 @@ namespace HandheldOptimiser.GameBar
         /// Turns the processor's boost on or off, starting the service if need be. Windows keeps the setting
         /// in the power plan, so it holds after the service ends.
         /// </summary>
+        /// <summary>A true or false field, or null when it is missing or null, as from an older service.</summary>
+        private static bool? Flag(JsonObject json, string name) =>
+            json.TryGetValue(name, out var value) && value.ValueType == JsonValueType.Boolean ? value.GetBoolean() : (bool?)null;
+
+        /// <summary>Switches a Radeon setting (one of RadeonState's switch names, such as "rsr") on or off, starting the service if need be.</summary>
+        public static EngineStatus SetRadeon(string feature, bool on) =>
+            SendStarting(new JsonObject
+            {
+                [AutoTdpProtocol.Fields.Command] = JsonValue.CreateStringValue(AutoTdpProtocol.SetRadeon),
+                [AutoTdpProtocol.Fields.RadeonFeature] = JsonValue.CreateStringValue(feature),
+                [AutoTdpProtocol.Fields.RadeonOn] = JsonValue.CreateBooleanValue(on)
+            }.Stringify());
+
+        /// <summary>Sets a Radeon setting's number (one of RadeonState's number names, such as "chill-min"), starting the service if need be.</summary>
+        public static EngineStatus SetRadeonValue(string feature, int value) =>
+            SendStarting(new JsonObject
+            {
+                [AutoTdpProtocol.Fields.Command] = JsonValue.CreateStringValue(AutoTdpProtocol.SetRadeon),
+                [AutoTdpProtocol.Fields.RadeonFeature] = JsonValue.CreateStringValue(feature),
+                [AutoTdpProtocol.Fields.RadeonValue] = JsonValue.CreateNumberValue(value)
+            }.Stringify());
+
         public static EngineStatus SetCpuBoost(bool on)
         {
             var request = new JsonObject
@@ -152,6 +203,13 @@ namespace HandheldOptimiser.GameBar
         /// Switches the stats screen on the Ally's own panel on or off, starting the service if need be. The
         /// service starts it and keeps it running; it shows only while a monitor is in use.
         /// </summary>
+        public static EngineStatus SetMode(string mode) =>
+            SendStarting(new JsonObject
+            {
+                [AutoTdpProtocol.Fields.Command] = JsonValue.CreateStringValue(AutoTdpProtocol.SetMode),
+                [AutoTdpProtocol.Fields.Mode] = JsonValue.CreateStringValue(mode)
+            }.Stringify());
+
         public static EngineStatus SetScreenStats(bool on)
         {
             var request = new JsonObject
@@ -252,16 +310,29 @@ namespace HandheldOptimiser.GameBar
                 Replacing = json.GetNamedBoolean(AutoTdpProtocol.Fields.Replacing, false),
                 ControllerConnected = json.GetNamedBoolean(AutoTdpProtocol.Fields.ControllerConnected, false),
                 ControllerMode = Text(json, AutoTdpProtocol.Fields.ControllerMode),
-                CpuBoost = json.TryGetValue(AutoTdpProtocol.Fields.CpuBoost, out var boost) && boost.ValueType == JsonValueType.Boolean
-                    ? boost.GetBoolean()
-                    : (bool?)null,
+                CpuBoost = Flag(json, AutoTdpProtocol.Fields.CpuBoost),
+                Rsr = Flag(json, AutoTdpProtocol.Fields.Rsr),
+                Afmf = Flag(json, AutoTdpProtocol.Fields.Afmf),
+                RsrSharpness = (int?)Number(json, AutoTdpProtocol.Fields.RsrSharpness),
+                RsrSharpnessRange = Range(json, AutoTdpProtocol.Fields.RsrSharpnessRange),
+                AntiLag = Flag(json, AutoTdpProtocol.Fields.AntiLag),
+                Chill = Flag(json, AutoTdpProtocol.Fields.Chill),
+                ChillMin = (int?)Number(json, AutoTdpProtocol.Fields.ChillMin),
+                ChillMax = (int?)Number(json, AutoTdpProtocol.Fields.ChillMax),
+                ChillRange = Range(json, AutoTdpProtocol.Fields.ChillRange),
+                Sharpening = Flag(json, AutoTdpProtocol.Fields.Sharpening),
+                SharpeningStrength = (int?)Number(json, AutoTdpProtocol.Fields.SharpeningStrength),
+                SharpeningRange = Range(json, AutoTdpProtocol.Fields.SharpeningRange),
                 OverlayLevel = Text(json, AutoTdpProtocol.Fields.OverlayLevel),
                 OverlayCorner = Text(json, AutoTdpProtocol.Fields.OverlayCorner),
                 OverlayLayout = Text(json, AutoTdpProtocol.Fields.OverlayLayout),
                 ScreenStats = json.GetNamedBoolean(AutoTdpProtocol.Fields.ScreenStats, false),
                 GpuMemoryNow = (int?)Number(json, AutoTdpProtocol.Fields.GpuMemoryNow),
                 GpuMemoryNext = (int?)Number(json, AutoTdpProtocol.Fields.GpuMemoryNext),
-                GpuMemoryOffered = Numbers(json, AutoTdpProtocol.Fields.GpuMemoryOffered)
+                GpuMemoryOffered = Numbers(json, AutoTdpProtocol.Fields.GpuMemoryOffered),
+                Mode = Text(json, AutoTdpProtocol.Fields.Mode),
+                ManualPowerLimit = (int)(Number(json, AutoTdpProtocol.Fields.ManualPowerLimit) ?? 0),
+                ManualFans = Text(json, AutoTdpProtocol.Fields.ManualFans)
             };
         }
 
@@ -280,6 +351,13 @@ namespace HandheldOptimiser.GameBar
             }
 
             return numbers;
+        }
+
+        /// <summary>A range of lowest, highest and step, or null when it is missing or not three numbers.</summary>
+        private static int[] Range(JsonObject json, string name)
+        {
+            var numbers = Numbers(json, name);
+            return numbers.Length == 3 ? numbers : null;
         }
 
         private static double? Number(JsonObject json, string name) =>

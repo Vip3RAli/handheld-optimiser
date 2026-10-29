@@ -90,6 +90,44 @@ public class AutoTdpControllerTests
         Assert.True(watts.TakeLast(30).Max() <= 16, $"Went to {watts.TakeLast(30).Max()} W");
     }
 
+    // ----- Auto with no frame rate: the most frames for the least power -----
+
+    private static readonly AutoTdpSettings NoTarget = new(AutoTdpProtocol.NoTargetFps, MinWatts: 7, MaxWatts: 30, TemperatureLimit: 80);
+
+    [Fact]
+    public void With_no_target_a_game_that_still_gains_from_power_keeps_the_top()
+    {
+        // Every watt still buys frames, if fewer each time: a quarter less power costs about 12% of them,
+        // which a target's idle-menu allowance would accept, but with no target it is frames thrown away.
+        var controller = new AutoTdpController(NoTarget, startWatts: 30);
+        var watts = Run(controller, 400, (_, w) => 60 * Math.Sqrt(w / 30.0));
+
+        var top = watts.TakeLast(120).Count(w => w >= 28);
+        Assert.True(top >= 100, $"Only {top} of the last 120 seconds at 28 W or more");
+    }
+
+    [Fact]
+    public void With_no_target_steps_down_from_the_top_do_not_add_up()
+    {
+        // Each quarter less power costs about 4% of the frames, under any one step's allowance, but three
+        // in a row cost 12% against the top. Judged against the top, it stops before they add up.
+        var controller = new AutoTdpController(NoTarget, startWatts: 30);
+        var watts = Run(controller, 600, (_, w) => 60 * Math.Pow(w / 30.0, 0.15));
+
+        Assert.True(watts.TakeLast(120).Min() >= 15, $"Went down to {watts.TakeLast(120).Min()} W");
+    }
+
+    [Fact]
+    public void With_no_target_a_game_more_power_cannot_help_still_comes_down()
+    {
+        // Capped by the processor at 45 fps from 12 W up: power above that buys nothing.
+        var controller = new AutoTdpController(NoTarget, startWatts: 30);
+        var watts = Run(controller, 400, (_, w) => Math.Min(45, 4.0 * w));
+
+        var low = watts.TakeLast(120).Count(w => w <= 18);
+        Assert.True(low >= 100, $"Only {low} of the last 120 seconds at 18 W or under");
+    }
+
     [Fact]
     public void A_game_idling_at_the_top_limit_is_stepped_down_after_a_minute()
     {

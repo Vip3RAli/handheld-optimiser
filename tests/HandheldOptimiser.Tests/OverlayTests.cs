@@ -171,8 +171,12 @@ public class OverlayTests
     public void The_widgets_overlay_and_boost_tiles_name_choices_the_service_knows()
     {
         var xaml = File.ReadAllText(Path.Combine(RepoRoot(), "src", "HandheldOptimiser.GameBar", "TdpWidget.xaml"));
+        var code = File.ReadAllText(Path.Combine(RepoRoot(), "src", "HandheldOptimiser.GameBar", "TdpWidget.xaml.cs"));
 
-        Assert.Equal(AutoTdpProtocol.OverlayLevels, Tags(xaml, "OnOverlayLevel"));
+        // The overlay size is a slider whose stops are the protocol's own names, in order (since 2026-10-28).
+        Assert.Equal([AutoTdpProtocol.OverlayOff, AutoTdpProtocol.OverlaySmall, AutoTdpProtocol.OverlayMedium, AutoTdpProtocol.OverlayFull],
+            AutoTdpProtocol.OverlayLevels);
+        Assert.Contains("AutoTdpProtocol.OverlayOff, AutoTdpProtocol.OverlaySmall, AutoTdpProtocol.OverlayMedium, AutoTdpProtocol.OverlayFull", code);
         Assert.Equal(AutoTdpProtocol.OverlayCorners, Tags(xaml, "OnOverlayCorner"));
         Assert.Equal(AutoTdpProtocol.OverlayLayouts, Tags(xaml, "OnOverlayLayout"));
         Assert.Matches("<ToggleSwitch\\b[^>]*Toggled=\"OnCpuBoost\"", xaml);

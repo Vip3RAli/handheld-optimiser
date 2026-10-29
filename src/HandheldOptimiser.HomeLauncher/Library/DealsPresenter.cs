@@ -625,7 +625,7 @@ internal sealed class DealsPresenter
 
     private void OnOpenDealsSettings(object sender, RoutedEventArgs e)
     {
-        _menu.Show(_menuView.DealsItems, "Game deals", SettingsMenu.GamesApps);
+        _menu.Show(_menuView.DealsItems, "Deals & Free Games", SettingsMenu.GamesApps);
         RefreshDealsSettings();
         _notices.Show(_dealsError ?? string.Empty);
     }
@@ -660,7 +660,7 @@ internal sealed class DealsPresenter
         // What it needs to work was under the row's name, and is said once as it is switched on.
         if (LibrarySettings.WishlistDeals)
         {
-            _notices.Show(LibrarySettings.SteamKey is null ? "Wishlist deals need a Steam Web API key. Add it under Games and apps, Games not installed."
+            _notices.Show(LibrarySettings.SteamKey is null ? "Wishlist deals need a Steam Web API key. Add it under Catalog & Content, Ready to Install."
                 : "Your Steam wishlist must be public for this to work.");
         }
         _ = RefreshDealsAsync(force: true);

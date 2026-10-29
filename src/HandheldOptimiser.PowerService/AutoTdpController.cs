@@ -63,6 +63,11 @@ internal sealed class AutoTdpController
     private const double StepDownLoss = 0.85;
     private const double HeldMoved = 0.20;
 
+    // With no target (Auto's "most frames for the power"), a step down may cost only this much, and is judged
+    // against the frame rate at the top rather than the step before, so small losses cannot add up: frames
+    // that power still buys are not given away.
+    private const double NoTargetLoss = 0.95;
+
     // A step down takes a quarter of the limit, at least 2 W: big enough that a game the power is helping
     // loses well over the 15% allowed, where a game that gains nothing from it loses nothing.
     private const int StepDownShare = 4;
@@ -93,6 +98,10 @@ internal sealed class AutoTdpController
 
     // The last change and the frame rate before it, judged once it has had time to work.
     private (Step Kind, int From, double FpsBefore)? _judging;
+
+    // With no target, the frame rate at the top limit, taken as it last stepped down from there, which every
+    // step down is judged against until it steps down from the top again.
+    private double? _topFps;
 
     // The game needed this much, so the limit is not stepped below it until the time given.
     private int _floor;
@@ -396,7 +405,10 @@ internal sealed class AutoTdpController
         _judging = null;
         if (last.Kind == Step.Down)
         {
-            if (fps >= last.FpsBefore * StepDownLoss)
+            var kept = _settings.TargetFps == AutoTdpProtocol.NoTargetFps
+                ? fps >= (_topFps ?? last.FpsBefore) * NoTargetLoss
+                : fps >= last.FpsBefore * StepDownLoss;
+            if (kept)
             {
                 // Nothing lost: held here, and the next step down comes as soon as this one has settled.
                 Hold(now, Watts, fps);
@@ -494,7 +506,13 @@ internal sealed class AutoTdpController
         }
 
         // Judged against the same longer window, taken before the step.
-        _judging = (Step.Down, Watts, _longReadings.Count >= StepDownWindow ? LongMiddle() : fps);
+        var before = _longReadings.Count >= StepDownWindow ? LongMiddle() : fps;
+        if (Watts >= _settings.MaxWatts || _topFps is null)
+        {
+            _topFps = before;
+        }
+
+        _judging = (Step.Down, Watts, before);
         return Change(now, Watts - Math.Max(SmallestStepDown, Watts / StepDownShare), SettleAfterLower);
     }
 

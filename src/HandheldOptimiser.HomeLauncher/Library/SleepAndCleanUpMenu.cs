@@ -34,6 +34,7 @@ internal sealed class SleepAndCleanUpMenu
         // Play and sleep.
         view.WhilePlayingGroup.Click += (_, _) => OpenWhilePlaying();
         view.GameModeSetting.Click += (_, _) => Toggle(() => LibrarySettings.GameMode = !LibrarySettings.GameMode);
+        view.WindowsGameModeSetting.Click += (_, _) => Toggle(() => LibrarySettings.WindowsGameMode = SettingSteps.Step(LibrarySettings.WindowsGameMode, 1));
         view.AppsToCloseGroup.Click += (_, _) => OpenAppsToClose();
         view.ReopenSetting.Click += (_, _) => Toggle(() => LibrarySettings.ReopenApps = !LibrarySettings.ReopenApps);
         view.AutoTdpSetting.Click += (_, _) => StepAutoTdp(1);
@@ -106,7 +107,7 @@ internal sealed class SleepAndCleanUpMenu
     private void OpenWhilePlaying(Button? focus = null)
     {
         RefreshWhilePlaying();
-        _menu.Show(_view.WhilePlayingItems, "Play and sleep", SettingsMenu.SleepTweaks, focus);
+        _menu.Show(_view.WhilePlayingItems, "Game Mode & Optimisation", SettingsMenu.SleepTweaks, focus);
     }
 
     private void Toggle(Action change)
@@ -122,6 +123,12 @@ internal sealed class SleepAndCleanUpMenu
         view.ResumeSetting.Tag = SettingSteps.OnOff(LibrarySettings.ResumeAfterSleep);
 
         view.GameModeSetting.Tag = SettingSteps.OnOff(LibrarySettings.GameMode);
+        view.WindowsGameModeSetting.Tag = LibrarySettings.WindowsGameMode switch
+        {
+            WindowsGameMode.Always => "Always",
+            WindowsGameMode.XboxMode => "In Xbox mode",
+            _ => "Off"
+        };
         view.AppsToCloseGroup.Tag = BackgroundApps.Choices().Count(c => c.Close) is var chosen and > 0 ? chosen.ToString() : "None";
 
         view.ReopenSetting.Tag = SettingSteps.OnOff(LibrarySettings.ReopenApps);
@@ -180,6 +187,10 @@ internal sealed class SleepAndCleanUpMenu
         if (ReferenceEquals(row, view.StoreClosingSetting))
         {
             StepStoreClosing(step);
+        }
+        else if (ReferenceEquals(row, view.WindowsGameModeSetting))
+        {
+            Toggle(() => LibrarySettings.WindowsGameMode = SettingSteps.Step(LibrarySettings.WindowsGameMode, step));
         }
         else if (ReferenceEquals(row, view.AutoTdpSetting))
         {
@@ -266,7 +277,7 @@ internal sealed class SleepAndCleanUpMenu
         _menu.Armed = null;
         view.TempItem.Tag = view.ShaderItem.Tag = view.RecycleItem.Tag = "Measuring...";
         view.StartupGroup.Tag = null;
-        _menu.Show(view.MaintenanceItems, "Clean up", StorageSummary(), focus);
+        _menu.Show(view.MaintenanceItems, "Storage Clean-up", StorageSummary(), focus);
         _ = MeasureAsync();
     }
 

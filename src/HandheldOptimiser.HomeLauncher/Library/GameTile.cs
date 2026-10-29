@@ -171,6 +171,12 @@ internal sealed class GameTile : INotifyPropertyChanged, INoticeHost
         CoverChanged();
     }
 
+    /// <summary>Lets go of the card's cached gradient brush while a game is in front.</summary>
+    public void UnloadBrushes()
+    {
+        _cardBrush = null;
+    }
+
     /// <summary>
     /// The tiles for a fresh scan. A game that is exactly as it was last time keeps its tile, so a rescan
     /// that finds nothing new decodes no pictures at all; only new or changed games get a new tile. The

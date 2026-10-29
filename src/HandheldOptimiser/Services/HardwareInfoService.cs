@@ -223,6 +223,14 @@ public sealed class HardwareInfoService(LogService log, PowerShellRunner runner)
             return _graphics;
         }
 
+        // Direct registry read takes less than a millisecond and avoids spawning a full powershell.exe process.
+        if (ReadGraphicsFromRegistry() is { } direct)
+        {
+            _graphics = direct;
+            _graphicsLoaded = true;
+            return _graphics;
+        }
+
         var outcome = await _runner.RunScriptAsync(
             """
             $ErrorActionPreference = 'SilentlyContinue'
@@ -251,6 +259,105 @@ public sealed class HardwareInfoService(LogService log, PowerShellRunner runner)
 
         _graphicsLoaded = true;
         return _graphics;
+    }
+
+    private static GraphicsReading? ReadGraphicsFromRegistry()
+    {
+        try
+        {
+            using var classKey = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}");
+            if (classKey is null)
+            {
+                return null;
+            }
+
+            var candidates = new List<GraphicsReading>();
+            foreach (var subKeyName in classKey.GetSubKeyNames())
+            {
+                if (subKeyName.Length != 4 || !char.IsDigit(subKeyName[0]))
+                {
+                    continue;
+                }
+
+                using var key = classKey.OpenSubKey(subKeyName);
+                if (key is null)
+                {
+                    continue;
+                }
+
+                var matchingId = key.GetValue("MatchingDeviceId") as string;
+                if (matchingId is null && key.GetValue("MatchingDeviceId") is string[] ids && ids.Length > 0)
+                {
+                    matchingId = ids[0];
+                }
+
+                if (string.IsNullOrWhiteSpace(matchingId))
+                {
+                    continue;
+                }
+
+                var isIntel = matchingId.Contains("VEN_8086", StringComparison.OrdinalIgnoreCase);
+                var isAmd = matchingId.Contains("VEN_1002", StringComparison.OrdinalIgnoreCase);
+                if (!isIntel && !isAmd)
+                {
+                    continue;
+                }
+
+                var name = (key.GetValue("DriverDesc") as string)?.Trim();
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    continue;
+                }
+
+                var version = (key.GetValue("DriverVersion") as string)?.Trim() ?? string.Empty;
+                var dateStr = key.GetValue("DriverDate") as string;
+                DateTime? driverDate = null;
+                if (!string.IsNullOrWhiteSpace(dateStr))
+                {
+                    if (DateTime.TryParseExact(dateStr, "M-d-yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ||
+                        DateTime.TryParseExact(dateStr, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out d) ||
+                        DateTime.TryParse(dateStr, CultureInfo.InvariantCulture, DateTimeStyles.None, out d))
+                    {
+                        driverDate = d;
+                    }
+                }
+
+                long? memory = null;
+                var memVal = key.GetValue("HardwareInformation.qwMemorySize");
+                if (memVal is long l && l > 0)
+                {
+                    memory = l;
+                }
+                else if (memVal is int i && i > 0)
+                {
+                    memory = i;
+                }
+                else if (memVal is byte[] b && b.Length >= 8)
+                {
+                    var parsed = BitConverter.ToInt64(b, 0);
+                    if (parsed > 0)
+                    {
+                        memory = parsed;
+                    }
+                }
+
+                var vendorSoftware = (key.GetValue("RadeonSoftwareVersion") as string)?.Trim();
+
+                candidates.Add(new GraphicsReading(
+                    Name: name,
+                    IsIntel: isIntel,
+                    DriverVersion: version,
+                    DriverDate: driverDate,
+                    DedicatedMemoryBytes: memory,
+                    VendorSoftwareVersion: string.IsNullOrWhiteSpace(vendorSoftware) ? null : vendorSoftware));
+            }
+
+            return candidates.Count > 0 ? candidates.MinBy(g => g.DedicatedMemoryBytes ?? long.MaxValue) : null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static GraphicsReading? ParseGraphics(string line)

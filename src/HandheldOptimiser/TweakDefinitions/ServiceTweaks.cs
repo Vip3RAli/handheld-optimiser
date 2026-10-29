@@ -22,8 +22,26 @@ public static class ServiceTweaks
         PrintAndFax,
         CompatibilityAssistant,
         LinkTracking,
-        UnusedHandheldServices
+        UnusedHandheldServices,
+        BackgroundExtras
     ];
+
+    /// <summary>
+    /// Services from drivers that run all the time but that a handheld seldom needs. Each is only touched where
+    /// it is installed. Measured running in Xbox mode on an Ally (2026-10-28): about 17 and 33 MB. The Claude
+    /// app's Cowork service was here too, but its package lets no one change how it starts, so the library
+    /// stops it as a game starts instead (see WindowsProcessOptimiser).
+    /// </summary>
+    public static Tweak BackgroundExtras => DisableServices(
+        id: "services.extras",
+        name: "Turn off Logitech lighting and MIDI services",
+        description:
+            "Turns off the Logitech LampArray service and the Windows MIDI Service, where they are installed.",
+        risk: RiskLevel.Moderate,
+        warning:
+            "Logitech Dynamic Lighting and MIDI instruments and controllers stop working until this is undone.",
+        includeInOneClick: false,
+        services: ["logi_lamparray_service", "midisrv"]);
 
     public static Tweak CompatibilityAssistant => DisableServices(
         id: "services.pcasvc",
@@ -204,23 +222,16 @@ public static class ServiceTweaks
 
             var list = string.Join(",", toChange.Select(s => $"'{s}'"));
 
-            var status = await ctx.Runner.RunScriptAsync(
-                $$"""
-                foreach ($n in @({{list}})) {
-                    $s = Get-Service -Name $n -ErrorAction SilentlyContinue
-                    if ($s) { Write-Output "SVC=$n=$($s.Status)" }
-                }
-                """,
-                "Capture service run state before changing it",
-                ct,
-                echoScript: false);
-
-            foreach (var line in status.OutputLines.Where(l => l.StartsWith("SVC=", StringComparison.Ordinal)))
+            foreach (var service in toChange)
             {
-                var parts = line.Split('=', 3);
-                if (parts.Length == 3)
+                try
                 {
-                    journal.CapturedState[$"service.{parts[1]}.status"] = parts[2];
+                    using var sc = new System.ServiceProcess.ServiceController(service);
+                    journal.CapturedState[$"service.{service}.status"] = sc.Status.ToString();
+                }
+                catch
+                {
+                    // Service might not exist or could not be queried
                 }
             }
 

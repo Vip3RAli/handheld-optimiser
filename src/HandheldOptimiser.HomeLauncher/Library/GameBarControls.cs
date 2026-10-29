@@ -20,8 +20,18 @@ internal static class GameBarControls
     public static string? ModeWhileOpen(AutoTdpStatus? status) =>
         status is { Replacing: true, ControllerMode: AutoTdpProtocol.DesktopMode } ? AutoTdpProtocol.GamepadMode : null;
 
-    /// <summary>Opens Game Bar with Win+G, holding the controller as a gamepad until it closes when need be.</summary>
-    /// <returns>False when Windows would not take Win+G.</returns>
+    /// <summary>
+    /// Game Bar's own link for opening it on one widget, here TDP Engine's, as the Command Center button
+    /// opened ASUS's widget. The widget's id is its package family, its app's id and its extension's id.
+    /// Win+G always opens it on Home.
+    /// </summary>
+    internal const string WidgetLink = "ms-gamebar://launchForeground/activate/" + AutoTdpProtocol.WidgetPackage + "_App_TdpEngine";
+
+    /// <summary>
+    /// Opens Game Bar on the TDP Engine widget, holding the controller as a gamepad until it closes when
+    /// need be. Should the link not open it, Win+G opens it on Home.
+    /// </summary>
+    /// <returns>False when Game Bar could not be opened either way.</returns>
     public static bool Open()
     {
         var hold = ModeWhileOpen(AutoTdp.StatusAsync().GetAwaiter().GetResult());
@@ -30,7 +40,7 @@ internal static class GameBarControls
             _ = AutoTdp.SetControllerModeAsync(hold, temporary: true).GetAwaiter().GetResult();
         }
 
-        var opened = Native.PressWinG();
+        var opened = OpenOnWidget() || Native.PressWinG();
         if (hold is null)
         {
             return opened;
@@ -45,6 +55,42 @@ internal static class GameBarControls
         _ = AutoTdp.ReleaseControllerModeAsync().GetAwaiter().GetResult();
         Program.Log("Game Bar closed, so the controller is back in the mode the player chose");
         return opened;
+    }
+
+    /// <summary>
+    /// Opens Game Bar on the TDP Engine widget with <see cref="WidgetLink"/>. Windows can take the link and
+    /// still open nothing, as the plain ms-gamebar: link did on the Ally, so it counts only once Game Bar
+    /// has the input, or when Windows will not say.
+    /// </summary>
+    private static bool OpenOnWidget()
+    {
+        try
+        {
+            using var _ = Process.Start(new ProcessStartInfo(WidgetLink) { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            Program.Log($"Game Bar's link to the TDP Engine widget did not open: {ex.Message}");
+            return false;
+        }
+
+        var started = Stopwatch.StartNew();
+        while (started.Elapsed < OpenWait)
+        {
+            switch (GameBarState.IsOpen())
+            {
+                case true:
+                    Program.Log("Opened Game Bar on the TDP Engine widget");
+                    return true;
+                case null:
+                    return true;
+            }
+
+            Thread.Sleep(Poll);
+        }
+
+        Program.Log("Game Bar's link to the TDP Engine widget opened nothing, so Win+G is pressed instead");
+        return false;
     }
 
     /// <summary>

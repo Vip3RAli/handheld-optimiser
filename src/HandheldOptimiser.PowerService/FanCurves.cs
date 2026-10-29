@@ -22,5 +22,28 @@ internal static class FanCurves
         _ => null
     };
 
+    /// <summary>
+    /// The curve for one of Auto's 11 steps: 0 is Quiet, 5 is Cool and 10 is Full, and a step between is each
+    /// point's speed on a straight line between the two it lies between. Every one still reaches full by 90 °C.
+    /// </summary>
+    public static byte[] Blend(int step)
+    {
+        step = Math.Clamp(step, 0, FineFans.Steps);
+        var half = FineFans.Steps / 2;
+        var (from, to, share) = step <= half
+            ? (For(AutoTdpProtocol.QuietFans)!, For(AutoTdpProtocol.CoolFans)!, (double)step / half)
+            : (For(AutoTdpProtocol.CoolFans)!, For(AutoTdpProtocol.FullFans)!, (double)(step - half) / half);
+
+        var speeds = new byte[Temperatures.Length];
+        for (var i = 0; i < speeds.Length; i++)
+        {
+            var low = from[Temperatures.Length + i];
+            var high = to[Temperatures.Length + i];
+            speeds[i] = (byte)Math.Round(low + (high - low) * share, MidpointRounding.AwayFromZero);
+        }
+
+        return Curve(speeds);
+    }
+
     private static byte[] Curve(params byte[] speeds) => [.. Temperatures, .. speeds];
 }

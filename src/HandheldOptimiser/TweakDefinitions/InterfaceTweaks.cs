@@ -16,8 +16,44 @@ public static class InterfaceTweaks
     [
         MenuShowDelay,
         EdgeSwipe,
-        VisualEffects
+        VisualEffects,
+        ClassicContextMenu,
+        HideGallery
     ];
+
+    public static Tweak ClassicContextMenu => new()
+    {
+        Id = "ux.classiccontextmenu",
+        Name = "Use classic right-click context menu",
+        Description =
+            "Shows the full right-click menu immediately on the desktop and in File Explorer, skipping " +
+            "the \"Show more options\" tap on touchscreens.",
+        Category = TweakCategory.TouchAndDesktop,
+        Risk = RiskLevel.Safe,
+        RequiresReboot = true,
+        RegistryValues =
+        [
+            new(RegistryRoot.CurrentUser, @"Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32",
+                string.Empty, string.Empty, RegistryValueKind.String)
+        ]
+    };
+
+    public static Tweak HideGallery => new()
+    {
+        Id = "ux.hidegallery",
+        Name = "Hide Gallery from File Explorer",
+        Description =
+            "Removes the Gallery icon from File Explorer's sidebar to give more vertical space for " +
+            "game folders and SD card navigation on compact screens.",
+        Category = TweakCategory.TouchAndDesktop,
+        Risk = RiskLevel.Safe,
+        RequiresReboot = false,
+        RegistryValues =
+        [
+            new(RegistryRoot.CurrentUser, @"Software\Classes\CLSID\{e88865ea-0e1c-4e20-9aa6-edcd0212c87c}",
+                "System.IsPinnedToNameSpaceTree", 0, RegistryValueKind.DWord)
+        ]
+    };
 
     public static Tweak MenuShowDelay => new()
     {

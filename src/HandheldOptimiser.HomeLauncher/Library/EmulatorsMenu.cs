@@ -43,7 +43,7 @@ internal sealed class EmulatorsMenu
         _menu.Armed = null;
         _menu.ClearRows(_view.EmulatorItems);
         _systemRows.Clear();
-        _menu.Show(_view.EmulatorItems, "Emulators", "Looking for consoles and emulators...", focus);
+        _menu.Show(_view.EmulatorItems, "Emulators & ROMs", "Looking for consoles and emulators...", focus);
         _ = ListAsync(focus is null);
     }
 
