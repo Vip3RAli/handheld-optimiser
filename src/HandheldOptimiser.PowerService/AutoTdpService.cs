@@ -154,6 +154,7 @@ internal sealed partial class AutoTdpService : ServiceBase
             if (AllyControlsStore.Replacing())
             {
                 Log.Write("Replacing Armoury Crate");
+                AllyControlsStore.SetOemWidget();
                 _controls = new AllyControlsHost();
                 _controls.Start(cancel);
             }

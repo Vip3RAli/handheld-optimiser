@@ -116,9 +116,24 @@ public static class ArmouryCrateTweaks
     /// <summary>The widget's package family, which registers it again from Windows' provisioned copy.</summary>
     public const string CommandCenterFamily = "B9ECED6F.ASUSCommandCenter_qmba6cd70vzyy";
 
+    /// <summary>
+    /// Where Xbox Game Bar reads the device's OEM widget package family name. Game Bar puts that package's
+    /// widget first on the Compact Mode bar (before the Home button), which is how ASUS Command Center gets
+    /// that spot. Pointing it at <see cref="WidgetFamily"/> while Armoury Crate is replaced gives the TDP
+    /// Engine widget the same first slot.
+    /// </summary>
+    public const string GamingConfigurationKey = @"Software\Microsoft\Windows\CurrentVersion\GamingConfiguration";
+
+    /// <inheritdoc cref="GamingConfigurationKey"/>
+    public const string OemWidgetValue = "OEMGameBarWidget";
+
+    /// <summary>The TDP Engine widget's package family, the same as <c>AutoTdpProtocol.WidgetPackage</c>.</summary>
+    public const string WidgetFamily = "HandheldOptimiser.GameBar_pgc7cpy78bqbw";
+
     /// <summary>What the apply script prints once the widget is removed, and the journal key that remembers it.</summary>
     private const string WidgetRemoved = "WIDGET=REMOVED";
     private const string WidgetJournalKey = "widget.commandcenter";
+    private const string OemWidgetJournalKey = "widget.oem";
 
     public static IReadOnlyList<Tweak> All => [ReplaceArmouryCrate];
 
@@ -235,6 +250,17 @@ public static class ArmouryCrateTweaks
                     ctx.Log.Warning($"    The {ScreenManagerEntry} startup flag is not binary, leaving it as it is");
                     break;
             }
+        }
+
+        switch (ctx.Registry.ReadValue(RegistryRoot.LocalMachine, GamingConfigurationKey, OemWidgetValue))
+        {
+            case null:
+                journal.CapturedState.TryAdd(OemWidgetJournalKey, Absent);
+                break;
+            // The value itself is kept, so undo puts back whatever the maker set, not always ASUS's widget.
+            case string oem when !string.Equals(oem, WidgetFamily, StringComparison.OrdinalIgnoreCase):
+                journal.CapturedState.TryAdd(OemWidgetJournalKey, oem);
+                break;
         }
 
         var stop = ServicesInStopOrder.Where(present.Contains).ToList();
@@ -370,6 +396,12 @@ public static class ArmouryCrateTweaks
                     Write-Output "Leaving ASUS Command Center in Game Bar: Windows keeps no copy to bring it back from"
                 }
             }
+            Write-Output "Setting TDP Engine as the Game Bar OEM widget"
+            try {
+                $k = [Microsoft.Win32.Registry]::LocalMachine.CreateSubKey({{Quote(GamingConfigurationKey)}})
+                $k.SetValue({{Quote(OemWidgetValue)}}, {{Quote(WidgetFamily)}}, [Microsoft.Win32.RegistryValueKind]::String)
+                $k.Close()
+            } catch { Write-Output "  failed: $($_.Exception.Message)"; $failed = $true }
             Write-Output "Telling TDP Engine to replace Armoury Crate"
             try {
                 $k = [Microsoft.Win32.Registry]::LocalMachine.CreateSubKey({{Quote(ControlsKey)}})
@@ -450,6 +482,21 @@ public static class ArmouryCrateTweaks
                 """
             : "Write-Output \"No widget to put back\"";
 
+        // With nothing journalled, as for a tweak applied before this was added, ASUS's widget is what the Ally shipped with.
+        var oem = captured.TryGetValue(OemWidgetJournalKey, out var saved) ? saved : CommandCenterFamily;
+        var putOem = oem == Absent
+            ? $"$k.DeleteValue({Quote(OemWidgetValue)}, $false)"
+            : $"$k.SetValue({Quote(OemWidgetValue)}, {Quote(oem)}, [Microsoft.Win32.RegistryValueKind]::String)";
+
+        var oemWidget = $$"""
+            Write-Output "Putting back the Game Bar OEM widget"
+            try {
+                $k = [Microsoft.Win32.Registry]::LocalMachine.CreateSubKey({{Quote(GamingConfigurationKey)}})
+                {{putOem}}
+                $k.Close()
+            } catch { Write-Output "  failed: $($_.Exception.Message)"; $script:failed = $true }
+            """;
+
         var run = "Write-Output \"No startup entry to put back\"";
         if (captured.TryGetValue("run.screenmanager", out var flag))
         {
@@ -496,6 +543,7 @@ public static class ArmouryCrateTweaks
             {{string.Join("\n", restore)}}
             {{task}}
             {{run}}
+            {{oemWidget}}
             foreach ($n in @({{List(start)}})) {
                 Write-Output "Starting $n"
                 try { Start-Service -Name $n -ErrorAction Stop }

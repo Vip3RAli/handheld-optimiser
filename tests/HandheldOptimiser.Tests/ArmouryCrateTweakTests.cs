@@ -1,3 +1,5 @@
+using System.IO;
+using System.Runtime.CompilerServices;
 using HandheldOptimiser.Models;
 using HandheldOptimiser.Services;
 using HandheldOptimiser.TweakDefinitions;
@@ -267,6 +269,52 @@ public sealed class ArmouryCrateTweakTests
             ArmouryCrateTweaks.BuildRevertScript(removed), StringComparison.Ordinal);
         Assert.DoesNotContain("Add-AppxPackage", ArmouryCrateTweaks.BuildRevertScript(Journal("2", "0")), StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Apply_sets_the_TDP_Engine_widget_as_the_Game_Bar_OEM_widget_and_revert_restores_Command_Center()
+    {
+        var all = ArmouryCrateTweaks.ServicesInStopOrder.Concat(ArmouryCrateTweaks.UpdateServices).ToArray();
+        var apply = ArmouryCrateTweaks.BuildApplyScript(all, ArmouryCrateTweaks.ServicesInStopOrder, true, true);
+        var revert = ArmouryCrateTweaks.BuildRevertScript(Journal("2", "0"));
+        var revertAbsent = ArmouryCrateTweaks.BuildRevertScript(new Dictionary<string, string>(Journal("2", "0"))
+        {
+            ["widget.oem"] = "absent"
+        });
+
+        Assert.Contains(
+            $"SetValue('{ArmouryCrateTweaks.OemWidgetValue}', '{ArmouryCrateTweaks.WidgetFamily}'",
+            apply, StringComparison.Ordinal);
+        Assert.Contains(
+            $"SetValue('{ArmouryCrateTweaks.OemWidgetValue}', '{ArmouryCrateTweaks.CommandCenterFamily}'",
+            revert, StringComparison.Ordinal);
+        Assert.Contains(
+            $"DeleteValue('{ArmouryCrateTweaks.OemWidgetValue}', $false)",
+            revertAbsent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Revert_puts_back_the_OEM_widget_that_was_there_before()
+    {
+        var revert = ArmouryCrateTweaks.BuildRevertScript(new Dictionary<string, string>(Journal("2", "0"))
+        {
+            ["widget.oem"] = "Some.OtherMaker_abc123"
+        });
+
+        Assert.Contains($"SetValue('{ArmouryCrateTweaks.OemWidgetValue}', 'Some.OtherMaker_abc123'", revert, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_Game_Bar_widget_manifest_requests_Compact_Mode_priority_and_device_widget_placement()
+    {
+        var manifest = File.ReadAllText(Path.Combine(RepoRoot(), "src", "HandheldOptimiser.GameBar", "Package.appxmanifest"));
+
+        Assert.Contains("<FavoriteAfterInstall>true</FavoriteAfterInstall>", manifest, StringComparison.Ordinal);
+        Assert.Contains("<CompactModePriorityPlacement>true</CompactModePriorityPlacement>", manifest, StringComparison.Ordinal);
+        Assert.Contains("<IsDeviceWidget>true</IsDeviceWidget>", manifest, StringComparison.Ordinal);
+    }
+
+    private static string RepoRoot([CallerFilePath] string here = "") =>
+        Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, "..", ".."));
 
     [Fact]
     public void The_tweak_is_in_the_catalog() =>
