@@ -325,7 +325,9 @@ internal sealed partial class AutoTdpService : ServiceBase
     private void Tick()
     {
         var frames = _frames?.Take();
-        _lastFrames = frames;
+
+        // The overlay and the stats screen show frames as seen, Fluid Motion Frames included.
+        _lastFrames = frames?.Shown;
         if (_overlay.Wanted || _screenStats.On)
         {
             _overlayTemperature = _power?.ReadTemperature();
@@ -344,7 +346,12 @@ internal sealed partial class AutoTdpService : ServiceBase
             return;
         }
 
-        var (fps, program) = frames is null ? (0, null) : GameFps(frames, control.GameFolder ?? control.FoundFolder, control.LibraryFolders);
+        // Everything here steers by the frames the game rendered: Fluid Motion Frames roughly doubles what is
+        // shown, and steering by that would cut the power to half the frames the player chose. The widget and
+        // the Dashboard are still told the shown rate, for the same program.
+        var (fps, program, processId) = frames is null ? (0, null, 0)
+            : GameFps(frames.Rendered, control.GameFolder ?? control.FoundFolder, control.LibraryFolders);
+        var shownFps = frames is not null && frames.Shown.TryGetValue(processId, out var shown) ? shown : fps;
         var temperature = _power.ReadTemperature();
         var now = DateTime.UtcNow;
 
@@ -408,7 +415,7 @@ internal sealed partial class AutoTdpService : ServiceBase
             ApplyFans(control);
         }
 
-        _last = Status(control, fps, temperature);
+        _last = Status(control, shownFps, temperature);
     }
 
     /// <summary>
@@ -621,7 +628,7 @@ internal sealed partial class AutoTdpService : ServiceBase
     /// busiest program of all but Windows' own compositor, whose frames are every window's.
     /// </summary>
     /// <param name="library">Until the game's folder is known, the library's game folders. See AutoTdpRules.GameFps.</param>
-    private static (double Fps, string? Program) GameFps(Dictionary<int, double> frames, string? folder, string[]? library) =>
+    private static (double Fps, string? Program, int ProcessId) GameFps(Dictionary<int, double> frames, string? folder, string[]? library) =>
         AutoTdpRules.GameFps(frames, folder, library, ProcessPath);
 
     // ----- Requests from the library -----

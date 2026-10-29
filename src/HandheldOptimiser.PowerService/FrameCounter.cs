@@ -12,28 +12,46 @@ namespace HandheldOptimiser.PowerService;
 ///
 /// Direct3D 10 to 12 games are counted by DXGI's present event and Direct3D 9 games by Direct3D 9's.
 /// Vulkan and OpenGL games write neither, so for a program with none of those the graphics kernel's own
-/// present event counts instead. Event numbers and keywords are from PresentMon's
-/// PresentData/ETW headers (github.com/GameTechDev/PresentMon).
+/// present event counts instead. Frames added by AMD Fluid Motion Frames are made inside the display
+/// driver after the game's present, and are counted from the PresentMon flip event the driver writes as
+/// each one is shown. Event numbers and keywords are from PresentMon's PresentData/ETW headers
+/// (github.com/GameTechDev/PresentMon).
 /// </summary>
 internal sealed unsafe partial class FrameCounter : IDisposable
 {
+    /// <summary>
+    /// Each program's frames a second, by process id. Rendered is what the program drew itself, which is
+    /// what TDP Engine steers by: power only changes how many of those there are. Shown adds the frames
+    /// AMD Fluid Motion Frames made for it, which is what the player sees, for the overlay and the
+    /// Dashboard. Without Fluid Motion Frames the two are the same.
+    /// </summary>
+    public sealed record FrameRates(Dictionary<int, double> Rendered, Dictionary<int, double> Shown);
+
     private const string SessionName = "HandheldOptimiser AutoTdp";
 
     private static readonly Guid Dxgi = new("CA11C036-0102-4A2D-A6AD-F03CFED5D3C9");
     private static readonly Guid D3D9 = new("783ACA0A-790E-4D7F-8451-AA850511C6B9");
     private static readonly Guid DxgKrnl = new("802EC45A-1E99-4B83-9920-87C98277BA9D");
+    private static readonly Guid PresentMon = new("ECAA4712-4644-442F-B94C-A32F6CF8A499");
 
-    // DXGI Present_Start and PresentMultiplaneOverlay_Start, Direct3D 9 Present_Start, DxgKrnl Present_Info.
+    // DXGI Present_Start and PresentMultiplaneOverlay_Start, Direct3D 9 Present_Start, DxgKrnl Present_Info,
+    // and Intel-PresentMon FlipFrameType_Info (written by AMD's display driver while Fluid Motion Frames is on).
     private const ushort DxgiPresent = 0x2A;
     private const ushort DxgiOverlayPresent = 0x37;
     private const ushort D3D9Present = 0x01;
     private const ushort KernelPresent = 0xB8;
+    private const ushort FlipFrameType = 0x02;
+
+    // FrameType in FlipFrameType_Info: 1 is the game's own frame, 100 is one made by AMD Fluid Motion Frames.
+    private const byte OriginalFrame = 1;
+    private const byte AfmfFrame = 100;
 
     // The keywords those events carry, less the channel bits PresentMon also leaves out. Before Windows 11
     // the kernel's present events have no Present keyword.
     private const ulong RuntimeKeywords = 0x8000000000000002;
     private const ulong KernelKeywords = 0x0000000008000001;
     private const ulong KernelKeywordsBeforeWindows11 = 0x0000000000000001;
+    private const ulong FrameTypeKeywords = 0x0000000000000001;
 
     private const uint RealTimeMode = 0x00000100;
     private const uint TracedGuid = 0x00020000;
@@ -63,15 +81,18 @@ internal sealed unsafe partial class FrameCounter : IDisposable
 
     private readonly object _gate = new();
     private Dictionary<int, Counts> _counts = [];
-    private DateTime _since = DateTime.UtcNow;
+    private int _original;
+    private int _afmf;
+    private DateTime _since;
 
     private ulong _session;
     private ulong _trace = InvalidTrace;
     private Thread? _thread;
     private nint _name;
 
-    private FrameCounter()
+    internal FrameCounter(DateTime? since = null)
     {
+        _since = since ?? DateTime.UtcNow;
     }
 
     /// <summary>Starts counting.</summary>
@@ -93,23 +114,65 @@ internal sealed unsafe partial class FrameCounter : IDisposable
         }
     }
 
-    /// <summary>Each program's frames a second since the last call, by process id.</summary>
-    public Dictionary<int, double> Take()
+    /// <summary>Each program's frames a second since the last call, by process id, as rendered and as shown.</summary>
+    public FrameRates Take() => Take(DateTime.UtcNow);
+
+    internal FrameRates Take(DateTime now)
     {
         Dictionary<int, Counts> counts;
+        int original;
+        int afmf;
         DateTime since;
         lock (_gate)
         {
             counts = _counts;
+            original = _original;
+            afmf = _afmf;
             since = _since;
             _counts = [];
-            _since = DateTime.UtcNow;
+            _original = 0;
+            _afmf = 0;
+            _since = now;
         }
 
-        var seconds = Math.Max((DateTime.UtcNow - since).TotalSeconds, 0.001);
+        var seconds = Math.Max((now - since).TotalSeconds, 0.001);
+        int? game = afmf > 0 && counts.Count > 0 ? AfmfProcess(counts, original) : null;
 
         // The runtime's count where there is one: the kernel's event can also come from other paths for the same frame.
-        return counts.ToDictionary(pair => pair.Key, pair => (pair.Value.Runtime > 0 ? pair.Value.Runtime : pair.Value.Kernel) / seconds);
+        var rendered = counts.ToDictionary(pair => pair.Key, pair => Presented(pair.Value) / seconds);
+        if (game is not { } withAfmf)
+        {
+            return new FrameRates(rendered, rendered);
+        }
+
+        var shown = new Dictionary<int, double>(rendered);
+        shown[withAfmf] += afmf / seconds;
+        return new FrameRates(rendered, shown);
+    }
+
+    private static int Presented(Counts counts) => counts.Runtime > 0 ? counts.Runtime : counts.Kernel;
+
+    // FlipFrameType_Info is written from the display driver's interrupt handler, so its header carries the
+    // interrupted process rather than the game's. The driver writes one OriginalFrame for each of the game's
+    // own presents alongside the AfmfFrame ones, which picks out the game among the programs that presented.
+    private static int AfmfProcess(Dictionary<int, Counts> counts, int original)
+    {
+        var bestProcess = 0;
+        var bestFrames = -1;
+        var bestDistance = int.MaxValue;
+        foreach (var (processId, count) in counts)
+        {
+            var frames = Presented(count);
+            var distance = original > 0 ? Math.Abs(frames - original) : 0;
+            if (distance < bestDistance || (distance == bestDistance && frames > bestFrames))
+            {
+                bestProcess = processId;
+                bestFrames = frames;
+                bestDistance = distance;
+            }
+        }
+
+        return bestProcess;
     }
 
     private void StartSession()
@@ -140,6 +203,7 @@ internal sealed unsafe partial class FrameCounter : IDisposable
         Enable(Dxgi, RuntimeKeywords, [DxgiPresent, DxgiOverlayPresent]);
         Enable(D3D9, RuntimeKeywords, [D3D9Present]);
         Enable(DxgKrnl, Environment.OSVersion.Version.Build >= 22000 ? KernelKeywords : KernelKeywordsBeforeWindows11, [KernelPresent]);
+        Enable(PresentMon, FrameTypeKeywords, [FlipFrameType]);
     }
 
     private static byte[] NewProperties()
@@ -223,17 +287,48 @@ internal sealed unsafe partial class FrameCounter : IDisposable
     }
 
     [UnmanagedCallersOnly]
-    private static void OnEvent(byte* record)
-    {
-        if (_running is not { } counter)
-        {
-            return;
-        }
+    private static void OnEvent(byte* record) => _running?.Record(record);
 
-        // EVENT_RECORD starts with EVENT_HEADER: ProcessId at 12, ProviderId at 24, EventDescriptor.Id at 40.
+    internal void Record(byte* record)
+    {
+        // EVENT_RECORD starts with EVENT_HEADER: ProcessId at 12, ProviderId at 24, EventDescriptor.Id at 40,
+        // EventDescriptor.Version at 42. UserDataLength is at 86 and UserData at 96.
         var processId = *(int*)(record + 12);
         var provider = *(Guid*)(record + 24);
         var id = *(ushort*)(record + 40);
+
+        if (provider == PresentMon && id == FlipFrameType)
+        {
+            var version = record[42];
+            var length = *(ushort*)(record + 86);
+            var data = *(byte**)(record + 96);
+            // FlipFrameType_Info: VidPnSourceId (4), LayerIndex (4), PresentId (8), FrameType (1), then in
+            // version 1 TimeStamp (8), which is 0 when the generated frame was dropped without being shown.
+            if (data is null || length < 17 || (version >= 1 && (length < 25 || *(ulong*)(data + 17) == 0)))
+            {
+                return;
+            }
+
+            var type = data[16];
+            if (type is not (OriginalFrame or AfmfFrame))
+            {
+                return;
+            }
+
+            lock (_gate)
+            {
+                if (type == AfmfFrame)
+                {
+                    _afmf++;
+                }
+                else
+                {
+                    _original++;
+                }
+            }
+
+            return;
+        }
 
         var runtime = (provider == Dxgi && id is DxgiPresent or DxgiOverlayPresent) || (provider == D3D9 && id == D3D9Present);
         var kernel = provider == DxgKrnl && id == KernelPresent;
@@ -242,9 +337,9 @@ internal sealed unsafe partial class FrameCounter : IDisposable
             return;
         }
 
-        lock (counter._gate)
+        lock (_gate)
         {
-            ref var counts = ref CollectionsMarshal.GetValueRefOrAddDefault(counter._counts, processId, out _);
+            ref var counts = ref CollectionsMarshal.GetValueRefOrAddDefault(_counts, processId, out _);
             if (runtime)
             {
                 counts.Runtime++;

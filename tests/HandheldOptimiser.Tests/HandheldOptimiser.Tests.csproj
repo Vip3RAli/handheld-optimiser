@@ -4,6 +4,7 @@
     <TargetFramework>net10.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <UseWPF>true</UseWPF>
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
@@ -42,6 +43,7 @@
     <Compile Include="..\..\src\HandheldOptimiser.PowerService\OverlayRules.cs" Link="OverlayRules.cs" />
     <Compile Include="..\..\src\HandheldOptimiser.PowerService\FanCurves.cs" Link="FanCurves.cs" />
     <Compile Include="..\..\src\HandheldOptimiser.PowerService\DynamicFans.cs" Link="DynamicFans.cs" />
+    <Compile Include="..\..\src\HandheldOptimiser.PowerService\FrameCounter.cs" Link="FrameCounter.cs" />
     <Compile Include="..\..\src\HandheldOptimiser.PowerService\GameLock.cs" Link="GameLock.cs" />
     <Compile Include="..\..\src\HandheldOptimiser.PowerService\GpuMemory.cs" Link="GpuMemory.cs" />
     <Compile Include="..\..\src\HandheldOptimiser.PowerService\PowerLimits.cs" Link="PowerLimits.cs" />
