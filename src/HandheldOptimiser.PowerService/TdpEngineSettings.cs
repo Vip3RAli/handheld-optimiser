@@ -32,7 +32,7 @@ internal sealed class TdpEngineSettings
         }
     }
 
-    /// <summary>Whether TDP Engine picks the power limit, fans and boost itself.</summary>
+    /// <summary>Whether TDP Engine picks the power limit and fans itself. CPU boost is the player's either way.</summary>
     public bool Auto { get; private set; } = true;
 
     /// <summary>The power limit last chosen in Manual, or 0 for Auto.</summary>

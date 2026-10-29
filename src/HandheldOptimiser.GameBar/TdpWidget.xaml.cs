@@ -49,6 +49,13 @@ namespace HandheldOptimiser.GameBar
         // The fan curve and overlay size, each a slider of named stops.
         private readonly StepSlider _fans;
         private readonly StepSlider _overlay;
+
+        // The Radeon settings' numbers, each a slider over the range the driver gives.
+        private readonly NumberSlider _rsrSharpness;
+        private readonly NumberSlider _chillMin;
+        private readonly NumberSlider _chillMax;
+        private readonly NumberSlider _sharpening;
+
         // TDP Engine's mode and the last manual choices, from its last answer, kept in the widget's own settings
         // so they are right while TDP Engine is not running, which is most of the time between games.
         private const string ModeSetting = "Mode";
@@ -84,6 +91,16 @@ namespace HandheldOptimiser.GameBar
                 new[] { AutoTdpProtocol.OverlayOff, AutoTdpProtocol.OverlaySmall, AutoTdpProtocol.OverlayMedium, AutoTdpProtocol.OverlayFull },
                 new[] { "Off", "Small", "Medium", "Full" },
                 level => Send(() => EngineClient.SetOverlay(level, null, null)));
+
+            // The names sent are RadeonState's, which the launcher's --radeon mode knows.
+            _rsrSharpness = new NumberSlider(RsrSharpnessSlider, RsrSharpnessValue, "%",
+                value => Send(() => EngineClient.SetRadeonValue("rsr-sharpness", value)));
+            _chillMin = new NumberSlider(ChillMinSlider, ChillMinValue, " fps",
+                value => Send(() => EngineClient.SetRadeonValue("chill-min", value)));
+            _chillMax = new NumberSlider(ChillMaxSlider, ChillMaxValue, " fps",
+                value => Send(() => EngineClient.SetRadeonValue("chill-max", value)));
+            _sharpening = new NumberSlider(SharpeningSlider, SharpeningValue, "%",
+                value => Send(() => EngineClient.SetRadeonValue("sharpening-strength", value)));
             Loaded += (sender, e) =>
             {
                 _loaded = true;
@@ -110,6 +127,10 @@ namespace HandheldOptimiser.GameBar
 
                 _fans.Flush();
                 _overlay.Flush();
+                _rsrSharpness.Flush();
+                _chillMin.Flush();
+                _chillMax.Flush();
+                _sharpening.Flush();
             };
         }
 
@@ -174,7 +195,8 @@ namespace HandheldOptimiser.GameBar
         }
 
         /// <summary>True while the player moves any slider and the choice is not sent yet.</summary>
-        private bool Moving => _sliding || _frameRateSliding || _fans.Moving || _overlay.Moving;
+        private bool Moving => _sliding || _frameRateSliding || _fans.Moving || _overlay.Moving
+            || _rsrSharpness.Moving || _chillMin.Moving || _chillMax.Moving || _sharpening.Moving;
 
         private void OnFrameRateSlider(object sender, RangeBaseValueChangedEventArgs e)
         {
@@ -306,7 +328,7 @@ namespace HandheldOptimiser.GameBar
             Send(() => EngineClient.SetControllerMode(mode));
         }
 
-        /// <summary>RSR or AFMF, named by the switch's Tag. TDP Engine runs the change as the player and answers with both.</summary>
+        /// <summary>A Radeon setting, named by the switch's Tag. TDP Engine runs the change as the player and answers with them all.</summary>
         private void OnRadeon(object sender, RoutedEventArgs e)
         {
             // Set from TDP Engine's answer, not by the player: nothing to send.
@@ -522,15 +544,14 @@ namespace HandheldOptimiser.GameBar
                 _saved.Values[ManualFansSetting] = _manualFans;
             }
 
-            // Auto hides what TDP Engine picks itself: the power limit, CPU boost and the fans.
+            // Auto hides what TDP Engine picks itself: the power limit and the fans. CPU boost stays the player's.
             var manual = Auto ? Visibility.Collapsed : Visibility.Visible;
             _placingMode = true;
             ModeSwitch.IsOn = Auto;
             _placingMode = false;
-            ModeNote.Text = Auto ? "TDP Engine sets power, fans and boost" : "You set power, fans and boost";
+            ModeNote.Text = Auto ? "TDP Engine sets power and fans" : "You set power and fans";
             PowerLabel.Visibility = manual;
             PowerRow.Visibility = manual;
-            BoostRow.Visibility = manual;
             CoolingCard.Visibility = manual;
             FrameRateLowest.Text = Auto ? "None" : "Off";
 
@@ -664,8 +685,9 @@ namespace HandheldOptimiser.GameBar
         }
 
         /// <summary>
-        /// The RSR and AFMF switches as TDP Engine last read them. Each is hidden until it is known, and where the
-        /// driver does not offer it. With no answer at all they stay as they were.
+        /// The Radeon settings as TDP Engine last read them. Each row is hidden until it is known, and where the
+        /// driver does not offer it, and the card with them when none is offered. A setting's slider shows while it
+        /// is on. With no answer at all they stay as they were.
         /// </summary>
         private void ShowRadeon(EngineStatus status)
         {
@@ -675,12 +697,47 @@ namespace HandheldOptimiser.GameBar
             }
 
             _placingRadeon = true;
-            RsrRow.Visibility = status.Rsr == null ? Visibility.Collapsed : Visibility.Visible;
-            RsrSwitch.IsOn = status.Rsr == true;
-            AfmfRow.Visibility = status.Afmf == null ? Visibility.Collapsed : Visibility.Visible;
-            AfmfSwitch.IsOn = status.Afmf == true;
+            ShowSwitch(RsrRow, RsrSwitch, status.Rsr);
+            ShowSwitch(AfmfRow, AfmfSwitch, status.Afmf);
+            ShowSwitch(AntiLagRow, AntiLagSwitch, status.AntiLag);
+            ShowSwitch(ChillRow, ChillSwitch, status.Chill);
+            ShowSwitch(SharpeningRow, SharpeningSwitch, status.Sharpening);
             _placingRadeon = false;
+
+            RsrSharpnessPanel.Visibility = Shown(status.Rsr == true && status.RsrSharpness != null);
+            _rsrSharpness.Show(status.RsrSharpness, status.RsrSharpnessRange);
+            ChillPanel.Visibility = Shown(status.Chill == true && status.ChillMin != null && status.ChillMax != null);
+            _chillMin.Show(status.ChillMin, status.ChillRange);
+            _chillMax.Show(status.ChillMax, status.ChillRange);
+            SharpeningPanel.Visibility = Shown(status.Sharpening == true && status.SharpeningStrength != null);
+            _sharpening.Show(status.SharpeningStrength, status.SharpeningRange);
+
+            RadeonCard.Visibility = Shown(status.Rsr != null || status.Afmf != null || status.AntiLag != null
+                || status.Chill != null || status.Sharpening != null);
         }
+
+        /// <summary>Folds the AMD Radeon card open or shut. It starts shut each time the widget loads.</summary>
+        private void OnRadeonFold(object sender, RoutedEventArgs e) =>
+            ShowRadeonFold(RadeonBody.Visibility != Visibility.Visible);
+
+        private void ShowRadeonFold(bool open)
+        {
+            RadeonBody.Visibility = Shown(open);
+            RadeonChevron.Text = open ? "" : "";
+
+            // Open, the header looks like every other card's: a line under it and a gap before the rows.
+            RadeonHeader.BorderThickness = new Thickness(0, 0, 0, open ? 1 : 0);
+            RadeonHeader.Padding = new Thickness(0, 0, 0, open ? 8 : 0);
+            RadeonHeader.Margin = new Thickness(0, 0, 0, open ? 12 : 0);
+        }
+
+        private static void ShowSwitch(FrameworkElement row, ToggleSwitch toggle, bool? on)
+        {
+            row.Visibility = Shown(on != null);
+            toggle.IsOn = on == true;
+        }
+
+        private static Visibility Shown(bool shown) => shown ? Visibility.Visible : Visibility.Collapsed;
 
         /// <summary>A readout's number, with its unit hidden when the value is a word such as Auto.</summary>
         private static void SetReadout(Run value, Run unit, string unitText, string text, bool known)

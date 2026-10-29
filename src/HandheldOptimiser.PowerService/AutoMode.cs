@@ -1,9 +1,9 @@
 namespace HandheldOptimiser.PowerService;
 
 /// <summary>
-/// TDP Engine's Auto mode, in which it picks the power limit, the fans and the processor's boost itself for
-/// every session, with or without a frame rate to hold. What Auto sets a session up with is here, with no
-/// Windows calls, so it can be tested. Manual is everything as before.
+/// TDP Engine's Auto mode, in which it picks the power limit and the fans itself for every session, with or
+/// without a frame rate to hold. The processor's boost is the player's in both modes. What Auto sets a session
+/// up with is here, with no Windows calls, so it can be tested. Manual is everything as before.
 /// </summary>
 internal static class AutoMode
 {

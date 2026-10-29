@@ -53,7 +53,7 @@ internal static class Program
             return 0;
         }
 
-        // RSR and AFMF for the widget, which TDP Engine starts as the player and reads from the exit code.
+        // The Radeon settings for the widget, which TDP Engine starts as the player, reading what it prints.
         if (args.Length > 0 && string.Equals(args[0], PowerService.RadeonState.Argument, StringComparison.OrdinalIgnoreCase))
         {
             return RunRadeon(args);
@@ -139,25 +139,45 @@ internal static class Program
     internal const string ScreenStatsArgument = "--screen-stats";
 
     /// <summary>
-    /// --radeon alone reads RSR and AFMF; --radeon rsr on (or afmf, or off) switches one first. The exit code is
-    /// the state found, as RadeonState says, or 1 when AMD's ADLX could not be used.
+    /// --radeon alone reads the Radeon settings; --radeon followed by a setting's name and on, off or a number sets
+    /// that one first (see RadeonState). Prints what it found as one line for TDP Engine, which reads this
+    /// program's output, and ends with 0, or with 1 when AMD's ADLX could not be used.
     /// </summary>
     private static int RunRadeon(string[] args)
     {
-        var feature = args.Length > 1 ? args[1].ToLowerInvariant() : null;
-        var on = args.Length > 2 && string.Equals(args[2], PowerService.RadeonState.OnName, StringComparison.OrdinalIgnoreCase);
-        if (feature is not (null or PowerService.RadeonState.RsrName or PowerService.RadeonState.AfmfName))
+        Library.RadeonSettings.Change? change = null;
+        if (args.Length > 1)
         {
-            Log($"Radeon settings: {feature} is not a setting this knows");
+            var name = args[1].ToLowerInvariant();
+            var value = args.Length > 2 ? args[2].ToLowerInvariant() : "";
+            bool? on = value switch { PowerService.RadeonState.OnName => true, PowerService.RadeonState.OffName => false, _ => null };
+            int? number = int.TryParse(value, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var n) ? n : null;
+            if (!PowerService.RadeonState.IsChange(name, on, number))
+            {
+                Log($"Radeon settings: \"{name} {value}\" is not a change this knows");
+                return 1;
+            }
+
+            Log($"Radeon settings: setting {name} to {value}");
+            change = new Library.RadeonSettings.Change(name, on, number);
+        }
+
+        if (Library.RadeonSettings.Apply(change) is not { } state)
+        {
             return 1;
         }
 
-        if (feature is not null)
+        // The driver switches some settings off as another goes on (RSR as Image Sharpening does, Anti-Lag as
+        // Chill does), and the session that made the change still reads them as they were. A new session reads
+        // them as they are (seen on the Ally on 2026-10-28).
+        if (change is not null && Library.RadeonSettings.Apply(null) is { } after)
         {
-            Log($"Radeon settings: switching {feature} {(on ? "on" : "off")}");
+            state = after;
         }
 
-        return Library.RadeonSettings.Apply(feature, on)?.ToExitCode() ?? 1;
+        Console.Out.WriteLine(state.Format());
+        Console.Out.Flush();
+        return 0;
     }
 
     private static void RunScreenStats()

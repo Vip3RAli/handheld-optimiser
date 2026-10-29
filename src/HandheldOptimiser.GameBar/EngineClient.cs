@@ -43,6 +43,21 @@ namespace HandheldOptimiser.GameBar
         /// <summary>Whether AMD Fluid Motion Frames is on, or null where it is not offered or not read yet.</summary>
         public bool? Afmf;
 
+        /// <summary>
+        /// The other Radeon settings, each null where it is not offered or not read yet. A range is lowest,
+        /// highest and step, or null.
+        /// </summary>
+        public int? RsrSharpness;
+        public int[] RsrSharpnessRange;
+        public bool? AntiLag;
+        public bool? Chill;
+        public int? ChillMin;
+        public int? ChillMax;
+        public int[] ChillRange;
+        public bool? Sharpening;
+        public int? SharpeningStrength;
+        public int[] SharpeningRange;
+
         /// <summary>The overlay's level, corner and layout, or null when not known.</summary>
         public string OverlayLevel;
         public string OverlayCorner;
@@ -138,13 +153,22 @@ namespace HandheldOptimiser.GameBar
         private static bool? Flag(JsonObject json, string name) =>
             json.TryGetValue(name, out var value) && value.ValueType == JsonValueType.Boolean ? value.GetBoolean() : (bool?)null;
 
-        /// <summary>Switches RSR or AFMF (RadeonState's names, "rsr" or "afmf") on or off, starting the service if need be.</summary>
+        /// <summary>Switches a Radeon setting (one of RadeonState's switch names, such as "rsr") on or off, starting the service if need be.</summary>
         public static EngineStatus SetRadeon(string feature, bool on) =>
             SendStarting(new JsonObject
             {
                 [AutoTdpProtocol.Fields.Command] = JsonValue.CreateStringValue(AutoTdpProtocol.SetRadeon),
                 [AutoTdpProtocol.Fields.RadeonFeature] = JsonValue.CreateStringValue(feature),
                 [AutoTdpProtocol.Fields.RadeonOn] = JsonValue.CreateBooleanValue(on)
+            }.Stringify());
+
+        /// <summary>Sets a Radeon setting's number (one of RadeonState's number names, such as "chill-min"), starting the service if need be.</summary>
+        public static EngineStatus SetRadeonValue(string feature, int value) =>
+            SendStarting(new JsonObject
+            {
+                [AutoTdpProtocol.Fields.Command] = JsonValue.CreateStringValue(AutoTdpProtocol.SetRadeon),
+                [AutoTdpProtocol.Fields.RadeonFeature] = JsonValue.CreateStringValue(feature),
+                [AutoTdpProtocol.Fields.RadeonValue] = JsonValue.CreateNumberValue(value)
             }.Stringify());
 
         public static EngineStatus SetCpuBoost(bool on)
@@ -289,6 +313,16 @@ namespace HandheldOptimiser.GameBar
                 CpuBoost = Flag(json, AutoTdpProtocol.Fields.CpuBoost),
                 Rsr = Flag(json, AutoTdpProtocol.Fields.Rsr),
                 Afmf = Flag(json, AutoTdpProtocol.Fields.Afmf),
+                RsrSharpness = (int?)Number(json, AutoTdpProtocol.Fields.RsrSharpness),
+                RsrSharpnessRange = Range(json, AutoTdpProtocol.Fields.RsrSharpnessRange),
+                AntiLag = Flag(json, AutoTdpProtocol.Fields.AntiLag),
+                Chill = Flag(json, AutoTdpProtocol.Fields.Chill),
+                ChillMin = (int?)Number(json, AutoTdpProtocol.Fields.ChillMin),
+                ChillMax = (int?)Number(json, AutoTdpProtocol.Fields.ChillMax),
+                ChillRange = Range(json, AutoTdpProtocol.Fields.ChillRange),
+                Sharpening = Flag(json, AutoTdpProtocol.Fields.Sharpening),
+                SharpeningStrength = (int?)Number(json, AutoTdpProtocol.Fields.SharpeningStrength),
+                SharpeningRange = Range(json, AutoTdpProtocol.Fields.SharpeningRange),
                 OverlayLevel = Text(json, AutoTdpProtocol.Fields.OverlayLevel),
                 OverlayCorner = Text(json, AutoTdpProtocol.Fields.OverlayCorner),
                 OverlayLayout = Text(json, AutoTdpProtocol.Fields.OverlayLayout),
@@ -317,6 +351,13 @@ namespace HandheldOptimiser.GameBar
             }
 
             return numbers;
+        }
+
+        /// <summary>A range of lowest, highest and step, or null when it is missing or not three numbers.</summary>
+        private static int[] Range(JsonObject json, string name)
+        {
+            var numbers = Numbers(json, name);
+            return numbers.Length == 3 ? numbers : null;
         }
 
         private static double? Number(JsonObject json, string name) =>

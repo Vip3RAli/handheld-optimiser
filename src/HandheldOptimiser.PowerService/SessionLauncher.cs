@@ -1,3 +1,4 @@
+using Microsoft.Win32.SafeHandles;
 using System.Runtime.InteropServices;
 
 namespace HandheldOptimiser.PowerService;
@@ -51,13 +52,34 @@ internal static partial class SessionLauncher
     /// up to <paramref name="timeout"/> for it to finish. For a short job that has to run as the player.
     /// </summary>
     /// <param name="exitCode">What it ended with, or null when it did not start or finish.</param>
+    /// <param name="output">What it printed, or null when it did not start or finish.</param>
     /// <returns>Why there is no exit code, or null when there is.</returns>
-    public static string? Run(string exePath, string arguments, TimeSpan timeout, out int? exitCode)
+    public static unsafe string? Run(string exePath, string arguments, TimeSpan timeout, out int? exitCode, out string? output)
     {
         exitCode = null;
-        if (Start(exePath, arguments, uiAccess: false, keepHandle: true, out _, out var handle) is { } refused)
+        output = null;
+
+        // The program's output goes into a pipe. Only the end it writes to is passed on to it; this end is not.
+        var security = new SecurityAttributes { Length = sizeof(SecurityAttributes), InheritHandle = 1 };
+        if (!CreatePipe(out var readEnd, out var writeEnd, ref security, OutputPipeSize))
         {
-            return refused;
+            return $"A pipe for its output could not be made (error {Marshal.GetLastPInvokeError()}).";
+        }
+
+        using var reader = new SafeFileHandle(readEnd, ownsHandle: true);
+        nint handle;
+        try
+        {
+            SetHandleInformation(readEnd, HandleFlagInherit, 0);
+            if (Start(exePath, arguments, uiAccess: false, keepHandle: true, out _, out handle, writeEnd) is { } refused)
+            {
+                return refused;
+            }
+        }
+        finally
+        {
+            // Closed here as well as in the program, so the pipe ends when the program does.
+            CloseHandle(writeEnd);
         }
 
         try
@@ -73,6 +95,11 @@ internal static partial class SessionLauncher
             }
 
             exitCode = (int)code;
+
+            // It has ended, so the pipe holds all it printed, which is far less than the pipe's size.
+            using var stream = new FileStream(reader, FileAccess.Read, 1);
+            using var text = new StreamReader(stream);
+            output = text.ReadToEnd();
             return null;
         }
         finally
@@ -82,7 +109,9 @@ internal static partial class SessionLauncher
     }
 
     /// <param name="keepHandle">Hand back the process's handle, for the caller to wait on and close, rather than close it.</param>
-    private static unsafe string? Start(string exePath, string arguments, bool uiAccess, bool keepHandle, out int processId, out nint processHandle)
+    /// <param name="standardOutput">An inheritable handle the program's output goes to, the only handle it is given, or 0 for none.</param>
+    private static unsafe string? Start(string exePath, string arguments, bool uiAccess, bool keepHandle, out int processId,
+        out nint processHandle, nint standardOutput = 0)
     {
         processId = 0;
         processHandle = 0;
@@ -136,11 +165,55 @@ internal static partial class SessionLauncher
             fixed (char* desktop = @"winsta0\default")
             fixed (char* command = commandBuffer)
             {
-                var startup = new StartupInfo { Size = sizeof(StartupInfo), Desktop = desktop };
-                if (!CreateProcessAsUser(primaryToken, exePath, command, 0, 0, inheritHandles: false,
-                        CreateUnicodeEnvironment, environment, directory, ref startup, out process))
+                var startup = new StartupInfoEx();
+                startup.StartupInfo.Size = sizeof(StartupInfo);
+                startup.StartupInfo.Desktop = desktop;
+                var flags = CreateUnicodeEnvironment;
+                byte* attributes = null;
+                var listMade = false;
+
+                // Where the list points, so it has to outlive the call that starts the program.
+                var passed = standardOutput;
+                try
                 {
-                    return $"The program could not be started (error {Marshal.GetLastPInvokeError()}).";
+                    if (standardOutput != 0)
+                    {
+                        // A list naming the one handle to pass on, so nothing else the service has open that
+                        // happens to be inheritable reaches the program.
+                        nuint size = 0;
+                        InitializeProcThreadAttributeList(null, 1, 0, ref size);
+                        attributes = (byte*)NativeMemory.Alloc(size);
+                        listMade = InitializeProcThreadAttributeList(attributes, 1, 0, ref size);
+                        if (!listMade
+                            || !UpdateProcThreadAttribute(attributes, 0, ProcThreadAttributeHandleList, &passed, (nuint)sizeof(nint), null, null))
+                        {
+                            return $"The program's output could not be set up (error {Marshal.GetLastPInvokeError()}).";
+                        }
+
+                        startup.StartupInfo.Size = sizeof(StartupInfoEx);
+                        startup.StartupInfo.Flags = StartfUseStdHandles;
+                        startup.StartupInfo.StdOutput = standardOutput;
+                        startup.AttributeList = attributes;
+                        flags |= ExtendedStartupInfoPresent;
+                    }
+
+                    if (!CreateProcessAsUser(primaryToken, exePath, command, 0, 0, inheritHandles: standardOutput != 0,
+                            flags, environment, directory, &startup, out process))
+                    {
+                        return $"The program could not be started (error {Marshal.GetLastPInvokeError()}).";
+                    }
+                }
+                finally
+                {
+                    if (listMade)
+                    {
+                        DeleteProcThreadAttributeList(attributes);
+                    }
+
+                    if (attributes != null)
+                    {
+                        NativeMemory.Free(attributes);
+                    }
                 }
             }
 
@@ -223,6 +296,31 @@ internal static partial class SessionLauncher
         public nint StdError;
     }
 
+    // STARTUPINFOEXW: the above, then the attribute list.
+    [StructLayout(LayoutKind.Sequential)]
+    private unsafe struct StartupInfoEx
+    {
+        public StartupInfo StartupInfo;
+        public byte* AttributeList;
+    }
+
+    // SECURITY_ATTRIBUTES, only to make a pipe's handle inheritable.
+    [StructLayout(LayoutKind.Sequential)]
+    private struct SecurityAttributes
+    {
+        public int Length;
+        public nint SecurityDescriptor;
+        public int InheritHandle;
+    }
+
+    private const int StartfUseStdHandles = 0x00000100;
+    private const uint ExtendedStartupInfoPresent = 0x00080000;
+    private const uint HandleFlagInherit = 0x00000001;
+    private static readonly nuint ProcThreadAttributeHandleList = 0x00020002;
+
+    // Far more than the Radeon settings line, so the program never waits for the pipe to be read.
+    private const int OutputPipeSize = 64 * 1024;
+
     // PROCESS_INFORMATION.
     [StructLayout(LayoutKind.Sequential)]
     private struct ProcessInformation
@@ -271,7 +369,27 @@ internal static partial class SessionLauncher
     [return: MarshalAs(UnmanagedType.Bool)]
     private static unsafe partial bool CreateProcessAsUser(nint token, string applicationName, char* commandLine,
         nint processAttributes, nint threadAttributes, [MarshalAs(UnmanagedType.Bool)] bool inheritHandles, uint flags,
-        nint environment, string? currentDirectory, ref StartupInfo startup, out ProcessInformation process);
+        nint environment, string? currentDirectory, StartupInfoEx* startup, out ProcessInformation process);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool CreatePipe(out nint readPipe, out nint writePipe, ref SecurityAttributes attributes, int size);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool SetHandleInformation(nint handle, uint mask, uint flags);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static unsafe partial bool InitializeProcThreadAttributeList(byte* list, int count, int flags, ref nuint size);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static unsafe partial bool UpdateProcThreadAttribute(byte* list, uint flags, nuint attribute, void* value, nuint size,
+        void* previousValue, nuint* returnSize);
+
+    [LibraryImport("kernel32.dll")]
+    private static unsafe partial void DeleteProcThreadAttributeList(byte* list);
 
     [LibraryImport("kernel32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

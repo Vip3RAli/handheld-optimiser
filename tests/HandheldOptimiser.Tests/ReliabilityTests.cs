@@ -105,10 +105,12 @@ public class ReliabilityTests
         // The controller is a switch: on is Gamepad, off is Desktop.
         Assert.Contains("ControllerSwitch.IsOn ? AutoTdpProtocol.GamepadMode : AutoTdpProtocol.DesktopMode", code);
 
-        // The RSR and AFMF switches name the settings the launcher's --radeon mode knows.
+        // The Radeon switches and sliders name the settings the launcher's --radeon mode knows, every one of them.
         var radeon = Regex.Matches(xaml, @"<ToggleSwitch\b[^>]*?Toggled=""OnRadeon""[^>]*>")
             .Select(m => Regex.Match(m.Value, "Tag=\"([^\"]*)\"").Groups[1].Value);
-        Assert.Equal(new[] { RadeonState.AfmfName, RadeonState.RsrName }, radeon.Order());
+        Assert.Equal(RadeonState.Switches.Order(), radeon.Order());
+        var numbers = Regex.Matches(code, @"SetRadeonValue\(""([^""]*)""").Select(m => m.Groups[1].Value);
+        Assert.Equal(RadeonState.Numbers.Order(), numbers.Order());
     }
 
     /// <summary>The Tag of every button whose Click goes to the named handler, in the order they appear.</summary>

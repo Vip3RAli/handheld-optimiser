@@ -1,11 +1,13 @@
+using System.Globalization;
+
 namespace HandheldOptimiser.PowerService;
 
 /// <summary>
-/// Radeon Super Resolution and AMD Fluid Motion Frames for the widget. The service never loads AMD's ADLX itself:
-/// asked about these from the service's session, ADLX crashed the process (tried on an Ally on 2026-10-28), and in
-/// this process that would take the fans and the power limit down with it. Instead the launcher is run as the
-/// player with --radeon, which reads or switches them and says what it found through its exit code (see
-/// <see cref="RadeonState"/>). Each run takes about a fifth of a second.
+/// The AMD Radeon settings for the widget (see <see cref="RadeonState"/>). The service never loads AMD's ADLX
+/// itself: asked about these from the service's session, ADLX crashed the process (tried on an Ally on
+/// 2026-10-28), and in this process that would take the fans and the power limit down with it. Instead the
+/// launcher is run as the player with --radeon, which reads or sets them and prints what it found. Each run
+/// takes about a fifth of a second.
 /// </summary>
 internal sealed class RadeonHost
 {
@@ -20,13 +22,13 @@ internal sealed class RadeonHost
 
     private readonly string _launcher = Path.Combine(AppContext.BaseDirectory, LauncherExe);
     private readonly object _gate = new();
-    private RadeonState _state = new(null, null);
+    private RadeonState _state = RadeonState.Unknown;
     private DateTime _readAt = DateTime.MinValue;
     private bool _reading;
 
     /// <summary>
-    /// The status with RSR and AFMF as last read, null for each until a read has found it. A read due is started
-    /// in the background, so the answer is never held up for it: its result shows in the next answer.
+    /// The status with the Radeon settings as last read, null for each until a read has found it. A read due is
+    /// started in the background, so the answer is never held up for it: its result shows in the next answer.
     /// </summary>
     public AutoTdpStatus AddTo(AutoTdpStatus status)
     {
@@ -60,28 +62,48 @@ internal sealed class RadeonHost
             });
         }
 
-        return status with { Rsr = state.Rsr, Afmf = state.Afmf };
+        return With(status, state);
     }
 
-    /// <summary>Switches RSR or AFMF, waiting for the result.</summary>
-    /// <returns>Why it was not switched, in plain words, or null.</returns>
-    public string? Set(string? feature, bool? on)
+    /// <summary>The status carrying <paramref name="state"/>.</summary>
+    public static AutoTdpStatus With(AutoTdpStatus status, RadeonState state) => status with
     {
-        if (feature is not (RadeonState.RsrName or RadeonState.AfmfName) || on is not { } value)
+        Rsr = state.Rsr,
+        RsrSharpness = state.RsrSharpness,
+        RsrSharpnessRange = state.RsrSharpnessRange?.ToArray(),
+        Afmf = state.Afmf,
+        AntiLag = state.AntiLag,
+        Chill = state.Chill,
+        ChillMin = state.ChillMin,
+        ChillMax = state.ChillMax,
+        ChillRange = state.ChillRange?.ToArray(),
+        Sharpening = state.Sharpening,
+        SharpeningStrength = state.SharpeningStrength,
+        SharpeningRange = state.SharpeningRange?.ToArray(),
+    };
+
+    /// <summary>Switches a setting on or off, or sets its number, waiting for the result.</summary>
+    /// <returns>Why it was not changed, in plain words, or null.</returns>
+    public string? Set(string? feature, bool? on, int? value)
+    {
+        if (!RadeonState.IsChange(feature, on, value))
         {
-            return "The request did not say which setting to change, or whether on or off.";
+            return "The request did not say which Radeon setting to change, or what to.";
         }
 
-        Log.Write($"Radeon settings: {feature} {(value ? "on" : "off")}, from the widget");
-        return Run($"{RadeonState.Argument} {feature} {(value ? RadeonState.OnName : RadeonState.OffName)}");
+        var to = on is { } switched
+            ? (switched ? RadeonState.OnName : RadeonState.OffName)
+            : value!.Value.ToString(CultureInfo.InvariantCulture);
+        Log.Write($"Radeon settings: {feature} to {to}, from the widget");
+        return Run($"{RadeonState.Argument} {feature} {to}");
     }
 
     /// <summary>Runs the launcher as the player and keeps what it found.</summary>
     /// <returns>Why nothing was found, or null.</returns>
     private string? Run(string arguments)
     {
-        var problem = SessionLauncher.Run(_launcher, arguments, Timeout, out var code);
-        var state = code is { } exit ? RadeonState.FromExitCode(exit) : null;
+        var problem = SessionLauncher.Run(_launcher, arguments, Timeout, out var code, out var output);
+        var state = code == 0 ? RadeonState.Parse(output) : null;
         lock (_gate)
         {
             _readAt = DateTime.UtcNow;

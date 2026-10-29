@@ -38,7 +38,7 @@
     <Compile Include="..\..\src\HandheldOptimiser.PowerService\AutoTdpRules.cs" Link="AutoTdpRules.cs" />
     <Compile Include="..\..\src\HandheldOptimiser.PowerService\AutoMode.cs" Link="AutoMode.cs" />
     <Compile Include="..\..\src\HandheldOptimiser.PowerService\FineFans.cs" Link="FineFans.cs" />
-    <Compile Include="..\..\src\HandheldOptimiser.PowerService\AutoBoost.cs" Link="AutoBoost.cs" />    <Compile Include="..\..\src\HandheldOptimiser.PowerService\CpuBoostRules.cs" Link="CpuBoostRules.cs" />
+    <Compile Include="..\..\src\HandheldOptimiser.PowerService\CpuBoostRules.cs" Link="CpuBoostRules.cs" />
     <Compile Include="..\..\src\HandheldOptimiser.PowerService\OverlayRules.cs" Link="OverlayRules.cs" />
     <Compile Include="..\..\src\HandheldOptimiser.PowerService\FanCurves.cs" Link="FanCurves.cs" />
     <Compile Include="..\..\src\HandheldOptimiser.PowerService\DynamicFans.cs" Link="DynamicFans.cs" />

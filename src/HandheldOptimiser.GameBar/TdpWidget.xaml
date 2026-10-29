@@ -191,6 +191,42 @@
             <Setter Property="Background" Value="{StaticResource BarEdge}" />
             <Setter Property="FocusVisualPrimaryBrush" Value="{StaticResource Accent}" />
         </Style>
+
+        <!-- A slider over a range of numbers (see NumberSlider), with no ticks. -->
+        <Style x:Key="Range" TargetType="Slider">
+            <Setter Property="TickPlacement" Value="None" />
+            <Setter Property="IsThumbToolTipEnabled" Value="False" />
+            <Setter Property="Foreground" Value="{StaticResource Accent}" />
+            <Setter Property="Background" Value="{StaticResource BarEdge}" />
+            <Setter Property="FocusVisualPrimaryBrush" Value="{StaticResource Accent}" />
+        </Style>
+
+        <!-- A card header that folds the card: flat, the width of the card, with the green focus ring. -->
+        <Style x:Key="Fold" TargetType="Button">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="UseSystemFocusVisuals" Value="True" />
+            <Setter Property="FocusVisualPrimaryBrush" Value="{StaticResource AccentBright}" />
+            <Setter Property="FocusVisualPrimaryThickness" Value="2" />
+            <Setter Property="FocusVisualSecondaryThickness" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <ContentPresenter Background="{StaticResource Transparent}" Content="{TemplateBinding Content}"
+                                          HorizontalContentAlignment="Stretch" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- A slider's number, at the right of its label. -->
+        <Style x:Key="Amount" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource AccentBright}" />
+        </Style>
     </Page.Resources>
 
     <!-- Game Bar draws its own frame and title bar, so the page starts with the first card. -->
@@ -278,13 +314,13 @@
                         </Grid>
                     </Border>
 
-                    <!-- On is Auto: TDP Engine picks the power limit, fans and CPU boost, and only the frame rate is
+                    <!-- On is Auto: TDP Engine picks the power limit and fans, and the frame rate and CPU boost are
                          the player's. Off is Manual: the player picks them. Saved by TDP Engine, for every game. -->
                     <Border Style="{StaticResource Bar}" Margin="0,0,0,14" Padding="12,6,6,6">
                         <Grid>
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock Style="{StaticResource Label}" Margin="0" Text="Auto" />
-                                <TextBlock x:Name="ModeNote" Style="{StaticResource ReadoutName}" Text="TDP Engine sets power, fans and boost" />
+                                <TextBlock x:Name="ModeNote" Style="{StaticResource ReadoutName}" Text="TDP Engine sets power and fans" />
                             </StackPanel>
                             <ToggleSwitch x:Name="ModeSwitch" HorizontalAlignment="Right" MinWidth="0" Width="52" OnContent="" OffContent=""
                                           Toggled="OnMode" FocusVisualPrimaryBrush="{StaticResource Accent}" />
@@ -332,7 +368,8 @@
                     </Grid>
 
                     <!-- On or off for the power source in use. Not known while TDP Engine is not running: the switch
-                         then shows off with a line saying so, and turning it on starts TDP Engine. Manual only. -->
+                         then shows off with a line saying so, and turning it on starts TDP Engine. The player's in Auto and Manual
+                         alike, which the player asked for on 2026-10-28. -->
                     <Border x:Name="BoostRow" Style="{StaticResource Bar}" Margin="0,14,0,0" Padding="12,6,6,6">
                         <Grid>
                             <StackPanel VerticalAlignment="Center">
@@ -342,27 +379,6 @@
                             <!-- The switch's own template keeps room for a label beside it; a fixed width leaves only the switch. -->
                             <ToggleSwitch x:Name="BoostSwitch" HorizontalAlignment="Right" MinWidth="0" Width="52" OnContent="" OffContent=""
                                           Toggled="OnCpuBoost" FocusVisualPrimaryBrush="{StaticResource Accent}" />
-                        </Grid>
-                    </Border>
-
-                    <!-- Radeon Super Resolution and AMD Fluid Motion Frames, the same switches as in Radeon Software.
-                         Each shows only where the driver offers it, once TDP Engine has read them (see RadeonHost). -->
-                    <Border x:Name="RsrRow" Style="{StaticResource Bar}" Visibility="Collapsed" Margin="0,14,0,0" Padding="12,6,6,6">
-                        <Grid>
-                            <StackPanel VerticalAlignment="Center">
-                                <TextBlock Style="{StaticResource Label}" Margin="0" Text="Radeon Super Resolution" />
-                                <TextBlock Style="{StaticResource ReadoutName}" Text="Sharper upscaling below full resolution" />
-                            </StackPanel>
-                            <ToggleSwitch x:Name="RsrSwitch" Style="{StaticResource RowSwitch}" Tag="rsr" Toggled="OnRadeon" />
-                        </Grid>
-                    </Border>
-                    <Border x:Name="AfmfRow" Style="{StaticResource Bar}" Visibility="Collapsed" Margin="0,8,0,0" Padding="12,6,6,6">
-                        <Grid>
-                            <StackPanel VerticalAlignment="Center">
-                                <TextBlock Style="{StaticResource Label}" Margin="0" Text="Fluid Motion Frames" />
-                                <TextBlock Style="{StaticResource ReadoutName}" Text="Extra frames in DirectX 11 and 12 games" />
-                            </StackPanel>
-                            <ToggleSwitch x:Name="AfmfSwitch" Style="{StaticResource RowSwitch}" Tag="afmf" Toggled="OnRadeon" />
                         </Grid>
                     </Border>
 
@@ -392,6 +408,117 @@
                                         <ToggleButton Grid.Column="1" Style="{StaticResource Tile}" FontSize="13" Click="OnGpuMemoryLater" Content="Later" />
                                     </Grid>
                                 </Border>
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- ===== AMD Radeon: the same settings as in Radeon Software, for every game. Each row shows only where
+                 the driver offers it, once TDP Engine has read them (see RadeonHost), and the card only when one
+                 does. A setting's slider shows while it is on. The switches' Tags and the sliders' names are
+                 RadeonState's names. ===== -->
+            <Border x:Name="RadeonCard" Style="{StaticResource Card}" Visibility="Collapsed">
+                <StackPanel>
+                    <!-- The header folds the card open and shut. It starts shut each time the widget loads, which the
+                         player asked for on 2026-10-28; the line under it shows only while it is open. -->
+                    <Button x:Name="RadeonFold" Style="{StaticResource Fold}" Click="OnRadeonFold">
+                        <Border x:Name="RadeonHeader" BorderBrush="{StaticResource CardEdge}">
+                            <Grid>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource CardIcon}" Text="&#xE950;" />
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="AMD RADEON" />
+                                </StackPanel>
+                                <TextBlock x:Name="RadeonChevron" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                           FontFamily="Segoe MDL2 Assets" FontSize="12" Foreground="{StaticResource Muted}" Text="&#xE70D;" />
+                            </Grid>
+                        </Border>
+                    </Button>
+
+                    <StackPanel x:Name="RadeonBody" Visibility="Collapsed">
+                        <StackPanel x:Name="RsrRow" Visibility="Collapsed">
+                            <Border Style="{StaticResource Bar}" Padding="12,6,6,6">
+                                <Grid>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Style="{StaticResource Label}" Margin="0" Text="Radeon Super Resolution" />
+                                        <TextBlock Style="{StaticResource ReadoutName}" Text="Sharper upscaling. Turns Image Sharpening off" />
+                                    </StackPanel>
+                                    <ToggleSwitch x:Name="RsrSwitch" Style="{StaticResource RowSwitch}" Tag="rsr" Toggled="OnRadeon" />
+                                </Grid>
+                            </Border>
+                            <StackPanel x:Name="RsrSharpnessPanel" Margin="4,10,4,0" Visibility="Collapsed">
+                                <Grid>
+                                    <TextBlock Style="{StaticResource Label}" Text="Sharpness" />
+                                    <TextBlock x:Name="RsrSharpnessValue" Style="{StaticResource Amount}" />
+                                </Grid>
+                                <Slider x:Name="RsrSharpnessSlider" Style="{StaticResource Range}" />
+                            </StackPanel>
+                        </StackPanel>
+    
+                        <Border x:Name="AfmfRow" Style="{StaticResource Bar}" Visibility="Collapsed" Margin="0,8,0,0" Padding="12,6,6,6">
+                            <Grid>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Style="{StaticResource Label}" Margin="0" Text="Fluid Motion Frames" />
+                                    <TextBlock Style="{StaticResource ReadoutName}" Text="Extra frames in DirectX 11 and 12 games" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="AfmfSwitch" Style="{StaticResource RowSwitch}" Tag="afmf" Toggled="OnRadeon" />
+                            </Grid>
+                        </Border>
+    
+                        <Border x:Name="AntiLagRow" Style="{StaticResource Bar}" Visibility="Collapsed" Margin="0,8,0,0" Padding="12,6,6,6">
+                            <Grid>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Style="{StaticResource Label}" Margin="0" Text="Anti-Lag" />
+                                    <TextBlock Style="{StaticResource ReadoutName}" Text="Less input delay. Turns Chill off" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="AntiLagSwitch" Style="{StaticResource RowSwitch}" Tag="anti-lag" Toggled="OnRadeon" />
+                            </Grid>
+                        </Border>
+    
+                        <!-- Chill lowers the frame rate towards its lowest while the picture is still, and raises it towards
+                             its highest while it moves. The two sliders never cross: the launcher moves the other first.
+                             The driver switches Anti-Lag off as Chill goes on, and the other way round, as it does RSR and
+                             Image Sharpening (seen on the Ally on 2026-10-28). The answer to a change shows every switch as it now is. -->
+                        <StackPanel x:Name="ChillRow" Visibility="Collapsed" Margin="0,8,0,0">
+                            <Border Style="{StaticResource Bar}" Padding="12,6,6,6">
+                                <Grid>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Style="{StaticResource Label}" Margin="0" Text="Chill" />
+                                        <TextBlock Style="{StaticResource ReadoutName}" Text="Saves power when still. Turns Anti-Lag off" />
+                                    </StackPanel>
+                                    <ToggleSwitch x:Name="ChillSwitch" Style="{StaticResource RowSwitch}" Tag="chill" Toggled="OnRadeon" />
+                                </Grid>
+                            </Border>
+                            <StackPanel x:Name="ChillPanel" Margin="4,10,4,0" Visibility="Collapsed">
+                                <Grid>
+                                    <TextBlock Style="{StaticResource Label}" Text="Lowest frame rate" />
+                                    <TextBlock x:Name="ChillMinValue" Style="{StaticResource Amount}" />
+                                </Grid>
+                                <Slider x:Name="ChillMinSlider" Style="{StaticResource Range}" />
+                                <Grid Margin="0,6,0,0">
+                                    <TextBlock Style="{StaticResource Label}" Text="Highest frame rate" />
+                                    <TextBlock x:Name="ChillMaxValue" Style="{StaticResource Amount}" />
+                                </Grid>
+                                <Slider x:Name="ChillMaxSlider" Style="{StaticResource Range}" />
+                            </StackPanel>
+                        </StackPanel>
+    
+                        <StackPanel x:Name="SharpeningRow" Visibility="Collapsed" Margin="0,8,0,0">
+                            <Border Style="{StaticResource Bar}" Padding="12,6,6,6">
+                                <Grid>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Style="{StaticResource Label}" Margin="0" Text="Image Sharpening" />
+                                        <TextBlock Style="{StaticResource ReadoutName}" Text="Crisper picture. Turns RSR off" />
+                                    </StackPanel>
+                                    <ToggleSwitch x:Name="SharpeningSwitch" Style="{StaticResource RowSwitch}" Tag="sharpening" Toggled="OnRadeon" />
+                                </Grid>
+                            </Border>
+                            <StackPanel x:Name="SharpeningPanel" Margin="4,10,4,0" Visibility="Collapsed">
+                                <Grid>
+                                    <TextBlock Style="{StaticResource Label}" Text="Strength" />
+                                    <TextBlock x:Name="SharpeningValue" Style="{StaticResource Amount}" />
+                                </Grid>
+                                <Slider x:Name="SharpeningSlider" Style="{StaticResource Range}" />
                             </StackPanel>
                         </StackPanel>
                     </StackPanel>

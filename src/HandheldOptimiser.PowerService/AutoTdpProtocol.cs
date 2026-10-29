@@ -112,13 +112,14 @@ internal partial class AutoTdpJsonContext : JsonSerializerContext
 /// <param name="ScreenStats">With set-screen-stats: true to show the stats on the Ally's screen while docked, false to stop.</param>
 /// <param name="GpuMemory">With set-gpu-memory: the size in GB, 0 for Auto, one of GpuMemory.Sizes.</param>
 /// <param name="Mode">With set-mode: AutoTdpProtocol.AutoModeName or AutoTdpProtocol.ManualMode.</param>
-/// <param name="RadeonFeature">With set-radeon: RadeonState.RsrName or RadeonState.AfmfName.</param>
-/// <param name="RadeonOn">With set-radeon: true to switch it on, false to switch it off.</param>
+/// <param name="RadeonFeature">With set-radeon: one of RadeonState.Switches or RadeonState.Numbers.</param>
+/// <param name="RadeonOn">With set-radeon and a switch: true to switch it on, false to switch it off.</param>
+/// <param name="RadeonValue">With set-radeon and a number: the number to set, which the driver's range is fitted to.</param>
 internal sealed record AutoTdpRequest(string Command, int TargetFps = 0, int MinWatts = 0, int MaxWatts = 0,
     int TemperatureLimit = 0, int StartWatts = 0, string? GameFolder = null, string? FanCurve = null, int PowerLimit = 0,
     string? ControllerMode = null, bool Temporary = false, bool? CpuBoost = null, string? OverlayLevel = null,
     string? OverlayCorner = null, int ProcessId = 0, string? OverlayLayout = null, bool? ScreenStats = null,
-    int? GpuMemory = null, string? Mode = null, string? RadeonFeature = null, bool? RadeonOn = null);
+    int? GpuMemory = null, string? Mode = null, string? RadeonFeature = null, bool? RadeonOn = null, int? RadeonValue = null);
 
 /// <param name="Running">Whether it is setting the power limit or the fans right now.</param>
 /// <param name="State">One of the AutoTdpState names.</param>
@@ -143,9 +144,22 @@ internal sealed record AutoTdpRequest(string Command, int TargetFps = 0, int Min
 /// <param name="ManualFans">The fans last chosen in Manual, or null for the Ally's own.</param>
 /// <param name="Rsr">Whether Radeon Super Resolution is on, or null where it is not offered or not read yet.</param>
 /// <param name="Afmf">Whether AMD Fluid Motion Frames is on, or null where it is not offered or not read yet.</param>
+/// <param name="RsrSharpness">RSR's sharpness, or null where it is not offered or not read yet.</param>
+/// <param name="RsrSharpnessRange">RSR's sharpness range as lowest, highest and step, or null.</param>
+/// <param name="AntiLag">Whether Radeon Anti-Lag is on, or null where it is not offered or not read yet.</param>
+/// <param name="Chill">Whether Radeon Chill is on, or null where it is not offered or not read yet.</param>
+/// <param name="ChillMin">Chill's lowest frame rate, or null.</param>
+/// <param name="ChillMax">Chill's highest frame rate, or null.</param>
+/// <param name="ChillRange">The frame rates Chill can be set to, as lowest, highest and step, or null.</param>
+/// <param name="Sharpening">Whether Radeon Image Sharpening is on, or null where it is not offered or not read yet.</param>
+/// <param name="SharpeningStrength">Image Sharpening's strength, or null.</param>
+/// <param name="SharpeningRange">Image Sharpening's strength range as lowest, highest and step, or null.</param>
 internal sealed record AutoTdpStatus(bool Running, double? Fps = null, int? Watts = null, int? Temperature = null,
     string? State = null, string? Error = null, int TargetFps = 0, string? FanCurve = null, int PowerLimit = 0,
     bool Replacing = false, bool ControllerConnected = false, string? ControllerMode = null, bool? CpuBoost = null,
     string? OverlayLevel = null, string? OverlayCorner = null, string? OverlayLayout = null, bool ScreenStats = false,
     int? GpuMemoryNow = null, int? GpuMemoryNext = null, int[]? GpuMemoryOffered = null, string? Mode = null,
-    int ManualPowerLimit = 0, string? ManualFans = null, bool? Rsr = null, bool? Afmf = null);
+    int ManualPowerLimit = 0, string? ManualFans = null, bool? Rsr = null, bool? Afmf = null,
+    int? RsrSharpness = null, int[]? RsrSharpnessRange = null, bool? AntiLag = null, bool? Chill = null,
+    int? ChillMin = null, int? ChillMax = null, int[]? ChillRange = null, bool? Sharpening = null,
+    int? SharpeningStrength = null, int[]? SharpeningRange = null);

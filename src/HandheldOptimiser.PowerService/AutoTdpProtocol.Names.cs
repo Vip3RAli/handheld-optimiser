@@ -43,12 +43,12 @@ namespace HandheldOptimiser.PowerService
         /// <summary>From the widget: Auto or Manual, named by the request's Mode, saved and applied at once.</summary>
         public const string SetMode = "set-mode";
 
-        /// <summary>From the widget: switch RadeonFeature (RSR or AFMF) on or off, as RadeonOn says.</summary>
+        /// <summary>From the widget: switch RadeonFeature on or off, as RadeonOn says, or set it to RadeonValue.</summary>
         public const string SetRadeon = "set-radeon";
 
         /// <summary>
-        /// The modes. In Auto, TDP Engine picks the power limit, fans and boost for every session, and a frame
-        /// rate is optional. In Manual, the player picks them.
+        /// The modes. In Auto, TDP Engine picks the power limit and fans for every session, and a frame rate is
+        /// optional. In Manual, the player picks them. CPU boost is the player's in both.
         /// </summary>
         public const string AutoModeName = "auto";
         public const string ManualMode = "manual";
@@ -134,8 +134,19 @@ namespace HandheldOptimiser.PowerService
             public const string ManualFans = "ManualFans";
             public const string RadeonFeature = "RadeonFeature";
             public const string RadeonOn = "RadeonOn";
+            public const string RadeonValue = "RadeonValue";
             public const string Rsr = "Rsr";
             public const string Afmf = "Afmf";
+            public const string RsrSharpness = "RsrSharpness";
+            public const string RsrSharpnessRange = "RsrSharpnessRange";
+            public const string AntiLag = "AntiLag";
+            public const string Chill = "Chill";
+            public const string ChillMin = "ChillMin";
+            public const string ChillMax = "ChillMax";
+            public const string ChillRange = "ChillRange";
+            public const string Sharpening = "Sharpening";
+            public const string SharpeningStrength = "SharpeningStrength";
+            public const string SharpeningRange = "SharpeningRange";
         }
     }
 
