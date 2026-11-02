@@ -35,7 +35,10 @@ internal static partial class Log
     /// </summary>
     private static readonly string SecondsPath = Path.Combine(Folder, "tdp-seconds.csv");
     private const long SecondsMaxSize = 4 * 1024 * 1024;
-    private const string SecondsHeader = "time,game,target,fps,temperature,watts,state";
+    private const string SecondsHeader = "time,game,target,fps,temperature,watts,state,shown";
+
+    // A file from before a column was added is moved here, so the one in use keeps one header for every line.
+    private static readonly string SecondsOldPath = Path.Combine(Folder, "tdp-seconds.old.csv");
 
     // Whether the folders passed their checks; null until the first line.
     private static bool? _safe;
@@ -43,8 +46,12 @@ internal static partial class Log
     public static void Write(string message) =>
         Append(FilePath, MaxSize, null, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}");
 
-    /// <summary>One second of a session: the frame rate and temperature read, and the limit and state that followed.</summary>
-    public static void Second(DateTime now, string? game, int target, double fps, int? temperature, int watts, AutoTdpState state) =>
+    /// <summary>
+    /// One second of a session: the frame rate and temperature read, and the limit and state that followed.
+    /// <paramref name="fps"/> is the game's own frames, which TDP Engine steers by, and <paramref name="shown"/>
+    /// adds those AMD Fluid Motion Frames made, which is what the overlay shows.
+    /// </summary>
+    public static void Second(DateTime now, string? game, int target, double fps, int? temperature, int watts, AutoTdpState state, double shown) =>
         Append(SecondsPath, SecondsMaxSize, SecondsHeader,
             string.Join(',',
                 now.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture),
@@ -53,7 +60,8 @@ internal static partial class Log
                 fps.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture),
                 temperature?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,
                 watts.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                state));
+                state,
+                shown.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)));
 
     /// <summary>The last folder of a game's path, without commas or quotes, so the line stays plain CSV.</summary>
     private static string CsvName(string? folder) =>
@@ -106,7 +114,33 @@ internal static partial class Log
             return false;
         }
 
-        return ClearLink(FilePath) && ClearLink(SecondsPath);
+        if (!ClearLink(FilePath) || !ClearLink(SecondsPath) || !ClearLink(SecondsOldPath))
+        {
+            return false;
+        }
+
+        MoveOldSeconds();
+        return true;
+    }
+
+    /// <summary>Moves a seconds file whose header is not today's aside, keeping its lines for reading.</summary>
+    private static void MoveOldSeconds()
+    {
+        if (!File.Exists(SecondsPath))
+        {
+            return;
+        }
+
+        string? first;
+        using (var reader = new StreamReader(SecondsPath, Encoding.UTF8))
+        {
+            first = reader.ReadLine();
+        }
+
+        if (first is not null && first != SecondsHeader)
+        {
+            File.Move(SecondsPath, SecondsOldPath, overwrite: true);
+        }
     }
 
     /// <summary>

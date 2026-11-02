@@ -387,7 +387,7 @@ internal sealed partial class AutoTdpService : ServiceBase
             }
 
             Log.Second(now, control.GameFolder ?? control.FoundFolder, control.Settings?.TargetFps ?? 0, fps, temperature,
-                controller.Watts, controller.State);
+                controller.Watts, controller.State, shownFps);
         }
         else if (control.FixedWatts is { } fixedWatts && now - control.LastSet >= Reassert)
         {

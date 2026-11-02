@@ -54,6 +54,13 @@ internal sealed unsafe partial class FrameCounter : IDisposable
     private const ulong FrameTypeKeywords = 0x0000000000000001;
 
     private const uint RealTimeMode = 0x00000100;
+
+    // Makes FlushTimer a count of milliseconds. Flushed once a second, as before 2026-10-30, the events
+    // reached the count in lumps on the same beat as the one second tick that reads it, so a second read
+    // 6 frames and the next 112 while the game ran at 60.
+    private const uint MillisecondFlushTimer = 0x00000010;
+    private const uint FlushMilliseconds = 100;
+
     private const uint TracedGuid = 0x00020000;
     private const uint ControlStop = 1;
     private const uint EnableProvider = 1;
@@ -214,8 +221,8 @@ internal sealed unsafe partial class FrameCounter : IDisposable
             *(uint*)(p + 0) = PropertiesBuffer;   // Wnode.BufferSize
             *(uint*)(p + 40) = 1;                 // Wnode.ClientContext: QueryPerformanceCounter time stamps
             *(uint*)(p + 44) = TracedGuid;        // Wnode.Flags
-            *(uint*)(p + 64) = RealTimeMode;      // LogFileMode
-            *(uint*)(p + 68) = 1;                 // FlushTimer, in seconds
+            *(uint*)(p + 64) = RealTimeMode | MillisecondFlushTimer; // LogFileMode
+            *(uint*)(p + 68) = FlushMilliseconds; // FlushTimer
             *(uint*)(p + 116) = PropertiesSize;   // LoggerNameOffset
         }
 
