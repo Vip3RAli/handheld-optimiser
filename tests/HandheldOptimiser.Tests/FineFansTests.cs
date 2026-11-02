@@ -103,6 +103,26 @@ public class FineFansTests
     }
 
     [Fact]
+    public void It_comes_down_only_once_3_degrees_under_the_step()
+    {
+        // 70 wants step 6 and 69 step 5, so a temperature on that line swapped them all evening on 2026-10-29.
+        var fans = new FineFans();
+        Assert.Equal(6, fans.Pick(Start, 70, 10, Top, Limit, boost: false));
+
+        // 67 is 3 under 70: still step 6 a minute later.
+        Assert.Equal(6, fans.Pick(Start.AddSeconds(1), 69, 10, Top, Limit, boost: false));
+        Assert.Equal(6, fans.Pick(Start.AddSeconds(30), 67, 10, Top, Limit, boost: false));
+        Assert.Equal(6, fans.Pick(Start.AddSeconds(60), 67, 10, Top, Limit, boost: false));
+
+        // 66 is past the margin: down one step after 15 seconds.
+        Assert.Equal(6, fans.Pick(Start.AddSeconds(61), 66, 10, Top, Limit, boost: false));
+        Assert.Equal(5, fans.Pick(Start.AddSeconds(76), 66, 10, Top, Limit, boost: false));
+
+        // Up again at once, as before.
+        Assert.Equal(6, fans.Pick(Start.AddSeconds(77), 70, 10, Top, Limit, boost: false));
+    }
+
+    [Fact]
     public void No_temperature_starts_at_5_and_then_keeps_the_step()
     {
         var fans = new FineFans();

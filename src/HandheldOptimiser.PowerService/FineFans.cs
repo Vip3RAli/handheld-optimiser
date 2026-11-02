@@ -30,6 +30,11 @@ internal sealed class FineFans
     // While boost is on, the fans never run below this step.
     private const int BoostFloor = 4;
 
+    // The fans come down only once the temperature is this far under what the step they run at wants. A
+    // temperature sitting on the line between two steps swapped them every 20 to 60 seconds for a whole
+    // evening of Fortnite (2026-10-29).
+    public const int StepDownMargin = 3;
+
     private readonly Queue<(DateTime At, int Watts)> _recentWatts = new();
     private int _step = -1;
     private bool _boost;
@@ -44,34 +49,39 @@ internal sealed class FineFans
     public int Pick(DateTime now, int? temperature, int? watts, int topWatts, int temperatureLimit, bool boost)
     {
         // Without a temperature it keeps what it has, or starts in the middle.
-        var wanted = temperature is { } degrees ? ForTemperature(degrees, temperatureLimit) : Math.Max(_step, HighPowerStep);
+        var floor = Floor(now, watts, topWatts, boost);
+        var (wanted, keep) = temperature is { } degrees
+            ? (ForTemperature(degrees, temperatureLimit), ForTemperature(degrees + StepDownMargin, temperatureLimit))
+            : (Math.Max(_step, HighPowerStep), Math.Max(_step, HighPowerStep));
 
+        Step(now, Math.Clamp(Math.Max(wanted, floor), 0, Steps), Math.Clamp(Math.Max(keep, floor), 0, Steps));
+        return _step;
+    }
+
+    /// <summary>The lowest step the power limit and boost allow, whatever the temperature.</summary>
+    private int Floor(DateTime now, int? watts, int topWatts, bool boost)
+    {
+        var floor = 0;
         if (watts is { } power && topWatts > 0)
         {
             if (power * 100 >= topWatts * HighPowerPercent)
             {
-                wanted = Math.Max(wanted, HighPowerStep);
+                floor = HighPowerStep;
             }
 
             if (Jumped(now, power))
             {
-                wanted = Math.Max(wanted, Math.Max(_step, 0) + EarlySteps);
+                floor = Math.Max(floor, Math.Max(_step, 0) + EarlySteps);
             }
         }
 
         if (boost && !_boost)
         {
-            wanted = Math.Max(wanted, Math.Max(_step, 0) + EarlySteps);
+            floor = Math.Max(floor, Math.Max(_step, 0) + EarlySteps);
         }
 
         _boost = boost;
-        if (boost)
-        {
-            wanted = Math.Max(wanted, BoostFloor);
-        }
-
-        Step(now, Math.Clamp(wanted, 0, Steps));
-        return _step;
+        return boost ? Math.Max(floor, BoostFloor) : floor;
     }
 
     private static int ForTemperature(int degrees, int limit)
@@ -101,14 +111,16 @@ internal sealed class FineFans
         return jumped;
     }
 
-    private void Step(DateTime now, int wanted)
+    /// <param name="wanted">The step the temperature and power want now, which the fans rise to at once.</param>
+    /// <param name="keep">The step wanted were it <see cref="StepDownMargin"/> degrees hotter. The fans come down only once this is lower.</param>
+    private void Step(DateTime now, int wanted, int keep)
     {
         if (_step < 0 || wanted > _step)
         {
             _step = wanted;
             _lowerSince = null;
         }
-        else if (wanted == _step)
+        else if (keep >= _step)
         {
             _lowerSince = null;
         }
@@ -120,7 +132,7 @@ internal sealed class FineFans
         {
             // One step, and the next waits its own 15 seconds.
             _step--;
-            _lowerSince = _step > wanted ? now : null;
+            _lowerSince = _step > keep ? now : null;
         }
     }
 }
