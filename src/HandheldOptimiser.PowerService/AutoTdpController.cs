@@ -32,8 +32,11 @@ internal sealed record AutoTdpSettings(int TargetFps, int MinWatts, int MaxWatts
 ///   10 seconds, the two highest and two lowest left out, rather than the middle of 3.
 /// - Holding a cap the game has outgrown. When a hold runs out, one step up of a quarter decides: a gain
 ///   of 15%, with most seconds above the old ones, hands the game back to the usual raises, and anything
-///   less holds the limit again. A hold is also let go when most of 10 seconds have moved 20% from where
-///   it was held, for 8 seconds, as when the player goes from a menu back into a match.
+///   less holds the limit again.
+/// - Holding a low limit after the game wakes. A held limit is let go straight to the top when the
+///   first seconds after a pause fall well under the frames it was held at, or when most of 10 seconds
+///   have moved 20% from them, either way, for 4 seconds, as when the player goes from a menu or a sleep
+///   screen back into a match.
 /// - Reacting to loading screens and pauses. Under 5 frames a second nothing changes.
 /// - Heat. At the temperature limit the power limit comes down whatever the frame rate, and climbs back
 ///   only a watt every 20 seconds once it has cooled a few degrees. Reached twice within 10 minutes, the
@@ -58,7 +61,7 @@ internal sealed class AutoTdpController
 
     // A step down from the top is judged on the middle of 10 seconds rather than 3, and may cost up to 15%:
     // an idle menu's frame rate swings more than that from one second to the next. A held limit is let go
-    // when three quarters of the last 10 seconds have moved 20% from where it was held, for 8 seconds running.
+    // when three quarters of the last 10 seconds have moved 20% from where it was held, for 4 seconds running.
     private const int StepDownWindow = 10;
     private const double StepDownLoss = 0.85;
     private const double HeldMoved = 0.20;
@@ -84,7 +87,7 @@ internal sealed class AutoTdpController
     private static readonly TimeSpan RecentlyLowered = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan NoGainHold = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan CoolRaiseEvery = TimeSpan.FromSeconds(20);
-    private static readonly TimeSpan HeldMovedFor = TimeSpan.FromSeconds(8);
+    private static readonly TimeSpan HeldMovedFor = TimeSpan.FromSeconds(4);
     private static readonly TimeSpan FirstStepDownWait = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan LongestStepDownWait = TimeSpan.FromMinutes(4);
 
@@ -128,6 +131,12 @@ internal sealed class AutoTdpController
 
     // A limit is held because power bought nothing, so it is checked with a step up when the hold runs out.
     private bool _heldNoGain;
+
+    // A pause (under 5 frames a second) came while a limit was held, as when a game wakes from a sleep
+    // screen or loads. If the first seconds after it are this far short of the frames held at, the game
+    // has changed, and the limit goes straight to the top.
+    private bool _pausedWhileHeld;
+    private const double AfterPauseShort = 0.8;
 
     // A step up has to gain this much to show the power helps again: a game that needs the power gains
     // about 20% from a quarter more watts, where an idle menu's middle reading wanders by 10%.
@@ -197,6 +206,7 @@ internal sealed class AutoTdpController
             _readings.Clear();
             _longReadings.Clear();
             _judging = null;
+            _pausedWhileHeld = IsHeld(now);
             State = AutoTdpState.Waiting;
             return null;
         }
@@ -209,6 +219,16 @@ internal sealed class AutoTdpController
 
         var sorted = _readings.Order().ToArray();
         var middle = sorted[sorted.Length / 2];
+
+        // Checked before the window is judged steady, as a game waking up is anything but.
+        if (_pausedWhileHeld)
+        {
+            _pausedWhileHeld = false;
+            if (IsHeld(now) && middle < _noGainFps * AfterPauseShort)
+            {
+                return BackToTop(now);
+            }
+        }
         var low = sorted[0];
         var target = (double)_settings.TargetFps;
         var unsteady = low * Unsteady < middle || sorted[^1] > middle * Unsteady;
@@ -256,10 +276,12 @@ internal sealed class AutoTdpController
             _movedSince ??= now;
             if (now - _movedSince >= HeldMovedFor)
             {
-                _noGainUntil = DateTime.MinValue;
-                _steppingDown = false;
-                _heldNoGain = false;
-                _movedSince = null;
+                // Either way the game has changed, so straight to the top rather than climbing back three
+                // watts at a time. Fewer frames is what power fixes. More frames means the cap the limit was
+                // held for has gone: Fortnite keeps its 30 fps for a minute after waking from its sleep
+                // screen, then rose to 55 on the 12 W held for it on 2026-10-31, and took two minutes
+                // climbing from there to the 30 W the match needed.
+                return BackToTop(now);
             }
         }
         else
@@ -474,6 +496,30 @@ internal sealed class AutoTdpController
         }
 
         return null;
+    }
+
+    /// <summary>Whether a limit is held because power bought nothing.</summary>
+    private bool IsHeld(DateTime now) => _heldNoGain || now < _noGainUntil;
+
+    /// <summary>
+    /// Lets a held limit go and goes straight to the highest limit allowed now. The game has changed and
+    /// needs the power: Fortnite wakes from its 30 fps sleep into a match that ran at 8 fps on the 7 W held
+    /// for the sleep, and climbing back three watts at a time, or waiting out the hold, left it chugging for
+    /// up to a minute and a half on the Ally on 2026-10-30. Quick up, slow down: the usual steps down find
+    /// the limit the match needs from there.
+    /// </summary>
+    private int? BackToTop(DateTime now)
+    {
+        _noGainUntil = DateTime.MinValue;
+        _heldNoGain = false;
+        _steppingDown = false;
+        _movedSince = null;
+        _atTopSince = null;
+        _judging = null;
+        _wasted = 0;
+        _stepDownWait = FirstStepDownWait;
+        State = AutoTdpState.Raising;
+        return Change(now, Ceiling(now), SettleAfterRaise);
     }
 
     /// <summary>

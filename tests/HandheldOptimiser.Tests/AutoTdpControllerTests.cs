@@ -218,10 +218,59 @@ public class AutoTdpControllerTests
     }
 
     [Fact]
+    public void Waking_from_a_sleep_screen_goes_straight_to_the_top()
+    {
+        // As Fortnite did on the Ally on 2026-10-30: its 30 fps sleep screen held at a low limit, two seconds
+        // with no frames as it wakes, then a match that runs at 8 fps on 7 W and needs 20 W for 60.
+        var controller = new AutoTdpController(Sixty, startWatts: 30);
+        var watts = Run(controller, 320, (second, w) => second < 300 ? Math.Min(30, 4.0 * w)
+            : second < 302 ? 0
+            : Math.Max(5, 4.0 * w - 20));
+
+        Assert.True(watts[299] <= 10, $"Was at {watts[299]} W asleep");
+        Assert.Equal(30, watts[307]);
+    }
+
+    [Fact]
+    public void Frames_falling_under_a_held_limit_go_straight_to_the_top()
+    {
+        // The same with no pause between: most of 10 seconds well under the held frames, for 4 seconds.
+        var controller = new AutoTdpController(Sixty, startWatts: 30);
+        var watts = Run(controller, 330, (second, w) => second < 300 ? Math.Min(30, 4.0 * w) : Math.Max(5, 4.0 * w - 20));
+
+        Assert.True(watts[299] <= 10, $"Was at {watts[299]} W asleep");
+        // Within 16 seconds, which is 10 to fill the window and 4 to be sure, then the steps down begin.
+        Assert.Equal(30, watts.Skip(300).Take(16).Max());
+    }
+
+    [Fact]
+    public void A_sleep_cap_lifting_after_the_wake_goes_straight_to_the_top()
+    {
+        // As Fortnite did on the Ally on 2026-10-31: held low at its 30 fps sleep screen, it woke still capped
+        // at 30, then the cap lifted and the frames rose on the low limit held for it. The match needs 20 W.
+        var controller = new AutoTdpController(Sixty, startWatts: 30);
+        var watts = Run(controller, 330, (second, w) => second < 300 ? Math.Min(30, 4.0 * w) : Math.Min(60, 3.0 * w));
+
+        Assert.True(watts[299] <= 12, $"Was at {watts[299]} W asleep");
+        Assert.Equal(30, watts.Skip(300).Take(16).Max());
+    }
+
+    [Fact]
+    public void A_pause_on_a_sleep_screen_that_comes_back_the_same_keeps_the_limit()
+    {
+        // A second of no frames, then the same 30 fps screen: nothing has changed, so the limit stays low.
+        var controller = new AutoTdpController(Sixty, startWatts: 30);
+        var watts = Run(controller, 320, (second, w) => second is 300 or 301 ? 0 : Math.Min(30, 4.0 * w));
+
+        Assert.True(watts[299] <= 10, $"Was at {watts[299]} W asleep");
+        Assert.True(watts.Skip(300).Max() <= 12, $"Went up to {watts.Skip(300).Max()} W after the pause");
+    }
+
+    [Fact]
     public void A_lighter_scene_lifts_the_cap_too()
     {
         // The menu, then a light scene that would reach 60 fps from 10 W, more than the menu's 30 at the cap.
-        // Most of 10 seconds have to move, for 8 seconds, so it is let go within half a minute.
+        // Most of 10 seconds have to move, for 4 seconds, so it is let go within half a minute.
         var controller = new AutoTdpController(Sixty, startWatts: 30);
         var watts = Run(controller, 270, (second, w) => second < 240 ? Math.Min(30, 4.0 * w) : 6.0 * w);
 
