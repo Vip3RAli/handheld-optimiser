@@ -116,17 +116,17 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Pins the accent to the app's cyan instead of the Windows accent, so primary buttons, toggles,
+    /// Pins the accent to the app's Xbox Emerald Green instead of the Windows accent, so primary buttons, toggles,
     /// checkboxes, badges and the open tile's edge look the same on every device. Dark theme fills
     /// use the lighter steps, matching how Fluent derives them from a system accent.
     /// </summary>
     private static void ApplyBrandAccent()
     {
         ApplicationAccentColorManager.Apply(
-            systemAccent: Color.FromRgb(0x0E, 0x74, 0x90),
-            primaryAccent: Color.FromRgb(0x08, 0x91, 0xB2),
-            secondaryAccent: Color.FromRgb(0x06, 0xB6, 0xD4),
-            tertiaryAccent: Color.FromRgb(0x22, 0xD3, 0xEE));
+            systemAccent: Color.FromRgb(0x10, 0x7C, 0x10),
+            primaryAccent: Color.FromRgb(0x0E, 0x6E, 0x0E),
+            secondaryAccent: Color.FromRgb(0x14, 0x8A, 0x14),
+            tertiaryAccent: Color.FromRgb(0x1E, 0xD7, 0x60));
     }
 
     private static bool IsRunningElevated()

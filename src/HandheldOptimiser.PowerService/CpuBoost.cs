@@ -48,6 +48,21 @@ internal static partial class CpuBoost
         return null;
     }
 
+    /// <summary>The boost modes as they are now, plugged in and on battery, or null when Windows will not say.</summary>
+    public static BoostModes? Modes() => ReadModes();
+
+    /// <summary>Puts back modes read with <see cref="Modes"/>, exactly. Returns why it could not, or null.</summary>
+    public static string? Restore(BoostModes modes)
+    {
+        if (!WriteModes(modes))
+        {
+            return "Windows would not change the power plan's boost setting.";
+        }
+
+        Log.Write($"CPU boost put back: plugged in {modes.PluggedIn}, on battery {modes.OnBattery}");
+        return null;
+    }
+
     private static BoostModes? ReadModes()
     {
         if (ActiveScheme() is not { } scheme)
@@ -99,7 +114,7 @@ internal static partial class CpuBoost
         }
     }
 
-    private static bool OnBattery() => GetSystemPowerStatus(out var status) && status.AcLineStatus == 0;
+    internal static bool OnBattery() => GetSystemPowerStatus(out var status) && status.AcLineStatus == 0;
 
     /// <summary>The modes saved from before boost was turned off, or Disabled for each when none are.</summary>
     private static BoostModes LoadSaved()

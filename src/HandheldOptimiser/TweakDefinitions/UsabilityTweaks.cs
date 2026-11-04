@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using HandheldOptimiser.Models;
 
@@ -14,8 +15,89 @@ public static class UsabilityTweaks
     [
         StickyKeys,
         FilterKeys,
-        PowerThrottling
+        PowerThrottling,
+        MouseAcceleration
     ];
+
+    public static Tweak MouseAcceleration => new()
+    {
+        Id = "usability.mouseacceleration",
+        Name = "Turn off pointer acceleration for thumbsticks",
+        Description =
+            "Turns off Enhanced Pointer Precision so analog thumbsticks and trackpads move the mouse " +
+            "cursor at a predictable, 1:1 linear speed.",
+        Category = TweakCategory.TouchAndDesktop,
+        Risk = RiskLevel.Safe,
+        RequiresReboot = false,
+        RegistryValues =
+        [
+            new(RegistryRoot.CurrentUser, @"Control Panel\Mouse", "MouseSpeed", "0", RegistryValueKind.String),
+            new(RegistryRoot.CurrentUser, @"Control Panel\Mouse", "MouseThreshold1", "0", RegistryValueKind.String),
+            new(RegistryRoot.CurrentUser, @"Control Panel\Mouse", "MouseThreshold2", "0", RegistryValueKind.String)
+        ],
+
+        // The registry values above are only read at sign-in. Telling Windows through SystemParametersInfo
+        // makes the change live at once, and undo tells it the values it had before.
+        ScriptApply = (ctx, journal, _) =>
+        {
+            if (Mouse.Get() is not { } was)
+            {
+                return Task.FromResult(TweakResult.Fail(MouseAccelerationId, "Could not read the pointer settings."));
+            }
+
+            if (was is [0, 0, 0])
+            {
+                return Task.FromResult(TweakResult.NoChange(MouseAccelerationId));
+            }
+
+            journal.CapturedState["spi.mouse"] = string.Join(",", was);
+            ctx.Log.Command("SystemParametersInfo(SPI_SETMOUSE, 0 0 0)");
+            return Task.FromResult(Mouse.Set([0, 0, 0])
+                ? TweakResult.Ok(MouseAccelerationId)
+                : TweakResult.Fail(MouseAccelerationId, $"Could not turn off pointer acceleration (Win32 error {Marshal.GetLastWin32Error()})."));
+        },
+        ScriptRevert = (ctx, journal, _) =>
+        {
+            if (!journal.CapturedState.TryGetValue("spi.mouse", out var saved)
+                || saved.Split(',') is not [var a, var b, var c]
+                || !int.TryParse(a, out var speed) || !int.TryParse(b, out var first) || !int.TryParse(c, out var second))
+            {
+                return Task.FromResult(TweakResult.NoChange(MouseAccelerationId));
+            }
+
+            ctx.Log.Command($"SystemParametersInfo(SPI_SETMOUSE, {first} {second} {speed})");
+            return Task.FromResult(Mouse.Set([speed, first, second])
+                ? TweakResult.Ok(MouseAccelerationId)
+                : TweakResult.Fail(MouseAccelerationId, $"Could not restore pointer acceleration (Win32 error {Marshal.GetLastWin32Error()})."));
+        }
+    };
+
+    private const string MouseAccelerationId = "usability.mouseacceleration";
+
+    /// <summary>
+    /// The pointer's acceleration through SystemParametersInfo. Windows holds it as three numbers in the
+    /// order threshold 1, threshold 2, speed; here they are passed as speed, threshold 1, threshold 2,
+    /// the order of the journal and of the registry values.
+    /// </summary>
+    private static class Mouse
+    {
+        private const uint SpiGetMouse = 0x0003;
+        private const uint SpiSetMouse = 0x0004;
+        private const uint SpifUpdateIniFileAndBroadcast = 0x1 | 0x2;
+
+        [DllImport("user32.dll", EntryPoint = "SystemParametersInfoW", SetLastError = true)]
+        private static extern bool SystemParametersInfo(uint action, uint param, int[] value, uint winIni);
+
+        /// <summary>Speed, threshold 1 and threshold 2, or null if Windows would not say.</summary>
+        public static int[]? Get()
+        {
+            var values = new int[3];
+            return SystemParametersInfo(SpiGetMouse, 0, values, 0) ? [values[2], values[0], values[1]] : null;
+        }
+
+        public static bool Set(int[] speedFirstSecond) =>
+            SystemParametersInfo(SpiSetMouse, 0, [speedFirstSecond[1], speedFirstSecond[2], speedFirstSecond[0]], SpifUpdateIniFileAndBroadcast);
+    }
 
     public static Tweak StickyKeys => new()
     {

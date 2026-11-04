@@ -28,7 +28,11 @@ internal static class Program
     private const string ArmouryCrateSe = @"shell:AppsFolder\B9ECED6F.ArmouryCrateSE_qmba6cd70vzyy!App";
     private const string XboxApp = @"shell:AppsFolder\Microsoft.GamingApp_8wekyb3d8bbwe!Microsoft.Xbox.App";
 
-    private static readonly string LogPath = Path.Combine(
+    /// <summary>
+    /// The library's log. The tests point it at a file of their own, since several feed in bad input on
+    /// purpose and their lines in the player's log read like faults (2026-10-28).
+    /// </summary>
+    internal static string LogPath { get; set; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "HandheldOptimiser", "logs", "home-launcher.log");
 
@@ -47,6 +51,12 @@ internal static class Program
         {
             RunScreenStats();
             return 0;
+        }
+
+        // The Radeon settings for the widget, which TDP Engine starts as the player, reading what it prints.
+        if (args.Length > 0 && string.Equals(args[0], PowerService.RadeonState.Argument, StringComparison.OrdinalIgnoreCase))
+        {
+            return RunRadeon(args);
         }
 
         var action = ActionFor(args);
@@ -128,6 +138,48 @@ internal static class Program
     /// </summary>
     internal const string ScreenStatsArgument = "--screen-stats";
 
+    /// <summary>
+    /// --radeon alone reads the Radeon settings; --radeon followed by a setting's name and on, off or a number sets
+    /// that one first (see RadeonState). Prints what it found as one line for TDP Engine, which reads this
+    /// program's output, and ends with 0, or with 1 when AMD's ADLX could not be used.
+    /// </summary>
+    private static int RunRadeon(string[] args)
+    {
+        Library.RadeonSettings.Change? change = null;
+        if (args.Length > 1)
+        {
+            var name = args[1].ToLowerInvariant();
+            var value = args.Length > 2 ? args[2].ToLowerInvariant() : "";
+            bool? on = value switch { PowerService.RadeonState.OnName => true, PowerService.RadeonState.OffName => false, _ => null };
+            int? number = int.TryParse(value, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var n) ? n : null;
+            if (!PowerService.RadeonState.IsChange(name, on, number))
+            {
+                Log($"Radeon settings: \"{name} {value}\" is not a change this knows");
+                return 1;
+            }
+
+            Log($"Radeon settings: setting {name} to {value}");
+            change = new Library.RadeonSettings.Change(name, on, number);
+        }
+
+        if (Library.RadeonSettings.Apply(change) is not { } state)
+        {
+            return 1;
+        }
+
+        // The driver switches some settings off as another goes on (RSR as Image Sharpening does, Anti-Lag as
+        // Chill does), and the session that made the change still reads them as they were. A new session reads
+        // them as they are (seen on the Ally on 2026-10-28).
+        if (change is not null && Library.RadeonSettings.Apply(null) is { } after)
+        {
+            state = after;
+        }
+
+        Console.Out.WriteLine(state.Format());
+        Console.Out.Flush();
+        return 0;
+    }
+
     private static void RunScreenStats()
     {
         try
@@ -161,8 +213,8 @@ internal static class Program
     internal static bool IsFromButton(string[] args) => args.Contains(FromButtonArgument, StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Opens Xbox Game Bar, which is what the Command Center button shows. Win+G is pressed for the player:
-    /// the ms-gamebar: link Game Bar registers was tried first, and on the Ally it opens nothing.
+    /// Opens Xbox Game Bar on the TDP Engine widget, which is what the Command Center button shows, with
+    /// Win+G when that does not work. The plain ms-gamebar: link opens nothing on the Ally.
     /// </summary>
     private static void OpenGameBar() =>
         Log(Library.GameBarControls.Open() ? "Opened Game Bar" : "Could not open Game Bar: Windows would not take Win+G");

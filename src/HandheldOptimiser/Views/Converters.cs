@@ -76,7 +76,7 @@ public sealed class RiskToBrushConverter : IValueConverter
         value is RiskLevel risk
             ? new SolidColorBrush(risk switch
             {
-                RiskLevel.Safe => Color.FromRgb(0x6C, 0xC0, 0x7A),
+                RiskLevel.Safe => Color.FromRgb(0x1E, 0xD7, 0x60),
                 RiskLevel.Moderate => Color.FromRgb(0xE8, 0xC4, 0x5F),
                 RiskLevel.SecurityTradeoff => Color.FromRgb(0xE8, 0x8E, 0x4D),
                 RiskLevel.Breaking => Color.FromRgb(0xE0, 0x6C, 0x6C),
@@ -94,7 +94,7 @@ public sealed class HealthStatusToBrushConverter : IValueConverter
         value is HealthStatus status
             ? new SolidColorBrush(status switch
             {
-                HealthStatus.Good => Color.FromRgb(0x6C, 0xC0, 0x7A),
+                HealthStatus.Good => Color.FromRgb(0x1E, 0xD7, 0x60),
                 HealthStatus.Warning => Color.FromRgb(0xE8, 0xC4, 0x5F),
                 HealthStatus.Bad => Color.FromRgb(0xE0, 0x6C, 0x6C),
                 HealthStatus.Info => Color.FromRgb(0x7F, 0xB0, 0xE0),
@@ -131,7 +131,7 @@ public sealed class LogSeverityToBrushConverter : IValueConverter
             ? new SolidColorBrush(severity switch
             {
                 LogSeverity.Command => Color.FromRgb(0x7C, 0xB8, 0xE8),
-                LogSeverity.Success => Color.FromRgb(0x6C, 0xC0, 0x7A),
+                LogSeverity.Success => Color.FromRgb(0x1E, 0xD7, 0x60),
                 LogSeverity.Warning => Color.FromRgb(0xE8, 0xC4, 0x5F),
                 LogSeverity.Error => Color.FromRgb(0xE0, 0x6C, 0x6C),
                 LogSeverity.Trace => Color.FromRgb(0x88, 0x88, 0x88),
@@ -149,7 +149,7 @@ public sealed class RuntimeStatusToBrushConverter : IValueConverter
         value is RuntimeStatus status
             ? new SolidColorBrush(status switch
             {
-                RuntimeStatus.UpToDate => Color.FromRgb(0x6C, 0xC0, 0x7A),
+                RuntimeStatus.UpToDate => Color.FromRgb(0x1E, 0xD7, 0x60),
                 RuntimeStatus.UpdateAvailable => Color.FromRgb(0xE8, 0xC4, 0x5F),
                 RuntimeStatus.Error => Color.FromRgb(0xE0, 0x6C, 0x6C),
                 _ => Color.FromRgb(0x90, 0x90, 0x90)
@@ -166,7 +166,7 @@ public sealed class TweakStateToBrushConverter : IValueConverter
         value is TweakState state
             ? new SolidColorBrush(state switch
             {
-                TweakState.Applied => Color.FromRgb(0x6C, 0xC0, 0x7A),
+                TweakState.Applied => Color.FromRgb(0x1E, 0xD7, 0x60),
                 TweakState.Partial => Color.FromRgb(0xE8, 0xC4, 0x5F),
                 TweakState.Error => Color.FromRgb(0xE0, 0x6C, 0x6C),
                 _ => Color.FromRgb(0x90, 0x90, 0x90)
@@ -183,9 +183,9 @@ public sealed class UpdateRowStateToBrushConverter : IValueConverter
         value is ViewModels.UpdateRowState state
             ? new SolidColorBrush(state switch
             {
-                ViewModels.UpdateRowState.Done => Color.FromRgb(0x6C, 0xC0, 0x7A),
+                ViewModels.UpdateRowState.Done => Color.FromRgb(0x1E, 0xD7, 0x60),
                 ViewModels.UpdateRowState.Available => Color.FromRgb(0xE8, 0xC4, 0x5F),
-                ViewModels.UpdateRowState.Working => Color.FromRgb(0x22, 0xD3, 0xEE),
+                ViewModels.UpdateRowState.Working => Color.FromRgb(0x7F, 0xB0, 0xE0),
                 ViewModels.UpdateRowState.Failed => Color.FromRgb(0xE0, 0x6C, 0x6C),
                 _ => Color.FromRgb(0x90, 0x90, 0x90)
             })
@@ -195,17 +195,17 @@ public sealed class UpdateRowStateToBrushConverter : IValueConverter
         throw new NotSupportedException();
 }
 
-/// <summary>The dot on a Dashboard card: green, yellow or red for how the goal stands, cyan for a plain fact.</summary>
+/// <summary>The dot on a Dashboard card: green, yellow or red for how the goal stands, blue for a plain fact.</summary>
 public sealed class CardLevelToBrushConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
         value is CardLevel level
             ? new SolidColorBrush(level switch
             {
-                CardLevel.Good => Color.FromRgb(0x6C, 0xC0, 0x7A),
+                CardLevel.Good => Color.FromRgb(0x1E, 0xD7, 0x60),
                 CardLevel.Attention => Color.FromRgb(0xE8, 0xC4, 0x5F),
                 CardLevel.Bad => Color.FromRgb(0xE0, 0x6C, 0x6C),
-                CardLevel.Neutral => Color.FromRgb(0x22, 0xD3, 0xEE),
+                CardLevel.Neutral => Color.FromRgb(0x7F, 0xB0, 0xE0),
                 _ => Color.FromArgb(0x66, 0xFF, 0xFF, 0xFF)
             })
             : Brushes.Gray;

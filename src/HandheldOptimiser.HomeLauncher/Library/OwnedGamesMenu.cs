@@ -75,7 +75,7 @@ internal sealed class OwnedGamesMenu
 
     private void Open()
     {
-        _menu.Show(_view.OwnedItems, "Games not installed", SettingsMenu.GamesApps);
+        _menu.Show(_view.OwnedItems, "Ready to Install", SettingsMenu.GamesApps);
         Refresh();
         _notices.Show(_error ?? string.Empty);
     }
@@ -110,7 +110,7 @@ internal sealed class OwnedGamesMenu
         await RefreshAsync(force: true);
         await _host.ScanAsync();
         var count = _state.AllTiles.Count(t => !t.IsInstalled);
-        _notices.Show(_error ?? (count == 1 ? "1 game is not installed." : $"{count} games are not installed."));
+        _notices.Show(_error ?? (count == 1 ? "1 game ready to install." : $"{count} games ready to install."));
     }
 
     private void Refresh()

@@ -417,6 +417,28 @@ internal sealed class PanelKeeper
         AllyScreen.PutBack(PanelState.Off);
     }
 
+    /// <summary>
+    /// Switched off from the widget: the Ally's screen goes off with the stats. When it was turned on here it
+    /// goes back to what the player had, which may be duplicate. When it was already on as a screen of its
+    /// own as the stats screen started, as Windows can bring back after a restart, it is turned off too:
+    /// putting back only what was changed here left it lit and blank.
+    /// </summary>
+    public void SwitchOff()
+    {
+        if (_changedFrom is not null)
+        {
+            PutBack();
+            return;
+        }
+
+        _offWhileLocked = false;
+        if (AllyScreen.Read() is { MonitorOn: true, Panel: PanelState.Own })
+        {
+            Program.Log("Stats screen: switched off, so the Ally's screen is turned off as well");
+            AllyScreen.PutBack(PanelState.Off);
+        }
+    }
+
     /// <summary>Puts the screens back when they were changed here.</summary>
     public void PutBack()
     {

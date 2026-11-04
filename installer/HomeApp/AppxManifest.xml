@@ -24,7 +24,7 @@
 
   <Identity Name="HandheldOptimiser.HomeApp"
             Publisher="CN=Handheld Optimiser"
-            Version="0.2.3.0"
+            Version="0.2.4.0"
             ProcessorArchitecture="x64" />
 
   <Properties>

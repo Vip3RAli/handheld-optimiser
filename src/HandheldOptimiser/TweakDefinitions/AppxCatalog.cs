@@ -32,12 +32,18 @@ public static class AppxCatalog
         new() { IdentityName = "AdobeSystemsIncorporated.AdobeLightroom", FriendlyName = "Adobe Lightroom", Group = AppxGroup.ThirdPartyPreinstall, Recommended = true },
         new() { IdentityName = "AdobeSystemsIncorporated.AdobeExpress",   FriendlyName = "Adobe Express",   Group = AppxGroup.ThirdPartyPreinstall, Recommended = true },
         new() { IdentityName = "Clipchamp.Clipchamp",               FriendlyName = "Clipchamp",           Group = AppxGroup.ThirdPartyPreinstall, Recommended = true, KeepIfNote = "you edit clips on the device itself." },
+        new() { IdentityName = "ByteDance.CapCut",                  FriendlyName = "CapCut",              Group = AppxGroup.ThirdPartyPreinstall, Recommended = true, KeepIfNote = "you edit video with CapCut." },
+        new() { IdentityName = "DropboxInc.Dropbox",                FriendlyName = "Dropbox",             Group = AppxGroup.ThirdPartyPreinstall, Recommended = true, KeepIfNote = "you use Dropbox for file sync." },
+        new() { IdentityName = "McAfee.Security",                   FriendlyName = "McAfee Security",     Group = AppxGroup.ThirdPartyPreinstall, Recommended = true },
 
         // ---- Microsoft promotional / news & ad surfaces ----
         new() { IdentityName = "Microsoft.BingNews",                FriendlyName = "Bing News",           Group = AppxGroup.MicrosoftPromotional, Recommended = true },
+        new() { IdentityName = "Microsoft.News",                    FriendlyName = "Microsoft News",      Group = AppxGroup.MicrosoftPromotional, Recommended = true },
         new() { IdentityName = "Microsoft.BingWeather",             FriendlyName = "Bing Weather",        Group = AppxGroup.MicrosoftPromotional, Recommended = true, KeepIfNote = "you use the weather widget." },
+        new() { IdentityName = "Microsoft.Weather",                 FriendlyName = "Weather (other version)", Group = AppxGroup.MicrosoftPromotional, Recommended = true, KeepIfNote = "you use the weather widget." },
         new() { IdentityName = "Microsoft.BingFinance",             FriendlyName = "Bing Finance",        Group = AppxGroup.MicrosoftPromotional, Recommended = true },
         new() { IdentityName = "Microsoft.BingSports",              FriendlyName = "Bing Sports",         Group = AppxGroup.MicrosoftPromotional, Recommended = true },
+        new() { IdentityName = "Microsoft.BingTranslator",          FriendlyName = "Translator",          Group = AppxGroup.MicrosoftPromotional, Recommended = true },
         new() { IdentityName = "Microsoft.MicrosoftOfficeHub",      FriendlyName = "Microsoft 365 app (Office hub)", Group = AppxGroup.MicrosoftPromotional, Recommended = true, KeepIfNote = "you open Microsoft 365 or Office files from it." },
         new() { IdentityName = "Microsoft.MicrosoftSolitaireCollection", FriendlyName = "Solitaire Collection", Group = AppxGroup.MicrosoftPromotional, Recommended = true },
         new() { IdentityName = "Microsoft.OneConnect",              FriendlyName = "Mobile Plans",        Group = AppxGroup.MicrosoftPromotional, Recommended = true },

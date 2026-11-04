@@ -21,30 +21,29 @@
             <!--
                 The look, set once. WPF-UI reads these keys with DynamicResource, so redefining them here
                 changes every card, button and text box in the app without restyling any of them.
-                Cards are see-through dark grey with a faint light edge, so the window's Mica backdrop shows
-                behind them and they still read as raised. Everything has the same 8 px corner.
+                Cards are sculpted dark charcoal with a dimensional slate edge, giving tactile depth
+                reminiscent of the Xbox NXE console dashboard. Everything has a refined 10 px corner.
             -->
-            <CornerRadius x:Key="ControlCornerRadius">8</CornerRadius>
-            <SolidColorBrush x:Key="CardBackground" Color="#A61E1E1E" />
-            <SolidColorBrush x:Key="CardBorderBrush" Color="#1FFFFFFF" />
+            <CornerRadius x:Key="ControlCornerRadius">10</CornerRadius>
+            <SolidColorBrush x:Key="CardBackground" Color="#D9131822" />
+            <SolidColorBrush x:Key="CardBorderBrush" Color="#2A3548" />
 
             <!-- Segoe UI Variable is Windows 11's own font; Segoe UI stands in on Windows 10. -->
             <FontFamily x:Key="ContentControlThemeFontFamily">Segoe UI Variable Text, Segoe UI</FontFamily>
             <FontFamily x:Key="AppFont">Segoe UI Variable Text, Segoe UI</FontFamily>
             <FontFamily x:Key="AppDisplayFont">Segoe UI Variable Display, Segoe UI</FontFamily>
 
-            <!-- The brand cyan, for accents drawn by hand rather than by a themed control. Cyan is a light
-                 colour, so anything written on a cyan fill is dark, as the themed primary buttons are. -->
-            <SolidColorBrush x:Key="BrandAccent" Color="#22D3EE" />
-            <SolidColorBrush x:Key="BrandAccentStrong" Color="#06B6D4" />
-            <SolidColorBrush x:Key="BrandOnAccent" Color="#06222B" />
+            <!-- The brand Xbox Emerald Green, for accents drawn by hand rather than by a themed control. -->
+            <SolidColorBrush x:Key="BrandAccent" Color="#1ED760" />
+            <SolidColorBrush x:Key="BrandAccentStrong" Color="#107C10" />
+            <SolidColorBrush x:Key="BrandOnAccent" Color="#FFFFFF" />
 
             <!-- For panels that are plain Borders rather than ui:Card, so they match the cards. -->
             <Style x:Key="Panel" TargetType="Border">
                 <Setter Property="Background" Value="{DynamicResource CardBackground}" />
                 <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
-                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="CornerRadius" Value="10" />
             </Style>
 
             <!--
@@ -58,7 +57,7 @@
                 <Setter Property="Control.Template">
                     <Setter.Value>
                         <ControlTemplate>
-                            <Rectangle Margin="-3" RadiusX="11" RadiusY="11" StrokeThickness="2"
+                            <Rectangle Margin="-3" RadiusX="13" RadiusY="13" StrokeThickness="2"
                                        Stroke="{StaticResource BrandAccent}" SnapsToDevicePixels="True" />
                         </ControlTemplate>
                     </Setter.Value>
@@ -75,9 +74,9 @@
                 <Setter Property="MinHeight" Value="40" />
                 <Setter Property="Padding" Value="18,0" />
                 <Setter Property="FontSize" Value="13.5" />
-                <Setter Property="Foreground" Value="#F2FFFFFF" />
-                <Setter Property="Background" Value="#14FFFFFF" />
-                <Setter Property="BorderBrush" Value="#1FFFFFFF" />
+                <Setter Property="Foreground" Value="#F8FAFC" />
+                <Setter Property="Background" Value="#1A2230" />
+                <Setter Property="BorderBrush" Value="#2C394E" />
                 <Setter Property="Cursor" Value="Hand" />
                 <!-- Half the height, for fully round ends. A larger figure does not do it: WPF scales an
                      oversized radius down unevenly and the ends come out as part of an ellipse. -->
@@ -96,6 +95,7 @@
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
                                     <Setter TargetName="Shape" Property="Opacity" Value="0.85" />
+                                    <Setter TargetName="Shape" Property="BorderBrush" Value="#3B4B66" />
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
                                     <Setter TargetName="Shape" Property="Opacity" Value="0.7" />
@@ -113,14 +113,15 @@
                 <Setter Property="MinHeight" Value="56" />
                 <Setter Property="Border.CornerRadius" Value="28" />
                 <Setter Property="Background" Value="{StaticResource BrandAccentStrong}" />
-                <Setter Property="BorderBrush" Value="Transparent" />
+                <Setter Property="BorderBrush" Value="{StaticResource BrandAccent}" />
                 <Setter Property="Foreground" Value="{StaticResource BrandOnAccent}" />
+                <Setter Property="FontWeight" Value="SemiBold" />
             </Style>
 
             <!--
                 A tile: a name and a switch, a few to a row, so a whole goal fits on a screen or two. The
                 tile itself is a button, and pressing it anywhere but on its switch opens what it does
-                beneath its row. Its edge turns cyan while that detail is open (see ITile).
+                beneath its row. Its edge turns green while that detail is open (see ITile).
             -->
             <Style x:Key="Tile" TargetType="Button">
                 <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
@@ -135,11 +136,11 @@
                     <Setter.Value>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="Shape"
-                                    CornerRadius="8"
+                                    CornerRadius="10"
                                     Background="{DynamicResource CardBackground}"
                                     BorderBrush="{DynamicResource CardBorderBrush}"
                                     BorderThickness="1">
-                                <Border x:Name="Tint" CornerRadius="8" Padding="{TemplateBinding Padding}" Background="Transparent">
+                                <Border x:Name="Tint" CornerRadius="10" Padding="{TemplateBinding Padding}" Background="Transparent">
                                     <ContentPresenter VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
                                 </Border>
                             </Border>
@@ -149,7 +150,7 @@
                                 </Trigger>
                                 <DataTrigger Binding="{Binding IsOpen}" Value="True">
                                     <Setter TargetName="Shape" Property="BorderBrush" Value="{StaticResource BrandAccent}" />
-                                    <Setter TargetName="Tint" Property="Background" Value="#1422D3EE" />
+                                    <Setter TargetName="Tint" Property="Background" Value="#221ED760" />
                                 </DataTrigger>
                                 <!-- While a job runs the page is disabled, and a tile has to look it. -->
                                 <Trigger Property="IsEnabled" Value="False">
@@ -165,10 +166,10 @@
                  into view as it opens, since under the last row on screen it would be out of sight. -->
             <Style x:Key="TileDetail" TargetType="Border">
                 <Setter Property="views:ShowWhenLoaded.Enabled" Value="True" />
-                <Setter Property="Background" Value="#1422D3EE" />
-                <Setter Property="BorderBrush" Value="#7322D3EE" />
+                <Setter Property="Background" Value="#1C112618" />
+                <Setter Property="BorderBrush" Value="#661ED760" />
                 <Setter Property="BorderThickness" Value="1" />
-                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="CornerRadius" Value="10" />
                 <Setter Property="Padding" Value="16,12" />
             </Style>
 

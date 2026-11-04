@@ -13,9 +13,9 @@ internal sealed class SettingsMenu
 {
     // The categories the settings list opens, each a short list of groups. A group's list names its
     // category under its title.
-    public const string LibraryDisplay = "Library display";
-    public const string GamesApps = "Games and apps";
-    public const string SleepTweaks = "Sleep and clean-up";
+    public const string LibraryDisplay = "Appearance & Layout";
+    public const string GamesApps = "Catalog & Content";
+    public const string SleepTweaks = "Performance & Power";
 
     private readonly MenuView _view;
     private readonly MenuPresenter _menu;
@@ -55,10 +55,10 @@ internal sealed class SettingsMenu
         view.QuitSetting.Click += (_, _) => Quit();
         view.OpenMainAppSetting.Click += (_, _) => OpenMainApp();
 
-        // Library display's groups.
-        view.BackgroundGroup.Click += (_, _) => _menu.Show(view.BackgroundItems, "Art and background", LibraryDisplay);
-        view.DisplayGroup.Click += (_, _) => _menu.Show(view.DisplayItems, "What it shows", LibraryDisplay);
-        view.TvGroup.Click += (_, _) => _menu.Show(view.TvItems, "Docked mode",
+        // Appearance & Layout's groups.
+        view.BackgroundGroup.Click += (_, _) => _menu.Show(view.BackgroundItems, "Artwork & Theme", LibraryDisplay);
+        view.DisplayGroup.Click += (_, _) => _menu.Show(view.DisplayItems, "Library Elements", LibraryDisplay);
+        view.TvGroup.Click += (_, _) => _menu.Show(view.TvItems, "Docked Display",
             _host.Docked ? "The library is on a TV or monitor now" : "The library is on the built-in screen now");
 
         // Art and background.

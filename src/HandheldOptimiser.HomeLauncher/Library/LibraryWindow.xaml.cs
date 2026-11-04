@@ -243,6 +243,10 @@ public partial class LibraryWindow : Window, ILibraryHost
         _artwork.UnloadCardArt();
         _artwork.UnloadNotInstalled();
         _deals.UnloadDeals();
+        foreach (var tile in _state.AllTiles)
+        {
+            tile.UnloadBrushes();
+        }
         _oldSchool.UpdateRenderMode();
 
         // Once the rendering of the focus change has gone out, nothing here is needed until we are back.
@@ -379,11 +383,11 @@ public partial class LibraryWindow : Window, ILibraryHost
                 : string.Empty
             : _state.Filter.Apps
             ? _state.Tiles.Count == 0
-                ? "No apps yet. Press Menu, then Games and apps, then Add a program."
+                ? "No apps yet. Press Menu, then Catalog & Content, then Add Custom App."
                 : string.Empty
             : _state.AllTiles.All(t => !t.IsInstalled || t.IsApp) && !_state.Filter.NotInstalled
-            ? "No installed games were found in Steam, Xbox, Epic Games, Battle.net, GOG, the EA App or Ubisoft Connect.\nInstall a game, or press Menu, then Games and apps, then Add a program."
-            : _state.Tiles.Count == 0 ? "Every game is hidden. Turn on Show hidden games to bring them back. Press Menu, then Library display, then What it shows."
+            ? "No installed games were found in Steam, Xbox, Epic Games, Battle.net, GOG, the EA App or Ubisoft Connect.\nInstall a game, or press Menu, then Catalog & Content, then Add Custom App."
+            : _state.Tiles.Count == 0 ? "Every game is hidden. Turn on Show hidden games to bring them back. Press Menu, then Appearance & Layout, then Library Elements."
             : string.Empty;
     }
 

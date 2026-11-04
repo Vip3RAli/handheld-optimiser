@@ -11,7 +11,7 @@ internal readonly record struct TileFilter(GameStore? Store, bool Favourites, bo
     public static readonly TileFilter Uninstalled = new(null, false, true);
     public static readonly TileFilter AppsTab = new(null, false, Apps: true);
 
-    public string Name => Apps ? "Apps" : NotInstalled ? "Not installed" : Favourites ? "Favourites"
+    public string Name => Apps ? "Apps" : NotInstalled ? "Ready to Install" : Favourites ? "Favourites"
         : Store is { } store ? Game.NameOf(store) : "Games";
 
     /// <summary>What A does to a tile on this tab.</summary>

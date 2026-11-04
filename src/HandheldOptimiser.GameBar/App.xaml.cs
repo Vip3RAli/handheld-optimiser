@@ -41,7 +41,9 @@ namespace HandheldOptimiser.GameBar
             Window.Current.Content = frame;
 
             _widget = new XboxGameBarWidget(widgetArgs, Window.Current.CoreWindow, frame);
-            frame.Navigate(typeof(TdpWidget));
+
+            // The page is handed the widget so it can stop asking for news while it cannot be seen.
+            frame.Navigate(typeof(TdpWidget), _widget);
 
             Window.Current.Closed += OnWidgetClosed;
             Window.Current.Activate();

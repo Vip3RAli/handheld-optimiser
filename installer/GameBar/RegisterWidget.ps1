@@ -57,6 +57,10 @@ try {
                 Get-AppxPackage -Name 'HandheldOptimiser.GameBar' | Remove-AppxPackage
                 Add-AppxPackage -Path $package -DependencyPath $dependencies -ForceApplicationShutdown
             }
+
+            # Game Bar only reads the OEM widget and manifest placement when it starts, so a running copy
+            # is closed and the next press of the button starts it fresh.
+            Get-Process -Name 'GameBar' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
             exit 0
         }
         'Untrust' {

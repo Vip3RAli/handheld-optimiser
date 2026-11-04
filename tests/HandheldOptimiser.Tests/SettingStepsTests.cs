@@ -12,6 +12,11 @@ public sealed class SettingStepsTests
         Assert.Equal(LibraryLayout.Row, SettingSteps.Step(LibraryLayout.Grid, 1));
         Assert.Equal(LibraryLayout.Grid, SettingSteps.Step(LibraryLayout.OldSchool, 1));
         Assert.Equal(LibraryLayout.OldSchool, SettingSteps.Step(LibraryLayout.Grid, -1));
+
+        Assert.Equal(WindowsGameMode.XboxMode, SettingSteps.Step(WindowsGameMode.Off, 1));
+        Assert.Equal(WindowsGameMode.Always, SettingSteps.Step(WindowsGameMode.XboxMode, 1));
+        Assert.Equal(WindowsGameMode.Off, SettingSteps.Step(WindowsGameMode.Always, 1));
+        Assert.Equal(WindowsGameMode.Always, SettingSteps.Step(WindowsGameMode.Off, -1));
     }
 
     [Fact]

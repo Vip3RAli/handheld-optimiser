@@ -20,10 +20,16 @@
     <RootNamespace>HandheldOptimiser</RootNamespace>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
   </PropertyGroup>
 
   <ItemGroup>
+    <RuntimeHostConfigurationOption Include="System.GC.ConserveMemory" Value="7" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.12" />
     <PackageReference Include="WPF-UI" Version="4.3.0" />
   </ItemGroup>
 

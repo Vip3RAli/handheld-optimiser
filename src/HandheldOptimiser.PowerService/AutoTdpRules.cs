@@ -43,12 +43,12 @@ internal static class AutoTdpRules
         GameFps(frames, folder, null, pathOf).Fps;
 
     /// <summary>
-    /// The game's frames a second and the program they came from. With no folder yet, the library's game
-    /// folders narrow it down, as when started from Game Bar.
+    /// The game's frames a second, the program they came from and its process id (0 when none was found).
+    /// With no folder yet, the library's game folders narrow it down, as when started from Game Bar.
     /// </summary>
     /// <param name="library">The library's game folders: only programs inside one of them count. Null when
     /// the library has not saved any, and then the busiest program counts.</param>
-    public static (double Fps, string? Program) GameFps(IReadOnlyDictionary<int, double> frames, string? folder,
+    public static (double Fps, string? Program, int ProcessId) GameFps(IReadOnlyDictionary<int, double> frames, string? folder,
         string[]? library, Func<int, string?> pathOf)
     {
         // With a separator on the end, C:\Games\Foo does not take in C:\Games\FooBar's programs.
@@ -56,6 +56,7 @@ internal static class AutoTdpRules
 
         var best = 0.0;
         string? program = null;
+        var game = 0;
         foreach (var (processId, fps) in frames)
         {
             if (fps <= best)
@@ -77,10 +78,11 @@ internal static class AutoTdpRules
             {
                 best = fps;
                 program = path;
+                game = processId;
             }
         }
 
-        return (best, program);
+        return (best, program, game);
     }
 
     /// <summary>

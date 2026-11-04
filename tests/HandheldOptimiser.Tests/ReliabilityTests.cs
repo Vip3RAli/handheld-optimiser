@@ -94,13 +94,23 @@ public class ReliabilityTests
     public void The_widgets_fan_and_controller_buttons_name_choices_the_service_knows()
     {
         var xaml = File.ReadAllText(Path.Combine(RepoRoot(), "src", "HandheldOptimiser.GameBar", "TdpWidget.xaml"));
+        var code = File.ReadAllText(Path.Combine(RepoRoot(), "src", "HandheldOptimiser.GameBar", "TdpWidget.xaml.cs"));
 
-        var fans = Tags(xaml, "OnFans");
-        var modes = Tags(xaml, "OnControllerMode");
+        // The fan curve is a slider whose stops are the protocol's names, plus "" for the Ally's own (since 2026-10-28).
+        Assert.Equal(
+            new[] { AutoTdpProtocol.CoolFans, AutoTdpProtocol.DynamicFans, AutoTdpProtocol.FullFans, AutoTdpProtocol.QuietFans }.Order(),
+            AutoTdpProtocol.FanModes.Order());
+        Assert.Contains("AutoTdpProtocol.DynamicFans, AutoTdpProtocol.QuietFans, \"\", AutoTdpProtocol.CoolFans, AutoTdpProtocol.FullFans", code);
 
-        // The widget's Default button sends no curve, and its tag is empty.
-        Assert.Equal(AutoTdpProtocol.FanModes.Order(), fans.Where(t => t.Length > 0).Order());
-        Assert.Equal(new[] { AutoTdpProtocol.DesktopMode, AutoTdpProtocol.GamepadMode }, modes.Order());
+        // The controller is a switch: on is Gamepad, off is Desktop.
+        Assert.Contains("ControllerSwitch.IsOn ? AutoTdpProtocol.GamepadMode : AutoTdpProtocol.DesktopMode", code);
+
+        // The Radeon switches and sliders name the settings the launcher's --radeon mode knows, every one of them.
+        var radeon = Regex.Matches(xaml, @"<ToggleSwitch\b[^>]*?Toggled=""OnRadeon""[^>]*>")
+            .Select(m => Regex.Match(m.Value, "Tag=\"([^\"]*)\"").Groups[1].Value);
+        Assert.Equal(RadeonState.Switches.Order(), radeon.Order());
+        var numbers = Regex.Matches(code, @"SetRadeonValue\(""([^""]*)""").Select(m => m.Groups[1].Value);
+        Assert.Equal(RadeonState.Numbers.Order(), numbers.Order());
     }
 
     /// <summary>The Tag of every button whose Click goes to the named handler, in the order they appear.</summary>

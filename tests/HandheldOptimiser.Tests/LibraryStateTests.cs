@@ -42,8 +42,11 @@ public sealed class LibraryStateTests
         Assert.True(TileFilter.AppsTab.Shows(app));
         Assert.False(TileFilter.All.Shows(app));
         Assert.False(TileFilter.Uninstalled.Shows(app));
+        Assert.Equal("Ready to Install", TileFilter.Uninstalled.Name);
+        Assert.Equal("Apps", TileFilter.AppsTab.Name);
+        Assert.Equal("Games", TileFilter.All.Name);
 
-        // An app that is not installed is no reason for a Not installed tab.
+        // An app that is not installed is no reason for a Ready to install tab.
         Assert.DoesNotContain(TileFilter.Uninstalled, TileFilter.Options([Tile("a"), app], storeTabs: false));
     }
 

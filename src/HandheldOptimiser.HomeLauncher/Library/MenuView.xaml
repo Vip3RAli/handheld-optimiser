@@ -60,9 +60,9 @@
                 <StackPanel x:Name="SettingsItems" Visibility="Collapsed">
                     <Button x:Name="UpdateSetting" Style="{StaticResource MenuButton}" Content="Update now"
                             Visibility="Collapsed" />
-                    <Button x:Name="LibraryDisplayGroup" Style="{StaticResource MenuButton}" Content="Library display" />
-                    <Button x:Name="GamesAppsGroup" Style="{StaticResource MenuButton}" Content="Games and apps" />
-                    <Button x:Name="SleepTweaksGroup" Style="{StaticResource MenuButton}" Content="Sleep and clean-up" />
+                    <Button x:Name="LibraryDisplayGroup" Style="{StaticResource MenuButton}" Content="Appearance &amp; Layout" />
+                    <Button x:Name="GamesAppsGroup" Style="{StaticResource MenuButton}" Content="Catalog &amp; Content" />
+                    <Button x:Name="SleepTweaksGroup" Style="{StaticResource MenuButton}" Content="Performance &amp; Power" />
                     <Button x:Name="RescanItem" Style="{StaticResource MenuButton}" Content="Refresh library" />
                     <Button x:Name="QuitSetting" Style="{StaticResource MenuButton}" Content="Close library" />
 
@@ -80,9 +80,9 @@
 
                 <!-- Library display: how the library looks, on the built-in screen and docked. -->
                 <StackPanel x:Name="LibraryDisplayItems" Visibility="Collapsed">
-                    <Button x:Name="BackgroundGroup" Style="{StaticResource MenuButton}" Content="Art and background" />
-                    <Button x:Name="DisplayGroup" Style="{StaticResource MenuButton}" Content="What it shows" />
-                    <Button x:Name="TvGroup" Style="{StaticResource MenuButton}" Content="Docked mode" />
+                    <Button x:Name="BackgroundGroup" Style="{StaticResource MenuButton}" Content="Artwork &amp; Theme" />
+                    <Button x:Name="DisplayGroup" Style="{StaticResource MenuButton}" Content="Library Elements" />
+                    <Button x:Name="TvGroup" Style="{StaticResource MenuButton}" Content="Docked Display" />
                     <!-- For touch, which has no B button. -->
                     <Button x:Name="LibraryDisplaySettingsBackItem" Style="{StaticResource MenuButton}" Content="Back" />
 
@@ -100,10 +100,10 @@
 
                 <!-- Games and apps: what the library lists besides the installed games. -->
                 <StackPanel x:Name="GamesAppsItems" Visibility="Collapsed">
-                    <Button x:Name="OwnedGroup" Style="{StaticResource MenuButton}" Content="Games not installed" />
-                    <Button x:Name="DealsGroup" Style="{StaticResource MenuButton}" Content="Game deals" />
-                    <Button x:Name="EmulatorsGroup" Style="{StaticResource MenuButton}" Content="Emulators" />
-                    <Button x:Name="AddProgramGroup" Style="{StaticResource MenuButton}" Content="Add a program" />
+                    <Button x:Name="OwnedGroup" Style="{StaticResource MenuButton}" Content="Ready to Install" />
+                    <Button x:Name="DealsGroup" Style="{StaticResource MenuButton}" Content="Deals &amp; Free Games" />
+                    <Button x:Name="EmulatorsGroup" Style="{StaticResource MenuButton}" Content="Emulators &amp; ROMs" />
+                    <Button x:Name="AddProgramGroup" Style="{StaticResource MenuButton}" Content="Add Custom App" />
                     <!-- For touch, which has no B button. -->
                     <Button x:Name="GamesAppsSettingsBackItem" Style="{StaticResource MenuButton}" Content="Back" />
 
@@ -121,9 +121,9 @@
 
                 <!-- Sleep and clean-up: what happens around a game and sleep, clean-ups, and the main app. -->
                 <StackPanel x:Name="SleepTweaksItems" Visibility="Collapsed">
-                    <Button x:Name="WhilePlayingGroup" Style="{StaticResource MenuButton}" Content="Play and sleep" />
-                    <Button x:Name="MaintenanceGroup" Style="{StaticResource MenuButton}" Content="Clean up" />
-                    <Button x:Name="OpenMainAppSetting" Style="{StaticResource MenuButton}" Content="Launch Handheld Optimiser" />
+                    <Button x:Name="WhilePlayingGroup" Style="{StaticResource MenuButton}" Content="Game Mode &amp; Optimisation" />
+                    <Button x:Name="MaintenanceGroup" Style="{StaticResource MenuButton}" Content="Storage Clean-up" />
+                    <Button x:Name="OpenMainAppSetting" Style="{StaticResource MenuButton}" Content="Launch Handheld Optimiser App" />
                     <!-- For touch, which has no B button. -->
                     <Button x:Name="SleepTweaksSettingsBackItem" Style="{StaticResource MenuButton}" Content="Back" />
 
@@ -169,7 +169,7 @@
                     <Button x:Name="StoreDetailsSetting" Style="{StaticResource MenuButton}" Content="Store details" />
                     <Button x:Name="StatusSetting" Style="{StaticResource MenuButton}" Content="Battery and Wi-Fi" />
                     <Button x:Name="FilterSetting" Style="{StaticResource MenuButton}" Content="Store filter" />
-                    <Button x:Name="QuickActionsSetting" Style="{StaticResource MenuButton}" Content="Options hint" />
+                    <Button x:Name="QuickActionsSetting" Style="{StaticResource MenuButton}" Content="Controller guide hints" />
                     <Button x:Name="HiddenSetting" Style="{StaticResource MenuButton}" Content="Show hidden games" />
                     <Button x:Name="SortSetting" Style="{StaticResource MenuButton}" Content="Sort games" />
                     <!-- For touch, which has no B button. -->
@@ -324,16 +324,17 @@
                 <!-- Around games: closing background programs as one starts, and the store's app once it ends. -->
                 <StackPanel x:Name="WhilePlayingItems" Visibility="Collapsed">
                     <Button x:Name="GameModeSetting" Style="{StaticResource MenuButton}" Content="Close background programs" />
+                    <Button x:Name="WindowsGameModeSetting" Style="{StaticResource MenuButton}" Content="Optimise Windows processes" />
                     <Button x:Name="AppsToCloseGroup" Style="{StaticResource MenuButton}" Content="Programs to close" />
-                    <Button x:Name="ReopenSetting" Style="{StaticResource MenuButton}" Content="Open them again afterwards" />
+                    <Button x:Name="ReopenSetting" Style="{StaticResource MenuButton}" Content="Restore apps on game exit" />
                     <Button x:Name="AutoTdpSetting" Style="{StaticResource MenuButton}" Content="TDP Engine" />
                     <Button x:Name="AutoTdpTemperatureSetting" Style="{StaticResource MenuButton}" Content="TDP Engine temperature limit" />
                     <Button x:Name="AutoTdpWattsSetting" Style="{StaticResource MenuButton}" Content="TDP Engine maximum power" />
                     <Button x:Name="FanCurveSetting" Style="{StaticResource MenuButton}" Content="Fan curve" />
-                    <Button x:Name="StoreClosingSetting" Style="{StaticResource MenuButton}" Content="Close store apps after playing" />
+                    <Button x:Name="StoreClosingSetting" Style="{StaticResource MenuButton}" Content="Exit game launchers on game exit" />
                     <Button x:Name="StoreStartupItem" Style="{StaticResource MenuButton}" Content="Store apps at startup" />
                     <Button x:Name="QuickResumeSetting" Style="{StaticResource MenuButton}" Content="Quick Resume" />
-                    <Button x:Name="ResumeSetting" Style="{StaticResource MenuButton}" Content="Back to your game after sleep" />
+                    <Button x:Name="ResumeSetting" Style="{StaticResource MenuButton}" Content="Resume game on wake" />
                     <!-- For touch, which has no B button. -->
                     <Button x:Name="WhilePlayingSettingsBackItem" Style="{StaticResource MenuButton}" Content="Back" />
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
@@ -469,7 +470,7 @@
 
                 <!-- Owned games that are not installed, in a tab of their own. -->
                 <StackPanel x:Name="OwnedItems" Visibility="Collapsed">
-                    <Button x:Name="NotInstalledSetting" Style="{StaticResource MenuButton}" Content="Show games not installed" />
+                    <Button x:Name="NotInstalledSetting" Style="{StaticResource MenuButton}" Content="Show games ready to install" />
                     <Button x:Name="SteamKeySetting" Style="{StaticResource MenuButton}" Content="Steam Web API key" />
                     <Button x:Name="OwnedRefreshItem" Style="{StaticResource MenuButton}" Content="Look again" />
                     <!-- For touch, which has no B button. -->

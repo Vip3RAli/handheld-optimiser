@@ -296,7 +296,7 @@ internal sealed class GameActionsMenu
         _host.RestoreFocus();
         _notices.Show(!hidden ? $"{tile.Title} is back in the library."
             : _options.ShowHidden ? $"{tile.Title} is hidden. It shows faded while Show hidden games is on."
-            : $"{tile.Title} is hidden. Turn on Show hidden games to bring it back. It is under Library display, What it shows.");
+            : $"{tile.Title} is hidden. Turn on Show hidden games to bring it back. It is under Appearance & Layout, Library Elements.");
     }
 
     // ----- Typed settings: launch arguments and the artwork title -----

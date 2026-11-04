@@ -374,6 +374,11 @@ begin
   else
     Log('There was no ROG Screen Manager startup flag to remove.');
 
+  if RegWriteStringValue(HKLM64, 'SOFTWARE\Microsoft\Windows\CurrentVersion\GamingConfiguration', 'OEMGameBarWidget', 'B9ECED6F.ASUSCommandCenter_qmba6cd70vzyy') then
+    Log('Put ASUS Command Center back as the Game Bar OEM widget.')
+  else
+    Log('Could not put ASUS Command Center back as the Game Bar OEM widget.');
+
   StartAsus('asus');
   StartAsus('AsusAppService');
   StartAsus('ASUSOptimization');

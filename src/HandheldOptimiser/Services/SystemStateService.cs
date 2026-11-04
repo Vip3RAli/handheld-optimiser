@@ -176,34 +176,30 @@ public sealed class SystemStateService(LogService log, PowerShellRunner runner, 
 
         var watched = WatchedServices();
         var replacing = IsReplacingArmouryCrate();
-        var serviceNames = string.Join(",", watched.Select(s => PsQuote.Literal(s.ServiceName)));
 
-        var outcome = await _runner.RunScriptAsync(
-            $$"""
-             $ErrorActionPreference = 'SilentlyContinue'
-             foreach ($n in @({{serviceNames}})) {
-                 $s = Get-Service -Name $n -ErrorAction SilentlyContinue
-                 if ($null -eq $s) {
-                     Write-Output "SVC|$n|ABSENT|ABSENT"
-                 } else {
-                     Write-Output "SVC|$n|$($s.Status)|$($s.StartType)"
-                 }
-             }
-             """,
-            "Query protected service states",
-            ct,
-            echoScript: false);
-
-        var serviceStates = new Dictionary<string, (string Status, string StartType)>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var line in outcome.OutputLines.Where(l => l.StartsWith("SVC|", StringComparison.Ordinal)))
+        var serviceStates = await Task.Run(() =>
         {
-            var parts = line.Split('|');
-            if (parts.Length >= 4)
+            var states = new Dictionary<string, (string Status, string StartType)>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (serviceName, _, _) in watched)
             {
-                serviceStates[parts[1]] = (parts[2], parts[3]);
+                try
+                {
+                    using var sc = new System.ServiceProcess.ServiceController(serviceName);
+                    states[serviceName] = (sc.Status.ToString(), sc.StartType.ToString());
+                }
+                catch (InvalidOperationException)
+                {
+                    states[serviceName] = ("ABSENT", "ABSENT");
+                }
+                catch (Exception ex)
+                {
+                    _log.Trace($"Could not read service {serviceName} directly ({ex.Message}); marking absent.");
+                    states[serviceName] = ("ABSENT", "ABSENT");
+                }
             }
-        }
+
+            return states;
+        }, ct);
 
         foreach (var (serviceName, friendly, group) in watched)
         {

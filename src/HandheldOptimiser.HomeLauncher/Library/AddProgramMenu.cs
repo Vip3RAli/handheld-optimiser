@@ -35,7 +35,7 @@ internal sealed class AddProgramMenu
     private void Open()
     {
         _menu.ClearRows(_view.AddItems);
-        _menu.Show(_view.AddItems, _state.Filter.Apps ? "Add an app" : "Add a program", SettingsMenu.GamesApps);
+        _menu.Show(_view.AddItems, _state.Filter.Apps ? "Add Custom App" : "Add Custom Game", SettingsMenu.GamesApps);
         _menu.Subtitle = "Looking through the Start menu...";
         _ = ListStartMenuProgramsAsync();
     }
@@ -66,7 +66,7 @@ internal sealed class AddProgramMenu
     {
         var picker = new OpenFileDialog
         {
-            Title = _state.Filter.Apps ? "Add an app to the library" : "Add a program to the game library",
+            Title = _state.Filter.Apps ? "Add a custom app to the library" : "Add a custom game to the library",
             Filter = AddedPrograms.BrowseFilter,
 
             // A shortcut is kept as it is, so its own name and arguments are used.

@@ -404,6 +404,82 @@ internal static class OwnedGames
             .ToList();
     }
 
+    /// <summary>
+    /// Finds the most suitable Steam account id from loginusers.vdf contents.
+    /// Prefers the explicitly active user (MostRecent), then the account matching
+    /// AutoLoginUser from the registry, then any account set to AutoLogin, or finally
+    /// the account with the most recent login timestamp.
+    /// </summary>
+    public static ulong? ParseLoginUsers(string vdfText, string? autoLoginUser = null)
+    {
+        var users = KeyValues.Parse(vdfText)?.Block("users");
+        if (users?.Blocks is null)
+        {
+            return null;
+        }
+
+        var candidates = new List<(ulong SteamId, string? AccountName, bool MostRecent, bool AutoLogin, long Timestamp)>();
+
+        foreach (var (id, user) in users.Blocks)
+        {
+            ulong steamId;
+            if (ulong.TryParse(id, out var parsedId))
+            {
+                if (parsedId > SteamIdBase)
+                {
+                    steamId = parsedId;
+                }
+                else if (parsedId > 0 && parsedId <= uint.MaxValue)
+                {
+                    steamId = SteamIdBase + parsedId;
+                }
+                else
+                {
+                    continue;
+                }
+            }
+            else
+            {
+                continue;
+            }
+
+            var mostRecent = user.Value("MostRecent") == "1";
+            var autoLogin = user.Value("AutoLogin") == "1";
+            var accountName = user.Value("AccountName");
+            long.TryParse(user.Value("Timestamp"), out var timestamp);
+
+            candidates.Add((steamId, accountName, mostRecent, autoLogin, timestamp));
+        }
+
+        if (candidates.Count == 0)
+        {
+            return null;
+        }
+
+        // 1. Explicitly marked as most recent
+        if (candidates.FirstOrDefault(c => c.MostRecent) is { SteamId: > 0 } recent)
+        {
+            return recent.SteamId;
+        }
+
+        // 2. Matches AutoLoginUser from Steam registry
+        if (!string.IsNullOrWhiteSpace(autoLoginUser)
+            && candidates.FirstOrDefault(c => string.Equals(c.AccountName, autoLoginUser, StringComparison.OrdinalIgnoreCase)) is { SteamId: > 0 } matchedUser)
+        {
+            return matchedUser.SteamId;
+        }
+
+        // 3. Marked with AutoLogin in config
+        if (candidates.FirstOrDefault(c => c.AutoLogin) is { SteamId: > 0 } auto)
+        {
+            return auto.SteamId;
+        }
+
+        // 4. Highest timestamp (most recently used session), or first valid entry
+        var latest = candidates.OrderByDescending(c => c.Timestamp).First();
+        return latest.SteamId;
+    }
+
     /// <summary>The Steam id of the account signed in now, or else of the one that signed in last.</summary>
     public static ulong? SteamAccount()
     {
@@ -422,12 +498,33 @@ internal static class OwnedGames
                 return null;
             }
 
-            var users = KeyValues.Parse(File.ReadAllText(Path.Combine(steamDir, "config", "loginusers.vdf")))?.Block("users");
-            foreach (var (id, user) in users?.Blocks ?? [])
+            string? autoLoginUser = null;
+            using (var steam = Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam"))
             {
-                if (user.Value("MostRecent") == "1" && ulong.TryParse(id, out var steamId))
+                autoLoginUser = steam?.GetValue("AutoLoginUser") as string;
+            }
+
+            var loginUsersPath = Path.Combine(steamDir, "config", "loginusers.vdf");
+            if (File.Exists(loginUsersPath))
+            {
+                var vdf = File.ReadAllText(loginUsersPath);
+                if (ParseLoginUsers(vdf, autoLoginUser) is { } id)
                 {
-                    return steamId;
+                    return id;
+                }
+            }
+
+            var userDataPath = Path.Combine(steamDir, "userdata");
+            if (Directory.Exists(userDataPath))
+            {
+                var dirs = new DirectoryInfo(userDataPath).GetDirectories()
+                    .Where(d => uint.TryParse(d.Name, out var id) && id != 0)
+                    .OrderByDescending(d => d.LastWriteTimeUtc)
+                    .ToList();
+
+                if (dirs.Count > 0 && uint.TryParse(dirs[0].Name, out var accountId))
+                {
+                    return SteamIdBase + accountId;
                 }
             }
         }
