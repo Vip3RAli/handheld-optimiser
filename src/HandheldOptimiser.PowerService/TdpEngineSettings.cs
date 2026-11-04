@@ -4,7 +4,7 @@ namespace HandheldOptimiser.PowerService;
 
 /// <summary>
 /// TDP Engine's own saved settings, in HKLM beside its crash note: Auto or Manual, the power limit and fans
-/// last chosen in Manual, so Manual comes back as the player left it, and the player's own CPU boost while an
+/// last chosen in Manual, so Manual comes back as the player left it, the frame rate last held in Auto, and the player's own CPU boost while an
 /// Auto session holds it, so a crash still gives it back. Read once as the service starts; a value that
 /// cannot be read counts as missing, and Auto is the mode when none is saved.
 /// </summary>
@@ -14,6 +14,7 @@ internal sealed class TdpEngineSettings
     private const string ModeValue = "Mode";
     private const string ManualPowerLimitValue = "ManualPowerLimit";
     private const string ManualFansValue = "ManualFans";
+    private const string AutoTargetFpsValue = "AutoTargetFps";
     private const string PlayerBoostPluggedInValue = "PlayerBoostPluggedIn";
     private const string PlayerBoostOnBatteryValue = "PlayerBoostOnBattery";
 
@@ -25,6 +26,7 @@ internal sealed class TdpEngineSettings
             Auto = AutoMode.IsAuto(key?.GetValue(ModeValue) as string);
             ManualPowerLimit = key?.GetValue(ManualPowerLimitValue) is int watts ? watts : 0;
             ManualFans = key?.GetValue(ManualFansValue) is string { Length: > 0 } fans ? fans : null;
+            AutoTargetFps = key?.GetValue(AutoTargetFpsValue) is int target ? target : 0;
         }
         catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
         {
@@ -40,6 +42,24 @@ internal sealed class TdpEngineSettings
 
     /// <summary>The fans last chosen in Manual, or null for the Ally's own.</summary>
     public string? ManualFans { get; private set; }
+
+    /// <summary>
+    /// The frame rate an Auto session last held, 0 for none, for a session TDP Engine starts by itself for a
+    /// game launched outside the library.
+    /// </summary>
+    public int AutoTargetFps { get; private set; }
+
+    /// <summary>Saves the frame rate an Auto session holds, when it changed.</summary>
+    public void SaveAutoTarget(int targetFps)
+    {
+        if (targetFps == AutoTargetFps)
+        {
+            return;
+        }
+
+        AutoTargetFps = targetFps;
+        Write(key => key.SetValue(AutoTargetFpsValue, targetFps, RegistryValueKind.DWord));
+    }
 
     /// <summary>The mode's name for a status.</summary>
     public string ModeName => Auto ? AutoTdpProtocol.AutoModeName : AutoTdpProtocol.ManualMode;

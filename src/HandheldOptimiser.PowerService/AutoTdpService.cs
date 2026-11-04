@@ -72,6 +72,13 @@ internal sealed partial class AutoTdpService : ServiceBase
     // Set once it has decided to end, so a start that arrives meanwhile is turned away rather than lost.
     private bool _ending;
 
+    // For a session started by itself for a game launched outside the library: the player's library folders,
+    // when they were read, and the program being watched until it has held a game's frame rate long enough.
+    private string[]? _playerLibrary;
+    private DateTime _playerLibraryRead;
+    private static readonly TimeSpan PlayerLibraryEvery = TimeSpan.FromMinutes(1);
+    private GameLock _runningGameLock = new();
+
     public AutoTdpService()
     {
         ServiceName = AutoTdpProtocol.ServiceName;
@@ -322,6 +329,50 @@ internal sealed partial class AutoTdpService : ServiceBase
         }
     }
 
+    /// <summary>
+    /// In Auto with nothing running, starts a session for a game the player launched outside the library, as
+    /// from Epic's own launcher. Only the library and the widget started one before, so the widget showed Auto
+    /// on while Fortnite ran with nothing setting its power (2026-11-02). A program counts once it runs from
+    /// one of the library's game folders, read through its own user, and holds a game's frame rate for
+    /// <see cref="GameLock.HoldFor"/>, so a launcher or a browser never starts one.
+    /// </summary>
+    private void StartForRunningGame(FrameCounter.FrameRates? frames)
+    {
+        if (!_engine.Auto || frames is null || _power is null || _error is not null || _ending)
+        {
+            _runningGameLock = new GameLock();
+            return;
+        }
+
+        // The library's folders are read through the busiest program's own user, a minute at a time.
+        var now = DateTime.UtcNow;
+        if (_playerLibrary is null || now - _playerLibraryRead > PlayerLibraryEvery)
+        {
+            var (_, _, busiest) = GameFps(frames.Rendered, null, null);
+            if (busiest > 0)
+            {
+                _playerLibrary = ClientGameFolders(busiest);
+                _playerLibraryRead = now;
+            }
+        }
+
+        if (_playerLibrary is not { Length: > 0 } library)
+        {
+            return;
+        }
+
+        var (fps, program, processId) = GameFps(frames.Rendered, null, library);
+        if (_runningGameLock.Observe(now, program, fps) is null || program is null)
+        {
+            return;
+        }
+
+        _runningGameLock = new GameLock();
+        var folder = library.FirstOrDefault(game => GameLock.InFolders(program, [game]));
+        Begin(new AutoTdpRequest(AutoTdpProtocol.Update, _engine.AutoTargetFps, GameFolder: folder), processId,
+            fromWidget: true, source: ", started outside the library while Auto is on");
+    }
+
     /// <summary>One second: the game's frame rate and the temperature to the controller, and its answer to the firmware.</summary>
     private void Tick()
     {
@@ -334,6 +385,11 @@ internal sealed partial class AutoTdpService : ServiceBase
             _overlayTemperature = _power?.ReadTemperature();
             _overlay.Keep();
             _screenStats.Keep();
+        }
+
+        if (_control is null)
+        {
+            StartForRunningGame(frames);
         }
 
         if (_control is not { } control || _power is null)
@@ -924,7 +980,8 @@ internal sealed partial class AutoTdpService : ServiceBase
         : status;
 
     /// <summary>A game starting from the library, or from the widget when nothing is running.</summary>
-    private AutoTdpStatus Begin(AutoTdpRequest request, int client, bool fromWidget = false)
+    /// <param name="source">How it started, for the log, when neither the library nor the widget.</param>
+    private AutoTdpStatus Begin(AutoTdpRequest request, int client, bool fromWidget = false, string? source = null)
     {
         if (_error is not null || _power is null)
         {
@@ -1025,7 +1082,7 @@ internal sealed partial class AutoTdpService : ServiceBase
         Set(_control);
         var target = (folder is null ? null : AutoTdpRules.Printable(folder))
             ?? (_control.LibraryFolders is { } library ? $"the busiest of the library's {library.Length} games" : "the busiest program");
-        Log.Write($"{Describe(_control)}, for {target}{(fromWidget ? ", from Game Bar" : "")}");
+        Log.Write($"{Describe(_control)}, for {target}{source ?? (fromWidget ? ", from Game Bar" : "")}");
         _last = Status(_control, null, _power.ReadTemperature());
         return _last;
     }
@@ -1102,6 +1159,12 @@ internal sealed partial class AutoTdpService : ServiceBase
 
     private void Set(Control control)
     {
+        // Kept for a session started for a game launched outside the library (see StartForRunningGame).
+        if (control.Auto)
+        {
+            _engine.SaveAutoTarget(AutoMode.ShownTarget(control.Settings?.TargetFps ?? 0));
+        }
+
         if (WattsNow(control) is { } watts)
         {
             Apply(control, watts);
