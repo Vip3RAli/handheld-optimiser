@@ -287,16 +287,39 @@
 
                     <!-- Only while TDP Engine replaces Armoury Crate, which is when it runs the Ally's controller.
                          On is Gamepad, off is Desktop (the controller works the mouse and keyboard). -->
-                    <Border x:Name="ControllerRow" Style="{StaticResource Bar}" Visibility="Collapsed" Margin="0,10,0,0" Padding="12,6,6,6">
-                        <Grid>
+                    <StackPanel x:Name="ControllerRow" Visibility="Collapsed" Margin="0,10,0,0">
+                        <Border Style="{StaticResource Bar}" Padding="12,6,6,6">
+                            <Grid>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Style="{StaticResource Label}" Margin="0" Text="Gamepad controls" />
+                                    <TextBlock x:Name="ControllerNote" Style="{StaticResource ReadoutName}" Text="Off: the controller works the mouse" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="ControllerSwitch" HorizontalAlignment="Right" MinWidth="0" Width="52" OnContent="" OffContent=""
+                                              Toggled="OnControllerMode" FocusVisualPrimaryBrush="{StaticResource Accent}" />
+                            </Grid>
+                        </Border>
+                        <Grid Margin="0,10,0,0">
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Style="{StaticResource Label}" Margin="0" Text="Gamepad controls" />
-                                <TextBlock x:Name="ControllerNote" Style="{StaticResource ReadoutName}" Text="Off: the controller works the mouse" />
+                                <TextBlock Style="{StaticResource Label}" Margin="0" Text="Back paddles" />
+                                <TextBlock Style="{StaticResource ReadoutName}" Text="M1 and M2 action" />
                             </StackPanel>
-                            <ToggleSwitch x:Name="ControllerSwitch" HorizontalAlignment="Right" MinWidth="0" Width="52" OnContent="" OffContent=""
-                                          Toggled="OnControllerMode" FocusVisualPrimaryBrush="{StaticResource Accent}" />
+                            <ComboBox x:Name="PaddleActions" HorizontalAlignment="Right" MinWidth="150"
+                                      DropDownClosed="OnPaddlePicked" PreviewKeyDown="OnPaddleKey" />
                         </Grid>
-                    </Border>
+                        <Grid Margin="0,10,0,0">
+                            <TextBlock Style="{StaticResource Label}" Text="Stick lights" />
+                            <TextBlock x:Name="LightingValue" HorizontalAlignment="Right" FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{StaticResource AccentBright}" />
+                        </Grid>
+                        <Slider x:Name="LightingSlider" Style="{StaticResource Stops}" />
+                        <!-- Battery colours the rings by the charge, so the colour only counts in the other modes. -->
+                        <Grid Margin="0,10,0,0">
+                            <TextBlock Style="{StaticResource Label}" Text="Stick colour" />
+                            <TextBlock x:Name="ColourValue" HorizontalAlignment="Right" FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{StaticResource AccentBright}" />
+                        </Grid>
+                        <Slider x:Name="ColourSlider" Style="{StaticResource Stops}" />
+                    </StackPanel>
                 </StackPanel>
             </Border>
 
@@ -379,6 +402,18 @@
                             <!-- The switch's own template keeps room for a label beside it; a fixed width leaves only the switch. -->
                             <ToggleSwitch x:Name="BoostSwitch" HorizontalAlignment="Right" MinWidth="0" Width="52" OnContent="" OffContent=""
                                           Toggled="OnCpuBoost" FocusVisualPrimaryBrush="{StaticResource Accent}" />
+                        </Grid>
+                    </Border>
+
+                    <!-- Stops charging at 80% while plugged in, through ASUS ACPI. Hidden where the device cannot set it. -->
+                    <Border x:Name="BatteryCareRow" Style="{StaticResource Bar}" Margin="0,10,0,0" Padding="12,6,6,6" Visibility="Collapsed">
+                        <Grid>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource Label}" Margin="0" Text="Battery Care (80% limit)" />
+                                <TextBlock Style="{StaticResource ReadoutName}" Text="Stops charging at 80% to reduce wear" />
+                            </StackPanel>
+                            <ToggleSwitch x:Name="BatteryCareSwitch" HorizontalAlignment="Right" MinWidth="0" Width="52" OnContent="" OffContent=""
+                                          Toggled="OnBatteryCare" FocusVisualPrimaryBrush="{StaticResource Accent}" />
                         </Grid>
                     </Border>
 

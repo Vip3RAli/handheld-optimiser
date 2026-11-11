@@ -36,19 +36,33 @@ namespace HandheldOptimiser.GameBar
         private bool _placingGpuMemory;
         private bool _placingMode;
         private bool _placingController;
+        private bool _placingPaddle;
+        private bool _placingBatteryCare;
         private bool _placingRadeon;
         private bool _placingFrameRate;
 
         // The frame rate slider's five stops. In Auto the first is None, no target; in Manual it is Off.
         private static readonly int[] FrameRateStops = { 0, 30, 40, 45, 60 };
 
+        private static readonly (string Action, string Label)[] PaddleChoices =
+        {
+            (AutoTdpProtocol.PaddleNone, "Off"),
+            (AutoTdpProtocol.PaddleOverlay, "Toggle overlay"),
+            (AutoTdpProtocol.PaddleMode, "Gamepad / Desktop"),
+            (AutoTdpProtocol.PaddleKeyboard, "Touch keyboard"),
+            (AutoTdpProtocol.PaddleScreenshot, "Screenshot"),
+            (AutoTdpProtocol.PaddleMute, "Mute")
+        };
+
         // The frame rate is sent once the slider has stopped moving for this long, as the power limit is.
         private readonly DispatcherTimer _frameRatePause = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
         private bool _frameRateSliding;
 
-        // The fan curve and overlay size, each a slider of named stops.
+        // The fan curve, overlay size and stick lights, each a slider of named stops.
         private readonly StepSlider _fans;
         private readonly StepSlider _overlay;
+        private readonly StepSlider _lighting;
+        private readonly StepSlider _colour;
 
         // The Radeon settings' numbers, each a slider over the range the driver gives.
         private readonly NumberSlider _rsrSharpness;
@@ -91,6 +105,24 @@ namespace HandheldOptimiser.GameBar
                 new[] { AutoTdpProtocol.OverlayOff, AutoTdpProtocol.OverlaySmall, AutoTdpProtocol.OverlayMedium, AutoTdpProtocol.OverlayFull },
                 new[] { "Off", "Small", "Medium", "Full" },
                 level => Send(() => EngineClient.SetOverlay(level, null, null)));
+            _lighting = new StepSlider(LightingSlider, LightingValue,
+                new[] { AutoTdpProtocol.LightingOff, AutoTdpProtocol.LightingLow, AutoTdpProtocol.LightingMedium, AutoTdpProtocol.LightingHigh, AutoTdpProtocol.LightingBattery },
+                new[] { "Off", "Low", "Medium", "High", "Battery" },
+                lighting => Send(() => EngineClient.SetLighting(lighting)));
+            _colour = new StepSlider(ColourSlider, ColourValue,
+                new[]
+                {
+                    AutoTdpProtocol.ColourGreen, AutoTdpProtocol.ColourWhite, AutoTdpProtocol.ColourRed, AutoTdpProtocol.ColourOrange,
+                    AutoTdpProtocol.ColourYellow, AutoTdpProtocol.ColourBlue, AutoTdpProtocol.ColourCyan, AutoTdpProtocol.ColourPurple,
+                    AutoTdpProtocol.ColourPink
+                },
+                new[] { "Xbox green", "White", "Red", "Orange", "Yellow", "Blue", "Cyan", "Purple", "Pink" },
+                colour => Send(() => EngineClient.SetLightingColour(colour)));
+
+            foreach (var choice in PaddleChoices)
+            {
+                PaddleActions.Items.Add(new ComboBoxItem { Content = choice.Label, Tag = choice.Action });
+            }
 
             // The names sent are RadeonState's, which the launcher's --radeon mode knows.
             _rsrSharpness = new NumberSlider(RsrSharpnessSlider, RsrSharpnessValue, "%",
@@ -127,6 +159,8 @@ namespace HandheldOptimiser.GameBar
 
                 _fans.Flush();
                 _overlay.Flush();
+                _lighting.Flush();
+                _colour.Flush();
                 _rsrSharpness.Flush();
                 _chillMin.Flush();
                 _chillMax.Flush();
@@ -195,7 +229,7 @@ namespace HandheldOptimiser.GameBar
         }
 
         /// <summary>True while the player moves any slider and the choice is not sent yet.</summary>
-        private bool Moving => _sliding || _frameRateSliding || _fans.Moving || _overlay.Moving
+        private bool Moving => _sliding || _frameRateSliding || _fans.Moving || _overlay.Moving || _lighting.Moving || _colour.Moving
             || _rsrSharpness.Moving || _chillMin.Moving || _chillMax.Moving || _sharpening.Moving;
 
         private void OnFrameRateSlider(object sender, RangeBaseValueChangedEventArgs e)
@@ -326,6 +360,38 @@ namespace HandheldOptimiser.GameBar
 
             var mode = ControllerSwitch.IsOn ? AutoTdpProtocol.GamepadMode : AutoTdpProtocol.DesktopMode;
             Send(() => EngineClient.SetControllerMode(mode));
+        }
+
+        private void OnPaddlePicked(object sender, object e)
+        {
+            if (_placingPaddle || !(PaddleActions.SelectedItem is ComboBoxItem item) || !(item.Tag is string action)
+                || action == (_status.PaddleAction ?? AutoTdpProtocol.PaddleNone))
+            {
+                return;
+            }
+
+            Send(() => EngineClient.SetPaddle(action));
+        }
+
+        private void OnPaddleKey(object sender, Windows.UI.Xaml.Input.KeyRoutedEventArgs e)
+        {
+            if (PaddleActions.IsDropDownOpen)
+            {
+                return;
+            }
+
+            OnGpuMemoryKey(sender, e);
+        }
+
+        private void OnBatteryCare(object sender, RoutedEventArgs e)
+        {
+            if (_placingBatteryCare)
+            {
+                return;
+            }
+
+            var on = BatteryCareSwitch.IsOn;
+            Send(() => EngineClient.SetBatteryCare(on));
         }
 
         /// <summary>A Radeon setting, named by the switch's Tag. TDP Engine runs the change as the player and answers with them all.</summary>
@@ -568,7 +634,26 @@ namespace HandheldOptimiser.GameBar
             ControllerNote.Text = status.ControllerMode == AutoTdpProtocol.GamepadMode ? "On: the controller plays games"
                 : status.ControllerMode == AutoTdpProtocol.DesktopMode ? "Off: the controller works the mouse"
                 : "Not known yet";
+            _placingPaddle = true;
+            var paddle = status.PaddleAction ?? AutoTdpProtocol.PaddleNone;
+            PaddleActions.SelectedItem = PaddleActions.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == paddle);
+            _placingPaddle = false;
+            _lighting.Show(status.ControllerLighting ?? AutoTdpProtocol.LightingMedium);
+            if (status.ControllerLighting == null && !_lighting.Moving)
+            {
+                // Not picked yet: the lights are as Armoury Crate or the player left them.
+                LightingValue.Text = "Not set";
+            }
+
+            _colour.Show(status.LightingColour ?? AutoTdpProtocol.ColourGreen);
+
             ShowBoost(status.CpuBoost);
+            if (status.Reachable)
+            {
+                _placingBatteryCare = true;
+                ShowSwitch(BatteryCareRow, BatteryCareSwitch, status.BatteryCare);
+                _placingBatteryCare = false;
+            }
             ShowRadeon(status);
             _overlay.Show(status.OverlayLevel ?? AutoTdpProtocol.OverlayOff);
             Check(OverlayCorners, status.OverlayCorner ?? "");

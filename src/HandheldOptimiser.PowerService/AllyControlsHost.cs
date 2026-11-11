@@ -1,14 +1,16 @@
+using System.Runtime.InteropServices;
+
 namespace HandheldOptimiser.PowerService;
 
 /// <summary>
 /// Runs the Ally's controller while the app stands in for Armoury Crate: finds it, wakes it, puts it in the
-/// saved mode, and turns the Armoury Crate and Command Center buttons into the library and Game Bar.
+/// saved mode and lighting, and turns the Armoury Crate, Command Center and back paddle buttons into actions.
 ///
 /// One background thread does the finding and the reading. Everything else (the pipe's requests, a resume
 /// from sleep, the service stopping) only changes state, sends a mode, or closes the handle so the thread
 /// starts again.
 /// </summary>
-internal sealed class AllyControlsHost : IDisposable
+internal sealed partial class AllyControlsHost(Action? toggleOverlay = null) : IDisposable
 {
     private const string LauncherExe = "HandheldOptimiser.HomeLauncher.exe";
 
@@ -35,6 +37,11 @@ internal sealed class AllyControlsHost : IDisposable
     private Thread? _thread;
     private IControllerBackend? _hid;
     private ControllerMode? _mode = AllyControlsStore.SavedMode();
+    private string _paddleAction = AllyControlsStore.SavedPaddleAction();
+    // Null until the player picks a stick lighting mode, and the lights are not touched till then.
+    private string? _lighting = AllyControlsStore.SavedLighting();
+    private string _colour = AllyControlsStore.SavedColour();
+    private (byte R, byte G, byte B)? _lastBatteryColour;
 
     // The mode held while Game Bar is open, over the saved one, or null. Never saved.
     private ControllerMode? _hold;
@@ -61,6 +68,42 @@ internal sealed class AllyControlsHost : IDisposable
             lock (_state)
             {
                 return _mode;
+            }
+        }
+    }
+
+    /// <summary>What the back paddles (M1 and M2) are set to do.</summary>
+    public string PaddleAction
+    {
+        get
+        {
+            lock (_state)
+            {
+                return _paddleAction;
+            }
+        }
+    }
+
+    /// <summary>The thumbstick light ring colour, one of <see cref="AutoTdpProtocol.LightingColours"/>.</summary>
+    public string Colour
+    {
+        get
+        {
+            lock (_state)
+            {
+                return _colour;
+            }
+        }
+    }
+
+    /// <summary>The thumbstick light ring mode, or null when the player has not picked one.</summary>
+    public string? Lighting
+    {
+        get
+        {
+            lock (_state)
+            {
+                return _lighting;
             }
         }
     }
@@ -157,6 +200,164 @@ internal sealed class AllyControlsHost : IDisposable
 
         Log.Write("Game Bar closed, so the saved controller mode is put back");
         return SendCurrent();
+    }
+
+    /// <summary>Saves what the back paddles (M1 and M2) do.</summary>
+    /// <returns>Why it was not set, or null.</returns>
+    public string? SetPaddleAction(string? action)
+    {
+        if (!AllyCommands.IsPaddleAction(action))
+        {
+            return "That paddle action is not supported.";
+        }
+
+        var chosen = AllyCommands.ParsePaddleAction(action);
+        AllyControlsStore.SavePaddleAction(chosen);
+        lock (_state)
+        {
+            _paddleAction = chosen;
+        }
+
+        Log.Write($"Back paddles set to {chosen}");
+        return null;
+    }
+
+    /// <summary>Saves the thumbstick light ring mode and sends it to the controller.</summary>
+    /// <returns>A notice for the player when it could not be sent now, or null when it was.</returns>
+    public string? SetLighting(string? lighting)
+    {
+        if (!AllyCommands.IsLightingMode(lighting))
+        {
+            return "That stick lighting mode is not supported.";
+        }
+
+        var chosen = AllyCommands.ParseLighting(lighting);
+        AllyControlsStore.SaveLighting(chosen);
+        lock (_state)
+        {
+            _lighting = chosen;
+        }
+
+        Log.Write($"Controller stick lighting set to {chosen}");
+        return SendLighting();
+    }
+
+    /// <summary>
+    /// Saves the thumbstick light ring colour and sends it. Picking a colour while the lights were never set
+    /// turns them on at Medium, as the player plainly wants to see it.
+    /// </summary>
+    /// <returns>A notice for the player when it could not be sent now, or null when it was.</returns>
+    public string? SetColour(string? colour)
+    {
+        if (!AllyCommands.IsLightingColour(colour))
+        {
+            return "That stick colour is not supported.";
+        }
+
+        var chosen = AllyCommands.ParseColour(colour);
+        AllyControlsStore.SaveColour(chosen);
+        string? turnedOn = null;
+        lock (_state)
+        {
+            _colour = chosen;
+            if (_lighting is null)
+            {
+                _lighting = turnedOn = AutoTdpProtocol.LightingMedium;
+            }
+        }
+
+        if (turnedOn is not null)
+        {
+            AllyControlsStore.SaveLighting(turnedOn);
+        }
+
+        Log.Write($"Controller stick colour set to {chosen}");
+        return SendLighting();
+    }
+
+    /// <summary>Sends the saved mode and colour to the controller.</summary>
+    private string? SendLighting()
+    {
+        IControllerBackend? hid;
+        string? lighting;
+        string colour;
+        lock (_state)
+        {
+            lighting = _lighting;
+            colour = _colour;
+            _lastBatteryColour = null;
+            hid = _hid;
+        }
+
+        if (lighting is null)
+        {
+            return null;
+        }
+
+        if (hid is null)
+        {
+            return "The controller is not connected. It will change when it is.";
+        }
+
+        var battery = lighting == AutoTdpProtocol.LightingBattery ? ReadBatteryPercent() : null;
+        bool sent;
+        lock (_send)
+        {
+            sent = hid.SetLighting(lighting, battery, colour);
+        }
+
+        var chosen = lighting;
+        if (sent)
+        {
+            lock (_state)
+            {
+                _lastBatteryColour = chosen == AutoTdpProtocol.LightingBattery ? AllyCommands.BatteryColour(battery) : null;
+            }
+
+            return null;
+        }
+
+        Log.Write("The controller did not take the stick lighting, so it is opened again");
+        Drop(hid);
+        return "The controller did not answer. It will change when it is found again.";
+    }
+
+    /// <summary>Updates the stick ring colour when set to Battery and the charge crosses a colour band.</summary>
+    public void RefreshBatteryLighting()
+    {
+        IControllerBackend? hid;
+        (byte R, byte G, byte B)? previous;
+        lock (_state)
+        {
+            if (_lighting != AutoTdpProtocol.LightingBattery || _hid is null)
+            {
+                return;
+            }
+
+            hid = _hid;
+            previous = _lastBatteryColour;
+        }
+
+        var percent = ReadBatteryPercent();
+        var colour = AllyCommands.BatteryColour(percent);
+        if (previous == colour)
+        {
+            return;
+        }
+
+        bool sent;
+        lock (_send)
+        {
+            sent = hid.SetLighting(AutoTdpProtocol.LightingBattery, percent, Colour);
+        }
+
+        if (sent)
+        {
+            lock (_state)
+            {
+                _lastBatteryColour = colour;
+            }
+        }
     }
 
     /// <summary>Sends the mode the controller should be in now, the hold or the saved one.</summary>
@@ -319,13 +520,18 @@ internal sealed class AllyControlsHost : IDisposable
         }
     }
 
-    /// <summary>Wakes the controller and puts it in the saved mode, if one is saved.</summary>
+    /// <summary>Wakes the controller and puts it in the saved mode and lighting.</summary>
     private void Apply(IControllerBackend hid)
     {
         // After sleep or a reconnect Game Bar is not holding anything, and the saved mode is what counts.
+        string? lighting;
+        string colour;
         lock (_state)
         {
             _hold = null;
+            lighting = _lighting;
+            colour = _colour;
+            _lastBatteryColour = null;
         }
 
         if (!hid.Wake())
@@ -333,18 +539,43 @@ internal sealed class AllyControlsHost : IDisposable
             Log.Write("The controller did not take the wake report");
         }
 
+        var battery = lighting == AutoTdpProtocol.LightingBattery ? ReadBatteryPercent() : null;
         lock (_send)
         {
             if (Mode is { } mode && !hid.SetMode(mode))
             {
                 Log.Write($"The controller did not take the {AllyCommands.ModeName(mode)} mode");
             }
+
+            // With no stick lighting mode picked, the lights stay as they were.
+            if (lighting is null)
+            {
+                return;
+            }
+
+            if (hid.SetLighting(lighting, battery, colour))
+            {
+                lock (_state)
+                {
+                    _lastBatteryColour = lighting == AutoTdpProtocol.LightingBattery ? AllyCommands.BatteryColour(battery) : null;
+                }
+            }
+            else
+            {
+                Log.Write($"The controller did not take the {lighting} lighting");
+            }
         }
     }
 
-    /// <summary>What a button does. The paddles do nothing here: their mapping lives on the controller.</summary>
+    /// <summary>What a button does: library, Game Bar, or the player's chosen back paddle action.</summary>
     private void Act(AllyButton button)
     {
+        if (button == AllyButton.Paddle)
+        {
+            ActPaddle();
+            return;
+        }
+
         var (arguments, name, what) = button switch
         {
             // --from-button tells the launcher it was started by this service, so it takes the foreground.
@@ -364,6 +595,63 @@ internal sealed class AllyControlsHost : IDisposable
             Log.Write($"{name} button: could not open {what} ({refused})");
         }
     }
+
+    private void ActPaddle()
+    {
+        var action = PaddleAction;
+        switch (action)
+        {
+            case AutoTdpProtocol.PaddleNone:
+                return;
+
+            case AutoTdpProtocol.PaddleOverlay:
+                toggleOverlay?.Invoke();
+                return;
+
+            case AutoTdpProtocol.PaddleMode:
+                var next = Mode == ControllerMode.Desktop ? ControllerMode.Gamepad : ControllerMode.Desktop;
+                _ = SetMode(next);
+                return;
+
+            case AutoTdpProtocol.PaddleKeyboard:
+                LaunchFromPaddle("--keyboard", "the touch keyboard");
+                return;
+
+            case AutoTdpProtocol.PaddleScreenshot:
+                LaunchFromPaddle("--screenshot", "a screenshot");
+                return;
+
+            case AutoTdpProtocol.PaddleMute:
+                LaunchFromPaddle("--mute", "mute");
+                return;
+        }
+    }
+
+    private void LaunchFromPaddle(string arguments, string what)
+    {
+        if (SessionLauncher.Launch(_launcher, arguments, out _) is { } refused)
+        {
+            Log.Write($"Back paddle: could not trigger {what} ({refused})");
+        }
+    }
+
+    private static int? ReadBatteryPercent() =>
+        GetSystemPowerStatus(out var status) && status.BatteryLifePercent <= 100 ? status.BatteryLifePercent : null;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct SystemPowerStatus
+    {
+        public byte ACLineStatus;
+        public byte BatteryFlag;
+        public byte BatteryLifePercent;
+        public byte SystemStatusFlag;
+        public int BatteryLifeTime;
+        public int BatteryFullLifeTime;
+    }
+
+    [LibraryImport("kernel32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool GetSystemPowerStatus(out SystemPowerStatus status);
 
     /// <summary>Lets go of this handle, and forgets it if it is still the current one.</summary>
     private void Drop(IControllerBackend hid)

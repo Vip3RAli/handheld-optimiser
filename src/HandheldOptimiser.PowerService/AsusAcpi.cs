@@ -128,6 +128,13 @@ internal sealed partial class AsusAcpi : IPowerBackend
     /// <returns>False when the firmware refused it.</returns>
     public bool SetGpuMemory(int code) => Set(GpuMemory.Device, code) == 1;
 
+    /// <summary>Whether this model can cap the battery charge (see <see cref="BatteryCare"/>).</summary>
+    public bool CanSetChargeLimit => Get(BatteryCare.Device) >= 0;
+
+    /// <summary>Sets the battery charge limit as a percentage (80 or 100).</summary>
+    /// <returns>False when the firmware refused it.</returns>
+    public bool SetChargeLimit(int percent) => Set(BatteryCare.Device, percent) == 1;
+
     /// <summary>A device's status, or below 0 when this model does not have it.</summary>
     private int Get(uint device)
     {

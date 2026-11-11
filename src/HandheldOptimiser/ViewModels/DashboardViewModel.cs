@@ -176,10 +176,11 @@ public sealed partial class DashboardViewModel : PageViewModelBase
         BatteryChargeText = battery.ChargePercent is { } percent ? $"{percent}%" : "Not reported";
 
         var watts = battery.Rate is { } rate ? $" {rate / 1000.0:0.0} W" : string.Empty;
+        var remaining = battery.RemainingTime is { } time ? $" · {time} left" : string.Empty;
         BatteryPowerText = battery.Charging ? $"Charging{watts}"
             : battery.OnMains ? "Plugged in"
             : battery.Rate is null ? "On battery"
-            : $"Discharging{watts}";
+            : $"Discharging{watts}{remaining}";
 
         if (_designCapacity is not { } design || battery.FullChargedCapacity == 0)
         {

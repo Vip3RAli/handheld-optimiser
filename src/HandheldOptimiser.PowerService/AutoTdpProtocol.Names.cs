@@ -46,6 +46,18 @@ namespace HandheldOptimiser.PowerService
         /// <summary>From the widget: switch RadeonFeature on or off, as RadeonOn says, or set it to RadeonValue.</summary>
         public const string SetRadeon = "set-radeon";
 
+        /// <summary>From the widget or the app: hold the battery at 80% while plugged in, or let it charge to 100%, named by BatteryCare.</summary>
+        public const string SetBatteryCare = "set-battery-care";
+
+        /// <summary>From the widget or the library: set what the back paddles (M1 and M2) do, named by PaddleAction.</summary>
+        public const string SetPaddle = "set-paddle";
+
+        /// <summary>From the widget or the library: set the Ally's thumbstick light rings, named by ControllerLighting.</summary>
+        public const string SetLighting = "set-lighting";
+
+        /// <summary>From the widget: set the colour of the Ally's thumbstick light rings, named by LightingColour.</summary>
+        public const string SetLightingColour = "set-lighting-colour";
+
         /// <summary>
         /// The modes. In Auto, TDP Engine picks the power limit and fans for every session, and a frame rate is
         /// optional. In Manual, the player picks them. CPU boost is the player's in both.
@@ -75,6 +87,32 @@ namespace HandheldOptimiser.PowerService
         /// <summary>The controller mode names a request and the saved setting carry.</summary>
         public const string GamepadMode = "gamepad";
         public const string DesktopMode = "desktop";
+
+        /// <summary>What the back paddles (M1 and M2) can do while TDP Engine replaces Armoury Crate.</summary>
+        public const string PaddleNone = "none";
+        public const string PaddleOverlay = "overlay";
+        public const string PaddleMode = "mode";
+        public const string PaddleKeyboard = "keyboard";
+        public const string PaddleScreenshot = "screenshot";
+        public const string PaddleMute = "mute";
+
+        /// <summary>The Ally's thumbstick light ring settings: Off, three brightnesses, or coloured by battery level.</summary>
+        public const string LightingOff = "off";
+        public const string LightingLow = "low";
+        public const string LightingMedium = "medium";
+        public const string LightingHigh = "high";
+        public const string LightingBattery = "battery";
+
+        /// <summary>The thumbstick light ring colours. Battery colours them by the charge instead.</summary>
+        public const string ColourGreen = "green";
+        public const string ColourWhite = "white";
+        public const string ColourRed = "red";
+        public const string ColourOrange = "orange";
+        public const string ColourYellow = "yellow";
+        public const string ColourBlue = "blue";
+        public const string ColourCyan = "cyan";
+        public const string ColourPurple = "purple";
+        public const string ColourPink = "pink";
 
         /// <summary>The state a status gives while a fixed power limit is held, beside the AutoTdpState names.</summary>
         public const string FixedState = "Fixed";
@@ -147,6 +185,10 @@ namespace HandheldOptimiser.PowerService
             public const string Sharpening = "Sharpening";
             public const string SharpeningStrength = "SharpeningStrength";
             public const string SharpeningRange = "SharpeningRange";
+            public const string BatteryCare = "BatteryCare";
+            public const string PaddleAction = "PaddleAction";
+            public const string ControllerLighting = "ControllerLighting";
+            public const string LightingColour = "LightingColour";
         }
     }
 

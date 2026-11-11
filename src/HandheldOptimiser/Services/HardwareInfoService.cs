@@ -15,6 +15,21 @@ public sealed record BatteryReading(
     public int? ChargePercent => FullChargedCapacity == 0
         ? null
         : (int)Math.Round(Math.Min(100.0, RemainingCapacity * 100.0 / FullChargedCapacity));
+
+    /// <summary>Estimated minutes of battery runtime left at the current discharge rate, or null when plugged in or unknown.</summary>
+    public int? RemainingMinutes => !OnMains && !Charging && Rate is > 0 && RemainingCapacity > 0
+        ? (int)Math.Round(RemainingCapacity * 60.0 / Rate.Value)
+        : null;
+
+    /// <summary>The estimated battery runtime formatted as "1h 22m" or "45m", or null when plugged in or unknown.</summary>
+    public string? RemainingTime => FormatDuration(RemainingMinutes);
+
+    public static string? FormatDuration(int? minutes) => minutes switch
+    {
+        null or <= 0 => null,
+        < 60 => $"{minutes}m",
+        _ => minutes % 60 == 0 ? $"{minutes / 60}h" : $"{minutes / 60}h {minutes % 60}m"
+    };
 }
 
 /// <summary>The integrated graphics adapter and its driver.</summary>

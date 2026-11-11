@@ -48,8 +48,9 @@ internal sealed partial class AutoTdpService : ServiceBase
     // The maker's firmware, through which the power limit and the fans are set.
     private IPowerBackend? _power;
 
-    // The GPU memory, set through the same firmware. Made once the firmware is opened.
+    // The GPU memory and battery charge limit, set through the same firmware. Made once the firmware is opened.
     private GpuMemoryHost _gpuMemory = new(null);
+    private BatteryCareHost _batteryCare = new(null);
     private readonly RadeonHost _radeon = new();
 
     // Auto or Manual, and the last manual choices, read once as the service starts.
@@ -109,6 +110,7 @@ internal sealed partial class AutoTdpService : ServiceBase
 
             // Outside the gate, as it closes the controller's handle.
             _controls?.Resume();
+            _batteryCare.RestoreIfEnabled();
         }
 
         return true;
@@ -162,12 +164,13 @@ internal sealed partial class AutoTdpService : ServiceBase
             {
                 Log.Write("Replacing Armoury Crate");
                 AllyControlsStore.SetOemWidget();
-                _controls = new AllyControlsHost();
+                _controls = new AllyControlsHost(ToggleOverlayFromPaddle);
                 _controls.Start(cancel);
             }
 
             _power = PowerBackends.Open();
             _gpuMemory = new GpuMemoryHost(_power as AsusAcpi);
+            _batteryCare = new BatteryCareHost(_power as AsusAcpi);
             if (_power is null)
             {
                 _error = "TDP Engine cannot set the power limit on this device. It works on the ROG Ally with ASUS's drivers installed.";
@@ -209,15 +212,18 @@ internal sealed partial class AutoTdpService : ServiceBase
                         Log.Write($"A second's work failed: {ex.Message}");
                     }
 
-                    // While replacing Armoury Crate it runs the controller too, and while the overlay or the stats
-                    // screen is on it feeds them, so it stays.
-                    if (_controls is null && _control is null && !_overlay.Wanted && !_screenStats.On && DateTime.UtcNow - _idleSince > IdleExit)
+                    // While replacing Armoury Crate it runs the controller too, and while the overlay, the stats
+                    // screen or the battery charge limit is on it keeps them, so it stays.
+                    if (_controls is null && _control is null && !_overlay.Wanted && !_screenStats.On
+                        && !_batteryCare.IsSavedOn && DateTime.UtcNow - _idleSince > IdleExit)
                     {
                         _ending = true;
                         Log.Write("Nothing to do, so ending");
                         break;
                     }
                 }
+
+                _controls?.RefreshBatteryLighting();
             }
         }
         catch (OperationCanceledException)
@@ -779,6 +785,20 @@ internal sealed partial class AutoTdpService : ServiceBase
             // Not under the gate, as it writes to the controller.
             status = SetControls(request);
         }
+        else if (request?.Command == AutoTdpProtocol.SetPaddle)
+        {
+            status = SetPaddle(request);
+        }
+        else if (request?.Command is AutoTdpProtocol.SetLighting or AutoTdpProtocol.SetLightingColour)
+        {
+            // Not under the gate, as it writes to the controller.
+            status = SetLighting(request);
+        }
+        else if (request?.Command == AutoTdpProtocol.SetBatteryCare)
+        {
+            // Not under the gate: Battery Care has its own lock.
+            status = SetBatteryCare(request);
+        }
         else if (request?.Command == AutoTdpProtocol.SetBoost)
         {
             // Not under the gate either: it changes Windows' power plan, not anything the engine holds.
@@ -825,6 +845,7 @@ internal sealed partial class AutoTdpService : ServiceBase
             ManualFans = _engine.ManualFans
         };
         status = _gpuMemory.AddTo(status);
+        status = _batteryCare.AddTo(status);
         status = _radeon.AddTo(status);
         await writer.WriteLineAsync(AutoTdpProtocol.Write(status).AsMemory(), cancel).ConfigureAwait(false);
 
@@ -969,13 +990,79 @@ internal sealed partial class AutoTdpService : ServiceBase
         return last with { Error = controls.SetMode(mode, request.Temporary) ?? error };
     }
 
+    /// <summary>A new back paddle action, from the widget or the library.</summary>
+    private AutoTdpStatus SetPaddle(AutoTdpRequest request)
+    {
+        AutoTdpStatus last;
+        string? error;
+        lock (_gate)
+        {
+            last = _last;
+            error = _error;
+        }
+
+        if (_controls is not { } controls)
+        {
+            return last with { Error = "Turn on Replace ASUS Services with Handheld Library and widget in Handheld Optimiser to use these buttons." };
+        }
+
+        return last with { Error = controls.SetPaddleAction(request.PaddleAction) ?? error };
+    }
+
+    /// <summary>A new thumbstick light ring mode or colour, from the widget.</summary>
+    private AutoTdpStatus SetLighting(AutoTdpRequest request)
+    {
+        AutoTdpStatus last;
+        string? error;
+        lock (_gate)
+        {
+            last = _last;
+            error = _error;
+        }
+
+        if (_controls is not { } controls)
+        {
+            return last with { Error = "Turn on Replace ASUS Services with Handheld Library and widget in Handheld Optimiser to use the stick lights." };
+        }
+
+        var problem = request.Command == AutoTdpProtocol.SetLightingColour
+            ? controls.SetColour(request.LightingColour)
+            : controls.SetLighting(request.ControllerLighting);
+        return last with { Error = problem ?? error };
+    }
+
+    /// <summary>The 80% battery charge limit switched on or off, from the widget or the app.</summary>
+    private AutoTdpStatus SetBatteryCare(AutoTdpRequest request)
+    {
+        AutoTdpStatus last;
+        lock (_gate)
+        {
+            last = _last;
+            _idleSince = DateTime.UtcNow;
+        }
+
+        return _batteryCare.Set(request.BatteryCare) is { } problem ? last with { Error = problem } : last;
+    }
+
+    private void ToggleOverlayFromPaddle()
+    {
+        lock (_gate)
+        {
+            _overlay.Toggle();
+            _idleSince = DateTime.UtcNow;
+        }
+    }
+
     /// <summary>The status with the controller's state, while replacing Armoury Crate. Otherwise as it is.</summary>
     private AutoTdpStatus WithControls(AutoTdpStatus status) => _controls is { } controls
         ? status with
         {
             Replacing = true,
             ControllerConnected = controls.Connected,
-            ControllerMode = controls.Mode is { } mode ? AllyCommands.ModeName(mode) : null
+            ControllerMode = controls.Mode is { } mode ? AllyCommands.ModeName(mode) : null,
+            PaddleAction = controls.PaddleAction,
+            ControllerLighting = controls.Lighting,
+            LightingColour = controls.Colour
         }
         : status;
 

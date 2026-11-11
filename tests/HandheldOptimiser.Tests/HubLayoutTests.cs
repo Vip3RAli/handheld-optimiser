@@ -36,7 +36,7 @@ public sealed class HubLayoutTests
 
     [Theory]
     [InlineData("Performance", 11, 8)]
-    [InlineData("Battery & sleep", 6, 0)]
+    [InlineData("Battery & sleep", 7, 0)]
     [InlineData("Clean up", 23, 14)]
     [InlineData("Full screen", 11, 6)]
     [InlineData("Maintenance & backup", 5, 1)]
@@ -65,10 +65,11 @@ public sealed class HubLayoutTests
     [InlineData("Turn off AMD User Experience telemetry", TweakCategory.Privacy)]
     [InlineData("Uninstall Microsoft Edge (leaves WebView2 intact)", TweakCategory.AdsAndAssistants)]
     [InlineData("Turn off Device Encryption (BitLocker)", TweakCategory.Storage)]
+    [InlineData("Limit battery charge to 80%", TweakCategory.Sleep)]
     public void A_tweak_sits_under_its_heading(string name, TweakCategory category) =>
         Assert.Equal(category, TweakCatalog.All.Single(t => t.Name == name).Category);
 
     [Fact]
-    public void The_catalog_holds_all_56_tweaks_once() =>
-        Assert.Equal(56, TweakCatalog.All.Select(t => t.Id).Distinct().Count());
+    public void The_catalog_holds_all_57_tweaks_once() =>
+        Assert.Equal(57, TweakCatalog.All.Select(t => t.Id).Distinct().Count());
 }

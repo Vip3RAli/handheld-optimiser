@@ -113,6 +113,7 @@ internal static class LibrarySettings
     private const string AutoTdpTemperatureValue = "AutoTdpTemperature";
     private const string AutoTdpWattsValue = "AutoTdpMaxWatts";
     private const string FanCurveValue = "FanCurve";
+    private const string SaveGuardValue = "SaveGuard";
 
     /// <summary>The sizes a TV or monitor can show the library at, as percentages. 0 fits it to the screen.</summary>
     public static readonly int[] DockedSizes = [0, 100, 125, 150, 175, 200];
@@ -373,6 +374,13 @@ internal static class LibrarySettings
     {
         get => Read(FanCurveValue) is { } fans && AutoTdp.FanChoices.Contains(fans) ? fans : AutoTdp.AllyFans;
         set => Write(FanCurveValue, value == AutoTdp.AllyFans ? null : value);
+    }
+
+    /// <summary>Back up local game saves before starting a game and when it closes, keeping up to three snapshots.</summary>
+    public static bool SaveGuard
+    {
+        get => ReadSwitch(SaveGuardValue);
+        set => WriteSwitch(SaveGuardValue, value);
     }
 
     private static int ReadChoice(string name, int[] choices, int fallback) =>

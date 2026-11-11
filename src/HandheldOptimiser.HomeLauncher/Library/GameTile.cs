@@ -80,6 +80,12 @@ internal sealed class GameTile : INotifyPropertyChanged, INoticeHost
         set => Set(ref _isHidden, value);
     }
 
+    /// <summary>Collection tags assigned to this game by the player.</summary>
+    public IReadOnlyList<string> Tags { get; set; } = [];
+
+    public bool HasTag(string tag) =>
+        Tags.Any(t => string.Equals(t, tag, StringComparison.OrdinalIgnoreCase));
+
     /// <summary>
     /// What the library has to say about the game, such as that it is starting, shown on its tile or card
     /// in place of its name. Null when it has nothing to say.

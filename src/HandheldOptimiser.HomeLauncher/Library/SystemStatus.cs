@@ -8,11 +8,17 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 /// <param name="BatteryPercent">Null on a machine with no battery.</param>
 /// <param name="PluggedIn">On mains power, so charging or full.</param>
 /// <param name="WifiQuality">0 to 100 when connected, 0 when not, null with no Wi-Fi adapter.</param>
-internal sealed record SystemStatus(int? BatteryPercent, bool PluggedIn, int? WifiQuality)
+/// <param name="RemainingMinutes">Estimated minutes of battery playtime left while discharging, or null.</param>
+internal sealed record SystemStatus(int? BatteryPercent, bool PluggedIn, int? WifiQuality, int? RemainingMinutes = null)
 {
     private const byte NoSystemBattery = 128;
     private const byte Unknown = 255;
     private const byte OnMains = 1;
+    private const int SystemBatteryState = 5;
+    private const int UnknownRate = unchecked((int)0x80000000);
+
+    /// <summary>The estimated battery runtime formatted as "1h 22m" or "45m", or null when plugged in or unknown.</summary>
+    public string? RemainingTime => OverlayLayout.FormatDuration(RemainingMinutes);
 
     // WLAN_INTERFACE_INFO: a GUID, a 256 character description, then the interface state.
     private const int InterfaceListHeader = 8;
@@ -36,6 +42,7 @@ internal sealed record SystemStatus(int? BatteryPercent, bool PluggedIn, int? Wi
     {
         int? battery = null;
         var pluggedIn = false;
+        int? remainingMinutes = null;
 
         if (Native.GetSystemPowerStatus(out var power))
         {
@@ -46,7 +53,12 @@ internal sealed record SystemStatus(int? BatteryPercent, bool PluggedIn, int? Wi
             }
         }
 
-        return new SystemStatus(battery, pluggedIn, ReadWifiQuality());
+        if (battery is not null && !pluggedIn)
+        {
+            remainingMinutes = Native.ReadBatteryRemainingMinutes(UnknownRate, SystemBatteryState);
+        }
+
+        return new SystemStatus(battery, pluggedIn, ReadWifiQuality(), remainingMinutes);
     }
 
     private static int? ReadWifiQuality()

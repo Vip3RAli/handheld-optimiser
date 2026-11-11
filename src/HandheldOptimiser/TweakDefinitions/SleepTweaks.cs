@@ -1,5 +1,6 @@
 using Microsoft.Win32;
 using HandheldOptimiser.Models;
+using HandheldOptimiser.PowerService;
 using HandheldOptimiser.Services;
 
 namespace HandheldOptimiser.TweakDefinitions;
@@ -47,6 +48,7 @@ public static class SleepTweaks
         DisconnectInStandby,
         NoWakeDevices,
         DisableCardReader,
+        BatteryCare,
         FastStartup
     ];
 
@@ -330,6 +332,58 @@ public static class SleepTweaks
                 "HiberbootEnabled", 0, RegistryValueKind.DWord)
         ]
     };
+
+    /// <summary>
+    /// Caps the ROG Ally's battery charge at 80% while plugged in, through ASUS's ACPI device 0x00120057
+    /// (the same call Armoury Crate's Battery Care Mode uses), and keeps the choice in HKLM so the TDP
+    /// Engine service puts it back after a restart or sleep.
+    /// </summary>
+    public static Tweak BatteryCare => new()
+    {
+        Id = "sleep.batterycare",
+        Name = "Limit battery charge to 80%",
+        Description =
+            "Stops charging at 80% while plugged in, which reduces battery wear when playing on mains " +
+            "power or a dock. TDP Engine re-applies the limit automatically after a restart or sleep.",
+        Category = TweakCategory.Sleep,
+        Risk = RiskLevel.Safe,
+        IncludeInOneClick = false,
+        OnlyFor = HandheldDevice.RogAlly,
+        Warning = "Full battery runtime is 20% shorter until you turn this off before a trip.",
+        RegistryValues =
+        [
+            new(RegistryRoot.LocalMachine, PowerService.BatteryCare.SettingsKey,
+                PowerService.BatteryCare.LimitValue, PowerService.BatteryCare.CareLimit, RegistryValueKind.DWord)
+        ],
+        ScriptApply = async (ctx, _, ct) =>
+        {
+            if (ctx.Registry is RegistryHelper)
+            {
+                await NotifyBatteryCareAsync(ctx, on: true, ct);
+            }
+
+            return TweakResult.NoChange("sleep.batterycare");
+        },
+        ScriptRevert = async (ctx, _, ct) =>
+        {
+            if (ctx.Registry is RegistryHelper)
+            {
+                await NotifyBatteryCareAsync(ctx, on: false, ct);
+            }
+
+            return TweakResult.Ok("sleep.batterycare", "Battery charge limit restored to 100%.");
+        }
+    };
+
+    private static async Task NotifyBatteryCareAsync(TweakContext ctx, bool on, CancellationToken ct)
+    {
+        var client = new TdpEngineClient(ctx.Log);
+        var status = await client.SendAsync(new AutoTdpRequest(AutoTdpProtocol.SetBatteryCare, BatteryCare: on), ct);
+        if (status?.Error is { } problem)
+        {
+            ctx.Log.Warning(problem);
+        }
+    }
 
     private const string HibernateSwitchedOn = "hibernate.switchedon";
 

@@ -468,7 +468,7 @@ internal static class Artwork
     /// </summary>
     private static async Task<string?> ArtListAsync(Game game, string kind, string? corrected, string apiKey)
     {
-        if (corrected is null && game.Store == GameStore.Steam)
+        if (corrected is null && game.Store == GameStore.Steam && !SteamShortcuts.IsShortcut(game))
         {
             // An exact match by Steam app id, for the Steam games with no art in Steam's own cache.
             return $"{kind}/steam/{game.Key[(game.Key.IndexOf(':') + 1)..]}";
