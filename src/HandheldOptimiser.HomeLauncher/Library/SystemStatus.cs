@@ -28,6 +28,11 @@ internal sealed record SystemStatus(int? BatteryPercent, bool PluggedIn, int? Wi
     // wlanSignalQuality inside WLAN_CONNECTION_ATTRIBUTES.wlanAssociationAttributes.
     private const int SignalQualityOffset = 576;
 
+    // dot11Ssid at the start of wlanAssociationAttributes: its length in bytes, then up to 32 bytes of name.
+    private const int SsidLengthOffset = 520;
+    private const int SsidOffset = 524;
+    private const int SsidMost = 32;
+
     /// <summary>Wi-Fi quality as the 0 to 4 bars shown in the top bar.</summary>
     public int WifiBars => WifiQuality switch
     {
@@ -58,11 +63,16 @@ internal sealed record SystemStatus(int? BatteryPercent, bool PluggedIn, int? Wi
             remainingMinutes = Native.ReadBatteryRemainingMinutes(UnknownRate, SystemBatteryState);
         }
 
-        return new SystemStatus(battery, pluggedIn, ReadWifiQuality(), remainingMinutes);
+        return new SystemStatus(battery, pluggedIn, ReadWifi().Quality, remainingMinutes);
     }
 
-    private static int? ReadWifiQuality()
+    /// <summary>
+    /// The Wi-Fi connection with the best signal: its quality (0 to 100, 0 when not connected, null with no
+    /// Wi-Fi adapter) and its network's name, which is null when not connected.
+    /// </summary>
+    public static (int? Quality, string? Name) ReadWifi()
     {
+        string? name = null;
         nint handle = 0;
         nint list = 0;
 
@@ -71,13 +81,13 @@ internal sealed record SystemStatus(int? BatteryPercent, bool PluggedIn, int? Wi
             if (Native.WlanOpenHandle(Native.WlanClientVersion, 0, out _, out handle) != Native.ErrorSuccess
                 || Native.WlanEnumInterfaces(handle, 0, out list) != Native.ErrorSuccess)
             {
-                return null;
+                return (null, null);
             }
 
             var count = Marshal.ReadInt32(list);
             if (count == 0)
             {
-                return null;
+                return (null, null);
             }
 
             var best = 0;
@@ -97,18 +107,28 @@ internal sealed record SystemStatus(int? BatteryPercent, bool PluggedIn, int? Wi
 
                 if (size >= SignalQualityOffset + sizeof(int))
                 {
-                    best = Math.Max(best, Math.Clamp(Marshal.ReadInt32(data + SignalQualityOffset), 1, 100));
+                    var quality = Math.Clamp(Marshal.ReadInt32(data + SignalQualityOffset), 1, 100);
+                    if (quality > best)
+                    {
+                        best = quality;
+
+                        // A name is nearly always UTF-8, though nothing makes it so.
+                        var length = Math.Clamp(Marshal.ReadInt32(data + SsidLengthOffset), 0, SsidMost);
+                        var bytes = new byte[length];
+                        Marshal.Copy(data + SsidOffset, bytes, 0, length);
+                        name = length > 0 ? System.Text.Encoding.UTF8.GetString(bytes) : null;
+                    }
                 }
 
                 Native.WlanFreeMemory(data);
             }
 
-            return best;
+            return (best, name);
         }
         catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
         {
             // Windows without the wireless service installed.
-            return null;
+            return (null, null);
         }
         finally
         {

@@ -236,10 +236,19 @@ internal static class Program
 
     /// <summary>
     /// Opens Xbox Game Bar on the TDP Engine widget, which is what the Command Center button shows, with
-    /// Win+G when that does not work. The plain ms-gamebar: link opens nothing on the Ally.
+    /// Win+G when that does not work. The plain ms-gamebar: link opens nothing on the Ally. With Game Bar
+    /// already open, the button closes it.
     /// </summary>
-    private static void OpenGameBar() =>
+    private static void OpenGameBar()
+    {
+        if (Library.GameBarControls.CloseIfOpen())
+        {
+            Log("Closed Game Bar");
+            return;
+        }
+
         Log(Library.GameBarControls.Open() ? "Opened Game Bar" : "Could not open Game Bar: Windows would not take Win+G");
+    }
 
     private static (string Target, string? CustomPath, string? CustomArgs) ReadSettings()
     {

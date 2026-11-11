@@ -11,7 +11,32 @@ internal enum StatTone
 }
 
 /// <summary>One tile of the stats screen: a short name, a big value, and its unit beside it.</summary>
-internal sealed record StatTile(string Label, string Value, string Unit, StatTone Tone = StatTone.Normal);
+/// <param name="Fraction">How far along the line under the value is filled, 0 to 1, or null for no line.</param>
+/// <param name="Caption">A few small words at the tile's top right, such as the frame rate aimed for, or none.</param>
+internal sealed record StatTile(string Label, string Value, string Unit, StatTone Tone = StatTone.Normal,
+    double? Fraction = null, string Caption = "");
+
+/// <summary>What the badges at the stats screen's top right show.</summary>
+/// <param name="Battery">The charge, 0 to 100, or null with no battery.</param>
+/// <param name="Charging">On mains power.</param>
+/// <param name="BatteryCare">Whether charging stops at 80%.</param>
+/// <param name="WifiQuality">0 to 100 when connected, 0 when not, null with no Wi-Fi adapter.</param>
+/// <param name="WifiName">The network's name, or null when not connected.</param>
+internal sealed record StatsHeader(int? Battery = null, bool Charging = false, bool BatteryCare = false,
+    int? WifiQuality = null, string? WifiName = null)
+{
+    /// <summary>Wi-Fi quality as 0 to 4 bars, as the library's top bar counts them.</summary>
+    public int WifiBars => new SystemStatus(null, false, WifiQuality).WifiBars;
+
+    /// <summary>The words beside the bars: the network's name, or that there is none.</summary>
+    public string WifiText => WifiQuality is > 0 ? string.IsNullOrWhiteSpace(WifiName) ? "WI-FI" : WifiName : "OFFLINE";
+
+    /// <summary>How much of the battery's picture is filled, 0 to 1.</summary>
+    public double BatteryFraction => Math.Clamp((Battery ?? 0) / 100.0, 0, 1);
+
+    /// <summary>The charge has run low, which only matters while it is not charging.</summary>
+    public bool BatteryLow => !Charging && Battery is < ScreenStatsLayout.LowBattery;
+}
 
 /// <summary>A rectangle of the Windows desktop, in pixels.</summary>
 internal readonly record struct ScreenRect(int X, int Y, int Width, int Height)
@@ -37,6 +62,15 @@ internal static class ScreenStatsLayout
     public const int PanelWidth = 1280;
     public const int PanelHeight = 720;
 
+    /// <summary>The charge below which the battery's badge turns red.</summary>
+    public const int LowBattery = 20;
+
+    // What each line under a value is measured against. The Ally's highest power limit is 30 W, it slows itself
+    // at 95 °C, and its processor reaches about 5 GHz.
+    private const double MostWatts = 30;
+    private const double MostDegrees = 95;
+    private const double MostGhz = 5;
+
     // Shown for a reading that is not known.
     private const string Unknown = "–";
 
@@ -48,25 +82,37 @@ internal static class ScreenStatsLayout
 
     /// <summary>
     /// The six tiles, in order: frame rate, power, temperature, processor use, processor clock and graphics use.
-    /// No battery: the screen only shows while docked to a monitor. They are always all there, so nothing moves
-    /// about; a reading not known shows a dash.
+    /// No battery: that is a badge in the header. They are always all there, so nothing moves about; a reading
+    /// not known shows a dash, and has no line under it.
     /// </summary>
-    public static IReadOnlyList<StatTile> Tiles(OverlayReading reading) =>
+    /// <param name="targetFps">The frame rate TDP Engine aims for, or 0 for none.</param>
+    public static IReadOnlyList<StatTile> Tiles(OverlayReading reading, int targetFps = 0) =>
     [
-        new("FPS", reading.Fps is { } fps ? Math.Round(fps).ToString(Numbers) : Unknown, string.Empty),
+        Fps(reading.Fps, targetFps),
         Power(reading),
         new("TEMP", reading.Temperature is { } degrees ? degrees.ToString(Numbers) : Unknown,
-            reading.Temperature is null ? string.Empty : "°C", TemperatureTone(reading.Temperature)),
+            reading.Temperature is null ? string.Empty : "°C", TemperatureTone(reading.Temperature),
+            Part(reading.Temperature, MostDegrees)),
         Percent("CPU", reading.Cpu),
-        reading.CpuGhz is { } ghz ? new("CPU CLOCK", ghz.ToString("0.0", Numbers), "GHz") : new("CPU CLOCK", Unknown, string.Empty),
+        reading.CpuGhz is { } ghz
+            ? new("CPU CLOCK", ghz.ToString("0.0", Numbers), "GHz", Fraction: Part(ghz, MostGhz))
+            : new("CPU CLOCK", Unknown, string.Empty),
         Percent("GPU", reading.Gpu)
     ];
 
-    /// <summary>The time as the player's own settings write it, without seconds.</summary>
-    public static string Clock(DateTime now, CultureInfo culture) => now.ToString(culture.DateTimeFormat.ShortTimePattern, culture);
+    /// <summary>
+    /// The time's digits as the player's own settings write them, without seconds and without am or pm, which
+    /// <see cref="ClockPeriod"/> gives to be set small beside them.
+    /// </summary>
+    public static string ClockTime(DateTime now, CultureInfo culture) =>
+        now.ToString(culture.DateTimeFormat.ShortTimePattern.Replace("tt", string.Empty).Replace("t", string.Empty).Trim(), culture).Trim();
 
-    /// <summary>The day and date under the time, such as "Sunday 25 October".</summary>
-    public static string Date(DateTime now, CultureInfo culture) => now.ToString("dddd d MMMM", culture);
+    /// <summary>"am" or "pm" where the player's settings write the time with one, otherwise nothing.</summary>
+    public static string ClockPeriod(DateTime now, CultureInfo culture) =>
+        culture.DateTimeFormat.ShortTimePattern.Contains('t') ? now.ToString("tt", culture).ToLower(culture) : string.Empty;
+
+    /// <summary>The day and date under the time, in capitals, such as "SUNDAY 25 OCTOBER".</summary>
+    public static string Date(DateTime now, CultureInfo culture) => now.ToString("dddd d MMMM", culture).ToUpper(culture);
 
     public static StatTone TemperatureTone(int? degrees) => degrees switch
     {
@@ -81,10 +127,25 @@ internal static class ScreenStatsLayout
     /// </summary>
     private static StatTile Power(OverlayReading reading) => reading switch
     {
-        { Watts: { } watts } => new("TDP", watts.ToString(Numbers), "W"),
-        { PowerDrawn: { } drawn } => new("POWER", Math.Round(drawn).ToString(Numbers), "W"),
+        { Watts: { } watts } => new("TDP", watts.ToString(Numbers), "W", Fraction: Part(watts, MostWatts)),
+        { PowerDrawn: { } drawn } => new("POWER", Math.Round(drawn).ToString(Numbers), "W", Fraction: Part(drawn, MostWatts)),
         _ => new("TDP", Unknown, string.Empty)
     };
+
+    /// <summary>
+    /// The frame rate. With a frame rate aimed for, the tile names it and its line fills as the game nears it;
+    /// with none there is nothing to measure against, so no line.
+    /// </summary>
+    private static StatTile Fps(double? fps, int targetFps)
+    {
+        var caption = targetFps > 0 ? "TARGET " + targetFps.ToString(Numbers) : string.Empty;
+        return fps is { } frames
+            ? new("FPS", Math.Round(frames).ToString(Numbers), string.Empty, Fraction: targetFps > 0 ? Part(frames, targetFps) : null, Caption: caption)
+            : new("FPS", Unknown, string.Empty, Caption: caption);
+    }
+
+    /// <summary>A reading as a part of the most it can be, 0 to 1, or null when it is not known.</summary>
+    private static double? Part(double? value, double most) => value is { } known ? Math.Clamp(known / most, 0, 1) : null;
 
     /// <summary>
     /// The panel's size: 720p when it offers that, otherwise the size it has now, as a size the panel does
@@ -169,6 +230,6 @@ internal static class ScreenStatsLayout
         monitors.FirstOrDefault(m => m is { X: 0, Y: 0 }, monitors[0]);
 
     private static StatTile Percent(string label, double? value) => value is { } percent
-        ? new StatTile(label, Math.Clamp(Math.Round(percent), 0, 100).ToString(Numbers), "%")
+        ? new StatTile(label, Math.Clamp(Math.Round(percent), 0, 100).ToString(Numbers), "%", Fraction: Part(percent, 100))
         : new StatTile(label, Unknown, string.Empty);
 }

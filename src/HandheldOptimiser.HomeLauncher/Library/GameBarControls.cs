@@ -28,6 +28,15 @@ internal static class GameBarControls
     internal const string WidgetLink = "ms-gamebar://launchForeground/activate/" + AutoTdpProtocol.WidgetPackage + "_App_TdpEngine";
 
     /// <summary>
+    /// Closes Game Bar when it is open, as a second press of the Command Center button should. The link to
+    /// the widget only ever opens: pressed with Game Bar open it left it open (the player found on
+    /// 2026-11-11), where Win+G closes it. The press that opened it is still waiting, and puts the
+    /// controller's mode back once it sees Game Bar gone.
+    /// </summary>
+    /// <returns>True when Game Bar was open and Windows took Win+G.</returns>
+    public static bool CloseIfOpen() => GameBarState.IsOpen() == true && Native.PressWinG();
+
+    /// <summary>
     /// Opens Game Bar on the TDP Engine widget, holding the controller as a gamepad until it closes when
     /// need be. Should the link not open it, Win+G opens it on Home.
     /// </summary>

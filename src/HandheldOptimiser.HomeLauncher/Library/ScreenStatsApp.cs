@@ -28,6 +28,9 @@ internal static class ScreenStatsApp
     // TDP Engine starts it again once a monitor is plugged in.
     private const int UndockedToEnd = 5;
 
+    // Seconds between looks at the Wi-Fi, which changes slowly and costs more to ask than the rest.
+    private const int WifiEvery = 10;
+
     public static void Run()
     {
         using var mutex = new Mutex(initiallyOwned: true, MutexName, out var createdNew);
@@ -56,6 +59,8 @@ internal static class ScreenStatsApp
         var busy = false;
         var hidden = false;
         var undocked = 0;
+        (int? Quality, string? Name) wifi = (null, null);
+        var wifiAge = WifiEvery;
 
         // Hidden while locked, or while a monitor is plugged in but the panel cannot be had, it can wait for
         // hours, so its memory is handed back once as it hides, as the library does behind a game. The next
@@ -149,8 +154,15 @@ internal static class ScreenStatsApp
                 hidden = false;
                 undocked = 0;
 
+                if (++wifiAge >= WifiEvery)
+                {
+                    wifi = SystemStatus.ReadWifi();
+                    wifiAge = 0;
+                }
+
                 var reading = readings.Read(status) with { Fps = fps.Add(process, status.Fps) };
-                window.ShowReadings(ScreenStatsLayout.Tiles(reading), DateTime.Now);
+                var header = new StatsHeader(reading.Battery, reading.Charging, status.BatteryCare == true, wifi.Quality, wifi.Name);
+                window.ShowReadings(ScreenStatsLayout.Tiles(reading, status.Running ? status.TargetFps : 0), header, DateTime.Now);
                 window.ShowOn(bounds);
                 guard.Keep(bounds);
             }

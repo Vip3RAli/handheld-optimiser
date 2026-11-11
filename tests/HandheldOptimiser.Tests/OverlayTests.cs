@@ -173,10 +173,13 @@ public class OverlayTests
         var xaml = File.ReadAllText(Path.Combine(RepoRoot(), "src", "HandheldOptimiser.GameBar", "TdpWidget.xaml"));
         var code = File.ReadAllText(Path.Combine(RepoRoot(), "src", "HandheldOptimiser.GameBar", "TdpWidget.xaml.cs"));
 
-        // The overlay size is a slider whose stops are the protocol's own names, in order (since 2026-10-28).
+        // The overlay is a switch, which sends off, and three size tiles tagged with the protocol's own names,
+        // in order (since 2026-11-11; a slider of all four before).
         Assert.Equal([AutoTdpProtocol.OverlayOff, AutoTdpProtocol.OverlaySmall, AutoTdpProtocol.OverlayMedium, AutoTdpProtocol.OverlayFull],
             AutoTdpProtocol.OverlayLevels);
-        Assert.Contains("AutoTdpProtocol.OverlayOff, AutoTdpProtocol.OverlaySmall, AutoTdpProtocol.OverlayMedium, AutoTdpProtocol.OverlayFull", code);
+        Assert.Equal(AutoTdpProtocol.OverlayLevels.Skip(1), Tags(xaml, "OnOverlaySize"));
+        Assert.Matches("<ToggleSwitch\\b[^>]*Toggled=\"OnOverlay\"", xaml);
+        Assert.Contains("OverlaySwitch.IsOn ? _overlaySize : AutoTdpProtocol.OverlayOff", code);
         Assert.Equal(AutoTdpProtocol.OverlayCorners, Tags(xaml, "OnOverlayCorner"));
         Assert.Equal(AutoTdpProtocol.OverlayLayouts, Tags(xaml, "OnOverlayLayout"));
         Assert.Matches("<ToggleSwitch\\b[^>]*Toggled=\"OnCpuBoost\"", xaml);
