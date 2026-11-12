@@ -34,10 +34,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- How the app talks to the TDP Engine service for the GPU memory, shared with it so the two always agree. -->
+    <!-- How the app talks to the TDP Engine service for the GPU memory and Battery Care, shared with it so the two always agree. -->
     <Compile Include="..\HandheldOptimiser.PowerService\AutoTdpProtocol.cs" Link="Services\TdpEngine\AutoTdpProtocol.cs" />
     <Compile Include="..\HandheldOptimiser.PowerService\AutoTdpProtocol.Names.cs" Link="Services\TdpEngine\AutoTdpProtocol.Names.cs" />
     <Compile Include="..\HandheldOptimiser.PowerService\GpuMemory.cs" Link="Services\TdpEngine\GpuMemory.cs" />
+    <Compile Include="..\HandheldOptimiser.PowerService\BatteryCare.cs" Link="Services\TdpEngine\BatteryCare.cs" />
   </ItemGroup>
 
   <ItemGroup>

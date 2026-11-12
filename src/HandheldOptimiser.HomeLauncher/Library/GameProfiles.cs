@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text.Json;
 using Microsoft.Win32;
 
 namespace HandheldOptimiser.HomeLauncher.Library;
@@ -197,5 +198,91 @@ internal static class GameProfiles
             Program.Log($"Could not save the profile for {game.Key}: {ex.Message}");
             return false;
         }
+    }
+
+    public static string DefaultPresetsFolder =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            "HandheldOptimiser", "Presets");
+
+    /// <summary>Exports a game's profile to a shareable JSON preset file and returns the saved path.</summary>
+    public static string? ExportPreset(Game game, GameProfile profile, string? folder = null)
+    {
+        var formatted = Format(profile);
+        if (formatted.Length == 0)
+        {
+            return null;
+        }
+
+        var dir = folder ?? DefaultPresetsFolder;
+        try
+        {
+            Directory.CreateDirectory(dir);
+            var safeTitle = string.Concat(game.Title.Where(c => !Path.GetInvalidFileNameChars().Contains(c))).Trim();
+            if (safeTitle.Length == 0)
+            {
+                safeTitle = "game";
+            }
+
+            var filePath = Path.Combine(dir, $"{safeTitle}.preset.json");
+            var payload = new
+            {
+                title = game.Title,
+                key = game.Key,
+                profile = formatted
+            };
+            var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(filePath, json);
+            return filePath;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Program.Log($"Could not export preset for {game.Key}: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Parses a preset from either a JSON preset file or a compact profile string
+    /// (<c>power=performance;res=1920x1080;hz=60</c>).
+    /// </summary>
+    public static GameProfile? ImportPreset(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return null;
+        }
+
+        var trimmed = text.Trim();
+        if (File.Exists(trimmed))
+        {
+            try
+            {
+                trimmed = File.ReadAllText(trimmed).Trim();
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return null;
+            }
+        }
+
+        if (trimmed.StartsWith('{'))
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(trimmed);
+                if (doc.RootElement.TryGetProperty("profile", out var p) && p.GetString() is { Length: > 0 } profileStr)
+                {
+                    var parsed = Parse(profileStr);
+                    return Format(parsed).Length > 0 ? parsed : null;
+                }
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+        }
+
+        var direct = Parse(trimmed);
+        return Format(direct).Length > 0 ? direct : null;
     }
 }

@@ -194,7 +194,7 @@ internal sealed class TopBarPresenter
         view.BatteryPanel.Visibility = status.BatteryPercent is null ? Visibility.Collapsed : Visibility.Visible;
         if (status.BatteryPercent is { } percent)
         {
-            view.BatteryText.Text = $"{percent}%";
+            view.BatteryText.Text = status.RemainingTime is { } time ? $"{percent}% · {time}" : $"{percent}%";
             view.BatteryFill.Width = BatteryFillWidth * percent / 100;
             view.BatteryFill.Fill = percent <= LowBatteryPercent && !status.PluggedIn ? LowBattery : NormalBattery;
             view.ChargingBolt.Visibility = status.PluggedIn ? Visibility.Visible : Visibility.Collapsed;

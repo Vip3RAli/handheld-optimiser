@@ -24,6 +24,7 @@ internal sealed class OverlayHost
     private const string LayoutValue = "Layout";
 
     private readonly SessionProgram _program = new("Overlay", OverlayArgument, MutexName, uiAccess: true);
+    private string _lastActiveLevel = AutoTdpProtocol.OverlayMedium;
 
     public OverlayHost()
     {
@@ -41,6 +42,11 @@ internal sealed class OverlayHost
             Corner = AutoTdpProtocol.TopLeft;
             Layout = AutoTdpProtocol.OverlayVertical;
         }
+
+        if (Level != AutoTdpProtocol.OverlayOff)
+        {
+            _lastActiveLevel = Level;
+        }
     }
 
     /// <summary>One of <see cref="AutoTdpProtocol.OverlayLevels"/>.</summary>
@@ -55,6 +61,10 @@ internal sealed class OverlayHost
     /// <summary>Whether the overlay is on, which keeps the service running.</summary>
     public bool Wanted => Level != AutoTdpProtocol.OverlayOff;
 
+    /// <summary>Toggles the overlay between Off and the last level it was shown at.</summary>
+    public void Toggle() =>
+        Set(Wanted ? AutoTdpProtocol.OverlayOff : _lastActiveLevel, null, null);
+
     /// <summary>A new level, corner or layout from the widget. Any may be null to keep it. Saved, and started at once.</summary>
     public void Set(string? level, string? corner, string? layout)
     {
@@ -64,6 +74,11 @@ internal sealed class OverlayHost
         if (newLevel == Level && newCorner == Corner && newLayout == Layout)
         {
             return;
+        }
+
+        if (newLevel != AutoTdpProtocol.OverlayOff)
+        {
+            _lastActiveLevel = newLevel;
         }
 
         Level = newLevel;

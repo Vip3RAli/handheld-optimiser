@@ -24,9 +24,12 @@ internal sealed partial class OverlayReadings : IDisposable
 
     private const uint PdhFormatDouble = 0x00000200;
     private const uint PdhMoreData = 0x800007D2;
+    private const int SystemBatteryState = 5;
+    private const int UnknownRate = unchecked((int)0x80000000);
 
     private long _idle;
     private long _busy;
+    private double? _smoothedRateMw;
     private nint _query;
     private nint _gpu;
     private nint _baseClock;
@@ -58,11 +61,12 @@ internal sealed partial class OverlayReadings : IDisposable
     {
         var collected = _query != 0 && PdhCollectQueryData(_query) == 0;
         var (memoryUsed, memoryTotal) = Memory();
-        var (battery, charging) = Battery();
+        var (battery, charging, batteryMinutes) = Battery();
         return new OverlayReading(status.Fps, status.Watts, status.Temperature, SampleCpu(), collected ? Gpu() : null,
             memoryUsed, memoryTotal, battery, charging,
             CpuGhz: collected ? CpuGhz() : null,
-            PowerDrawn: collected && Value(_packagePower) is { } milliwatts ? milliwatts / 1000 : null);
+            PowerDrawn: collected && Value(_packagePower) is { } milliwatts ? milliwatts / 1000 : null,
+            BatteryMinutes: batteryMinutes);
     }
 
     /// <returns>The counter, or 0 when this device does not have it, which is logged once.</returns>
@@ -214,15 +218,27 @@ internal sealed partial class OverlayReadings : IDisposable
         return ((status.TotalPhys - status.AvailPhys) / Gb, status.TotalPhys / Gb);
     }
 
-    private static (int? Percent, bool Charging) Battery()
+    private (int? Percent, bool Charging, int? Minutes) Battery()
     {
         // BatteryFlag 128 is no battery, and a percentage of 255 is not known.
         if (!GetSystemPowerStatus(out var status) || status.BatteryFlag == 128 || status.BatteryLifePercent == 255)
         {
-            return (null, false);
+            _smoothedRateMw = null;
+            return (null, false, null);
         }
 
-        return (status.BatteryLifePercent, status.AcLineStatus == 1);
+        var charging = status.AcLineStatus == 1;
+        if (charging || CallNtPowerInformation(SystemBatteryState, 0, 0, out var batteryState, (uint)Marshal.SizeOf<BatteryStateData>()) != 0
+            || batteryState.RemainingCapacity == 0 || batteryState.Rate is 0 or UnknownRate)
+        {
+            _smoothedRateMw = null;
+            return (status.BatteryLifePercent, charging, null);
+        }
+
+        var rate = (double)Math.Abs(batteryState.Rate);
+        _smoothedRateMw = _smoothedRateMw is { } previous ? previous * 0.8 + rate * 0.2 : rate;
+        var minutes = _smoothedRateMw > 0 ? (int)Math.Round(batteryState.RemainingCapacity * 60.0 / _smoothedRateMw.Value) : (int?)null;
+        return (status.BatteryLifePercent, false, minutes);
     }
 
     // PDH_FMT_COUNTERVALUE_ITEM_W: the instance name, then PDH_FMT_COUNTERVALUE (a status and a double).
@@ -267,7 +283,29 @@ internal sealed partial class OverlayReadings : IDisposable
         public uint BatteryFullLifeTime;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct BatteryStateData
+    {
+        public byte AcOnLine;
+        public byte BatteryPresent;
+        public byte Charging;
+        public byte Discharging;
+        public byte Spare1;
+        public byte Spare2;
+        public byte Spare3;
+        public byte Tag;
+        public uint MaxCapacity;
+        public uint RemainingCapacity;
+        public int Rate;
+        public uint EstimatedTime;
+        public uint DefaultAlert1;
+        public uint DefaultAlert2;
+    }
+
     private delegate bool EnumWindowsCallback(nint window, nint parameter);
+
+    [LibraryImport("powrprof.dll")]
+    private static partial uint CallNtPowerInformation(int level, nint input, uint inputLength, out BatteryStateData output, uint outputLength);
 
     [LibraryImport("kernel32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

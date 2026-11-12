@@ -298,6 +298,11 @@ internal sealed class ContinuePresenter
             rows.Add(new InfoRow("Time played", PlayStats.Duration(stats.Played)));
         }
 
+        if (Achievements.For(card.Game) is { Total: > 0 } achievements)
+        {
+            rows.Add(new InfoRow("Achievements", achievements.Describe()));
+        }
+
         if (_infoSize is { } size && size > 0)
         {
             rows.Add(new InfoRow("Size on disk", CleanResult.Size(size)));

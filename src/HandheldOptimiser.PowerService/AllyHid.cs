@@ -191,6 +191,20 @@ internal sealed partial class AllyHid : IControllerBackend
     public bool SetMode(ControllerMode mode) => Send(AllyCommands.Mode(mode));
 
     /// <inheritdoc/>
+    public bool SetLighting(string lighting, int? batteryPercent, string colour)
+    {
+        foreach (var report in AllyCommands.LightingReports(lighting, batteryPercent, colour))
+        {
+            if (!Send(report))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <inheritdoc/>
     public bool TryRead(out AllyButton button)
     {
         var report = Read();

@@ -139,7 +139,7 @@ internal static class SteamAppInfo
     }
 
     /// <summary>Reads entries up to the end of the object they are in, which is left behind the position.</summary>
-    private static Dictionary<string, object> ReadObject(byte[] data, ref int position, int end, string[]? names, int depth)
+    internal static Dictionary<string, object> ReadObject(byte[] data, ref int position, int end, string[]? names, int depth)
     {
         if (depth > 32)
         {

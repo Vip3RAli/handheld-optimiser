@@ -45,6 +45,7 @@ internal sealed class SleepAndCleanUpMenu
         view.StoreStartupItem.Click += (_, _) => OpenStartup(view.StoreStartupItem);
         view.QuickResumeSetting.Click += (_, _) => ToggleQuickResume();
         view.ResumeSetting.Click += (_, _) => Toggle(() => LibrarySettings.ResumeAfterSleep = !LibrarySettings.ResumeAfterSleep);
+        view.SaveGuardSetting.Click += (_, _) => Toggle(() => LibrarySettings.SaveGuard = !LibrarySettings.SaveGuard);
         view.WhilePlayingSettingsBackItem.Click += (_, _) => menu.Back();
         view.AddRunningAppItem.Click += (_, _) => OpenRunningApps();
         view.AppsToCloseBackItem.Click += (_, _) => menu.Back();
@@ -121,6 +122,7 @@ internal sealed class SleepAndCleanUpMenu
         var view = _view;
         view.QuickResumeSetting.Tag = SettingSteps.OnOff(LibrarySettings.QuickResume);
         view.ResumeSetting.Tag = SettingSteps.OnOff(LibrarySettings.ResumeAfterSleep);
+        view.SaveGuardSetting.Tag = SettingSteps.OnOff(LibrarySettings.SaveGuard);
 
         view.GameModeSetting.Tag = SettingSteps.OnOff(LibrarySettings.GameMode);
         view.WindowsGameModeSetting.Tag = LibrarySettings.WindowsGameMode switch

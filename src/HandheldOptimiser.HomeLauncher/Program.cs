@@ -59,6 +59,28 @@ internal static class Program
             return RunRadeon(args);
         }
 
+        // Back paddle actions started by TDP Engine in the player's session.
+        if (args.Contains("--keyboard", StringComparer.OrdinalIgnoreCase))
+        {
+            Library.TouchKeyboard.Toggle();
+            return 0;
+        }
+
+        if (args.Contains("--screenshot", StringComparer.OrdinalIgnoreCase))
+        {
+            return Library.Screenshot.Take() is null ? 1 : 0;
+        }
+
+        if (args.Contains("--mute", StringComparer.OrdinalIgnoreCase))
+        {
+            if (Library.Volume.Read() is { } current)
+            {
+                Library.Volume.SetMuted(!current.Muted);
+            }
+
+            return 0;
+        }
+
         var action = ActionFor(args);
 
         // Game Bar is opened whatever the home app choice is, and the choice is not read or changed.

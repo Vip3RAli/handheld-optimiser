@@ -82,6 +82,18 @@ namespace HandheldOptimiser.GameBar
         /// <summary>The GPU memory sizes that can be set, empty when this device cannot set it or the service did not say.</summary>
         public int[] GpuMemoryOffered = new int[0];
 
+        /// <summary>Whether the 80% battery charge limit is on, or null where this device cannot set it.</summary>
+        public bool? BatteryCare;
+
+        /// <summary>What the back paddles (M1 and M2) do while replacing Armoury Crate.</summary>
+        public string PaddleAction;
+
+        /// <summary>The thumbstick light ring mode while replacing Armoury Crate.</summary>
+        public string ControllerLighting;
+
+        /// <summary>The thumbstick light ring colour while replacing Armoury Crate.</summary>
+        public string LightingColour;
+
         public static readonly EngineStatus Off = new EngineStatus();
 
         public static EngineStatus Failed(string error) => new EngineStatus { Error = error };
@@ -272,8 +284,7 @@ namespace HandheldOptimiser.GameBar
             return answer == null ? EngineStatus.Failed("TDP Engine is not responding. Try again in a moment.") : Read(answer);
         }
 
-        /// <summary>
-        /// Sets the Ally controller's mode, "gamepad" or "desktop". The service always runs while it replaces
+        /// <summary>Sets the Ally controller's mode, "gamepad" or "desktop". The service always runs while it replaces
         /// Armoury Crate, which is the only time this is offered, so it is never started here.
         /// </summary>
         public static EngineStatus SetControllerMode(string mode)
@@ -282,6 +293,53 @@ namespace HandheldOptimiser.GameBar
             {
                 [AutoTdpProtocol.Fields.Command] = JsonValue.CreateStringValue(AutoTdpProtocol.SetControls),
                 [AutoTdpProtocol.Fields.ControllerMode] = JsonValue.CreateStringValue(mode)
+            }.Stringify();
+
+            var answer = Send(request);
+            return answer == null ? EngineStatus.Failed("TDP Engine is not responding. Try again in a moment.") : Read(answer);
+        }
+
+        /// <summary>Switches the 80% battery charge limit on or off, starting the service if need be.</summary>
+        public static EngineStatus SetBatteryCare(bool on) =>
+            SendStarting(new JsonObject
+            {
+                [AutoTdpProtocol.Fields.Command] = JsonValue.CreateStringValue(AutoTdpProtocol.SetBatteryCare),
+                [AutoTdpProtocol.Fields.BatteryCare] = JsonValue.CreateBooleanValue(on)
+            }.Stringify());
+
+        /// <summary>Sets what the back paddles (M1 and M2) do while replacing Armoury Crate.</summary>
+        public static EngineStatus SetPaddle(string action)
+        {
+            var request = new JsonObject
+            {
+                [AutoTdpProtocol.Fields.Command] = JsonValue.CreateStringValue(AutoTdpProtocol.SetPaddle),
+                [AutoTdpProtocol.Fields.PaddleAction] = JsonValue.CreateStringValue(action)
+            }.Stringify();
+
+            var answer = Send(request);
+            return answer == null ? EngineStatus.Failed("TDP Engine is not responding. Try again in a moment.") : Read(answer);
+        }
+
+        /// <summary>Sets the thumbstick light ring mode while replacing Armoury Crate.</summary>
+        public static EngineStatus SetLighting(string lighting)
+        {
+            var request = new JsonObject
+            {
+                [AutoTdpProtocol.Fields.Command] = JsonValue.CreateStringValue(AutoTdpProtocol.SetLighting),
+                [AutoTdpProtocol.Fields.ControllerLighting] = JsonValue.CreateStringValue(lighting)
+            }.Stringify();
+
+            var answer = Send(request);
+            return answer == null ? EngineStatus.Failed("TDP Engine is not responding. Try again in a moment.") : Read(answer);
+        }
+
+        /// <summary>Sets the thumbstick light ring colour while replacing Armoury Crate.</summary>
+        public static EngineStatus SetLightingColour(string colour)
+        {
+            var request = new JsonObject
+            {
+                [AutoTdpProtocol.Fields.Command] = JsonValue.CreateStringValue(AutoTdpProtocol.SetLightingColour),
+                [AutoTdpProtocol.Fields.LightingColour] = JsonValue.CreateStringValue(colour)
             }.Stringify();
 
             var answer = Send(request);
@@ -332,7 +390,11 @@ namespace HandheldOptimiser.GameBar
                 GpuMemoryOffered = Numbers(json, AutoTdpProtocol.Fields.GpuMemoryOffered),
                 Mode = Text(json, AutoTdpProtocol.Fields.Mode),
                 ManualPowerLimit = (int)(Number(json, AutoTdpProtocol.Fields.ManualPowerLimit) ?? 0),
-                ManualFans = Text(json, AutoTdpProtocol.Fields.ManualFans)
+                ManualFans = Text(json, AutoTdpProtocol.Fields.ManualFans),
+                BatteryCare = Flag(json, AutoTdpProtocol.Fields.BatteryCare),
+                PaddleAction = Text(json, AutoTdpProtocol.Fields.PaddleAction),
+                ControllerLighting = Text(json, AutoTdpProtocol.Fields.ControllerLighting),
+                LightingColour = Text(json, AutoTdpProtocol.Fields.LightingColour)
             };
         }
 

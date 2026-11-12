@@ -15,6 +15,7 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 /// <param name="Charging">Whether the charger is plugged in.</param>
 /// <param name="CpuGhz">The processor's clock now, in GHz, as Task Manager's speed figure.</param>
 /// <param name="PowerDrawn">The power the processor and graphics draw now, in watts, from Windows' energy meter.</param>
+/// <param name="BatteryMinutes">Estimated minutes of battery playtime remaining while discharging, or null.</param>
 internal sealed record OverlayReading(
     double? Fps = null,
     int? Watts = null,
@@ -26,7 +27,8 @@ internal sealed record OverlayReading(
     int? Battery = null,
     bool Charging = false,
     double? CpuGhz = null,
-    double? PowerDrawn = null);
+    double? PowerDrawn = null,
+    int? BatteryMinutes = null);
 
 /// <summary>One row of the overlay: a short name and its value.</summary>
 internal sealed record OverlayLine(string Label, string Value);
@@ -97,6 +99,15 @@ internal static class OverlayLayout
     private static string Percent(double? value) =>
         value is { } percent ? $"{Math.Clamp(Math.Round(percent), 0, 100).ToString(Text)}%" : "?";
 
-    // The charge alone: Windows' guess at the time left jumps about in a game, and the user had it taken out.
-    private static string BatteryNote(OverlayReading reading) => reading.Charging ? ", charging" : string.Empty;
+    /// <summary>Formats a minute count as "1h 22m" or "45m", or null when 0 or not known.</summary>
+    public static string? FormatDuration(int? minutes) => minutes switch
+    {
+        null or <= 0 => null,
+        < 60 => $"{minutes}m",
+        _ => minutes % 60 == 0 ? $"{minutes / 60}h" : $"{minutes / 60}h {minutes % 60}m"
+    };
+
+    private static string BatteryNote(OverlayReading reading) => reading.Charging
+        ? ", charging"
+        : FormatDuration(reading.BatteryMinutes) is { } left ? $", {left}" : string.Empty;
 }

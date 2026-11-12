@@ -209,6 +209,11 @@ internal sealed class GameSessionController
         _session = session;
         _sessionStoreWasOpen = storeWasOpen;
 
+        if (LibrarySettings.SaveGuard)
+        {
+            _ = Task.Run(() => SaveGuard.CreateSnapshot(game));
+        }
+
         var fullScreen = Native.IsFullScreenExperience();
         var shouldOptimiseWindows = LibrarySettings.WindowsGameMode switch
         {
@@ -346,6 +351,12 @@ internal sealed class GameSessionController
         StopAutoTdp();
         RestoreProfileSettings();
         ReopenClosedApps();
+        if (LibrarySettings.SaveGuard)
+        {
+            _ = Task.Run(() => SaveGuard.CreateSnapshot(session.Game));
+        }
+
+        _ = Achievements.SyncGameAsync(session.Game);
         _ = CloseStoreAppLaterAsync(session.Game.Store, _sessionStoreWasOpen);
 
         if (session.Played >= TimeSpan.FromMinutes(1))

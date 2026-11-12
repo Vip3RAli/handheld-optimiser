@@ -27,6 +27,9 @@ internal static partial class AutoTdpProtocol
     public const string ControlsKey = @"SOFTWARE\HandheldOptimiser\AllyControls";
     public const string ReplacingValue = "Replacing";
     public const string ControllerModeValue = "ControllerMode";
+    public const string PaddleActionValue = "PaddleAction";
+    public const string ControllerLightingValue = "ControllerLighting";
+    public const string LightingColourValue = "LightingColour";
 
     /// <summary>The Game Bar widget's package family name, which is the only app package let through to the pipe.</summary>
     public const string WidgetPackage = "HandheldOptimiser.GameBar_pgc7cpy78bqbw";
@@ -45,6 +48,17 @@ internal static partial class AutoTdpProtocol
 
     /// <summary>The overlay's layouts. The first is how it starts.</summary>
     public static readonly string[] OverlayLayouts = [OverlayVertical, OverlayHorizontal];
+
+    /// <summary>What the back paddles can be set to do. The first is Off.</summary>
+    public static readonly string[] PaddleActions = [PaddleNone, PaddleOverlay, PaddleMode, PaddleKeyboard, PaddleScreenshot, PaddleMute];
+
+    /// <summary>The thumbstick light ring modes, from Off to coloured by the battery level.</summary>
+    public static readonly string[] LightingModes = [LightingOff, LightingLow, LightingMedium, LightingHigh, LightingBattery];
+
+    /// <summary>The thumbstick light ring colours, in the widget's order. The first, Xbox green, is how it starts.</summary>
+    public static readonly string[] LightingColours =
+        [ColourGreen, ColourWhite, ColourRed, ColourOrange, ColourYellow, ColourBlue, ColourCyan, ColourPurple, ColourPink];
+
     public static string Write<T>(T message)
     {
         if (message is AutoTdpStatus status)
@@ -115,11 +129,16 @@ internal partial class AutoTdpJsonContext : JsonSerializerContext
 /// <param name="RadeonFeature">With set-radeon: one of RadeonState.Switches or RadeonState.Numbers.</param>
 /// <param name="RadeonOn">With set-radeon and a switch: true to switch it on, false to switch it off.</param>
 /// <param name="RadeonValue">With set-radeon and a number: the number to set, which the driver's range is fitted to.</param>
+/// <param name="BatteryCare">With set-battery-care: true to stop charging at 80%, false to charge to 100%.</param>
+/// <param name="PaddleAction">With set-paddle: one of <see cref="AutoTdpProtocol.PaddleActions"/>.</param>
+/// <param name="ControllerLighting">With set-lighting: one of <see cref="AutoTdpProtocol.LightingModes"/>.</param>
+/// <param name="LightingColour">With set-lighting-colour: one of <see cref="AutoTdpProtocol.LightingColours"/>.</param>
 internal sealed record AutoTdpRequest(string Command, int TargetFps = 0, int MinWatts = 0, int MaxWatts = 0,
     int TemperatureLimit = 0, int StartWatts = 0, string? GameFolder = null, string? FanCurve = null, int PowerLimit = 0,
     string? ControllerMode = null, bool Temporary = false, bool? CpuBoost = null, string? OverlayLevel = null,
     string? OverlayCorner = null, int ProcessId = 0, string? OverlayLayout = null, bool? ScreenStats = null,
-    int? GpuMemory = null, string? Mode = null, string? RadeonFeature = null, bool? RadeonOn = null, int? RadeonValue = null);
+    int? GpuMemory = null, string? Mode = null, string? RadeonFeature = null, bool? RadeonOn = null, int? RadeonValue = null,
+    bool? BatteryCare = null, string? PaddleAction = null, string? ControllerLighting = null, string? LightingColour = null);
 
 /// <param name="Running">Whether it is setting the power limit or the fans right now.</param>
 /// <param name="State">One of the AutoTdpState names.</param>
@@ -154,6 +173,10 @@ internal sealed record AutoTdpRequest(string Command, int TargetFps = 0, int Min
 /// <param name="Sharpening">Whether Radeon Image Sharpening is on, or null where it is not offered or not read yet.</param>
 /// <param name="SharpeningStrength">Image Sharpening's strength, or null.</param>
 /// <param name="SharpeningRange">Image Sharpening's strength range as lowest, highest and step, or null.</param>
+/// <param name="BatteryCare">Whether the 80% battery charge limit is on, or null where this device cannot set it.</param>
+/// <param name="PaddleAction">What the back paddles do while replacing Armoury Crate, one of <see cref="AutoTdpProtocol.PaddleActions"/>.</param>
+/// <param name="ControllerLighting">The thumbstick light ring mode while replacing Armoury Crate, one of <see cref="AutoTdpProtocol.LightingModes"/>.</param>
+/// <param name="LightingColour">The thumbstick light ring colour while replacing Armoury Crate, one of <see cref="AutoTdpProtocol.LightingColours"/>.</param>
 internal sealed record AutoTdpStatus(bool Running, double? Fps = null, int? Watts = null, int? Temperature = null,
     string? State = null, string? Error = null, int TargetFps = 0, string? FanCurve = null, int PowerLimit = 0,
     bool Replacing = false, bool ControllerConnected = false, string? ControllerMode = null, bool? CpuBoost = null,
@@ -162,4 +185,5 @@ internal sealed record AutoTdpStatus(bool Running, double? Fps = null, int? Watt
     int ManualPowerLimit = 0, string? ManualFans = null, bool? Rsr = null, bool? Afmf = null,
     int? RsrSharpness = null, int[]? RsrSharpnessRange = null, bool? AntiLag = null, bool? Chill = null,
     int? ChillMin = null, int? ChillMax = null, int[]? ChillRange = null, bool? Sharpening = null,
-    int? SharpeningStrength = null, int[]? SharpeningRange = null);
+    int? SharpeningStrength = null, int[]? SharpeningRange = null, bool? BatteryCare = null,
+    string? PaddleAction = null, string? ControllerLighting = null, string? LightingColour = null);

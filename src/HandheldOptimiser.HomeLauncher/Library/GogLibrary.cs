@@ -11,6 +11,10 @@ internal static class GogLibrary
 {
     private const string GamesKey = @"SOFTWARE\GOG.com\Games";
 
+    public static readonly string DefaultDatabasePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+        "GOG.com", "Galaxy", "storage", "galaxy-2.0.db");
+
     public static IEnumerable<Game> Scan()
     {
         using var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry32);

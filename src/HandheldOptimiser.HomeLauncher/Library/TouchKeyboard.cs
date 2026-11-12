@@ -22,6 +22,9 @@ internal static class TouchKeyboard
     /// <summary>Puts the keyboard away, if it is up.</summary>
     public static void Hide(nint window) => Set(window, show: false);
 
+    /// <summary>Shows the on-screen keyboard if it is hidden, or hides it if it is up.</summary>
+    public static void Toggle() => Set(Native.DesktopWindow(), show: !IsShowing());
+
     private static void Set(nint window, bool show)
     {
         try

@@ -189,9 +189,9 @@ internal sealed class SettingsMenu
         foreach (var (group, row) in new[]
         {
             (view.BackgroundItems, view.BackgroundGroup), (view.DisplayItems, view.DisplayGroup), (view.TvItems, view.TvGroup),
-            (view.OwnedItems, view.OwnedGroup), (view.DealsItems, view.DealsGroup), (view.AddItems, view.AddProgramGroup),
-            (view.WhilePlayingItems, view.WhilePlayingGroup), (view.EmulatorItems, view.EmulatorsGroup),
-            (view.MaintenanceItems, view.MaintenanceGroup)
+            (view.AccountsItems, view.AccountsGroup), (view.OwnedItems, view.OwnedGroup), (view.DealsItems, view.DealsGroup),
+            (view.AddItems, view.AddProgramGroup), (view.WhilePlayingItems, view.WhilePlayingGroup),
+            (view.EmulatorItems, view.EmulatorsGroup), (view.MaintenanceItems, view.MaintenanceGroup)
         })
         {
             _menu.SetBack(group, () =>

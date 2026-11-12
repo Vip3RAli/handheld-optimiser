@@ -88,7 +88,7 @@ internal static class StoreDetails
         try
         {
             var title = Artwork.SearchTitle(game) ?? game.Title;
-            var appId = game.Store == GameStore.Steam && game.Key.StartsWith("steam:", StringComparison.Ordinal)
+            var appId = game.Store == GameStore.Steam && game.Key.StartsWith("steam:", StringComparison.Ordinal) && !SteamShortcuts.IsShortcut(game)
                 ? game.Key[6..]
                 : await SearchAsync(title);
 

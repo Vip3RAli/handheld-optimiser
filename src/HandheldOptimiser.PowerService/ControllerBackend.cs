@@ -21,6 +21,10 @@ internal interface IControllerBackend : IDisposable
     /// <returns>False when it did not answer, which means it has gone.</returns>
     bool SetMode(ControllerMode mode);
 
+    /// <summary>Sets the thumbstick light rings to one of <see cref="AutoTdpProtocol.LightingModes"/>, in a colour.</summary>
+    /// <returns>False when it did not answer.</returns>
+    bool SetLighting(string lighting, int? batteryPercent, string colour);
+
     /// <summary>
     /// Waits for the controller's next report. <paramref name="button"/> is <see cref="AllyButton.None"/> for a
     /// report that is not about a front panel button.

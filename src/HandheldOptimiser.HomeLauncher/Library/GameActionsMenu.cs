@@ -57,8 +57,19 @@ internal sealed class GameActionsMenu
 
         view.InstallItem.Click += (_, _) => Install();
         view.FavouriteItem.Click += (_, _) => ToggleFavourite();
+        view.TagsItem.Click += (_, _) => OpenTags();
+        view.AddCustomTagItem.Click += (_, _) => EditCustomTag();
+        view.TagsBackItem.Click += (_, _) => menu.Back();
         view.ProfileItem.Click += (_, _) => OpenProfile();
         view.RecommendedItem.Click += (_, _) => OpenRecommended();
+        view.AchievementsItem.Click += (_, _) => OpenAchievements();
+        view.AchievementsSyncItem.Click += (_, _) => SyncGameAchievements();
+        view.AchievementsBackItem.Click += (_, _) => menu.Back();
+        view.SaveSnapshotsItem.Click += (_, _) => OpenSaveSnapshots();
+        view.BackupSaveNowItem.Click += (_, _) => BackupSaveNow();
+        view.SaveFolderSettingItem.Click += (_, _) => EditSaveFolder();
+        view.BrowseSaveFolderItem.Click += (_, _) => BrowseSaveFolder();
+        view.SaveSnapshotsBackItem.Click += (_, _) => menu.Back();
         view.MoveItem.Click += (_, _) => ToggleApp();
         view.ArgumentsItem.Click += (_, _) => EditArguments();
         view.FolderItem.Click += (_, _) => OpenFolder();
@@ -85,6 +96,8 @@ internal sealed class GameActionsMenu
         view.ProfileAppsSetting.Click += (_, _) => StepProfile(view.ProfileAppsSetting, 1);
         view.ProfileAutoTdpSetting.Click += (_, _) => StepProfile(view.ProfileAutoTdpSetting, 1);
         view.ProfileFanSetting.Click += (_, _) => StepProfile(view.ProfileFanSetting, 1);
+        view.ProfileExportItem.Click += (_, _) => ExportPreset();
+        view.ProfileImportItem.Click += (_, _) => ImportPreset();
         view.ProfileSettingsBackItem.Click += (_, _) => menu.Back();
         view.RecommendedApplyItem.Click += (_, _) => ApplyRecommended();
         view.RecommendedBackItem.Click += (_, _) => menu.Back();
@@ -92,6 +105,9 @@ internal sealed class GameActionsMenu
         // A game's profile and its optimised settings go back to its quick actions, on the row that opened them.
         menu.SetBack(view.ProfileItems, () => BackToGame(view.ProfileItem));
         menu.SetBack(view.RecommendedItems, () => BackToGame(view.RecommendedItem));
+        menu.SetBack(view.TagsItems, () => BackToGame(view.TagsItem));
+        menu.SetBack(view.AchievementsItems, () => BackToGame(view.AchievementsItem));
+        menu.SetBack(view.SaveSnapshotsItems, () => BackToGame(view.SaveSnapshotsItem));
         menu.AddStepper(StepProfile);
     }
 
@@ -145,6 +161,9 @@ internal sealed class GameActionsMenu
 
         view.FavouriteItem.Content = tile.IsFavourite ? "Remove from favourites" : "Add to favourites";
 
+        view.TagsItem.Visibility = installed && !tile.IsApp ? Visibility.Visible : Visibility.Collapsed;
+        view.TagsItem.Tag = tile.Tags.Count > 0 ? string.Join(", ", tile.Tags) : "None";
+
         // Profiles only change things for games.
         view.ProfileItem.Visibility = installed && !tile.IsApp ? Visibility.Visible : Visibility.Collapsed;
         view.ProfileItem.Tag = GameProfiles.For(game) is { IsEmpty: true, CloseApps: null, AutoTdpFps: null, FanCurve: null } ? "Not set" : "Set";
@@ -152,6 +171,14 @@ internal sealed class GameActionsMenu
         var recommendation = installed && !tile.IsApp ? GameSettingsDb.Current.For(game) : null;
         view.RecommendedItem.Visibility = recommendation is null ? Visibility.Collapsed : Visibility.Visible;
         view.RecommendedItem.Tag = recommendation?.Target;
+
+        view.AchievementsItem.Visibility = installed && !tile.IsApp ? Visibility.Visible : Visibility.Collapsed;
+        view.AchievementsItem.Tag = installed && !tile.IsApp && Achievements.For(game) is { } ach ? ach.Describe() : null;
+
+        view.SaveSnapshotsItem.Visibility = installed && !tile.IsApp ? Visibility.Visible : Visibility.Collapsed;
+        var snapshots = installed && !tile.IsApp ? SaveGuard.SnapshotsFor(game) : [];
+        view.SaveSnapshotsItem.Tag = snapshots.Count > 0 ? $"{snapshots.Count} saved" : "None";
+
         RefreshCloseGame(tile);
 
         var added = AddedPrograms.IsAdded(game);
@@ -605,5 +632,317 @@ internal sealed class GameActionsMenu
         Program.Log($"Saved the optimised device settings to {tile.Game.Key}'s profile");
         _notices.Show($"Optimised settings saved to {tile.Game.Title}'s profile.");
         RefreshRecommendedApply(tile);
+    }
+
+    // ----- Preset export and import -----
+
+    private void ExportPreset()
+    {
+        if (_menu.Tile is not { } tile)
+        {
+            return;
+        }
+
+        var path = GameProfiles.ExportPreset(tile.Game, _profile);
+        _notices.Show(path is null
+            ? "Set at least one profile option before exporting a preset."
+            : $"Preset exported to {Path.GetFileName(path)}.");
+    }
+
+    private void ImportPreset()
+    {
+        if (_menu.Tile is not { } tile)
+        {
+            return;
+        }
+
+        _menu.BeginEdit("Import preset",
+            "Enter a preset string (such as power=performance;res=1920x1080;hz=60;fps=60) or the full path to a .preset.json file.",
+            GameProfiles.Format(_profile), text =>
+            {
+                if (GameProfiles.ImportPreset(text) is not { } imported)
+                {
+                    _menu.ShowItems(_view.ProfileImportItem);
+                    _notices.Show("Could not read a valid game preset from that text.");
+                    return;
+                }
+
+                if (GameProfiles.Save(tile.Game, imported))
+                {
+                    _profile = imported;
+                    RefreshProfile();
+                    _menu.ShowItems(_view.ProfileImportItem);
+                    _notices.Show($"Imported preset for {tile.Title}.");
+                }
+                else
+                {
+                    _menu.ShowItems(_view.ProfileImportItem);
+                    _notices.Show("The imported game profile could not be saved.");
+                }
+            });
+    }
+
+    // ----- Tags and collections -----
+
+    private void OpenTags(Button? focus = null)
+    {
+        if (_menu.Tile is not { } tile)
+        {
+            return;
+        }
+
+        RefreshTagsRows(tile);
+        _menu.Show(_view.TagsItems, null, "Group games into filter tabs along the top bar", focus);
+    }
+
+    private void RefreshTagsRows(GameTile tile)
+    {
+        _menu.ClearRows(_view.TagsItems);
+        var current = GameTags.For(tile.Game);
+        tile.Tags = current;
+
+        var allChoices = GameTags.BuiltInTags
+            .Concat(current)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        foreach (var tag in allChoices)
+        {
+            var tagName = tag;
+            var has = current.Any(t => string.Equals(t, tagName, StringComparison.OrdinalIgnoreCase));
+            Button? row = null;
+            row = _menu.AddRow(_view.TagsItems, _view.AddCustomTagItem, tagName, SettingSteps.OnOff(has), () =>
+            {
+                if (GameTags.Toggle(tile.Game, tagName))
+                {
+                    tile.Tags = GameTags.For(tile.Game);
+                    _host.ShowTiles();
+                    OpenTags(row);
+                }
+            });
+        }
+    }
+
+    private void EditCustomTag()
+    {
+        if (_menu.Tile is not { } tile)
+        {
+            return;
+        }
+
+        _menu.BeginEdit("Add custom tag",
+            "Name a collection tag for this game (such as Couch Co-op, RPG or Indie). It appears as a filter tab while Store filter is on.",
+            string.Empty, text =>
+            {
+                if (text.Length > 0 && GameTags.Add(tile.Game, text))
+                {
+                    tile.Tags = GameTags.For(tile.Game);
+                    _host.ShowTiles();
+                }
+
+                OpenTags(_view.AddCustomTagItem);
+            });
+    }
+
+    // ----- Achievements -----
+
+    private void OpenAchievements()
+    {
+        if (_menu.Tile is not { } tile)
+        {
+            return;
+        }
+
+        var ach = Achievements.For(tile.Game);
+        PopulateAchievementsRows(ach);
+        var subtitle = ach is { Total: > 0 }
+            ? $"{ach.Unlocked} of {ach.Total} unlocked ({ach.Percentage}%)"
+            : "Sync to check your unlocked achievements";
+        _menu.Show(_view.AchievementsItems, null, subtitle);
+    }
+
+    private void PopulateAchievementsRows(GameAchievements? ach)
+    {
+        _menu.ClearRows(_view.AchievementsItems);
+        if (ach is not { Items.Count: > 0 })
+        {
+            return;
+        }
+
+        foreach (var item in ach.Items.OrderByDescending(i => i.Unlocked).ThenBy(i => i.Name, StringComparer.CurrentCultureIgnoreCase).Take(40))
+        {
+            var status = item.Unlocked ? "Unlocked" : "Locked";
+            var desc = item.Description;
+            _menu.AddRow(_view.AchievementsItems, _view.AchievementsSyncItem, item.Name, status, () =>
+            {
+                if (!string.IsNullOrWhiteSpace(desc))
+                {
+                    _notices.Show($"{item.Name}: {desc}");
+                }
+            });
+        }
+    }
+
+    private async void SyncGameAchievements()
+    {
+        if (_menu.Tile is not { } tile)
+        {
+            return;
+        }
+
+        _view.AchievementsSyncItem.Tag = "Syncing...";
+        var synced = await Achievements.SyncGameAsync(tile.Game);
+        _view.AchievementsSyncItem.Tag = null;
+        _continue.ForgetInfo();
+        _continue.Update();
+
+        if (!ReferenceEquals(_menu.List, _view.AchievementsItems) || _menu.Tile != tile)
+        {
+            return;
+        }
+
+        PopulateAchievementsRows(synced);
+        _menu.Subtitle = synced is { Total: > 0 }
+            ? $"{synced.Unlocked} of {synced.Total} unlocked ({synced.Percentage}%)"
+            : "No achievements found for this game";
+        _menu.ShowItems(_view.AchievementsSyncItem);
+    }
+
+    // ----- Save Guard snapshots -----
+
+    private void OpenSaveSnapshots()
+    {
+        if (_menu.Tile is not { } tile)
+        {
+            return;
+        }
+
+        RefreshSaveSnapshotsRows(tile);
+        _menu.Show(_view.SaveSnapshotsItems, null, "Up to 3 rotating backups of this game's save folder");
+    }
+
+    private void RefreshSaveSnapshotsRows(GameTile tile)
+    {
+        _menu.ClearRows(_view.SaveSnapshotsItems);
+        var folder = SaveGuard.FindSaveFolder(tile.Game);
+        _view.BackupSaveNowItem.IsEnabled = folder is not null;
+        _view.BackupSaveNowItem.Tag = folder is null ? "No save folder found" : null;
+        _view.SaveFolderSettingItem.Tag = SaveGuard.CustomSaveFolder(tile.Game) is { Length: > 0 }
+            ? "Custom"
+            : folder is not null ? "Auto" : "Not found";
+
+        var now = DateTimeOffset.UtcNow;
+        var snapshots = SaveGuard.SnapshotsFor(tile.Game);
+        for (var i = 0; i < snapshots.Count; i++)
+        {
+            AddRestoreRow(tile, snapshots[i], $"Restore snapshot {i + 1}", snapshots[i].Describe(now));
+        }
+
+        if (SaveGuard.BeforeRestoreFor(tile.Game) is { } before)
+        {
+            AddRestoreRow(tile, before, "Undo last restore", before.Describe(now));
+        }
+    }
+
+    /// <summary>A row that puts a snapshot back. It asks first: the save as it is now is replaced.</summary>
+    private void AddRestoreRow(GameTile tile, SaveSnapshot snapshot, string label, string detail)
+    {
+        Button? row = null;
+        row = _menu.AddRow(_view.SaveSnapshotsItems, _view.BackupSaveNowItem, label, detail, () =>
+        {
+            if (!ReferenceEquals(_menu.Armed, row))
+            {
+                _menu.Armed = row;
+                row!.Tag = "Press again to restore";
+                _notices.Show($"{tile.Title}'s save now is replaced. It is kept, and Undo last restore brings it back.");
+                return;
+            }
+
+            _menu.Armed = null;
+            var ok = SaveGuard.RestoreSnapshot(snapshot, SaveGuard.FindSaveFolder(tile.Game));
+            RefreshSaveSnapshotsRows(tile);
+            _menu.ShowItems(_view.BackupSaveNowItem);
+            _notices.Show(ok
+                ? $"{tile.Title}'s save from {snapshot.Describe(DateTimeOffset.UtcNow)} is back."
+                : $"{tile.Title}'s save could not be restored.");
+        });
+
+        // Moving off a row pressed once disarms it, and its own detail comes back.
+        row.LostKeyboardFocus += (_, _) =>
+        {
+            if (ReferenceEquals(_menu.Armed, row))
+            {
+                _menu.Armed = null;
+                row.Tag = detail;
+            }
+        };
+    }
+
+    private void BackupSaveNow()
+    {
+        if (_menu.Tile is not { } tile)
+        {
+            return;
+        }
+
+        var created = SaveGuard.CreateSnapshot(tile.Game);
+        RefreshSaveSnapshotsRows(tile);
+        _menu.ShowItems(_view.BackupSaveNowItem);
+        _notices.Show(created is not null
+            ? $"Saved backup for {tile.Title} ({CleanResult.Size(created.SizeBytes)})."
+            : $"Could not back up saves for {tile.Title}. Set its save folder if needed.");
+    }
+
+    private void EditSaveFolder()
+    {
+        if (_menu.Tile is not { } tile)
+        {
+            return;
+        }
+
+        _menu.BeginEdit("Save folder",
+            "Full path to this game's save files. Leave empty to find it automatically.",
+            SaveGuard.CustomSaveFolder(tile.Game) ?? SaveGuard.FindSaveFolder(tile.Game), text =>
+            {
+                SaveGuard.SaveCustomFolder(tile.Game, text);
+                RefreshSaveSnapshotsRows(tile);
+                _menu.ShowItems(_view.SaveFolderSettingItem);
+            });
+    }
+
+    /// <summary>
+    /// Picks the save folder with Windows' own folder picker, so a game whose saves were not found needs no
+    /// path typed in, which the player asked for on 2026-11-12. It opens on the folder in use, or on
+    /// Documents, where most games keep their saves. The library stops reading the controller while the
+    /// picker has the focus, so presses meant for the picker never reach the menu behind it.
+    /// </summary>
+    private void BrowseSaveFolder()
+    {
+        if (_menu.Tile is not { } tile)
+        {
+            return;
+        }
+
+        var current = SaveGuard.CustomSaveFolder(tile.Game) ?? SaveGuard.FindSaveFolder(tile.Game);
+        var picker = new Microsoft.Win32.OpenFolderDialog
+        {
+            Title = $"{tile.Title}'s save folder",
+            InitialDirectory = current is { Length: > 0 } && Directory.Exists(current)
+                ? current
+                : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+        };
+
+        var picked = picker.ShowDialog(_host.Window) == true;
+        if (picked)
+        {
+            SaveGuard.SaveCustomFolder(tile.Game, picker.FolderName);
+            RefreshSaveSnapshotsRows(tile);
+        }
+
+        _menu.ShowItems(_view.BrowseSaveFolderItem);
+        if (picked)
+        {
+            _notices.Show($"{tile.Title}'s saves are in {picker.FolderName}.");
+        }
     }
 }

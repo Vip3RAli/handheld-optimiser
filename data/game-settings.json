@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-25",
+  "updated": "2026-11-11",
   "games": [
     {
       "title": "Fortnite",
@@ -310,6 +310,203 @@
       "source": { "name": "ASUS ROG performance guide", "url": "https://rog.asus.com/articles/rog-ally/helldivers-2-on-the-rog-ally-performance-guide--best-settings/" },
       "checked": "2026-10-25",
       "confidence": "guide"
+    },
+    {
+      "title": "Black Myth: Wukong",
+      "keys": ["steam:2358720"],
+      "titles": ["Black Myth: Wukong", "Black Myth Wukong"],
+      "target": "1080p at 45 fps",
+      "device": { "power": "performance", "resolution": "1920x1080", "refresh": 60, "fps": 45, "closeApps": true },
+      "settings": [
+        { "name": "Resolution", "value": "1920 x 1080" },
+        { "name": "Super Resolution", "value": "FSR, 65" },
+        { "name": "Frame Generation", "value": "On" },
+        { "name": "Shadow Quality", "value": "Low" },
+        { "name": "Texture Quality", "value": "Medium" },
+        { "name": "Visual Effect Quality", "value": "Low" },
+        { "name": "Global Illumination", "value": "Low" },
+        { "name": "Vegetation Quality", "value": "Medium" }
+      ],
+      "note": "FSR with Frame Generation keeps boss fights smooth on handhelds.",
+      "source": { "name": "Starting point, not from a guide", "url": "" },
+      "checked": "2026-11-11",
+      "confidence": "starting-point"
+    },
+    {
+      "title": "Hogwarts Legacy",
+      "keys": ["steam:990080"],
+      "titles": ["Hogwarts Legacy"],
+      "target": "1080p at 45 fps",
+      "device": { "power": "performance", "resolution": "1920x1080", "refresh": 60, "fps": 45, "closeApps": true },
+      "settings": [
+        { "name": "Upscale Type", "value": "AMD FSR 2" },
+        { "name": "Upscale Mode", "value": "AMD FSR 2 Balanced" },
+        { "name": "Effects Quality", "value": "Low" },
+        { "name": "Material Quality", "value": "Medium" },
+        { "name": "Fog Quality", "value": "Low" },
+        { "name": "Sky Quality", "value": "Low" },
+        { "name": "Foliage Quality", "value": "Low" },
+        { "name": "Shadow Quality", "value": "Low" },
+        { "name": "Texture Quality", "value": "Medium" }
+      ],
+      "note": "Hogsmeade and the castle grounds can dip; indoors holds 50 to 60 fps.",
+      "source": { "name": "Starting point, not from a guide", "url": "" },
+      "checked": "2026-11-11",
+      "confidence": "starting-point"
+    },
+    {
+      "title": "God of War",
+      "keys": ["steam:1593500"],
+      "titles": ["God of War"],
+      "target": "1080p at 50 fps",
+      "device": { "power": "performance", "resolution": "1920x1080", "refresh": 60, "fps": 50, "closeApps": true },
+      "settings": [
+        { "name": "AMD FSR 2.0", "value": "Balanced" },
+        { "name": "Texture Quality", "value": "Original" },
+        { "name": "Model Quality", "value": "Original" },
+        { "name": "Anisotropic Filter", "value": "Original" },
+        { "name": "Shadows", "value": "Low" },
+        { "name": "Reflections", "value": "Low" },
+        { "name": "Atmospherics", "value": "Low" },
+        { "name": "Ambient Occlusion", "value": "Original" }
+      ],
+      "note": "Original matches the PlayStation 4 base preset and runs smoothly with FSR Balanced.",
+      "source": { "name": "Starting point, not from a guide", "url": "" },
+      "checked": "2026-11-11",
+      "confidence": "starting-point"
+    },
+    {
+      "title": "Palworld",
+      "keys": ["steam:1623730"],
+      "titles": ["Palworld"],
+      "target": "900p at 45 fps",
+      "device": { "power": "performance", "resolution": "1600x900", "refresh": 60, "fps": 45, "closeApps": true },
+      "settings": [
+        { "name": "Window Mode", "value": "Fullscreen" },
+        { "name": "Screen Resolution", "value": "1600 x 900" },
+        { "name": "Max FPS", "value": "60" },
+        { "name": "Anti-Aliasing", "value": "TSR" },
+        { "name": "View Distance", "value": "Medium" },
+        { "name": "Grass Details", "value": "Low" },
+        { "name": "Shadows", "value": "Low" },
+        { "name": "Effects Quality", "value": "Low" },
+        { "name": "Texture Quality", "value": "Medium" }
+      ],
+      "note": "900p with TSR keeps frame pacing steady around large bases.",
+      "source": { "name": "Starting point, not from a guide", "url": "" },
+      "checked": "2026-11-11",
+      "confidence": "starting-point"
+    },
+    {
+      "title": "Monster Hunter: World",
+      "keys": ["steam:582010"],
+      "titles": ["Monster Hunter: World", "Monster Hunter World"],
+      "target": "1080p at 60 fps",
+      "device": { "power": "performance", "resolution": "1920x1080", "refresh": 60, "fps": 60, "closeApps": true },
+      "settings": [
+        { "name": "DirectX 12 API", "value": "On" },
+        { "name": "Resolution", "value": "1920 x 1080" },
+        { "name": "FidelityFX CAS + Upscaling", "value": "On" },
+        { "name": "Texture Quality", "value": "Full" },
+        { "name": "Volume Rendering Quality", "value": "Off" },
+        { "name": "Shadow Quality", "value": "Mid" },
+        { "name": "Foliage Sway", "value": "Off" },
+        { "name": "Diffuse Quality", "value": "Low" }
+      ],
+      "note": "Volume Rendering Quality is the first setting to turn off if it dips.",
+      "source": { "name": "Starting point, not from a guide", "url": "" },
+      "checked": "2026-11-11",
+      "confidence": "starting-point"
+    },
+    {
+      "title": "Ghost of Tsushima",
+      "keys": ["steam:2215430"],
+      "titles": ["Ghost of Tsushima", "Ghost of Tsushima DIRECTOR'S CUT"],
+      "target": "1080p at 50 fps",
+      "device": { "power": "performance", "resolution": "1920x1080", "refresh": 60, "fps": 50, "closeApps": true },
+      "settings": [
+        { "name": "Resolution", "value": "1920 x 1080" },
+        { "name": "Upscale Method", "value": "AMD FSR 3, Balanced" },
+        { "name": "Texture Quality", "value": "Medium" },
+        { "name": "Shadow Quality", "value": "Low" },
+        { "name": "Level of Detail", "value": "Medium" },
+        { "name": "Terrain Detail", "value": "Medium" },
+        { "name": "Volumetric Fog", "value": "Low" },
+        { "name": "Screen Space Reflections", "value": "Off" }
+      ],
+      "note": "FSR 3 Balanced delivers sharp foliage and smooth combat.",
+      "source": { "name": "Starting point, not from a guide", "url": "" },
+      "checked": "2026-11-11",
+      "confidence": "starting-point"
+    },
+    {
+      "title": "Dave the Diver",
+      "keys": ["steam:1868140"],
+      "titles": ["Dave the Diver", "DAVE THE DIVER"],
+      "target": "1080p at 60 fps",
+      "device": { "power": "silent", "resolution": "1920x1080", "refresh": 60, "fps": 60, "closeApps": true },
+      "settings": [
+        { "name": "Resolution", "value": "1920 x 1080" },
+        { "name": "Quality", "value": "High" },
+        { "name": "VSync", "value": "On" }
+      ],
+      "note": "Light enough to try in Silent mode for longer battery life.",
+      "source": { "name": "Starting point, not from a guide", "url": "" },
+      "checked": "2026-11-11",
+      "confidence": "starting-point"
+    },
+    {
+      "title": "Hades II",
+      "keys": ["steam:1145350"],
+      "titles": ["Hades II", "Hades 2"],
+      "target": "1080p at 120 fps",
+      "device": { "power": "performance", "resolution": "1920x1080", "refresh": 120, "fps": 120, "closeApps": true },
+      "settings": [
+        { "name": "Resolution", "value": "1920 x 1080" },
+        { "name": "Graphics Quality", "value": "High" },
+        { "name": "VSync", "value": "On" }
+      ],
+      "note": "Set TDP Engine to 60 fps if you want more battery life.",
+      "source": { "name": "Starting point, not from a guide", "url": "" },
+      "checked": "2026-11-11",
+      "confidence": "starting-point"
+    },
+    {
+      "title": "Persona 3 Reload",
+      "keys": ["steam:2161700"],
+      "titles": ["Persona 3 Reload"],
+      "target": "1080p at 60 fps",
+      "device": { "power": "performance", "resolution": "1920x1080", "refresh": 60, "fps": 60, "closeApps": true },
+      "settings": [
+        { "name": "Resolution", "value": "1920 x 1080" },
+        { "name": "Rendering Scale", "value": "100%" },
+        { "name": "Shadow Quality", "value": "Middle" },
+        { "name": "Frame Rate Limit", "value": "60" },
+        { "name": "Reflections", "value": "Off" }
+      ],
+      "note": "Turning Reflections off keeps Tartarus and the mall at a steady 60 fps.",
+      "source": { "name": "Starting point, not from a guide", "url": "" },
+      "checked": "2026-11-11",
+      "confidence": "starting-point"
+    },
+    {
+      "title": "Forza Motorsport",
+      "keys": ["steam:2440510"],
+      "titles": ["Forza Motorsport"],
+      "target": "1080p at 45 fps",
+      "device": { "power": "performance", "resolution": "1920x1080", "refresh": 60, "fps": 45, "closeApps": true },
+      "settings": [
+        { "name": "Dynamic Render Quality", "value": "Low" },
+        { "name": "AMD FSR 2.0", "value": "Balanced" },
+        { "name": "Performance Target", "value": "60 FPS (V-Sync)" },
+        { "name": "Raytracing Quality", "value": "Off" },
+        { "name": "Car Model Quality", "value": "Medium" },
+        { "name": "Track Texture Quality", "value": "Medium" }
+      ],
+      "note": "Raytracing must be off on handhelds to keep frame times consistent.",
+      "source": { "name": "Starting point, not from a guide", "url": "" },
+      "checked": "2026-11-11",
+      "confidence": "starting-point"
     }
   ]
 }

@@ -126,6 +126,9 @@ internal static partial class Native
     private const ushort VkLeftWindows = 0x5B;
     private const ushort VkG = 0x47;
 
+    [LibraryImport("user32.dll", EntryPoint = "GetDesktopWindow")]
+    public static partial nint DesktopWindow();
+
     /// <summary>
     /// Opens Xbox Game Bar as the player would, with Win+G. Windows does not deliver a synthetic key to an
     /// elevated window, so this does nothing while the main app is in front.
@@ -272,6 +275,40 @@ internal static partial class Native
     [LibraryImport("kernel32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool GetSystemPowerStatus(out SystemPowerStatus status);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct SystemBatteryStateData
+    {
+        public byte AcOnLine;
+        public byte BatteryPresent;
+        public byte Charging;
+        public byte Discharging;
+        public byte Spare1;
+        public byte Spare2;
+        public byte Spare3;
+        public byte Tag;
+        public uint MaxCapacity;
+        public uint RemainingCapacity;
+        public int Rate;
+        public uint EstimatedTime;
+        public uint DefaultAlert1;
+        public uint DefaultAlert2;
+    }
+
+    [LibraryImport("powrprof.dll")]
+    private static partial uint CallNtPowerInformation(int level, nint input, uint inputLength, out SystemBatteryStateData output, uint outputLength);
+
+    /// <summary>Estimated minutes of battery playtime remaining while discharging, or null when plugged in or unknown.</summary>
+    public static int? ReadBatteryRemainingMinutes(int unknownRate, int level)
+    {
+        if (CallNtPowerInformation(level, 0, 0, out var state, (uint)Marshal.SizeOf<SystemBatteryStateData>()) != 0
+            || state.AcOnLine != 0 || state.Charging != 0 || state.RemainingCapacity == 0 || state.Rate is 0 || state.Rate == unknownRate)
+        {
+            return null;
+        }
+
+        return (int)Math.Round(state.RemainingCapacity * 60.0 / Math.Abs(state.Rate));
+    }
 
     [LibraryImport("powrprof.dll")]
     [return: MarshalAs(UnmanagedType.U1)]

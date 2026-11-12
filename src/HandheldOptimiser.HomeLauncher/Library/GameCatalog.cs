@@ -38,7 +38,10 @@ internal static class GameCatalog
             ("Battle.net", BattleNetLibrary.Scan),
             ("GOG", GogLibrary.Scan),
             ("EA App", EaLibrary.Scan),
-            ("Ubisoft Connect", UbisoftLibrary.Scan)
+            ("Ubisoft Connect", UbisoftLibrary.Scan),
+            ("Amazon Games", AmazonLibrary.Scan),
+            ("Heroic", HeroicLibrary.Scan),
+            ("Steam Shortcuts", SteamShortcuts.Scan)
         })
         {
             var folders = new List<string>();

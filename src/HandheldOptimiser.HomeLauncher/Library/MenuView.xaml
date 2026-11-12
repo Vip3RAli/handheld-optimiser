@@ -30,10 +30,13 @@
                     <Button x:Name="InstallItem" Style="{StaticResource MenuButton}" Content="Install"
                             Visibility="Collapsed" />
                     <Button x:Name="FavouriteItem" Style="{StaticResource MenuButton}" />
+                    <Button x:Name="TagsItem" Style="{StaticResource MenuButton}" Content="Tags &amp; collections" />
                     <Button x:Name="ProfileItem" Style="{StaticResource MenuButton}" Content="Game profile" />
                     <!-- Only for a game on the recommended settings list. -->
                     <Button x:Name="RecommendedItem" Style="{StaticResource MenuButton}" Content="Optimised settings"
                             Visibility="Collapsed" />
+                    <Button x:Name="AchievementsItem" Style="{StaticResource MenuButton}" Content="Achievements" />
+                    <Button x:Name="SaveSnapshotsItem" Style="{StaticResource MenuButton}" Content="Save snapshots" />
                     <!-- Only for a program the player added: moves it between the games and Apps. -->
                     <Button x:Name="MoveItem" Style="{StaticResource MenuButton}" />
                     <Button x:Name="ArgumentsItem" Style="{StaticResource MenuButton}" Content="Launch arguments" />
@@ -100,6 +103,7 @@
 
                 <!-- Games and apps: what the library lists besides the installed games. -->
                 <StackPanel x:Name="GamesAppsItems" Visibility="Collapsed">
+                    <Button x:Name="AccountsGroup" Style="{StaticResource MenuButton}" Content="Store Accounts &amp; Achievements" />
                     <Button x:Name="OwnedGroup" Style="{StaticResource MenuButton}" Content="Ready to Install" />
                     <Button x:Name="DealsGroup" Style="{StaticResource MenuButton}" Content="Deals &amp; Free Games" />
                     <Button x:Name="EmulatorsGroup" Style="{StaticResource MenuButton}" Content="Emulators &amp; ROMs" />
@@ -243,6 +247,8 @@
                     <Button x:Name="ProfileAppsSetting" Style="{StaticResource MenuButton}" Content="Background programs" />
                     <Button x:Name="ProfileAutoTdpSetting" Style="{StaticResource MenuButton}" Content="TDP Engine" />
                     <Button x:Name="ProfileFanSetting" Style="{StaticResource MenuButton}" Content="Fan curve" />
+                    <Button x:Name="ProfileExportItem" Style="{StaticResource MenuButton}" Content="Export preset" />
+                    <Button x:Name="ProfileImportItem" Style="{StaticResource MenuButton}" Content="Import preset" />
                     <!-- For touch, which has no B button. -->
                     <Button x:Name="ProfileSettingsBackItem" Style="{StaticResource MenuButton}" Content="Back" />
 
@@ -335,6 +341,7 @@
                     <Button x:Name="StoreStartupItem" Style="{StaticResource MenuButton}" Content="Store apps at startup" />
                     <Button x:Name="QuickResumeSetting" Style="{StaticResource MenuButton}" Content="Quick Resume" />
                     <Button x:Name="ResumeSetting" Style="{StaticResource MenuButton}" Content="Resume game on wake" />
+                    <Button x:Name="SaveGuardSetting" Style="{StaticResource MenuButton}" Content="Save Guard backups" />
                     <!-- For touch, which has no B button. -->
                     <Button x:Name="WhilePlayingSettingsBackItem" Style="{StaticResource MenuButton}" Content="Back" />
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
@@ -501,6 +508,73 @@
                             <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <TextBlock Text="Select" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Store accounts and achievement syncing. -->
+                <StackPanel x:Name="AccountsItems" Visibility="Collapsed">
+                    <Button x:Name="AccountsSteamKeyItem" Style="{StaticResource MenuButton}" Content="Steam Web API key" />
+                    <Button x:Name="AccountsSyncAchievementsItem" Style="{StaticResource MenuButton}" Content="Sync achievements now" />
+                    <Button x:Name="AccountsBackItem" Style="{StaticResource MenuButton}" Content="Back" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Select" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Achievements for one game, added when the list opens. -->
+                <StackPanel x:Name="AchievementsItems" Visibility="Collapsed">
+                    <Button x:Name="AchievementsSyncItem" Style="{StaticResource MenuButton}" Content="Sync achievements" />
+                    <Button x:Name="AchievementsBackItem" Style="{StaticResource MenuButton}" Content="Back" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Select" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Save Guard snapshots for one game. -->
+                <StackPanel x:Name="SaveSnapshotsItems" Visibility="Collapsed">
+                    <Button x:Name="BackupSaveNowItem" Style="{StaticResource MenuButton}" Content="Back up save now" />
+                    <Button x:Name="SaveFolderSettingItem" Style="{StaticResource MenuButton}" Content="Save folder" />
+                    <Button x:Name="BrowseSaveFolderItem" Style="{StaticResource MenuButton}" Content="Browse for save folder" />
+                    <Button x:Name="SaveSnapshotsBackItem" Style="{StaticResource MenuButton}" Content="Back" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Select" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Tags and collections for one game. -->
+                <StackPanel x:Name="TagsItems" Visibility="Collapsed">
+                    <Button x:Name="AddCustomTagItem" Style="{StaticResource MenuButton}" Content="Add custom tag" />
+                    <Button x:Name="TagsBackItem" Style="{StaticResource MenuButton}" Content="Back" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Change" FontSize="15" VerticalAlignment="Center" />
                         <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
                             <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>

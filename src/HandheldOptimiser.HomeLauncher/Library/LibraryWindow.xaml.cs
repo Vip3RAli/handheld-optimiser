@@ -84,6 +84,7 @@ public partial class LibraryWindow : Window, ILibraryHost
         _play = new GameSessionController(this, _state, _navigation, _notices, _continue, this, ScreenOff, ScreenOn, ShowLibrary);
         _power = new PowerMenu(Menu, _menu, _notices, this);
         _owned = new OwnedGamesMenu(Menu, _menu, _notices, _state, this);
+        _ = new AccountsMenu(Menu, _menu, _notices, _state, _continue);
         _gameActions = new GameActionsMenu(Menu, _menu, _notices, _state, _options, _artwork, _backdrop, _continue, this);
         _settings = new SettingsMenu(Menu, _menu, _notices, _state, _options, _backdrop, _artwork, _topBar, _continue, OptionsHint, this);
         _ = new AddProgramMenu(Menu, _menu, _notices, _state, this);
@@ -418,10 +419,11 @@ public partial class LibraryWindow : Window, ILibraryHost
 
         if (logo is null)
         {
-            // Apps, a download, a star, an added program, and a controller for the games.
+            // Apps, a download, a star, a tag collection, an added program, and a controller for the games.
             return filter.Apps ? ""
                 : filter.NotInstalled ? ""
                 : filter.Favourites ? ""
+                : filter.Tag is not null ? ""
                 : filter.Store is not null ? ""
                 : "";
         }
@@ -628,15 +630,18 @@ public partial class LibraryWindow : Window, ILibraryHost
     {
         var favourites = GameCatalog.Favourites();
         var hidden = GameCatalog.Hidden();
+        var tags = GameTags.All();
         var changed = false;
 
         foreach (var tile in tiles)
         {
             var favourite = favourites.Contains(tile.Game.Key);
             var isHidden = hidden.Contains(tile.Game.Key);
-            changed |= tile.IsFavourite != favourite || tile.IsHidden != isHidden;
+            var tileTags = tags.GetValueOrDefault(tile.Game.Key) ?? [];
+            changed |= tile.IsFavourite != favourite || tile.IsHidden != isHidden || !tile.Tags.SequenceEqual(tileTags);
             tile.IsFavourite = favourite;
             tile.IsHidden = isHidden;
+            tile.Tags = tileTags;
         }
 
         return changed;
