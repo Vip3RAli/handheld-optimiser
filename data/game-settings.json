@@ -1755,6 +1755,79 @@
       "source": { "name": "ROG Ally Life guide", "url": "https://rogallylife.com/2024/12/07/path-of-exile-2-rog-ally-game-settings/" },
       "checked": "2026-11-13",
       "confidence": "guide"
+    },
+    {
+      "title": "Stardew Valley",
+      "keys": ["steam:413150"],
+      "titles": ["Stardew Valley"],
+      "target": "1080p at 60 fps",
+      "device": { "power": "efficiency", "resolution": "1920x1080", "refresh": 60, "fps": 60, "closeApps": true },
+      "settings": [
+        { "name": "Window Mode", "value": "Borderless Fullscreen" },
+        { "name": "Resolution", "value": "1920 x 1080" },
+        { "name": "VSync", "value": "On" },
+        { "name": "Lighting Quality", "value": "High" },
+        { "name": "Zoom Level", "value": "105% to 115%" },
+        { "name": "UI Scale", "value": "115% to 125%" },
+        { "name": "Show Tool Hit Location", "value": "On" },
+        { "name": "Controller Style Menus", "value": "On" }
+      ],
+      "note": "Light enough to run on the lowest power. The zoom and UI scale sizes are for the Ally's own screen.",
+      "source": { "name": "Community advice, not an Ally guide", "url": "" },
+      "checked": "2026-11-13",
+      "confidence": "starting-point"
+    },
+    {
+      "title": "Terraria",
+      "keys": ["steam:105600"],
+      "titles": ["Terraria"],
+      "target": "1080p at 60 fps",
+      "device": { "power": "efficiency", "resolution": "1920x1080", "refresh": 60, "fps": 60, "closeApps": true },
+      "settings": [
+        { "name": "Window Mode", "value": "Borderless Windowed" },
+        { "name": "Resolution", "value": "1920 x 1080" },
+        { "name": "Frame Skip", "value": "Subtle" },
+        { "name": "Lighting", "value": "Color" },
+        { "name": "Multicore Lighting", "value": "Off" },
+        { "name": "Quality", "value": "High" },
+        { "name": "Background", "value": "On" },
+        { "name": "Parallax", "value": "50%" },
+        { "name": "Waves Quality", "value": "High" }
+      ],
+      "note": "Multicore Lighting causes stutters, so leave it off.",
+      "source": { "name": "Community advice, not an Ally guide", "url": "" },
+      "checked": "2026-11-13",
+      "confidence": "starting-point"
+    },
+    {
+      "title": "The Elder Scrolls V: Skyrim Special Edition",
+      "keys": ["steam:489830"],
+      "titles": ["The Elder Scrolls V: Skyrim Special Edition", "The Elder Scrolls V: Skyrim Anniversary Edition", "Skyrim Special Edition", "Skyrim Anniversary Edition"],
+      "target": "1080p at 60 fps",
+      "device": { "power": "balanced", "resolution": "1920x1080", "refresh": 60, "fps": 60, "closeApps": true },
+      "settings": [
+        { "name": "Windowed Mode and Borderless", "value": "Enabled" },
+        { "name": "Antialiasing", "value": "TAA" },
+        { "name": "Texture Quality", "value": "High" },
+        { "name": "Radial Blur Quality", "value": "Medium" },
+        { "name": "Shadow Quality", "value": "Medium" },
+        { "name": "Shadow Distance", "value": "Medium" },
+        { "name": "Decal Quantity", "value": "High" },
+        { "name": "Godrays Quality", "value": "Low" },
+        { "name": "Screen Space Reflections", "value": "On" },
+        { "name": "Screen Space Ambient Occlusion", "value": "On" },
+        { "name": "Precipitation Occlusion", "value": "On" },
+        { "name": "Snow Shader", "value": "Off" },
+        { "name": "Lens Flare", "value": "On" },
+        { "name": "Object / Actor / Item Fade", "value": "Max" },
+        { "name": "Grass Fade", "value": "65%" },
+        { "name": "Light Fade", "value": "Max" },
+        { "name": "Distant Object Detail and Object Detail Fade", "value": "High" }
+      ],
+      "note": "The game's physics break above 60 fps without mods, so these settings keep the screen at 60 Hz. Covers the Anniversary Edition too.",
+      "source": { "name": "Community advice, not an Ally guide", "url": "" },
+      "checked": "2026-11-13",
+      "confidence": "starting-point"
     }
   ]
 }

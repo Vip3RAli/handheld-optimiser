@@ -83,6 +83,8 @@ public sealed class GameSettingsDbTests
         Assert.Equal("Balatro", list.For(Steam("2379780", "Balatro"))?.Title);
         Assert.Equal("Marvel's Spider-Man: Miles Morales", list.For(Steam("1817190", "Marvel’s Spider-Man: Miles Morales"))?.Title);
         Assert.Equal("Marvel's Spider-Man 2", list.For(Steam("2651280", "Marvel's Spider-Man 2"))?.Title);
+        Assert.Equal("The Elder Scrolls V: Skyrim Special Edition", list.For(new Game("gog:1", "The Elder Scrolls V: Skyrim Anniversary Edition", GameStore.Gog, null, null, "x"))?.Title);
+        Assert.Equal("Stardew Valley", list.For(new Game("gog:2", "Stardew Valley", GameStore.Gog, null, null, "x"))?.Title);
         Assert.Equal("Overwatch", list.For(new Game("battlenet:pro", "Overwatch 2", GameStore.BattleNet, null, null, "x"))?.Title);
         Assert.Equal("Diablo II: Resurrected", list.For(Steam("2536520", "Diablo II: Resurrected \u2013 Infernal Edition"))?.Title);
         Assert.Null(list.For(Steam("2", "Some Other Game")));
