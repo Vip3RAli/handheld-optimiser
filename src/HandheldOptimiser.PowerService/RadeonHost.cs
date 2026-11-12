@@ -82,6 +82,10 @@ internal sealed class RadeonHost
         SharpeningRange = state.SharpeningRange?.ToArray(),
     };
 
+    /// <summary>A Radeon setting changed from the widget. Answered with the last status, its Error saying why not.</summary>
+    public AutoTdpStatus Answer(AutoTdpRequest request, AutoTdpStatus last) =>
+        Set(request.RadeonFeature, request.RadeonOn, request.RadeonValue) is { } problem ? last with { Error = problem } : last;
+
     /// <summary>Switches a setting on or off, or sets its number, waiting for the result.</summary>
     /// <returns>Why it was not changed, in plain words, or null.</returns>
     public string? Set(string? feature, bool? on, int? value)

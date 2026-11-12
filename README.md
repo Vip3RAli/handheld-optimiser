@@ -153,7 +153,7 @@ Counting a game's frames needs administrator, which the library never asks for, 
 The installer is not signed with a paid code-signing certificate yet. Each release lists the installer's SHA-256 hash if you want to verify your download.
 
 **Something went wrong. What do I do?**
-Use **Undo all changes** on the Maintenance & backup page, or roll back with the System Restore point the app created. Logs are in `%LOCALAPPDATA%\HandheldOptimiser\logs`; attach them to an issue.
+Use **Undo all changes** on the Maintenance & backup page, or roll back with the System Restore point the app created. To report it, open **Console** at the bottom of the app and press **Copy diagnostics**, then paste into an issue. That copies the version, your device's model, which tweaks are on and the last lines of each log, with your account name taken out. The full logs are in `%LOCALAPPDATA%\HandheldOptimiser\logs`.
 
 **Full screen mode opens to a blank grey screen.**
 This affected 0.4.0 and earlier. Open **Full screen** and switch on **Open your chosen app in full screen mode** once to fix it.

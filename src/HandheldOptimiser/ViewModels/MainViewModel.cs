@@ -61,6 +61,8 @@ public sealed partial class MainViewModel : ObservableObject, IShell
 
     private readonly UpdateService _updates;
     private readonly TweakStateStore _states;
+    private readonly TweakEngine _engine;
+    private readonly TweakJournalService _journal;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(UpdateTitle), nameof(UpdateMessage), nameof(CanInstallUpdate))]
@@ -103,6 +105,8 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         Log = log;
         _updates = updates;
         _states = states;
+        _engine = engine;
+        _journal = journal;
 
         var dashboard = new DashboardViewModel(engine, states, systemState, hardware, restorePoints, this);
         Pages.Add(dashboard);
@@ -384,6 +388,65 @@ public sealed partial class MainViewModel : ObservableObject, IShell
 
     [RelayCommand]
     private void ClearLog() => Log.Clear();
+
+    /// <summary>
+    /// Puts a report for an issue on the clipboard: the version, the device, every tweak's state and the
+    /// end of each log. See <see cref="DiagnosticsReport"/> for why it is text and not a file.
+    /// </summary>
+    [RelayCommand]
+    private async Task CopyDiagnosticsAsync()
+    {
+        // This session's lines are taken from memory, here on the window's thread, which owns the list.
+        var session = string.Join('\n', Log.Entries.Select(e => $"{e.TimeText} {e.Prefix} {e.Message}"));
+        var tweaks = _engine.AllTweaks.Where(_engine.IsForThisDevice).Select(t => (t.Name, _states.StateOf(t))).ToList();
+        var undo = _journal.Revertable().Select(e => e.TweakName).ToList();
+
+        var report = await Task.Run(() =>
+        {
+            var logs = System.IO.Path.Combine("HandheldOptimiser", "logs");
+            var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            var shared = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+
+            return DiagnosticsReport.Build(new DiagnosticsFacts
+            {
+                AppVersion = UpdateService.Display(_updates.CurrentVersion),
+                Windows = DiagnosticsReport.WindowsText(),
+                Device = DiagnosticsReport.DeviceText(_engine.Device),
+                ProfileFolder = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                UserName = Environment.UserName,
+                MachineName = Environment.MachineName,
+                Tweaks = tweaks,
+                UndoEntries = undo,
+                Logs =
+                [
+                    ("This session", session.Length == 0 ? "(empty)" : session),
+                    ("Game library", DiagnosticsReport.ReadLogTail(System.IO.Path.Combine(local, logs, "home-launcher.log"))),
+                    ("TDP Engine", DiagnosticsReport.ReadLogTail(System.IO.Path.Combine(shared, logs, "auto-tdp.log")))
+                ]
+            });
+        });
+
+        try
+        {
+            System.Windows.Clipboard.SetText(report);
+        }
+        catch (System.Runtime.InteropServices.ExternalException ex)
+        {
+            // Another program can hold the clipboard for a moment, and Windows then turns this down.
+            Log.Warning($"Could not copy the diagnostics: {ex.Message}");
+            await ConfirmAsync("Could not copy", "Another program is using the clipboard. Try again in a moment.", "OK");
+            return;
+        }
+
+        Log.Info($"Diagnostics copied to the clipboard ({report.Length:N0} characters).");
+        await ConfirmAsync(
+            "Diagnostics copied",
+            "Paste them into your issue on GitHub.\n\n" +
+            "They hold the app's version, your device's model, which tweaks are on, and the last lines of the " +
+            "app's, the game library's and TDP Engine's logs, which name the games you played. Your account " +
+            "name and the device's name are taken out.",
+            "OK");
+    }
 
     /// <summary>
     /// Opened in Notepad by full path, not through the shell. Shell-opening a .log from this elevated

@@ -38,6 +38,9 @@ internal sealed class ScreenStatsHost
     /// <summary>Whether it is switched on, which keeps the service running.</summary>
     public bool On { get; private set; }
 
+    /// <summary>The status with whether the stats screen is on.</summary>
+    public AutoTdpStatus AddTo(AutoTdpStatus status) => status with { ScreenStats = On };
+
     /// <summary>Switched on or off from the widget. Saved, and started at once.</summary>
     public void Set(bool on)
     {

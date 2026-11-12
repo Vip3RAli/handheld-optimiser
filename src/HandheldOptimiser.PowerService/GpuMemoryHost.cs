@@ -33,6 +33,15 @@ internal sealed class GpuMemoryHost(AsusAcpi? acpi)
         }
     }
 
+    /// <summary>
+    /// The GPU memory requests, from the widget or the app: read it, set it, or ask to restart Windows to use
+    /// it. Answered with the last status, its Error saying why a size was not set.
+    /// </summary>
+    public AutoTdpStatus Answer(AutoTdpRequest request, AutoTdpStatus last) =>
+        request.Command == AutoTdpProtocol.SetGpuMemory && Set(request.GpuMemory) is { } problem
+            ? last with { Error = problem }
+            : last;
+
     /// <summary>Sets the size, used from the next restart. Setting the size Windows has now clears a change that waits.</summary>
     /// <param name="size">In GB, 0 for Auto.</param>
     /// <returns>Why it was not set, in plain words, or null.</returns>

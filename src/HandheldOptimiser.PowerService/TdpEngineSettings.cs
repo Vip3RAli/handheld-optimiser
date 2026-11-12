@@ -64,6 +64,10 @@ internal sealed class TdpEngineSettings
     /// <summary>The mode's name for a status.</summary>
     public string ModeName => Auto ? AutoTdpProtocol.AutoModeName : AutoTdpProtocol.ManualMode;
 
+    /// <summary>The status with Auto or Manual, and the last manual choices.</summary>
+    public AutoTdpStatus AddTo(AutoTdpStatus status) =>
+        status with { Mode = ModeName, ManualPowerLimit = ManualPowerLimit, ManualFans = ManualFans };
+
     public void SetMode(bool auto)
     {
         Auto = auto;

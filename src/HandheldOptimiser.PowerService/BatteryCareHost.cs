@@ -65,6 +65,10 @@ internal sealed class BatteryCareHost
         }
     }
 
+    /// <summary>The 80% battery charge limit switched on or off, from the widget or the app.</summary>
+    public AutoTdpStatus Answer(AutoTdpRequest request, AutoTdpStatus last) =>
+        Set(request.BatteryCare) is { } problem ? last with { Error = problem } : last;
+
     /// <summary>Switches the 80% charge limit on or off, saving the choice and sending it to the firmware.</summary>
     /// <returns>Why it was not set, in plain words, or null.</returns>
     public string? Set(bool? on)

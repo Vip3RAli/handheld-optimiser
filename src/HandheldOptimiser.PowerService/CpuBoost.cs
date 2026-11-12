@@ -24,6 +24,23 @@ internal static partial class CpuBoost
     /// <summary>Whether boost is on now for the power source in use, or null when Windows will not say.</summary>
     public static bool? Read() => ReadModes() is { } modes ? CpuBoostRules.IsOn(modes, OnBattery()) : null;
 
+    /// <summary>
+    /// Turns the processor's boost on or off, from the widget. Answered with the last status, its Error
+    /// saying why when Windows would not change it.
+    /// </summary>
+    public static AutoTdpStatus Answer(AutoTdpRequest request, AutoTdpStatus last)
+    {
+        if (request.CpuBoost is not { } on)
+        {
+            return last with { Error = "The request did not say whether to turn boost on or off." };
+        }
+
+        return Set(on) is { } problem ? last with { Error = problem } : last;
+    }
+
+    /// <summary>The status with whether boost is on for the power source in use.</summary>
+    public static AutoTdpStatus AddTo(AutoTdpStatus status) => status with { CpuBoost = Read() };
+
     /// <summary>Turns boost on or off. Returns why it could not, or null.</summary>
     public static string? Set(bool on)
     {
