@@ -552,6 +552,7 @@
                 <StackPanel x:Name="SaveSnapshotsItems" Visibility="Collapsed">
                     <Button x:Name="BackupSaveNowItem" Style="{StaticResource MenuButton}" Content="Back up save now" />
                     <Button x:Name="SaveFolderSettingItem" Style="{StaticResource MenuButton}" Content="Save folder" />
+                    <Button x:Name="BrowseSaveFolderItem" Style="{StaticResource MenuButton}" Content="Browse for save folder" />
                     <Button x:Name="SaveSnapshotsBackItem" Style="{StaticResource MenuButton}" Content="Back" />
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
                         <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">

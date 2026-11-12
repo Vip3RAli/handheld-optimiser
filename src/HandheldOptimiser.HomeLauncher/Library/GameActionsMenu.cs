@@ -68,6 +68,7 @@ internal sealed class GameActionsMenu
         view.SaveSnapshotsItem.Click += (_, _) => OpenSaveSnapshots();
         view.BackupSaveNowItem.Click += (_, _) => BackupSaveNow();
         view.SaveFolderSettingItem.Click += (_, _) => EditSaveFolder();
+        view.BrowseSaveFolderItem.Click += (_, _) => BrowseSaveFolder();
         view.SaveSnapshotsBackItem.Click += (_, _) => menu.Back();
         view.MoveItem.Click += (_, _) => ToggleApp();
         view.ArgumentsItem.Click += (_, _) => EditArguments();
@@ -907,5 +908,41 @@ internal sealed class GameActionsMenu
                 RefreshSaveSnapshotsRows(tile);
                 _menu.ShowItems(_view.SaveFolderSettingItem);
             });
+    }
+
+    /// <summary>
+    /// Picks the save folder with Windows' own folder picker, so a game whose saves were not found needs no
+    /// path typed in, which the player asked for on 2026-11-12. It opens on the folder in use, or on
+    /// Documents, where most games keep their saves. The library stops reading the controller while the
+    /// picker has the focus, so presses meant for the picker never reach the menu behind it.
+    /// </summary>
+    private void BrowseSaveFolder()
+    {
+        if (_menu.Tile is not { } tile)
+        {
+            return;
+        }
+
+        var current = SaveGuard.CustomSaveFolder(tile.Game) ?? SaveGuard.FindSaveFolder(tile.Game);
+        var picker = new Microsoft.Win32.OpenFolderDialog
+        {
+            Title = $"{tile.Title}'s save folder",
+            InitialDirectory = current is { Length: > 0 } && Directory.Exists(current)
+                ? current
+                : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+        };
+
+        var picked = picker.ShowDialog(_host.Window) == true;
+        if (picked)
+        {
+            SaveGuard.SaveCustomFolder(tile.Game, picker.FolderName);
+            RefreshSaveSnapshotsRows(tile);
+        }
+
+        _menu.ShowItems(_view.BrowseSaveFolderItem);
+        if (picked)
+        {
+            _notices.Show($"{tile.Title}'s saves are in {picker.FolderName}.");
+        }
     }
 }
