@@ -16,12 +16,58 @@ public sealed class GameSettingsDbTests
 
         Assert.NotNull(list);
         Assert.NotEmpty(list!.Games);
+        var seenKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         Assert.All(list.Games, game =>
         {
             Assert.NotNull(game.Device);
             Assert.NotEmpty(game.Settings);
             Assert.NotEqual(game.ApplyTo(GameProfile.None), GameProfile.None);
+
+            if (game.Device!.Power is { } power)
+            {
+                Assert.True(Enum.TryParse<PowerMode>(power, ignoreCase: true, out var mode) && Enum.IsDefined(mode),
+                    $"{game.Title} has unknown power mode '{power}'.");
+            }
+
+            if (game.Device.Resolution is { } resolution)
+            {
+                Assert.NotNull(Resolution.Parse(resolution));
+            }
+
+            if (game.Device.Fps is { } fps)
+            {
+                Assert.Contains(fps, AutoTdp.FrameRates);
+            }
+
+            foreach (var key in game.Keys)
+            {
+                Assert.True(seenKeys.Add(key), $"Duplicate key '{key}' on {game.Title}.");
+            }
+
+            if (game.FromGuide)
+            {
+                Assert.NotNull(game.Source);
+                Assert.False(string.IsNullOrWhiteSpace(game.Source!.Name), $"{game.Title} guide is missing source name.");
+                Assert.True(Uri.TryCreate(game.Source.Url, UriKind.Absolute, out _), $"{game.Title} guide has invalid source URL.");
+                Assert.False(string.IsNullOrWhiteSpace(game.Checked), $"{game.Title} guide is missing checked date.");
+            }
+
+            AssertNoTypographicDash(game.Title);
+            AssertNoTypographicDash(game.Target);
+            AssertNoTypographicDash(game.Note);
         });
+    }
+
+    private static void AssertNoTypographicDash(string? text)
+    {
+        if (text is null)
+        {
+            return;
+        }
+
+        Assert.DoesNotContain('\u2013', text);
+        Assert.DoesNotContain('\u2014', text);
     }
 
     [Fact]
@@ -32,6 +78,13 @@ public sealed class GameSettingsDbTests
         Assert.Equal("Fallout 4", list.For(Steam("377160", "Something else"))?.Title);
         Assert.Equal("Baldur's Gate 3", list.For(Steam("1", "BALDUR’S GATE 3"))?.Title);
         Assert.Equal("Cyberpunk 2077", list.For(new Game("gog:999", "Cyberpunk 2077", GameStore.Gog, null, null, "x"))?.Title);
+        Assert.Equal("Diablo IV", list.For(Steam("2344520", "Diablo IV"))?.Title);
+        Assert.Equal("Slay the Spire 2", list.For(Steam("2868840", "Slay the Spire 2"))?.Title);
+        Assert.Equal("Balatro", list.For(Steam("2379780", "Balatro"))?.Title);
+        Assert.Equal("Marvel's Spider-Man: Miles Morales", list.For(Steam("1817190", "Marvel’s Spider-Man: Miles Morales"))?.Title);
+        Assert.Equal("Marvel's Spider-Man 2", list.For(Steam("2651280", "Marvel's Spider-Man 2"))?.Title);
+        Assert.Equal("Overwatch", list.For(new Game("battlenet:pro", "Overwatch 2", GameStore.BattleNet, null, null, "x"))?.Title);
+        Assert.Equal("Diablo II: Resurrected", list.For(Steam("2536520", "Diablo II: Resurrected \u2013 Infernal Edition"))?.Title);
         Assert.Null(list.For(Steam("2", "Some Other Game")));
         Assert.Null(list.For(Steam("377160", "Fallout 4") with { IsApp = true }));
     }
