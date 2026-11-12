@@ -49,6 +49,8 @@
       its licence, which asks to travel with it, is copied beside the app.
     -->
     <Resource Include="Fonts\*.ttf" />
+    <!-- The Console space look's card tilt, compiled from CardTilt.fx beside it (see CardTilt.cs). -->
+    <Resource Include="Library\Shaders\CardTilt.ps" />
     <Content Include="Fonts\OFL.txt" Link="Open Sans licence.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

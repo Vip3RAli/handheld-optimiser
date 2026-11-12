@@ -43,8 +43,36 @@ internal static class OldSchoolStack
     // The furthest back of the cards that are fully on show.
     private const int LastShown = 4;
 
-    // The most the cards are enlarged to fill a wide screen.
+    // The most the cards are enlarged to fill a wide screen. Less in the Console space look, which keeps
+    // room under the cards for the floor they are reflected in.
     private const double MostFit = 1.75;
+    private const double MostConsoleFit = 1.42;
+
+    /// <summary>
+    /// How far each card is turned away in the Console space look, at each whole depth from the front:
+    /// the front card faces the player, and the rest turn a little more the further back they are.
+    /// </summary>
+    private static readonly double[] Tilts = [0, 0.14, 0.19, 0.23, 0.26, 0.28];
+
+    /// <summary>How bright each card is drawn in the Console space look, darker the further from the light.</summary>
+    private static readonly double[] Dims = [1, 0.9, 0.82, 0.75, 0.69, 0.64];
+
+    /// <summary>
+    /// The room the Console space look keeps round a card for its glow, shadows and reflection, as
+    /// LibraryResources.xaml's ConsoleFrame lays it out: from 60 left of and above the card, 560 across and
+    /// 760 down. CardTilt needs to know where in that the card is.
+    /// </summary>
+    public const double FrameLeft = 60;
+    public const double FrameTop = 60;
+    public const double FrameWidth = 560;
+    public const double FrameHeight = 760;
+
+    /// <summary>
+    /// The room under the cards for their reflections in the Console space look, as a part of a card's
+    /// height: the reflection fades out at 32% of it, 8 under the card. The stack is that much taller, as
+    /// the scroll viewer it sits in cuts off anything drawn outside it.
+    /// </summary>
+    public const double ReflectionRoom = 0.34;
 
     /// <summary>How much bigger than a card the tallest one is drawn: the one sliding out, which grows as it goes.</summary>
     public static readonly double Tallest = Stops.Max(s => s.Scale);
@@ -54,10 +82,26 @@ internal static class OldSchoolStack
     /// screen. Never smaller than they are designed, for the handheld's own screen.
     /// </summary>
     /// <param name="width">The room across, in the units the cards are sized in.</param>
-    public static double Fit(double width)
+    /// <param name="console">Whether the Console space look is on, which enlarges them less.</param>
+    public static double Fit(double width, bool console = false)
     {
         var (scale, left, _) = Stops[LastShown - FirstDepth];
-        return double.IsFinite(width) ? Math.Clamp(width / (left + (scale * CardWidth)), 1, MostFit) : 1;
+        return double.IsFinite(width) ? Math.Clamp(width / (left + (scale * CardWidth)), 1, console ? MostConsoleFit : MostFit) : 1;
+    }
+
+    /// <summary>How far a card that many places behind the front one is turned away, in the Console space look.</summary>
+    public static double Tilt(double depth) => Between(Tilts, depth);
+
+    /// <summary>How bright a card that many places behind the front one is drawn, in the Console space look.</summary>
+    public static double Dim(double depth) => Between(Dims, depth);
+
+    /// <summary>The value at that depth, part way between two whole ones, and held at either end.</summary>
+    private static double Between(double[] values, double depth)
+    {
+        var at = Math.Clamp(depth, 0, values.Length - 1);
+        var before = (int)Math.Floor(at);
+        var after = Math.Min(before + 1, values.Length - 1);
+        return values[before] + ((values[after] - values[before]) * (at - before));
     }
 
     /// <summary>The size, left edge and opacity of a card that many places behind the front one.</summary>
@@ -89,6 +133,12 @@ internal static class OldSchoolStack
 /// </summary>
 internal sealed class OldSchoolPanel : Panel
 {
+    /// <summary>
+    /// Whether the Console space look is on, which every stack of cards draws in. Set by ConsoleSpace,
+    /// which then lays the stacks out again.
+    /// </summary>
+    public static bool ConsoleSpace { get; set; }
+
     public static readonly DependencyProperty PositionProperty = DependencyProperty.Register(
         nameof(Position), typeof(double), typeof(OldSchoolPanel),
         new FrameworkPropertyMetadata(0d, (panel, _) => ((OldSchoolPanel)panel).PlaceCards()));
@@ -135,14 +185,15 @@ internal sealed class OldSchoolPanel : Panel
         }
 
         // As wide as there is room for, and tall enough for the card sliding out, which grows as it goes.
-        Fit = OldSchoolStack.Fit(availableSize.Width);
+        Fit = OldSchoolStack.Fit(availableSize.Width, ConsoleSpace);
         var width = double.IsInfinity(availableSize.Width) ? card.Width : availableSize.Width;
-        return new Size(width, card.Height * Fit * OldSchoolStack.Tallest);
+        var reflections = ConsoleSpace ? card.Height * Fit * OldSchoolStack.ReflectionRoom : 0;
+        return new Size(width, (card.Height * Fit * OldSchoolStack.Tallest) + reflections);
     }
 
     protected override Size ArrangeOverride(Size finalSize)
     {
-        Fit = OldSchoolStack.Fit(finalSize.Width);
+        Fit = OldSchoolStack.Fit(finalSize.Width, ConsoleSpace);
         var card = new Rect(0, 0, OldSchoolStack.CardWidth, CardHeight);
         var children = InternalChildren;
         for (var i = 0; i < children.Count; i++)
@@ -183,10 +234,41 @@ internal sealed class OldSchoolPanel : Panel
             // Sized about its own middle, so every card shares one centre line down the middle of the panel.
             transform.Matrix = new Matrix(scale * fit, 0, 0, scale * fit, left * fit, (OldSchoolStack.Tallest - scale) * height / 2);
             child.Opacity = opacity;
+            Turn(child, i - position);
 
             // A card out of sight takes no taps, but can still be given the focus, which brings it forward.
             child.IsHitTestVisible = opacity > 0.5;
         }
+    }
+
+    /// <summary>
+    /// In the Console space look, turns a card behind the front one away and darkens it. The front card,
+    /// and every card in the Classic look, is drawn flat with no effect at all, which costs nothing.
+    /// </summary>
+    private static void Turn(UIElement card, double depth)
+    {
+        if (!ConsoleSpace || depth < 0.02)
+        {
+            if (card.Effect is not null)
+            {
+                card.Effect = null;
+            }
+
+            return;
+        }
+
+        if (card.Effect is not CardTilt tilt)
+        {
+            card.Effect = tilt = new CardTilt
+            {
+                CardLeft = OldSchoolStack.FrameLeft / OldSchoolStack.FrameWidth,
+                CardWidth = OldSchoolStack.CardWidth / OldSchoolStack.FrameWidth,
+                CardMiddle = (OldSchoolStack.FrameTop + (OldSchoolStack.CardHeight / 2)) / OldSchoolStack.FrameHeight
+            };
+        }
+
+        tilt.Tilt = OldSchoolStack.Tilt(depth);
+        tilt.Dim = OldSchoolStack.Dim(depth);
     }
 }
 
@@ -277,6 +359,9 @@ internal static class OldSchoolList
 /// </summary>
 internal sealed class OldSchoolListPanel : Panel
 {
+    /// <summary>Whether the names other than the open one fade further back, as the Console space look has them.</summary>
+    public static bool Recede { get; set; }
+
     public static readonly DependencyProperty PositionProperty = DependencyProperty.Register(
         nameof(Position), typeof(double), typeof(OldSchoolListPanel),
         new FrameworkPropertyMetadata(0d, (panel, _) => ((OldSchoolListPanel)panel).PlaceNames()));
@@ -347,7 +432,7 @@ internal sealed class OldSchoolListPanel : Panel
 
             // Sized about its bottom left corner, so every name starts at the same edge.
             transform.Matrix = new Matrix(scale, 0, 0, scale, 0, (child.DesiredSize.Height * (1 - scale)) - up);
-            child.Opacity = opacity;
+            child.Opacity = Recede ? opacity * (1 - (0.35 * Math.Clamp(place, 0, 1))) : opacity;
             child.IsHitTestVisible = opacity > 0.3;
         }
     }

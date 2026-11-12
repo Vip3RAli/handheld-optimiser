@@ -41,6 +41,9 @@ internal interface ILibraryHost
     /// <summary>Draws the layout again if a layout or docked mode setting asks for a different one.</summary>
     void LayoutSettingsChanged();
 
+    /// <summary>The Old School look or its moving background was changed in Settings.</summary>
+    void OldSchoolLookChanged();
+
     /// <summary>Resumes a game Quick Resume paused, for anything that brings it back or ends it.</summary>
     void ResumeGame(GameSession session);
 

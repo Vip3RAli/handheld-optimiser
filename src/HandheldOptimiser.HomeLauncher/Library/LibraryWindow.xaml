@@ -24,6 +24,12 @@
         <Rectangle x:Name="BackdropFront" Opacity="0" IsHitTestVisible="False"
                    RenderOptions.BitmapScalingMode="NearestNeighbor" />
 
+        <!--
+            The Old School layout's Console space look: the lit green space, its moving lines and motes and
+            the glass floor, over the backdrop and under everything else. Filled in by ConsoleSpaceLayer.
+        -->
+        <local:ConsoleSpaceLayer x:Name="ConsoleSpace" />
+
         <!-- Everything else, drawn bigger on a TV or monitor by docked mode. -->
         <Grid x:Name="ScaledContent">
         <Grid.RowDefinitions>
@@ -58,16 +64,23 @@
             The Old School layout's Not installed card, opened: one card nearly the size of the screen,
             which the page below is laid out inside for as long as it is open, so the games that are not
             installed scroll within it. The search is moved into its heading from the top bar. See
-            OldSchoolPresenter.cs, which has the page's edges to match the sizes here.
+            OldSchoolPresenter.cs, which has the page's edges to match the sizes here. It is drawn as the
+            menu's panel is, the slate of the Xbox 360's settings with its fine lines, and the game in
+            focus is ringed in the menu's green.
         -->
         <Grid x:Name="OpenCard" Grid.Row="2" Margin="24,0,24,0" Visibility="Collapsed">
-            <Border x:Name="OpenCardBack" CornerRadius="14" Background="{StaticResource OldSchoolGreenBack}" />
+            <Border x:Name="OpenCardBack" CornerRadius="5" Background="{StaticResource MenuPanelBack}"
+                    BorderBrush="#47FFFFFF" BorderThickness="1">
+                <Rectangle Fill="{StaticResource MenuPanelLines}" RadiusX="5" RadiusY="5" IsHitTestVisible="False" />
+            </Border>
             <Grid x:Name="OpenCardHeading" Height="60" Margin="14,0,14,0" VerticalAlignment="Top" Visibility="Collapsed">
+                <!-- The hairline under the heading, as under each of the menu's rows. -->
+                <Rectangle Height="1" Margin="6,0" VerticalAlignment="Bottom" Fill="#30FFFFFF" />
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <!-- For a finger or the mouse. B does the same on the controller. -->
                     <Button x:Name="CloseOpenCardButton" Style="{StaticResource IconButton}" Margin="0,0,14,0" FontSize="16"
                             VerticalAlignment="Center" Content="&#xE72B;" ToolTip="Back to the cards" />
-                    <TextBlock Text="Ready to Install" FontSize="26" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <TextBlock Text="Ready to install" FontSize="26" FontWeight="SemiBold" VerticalAlignment="Center" />
                     <TextBlock x:Name="OpenCardCount" Margin="14,0,0,0" FontSize="15" Opacity="0.75" VerticalAlignment="Center" />
                 </StackPanel>
                 <StackPanel x:Name="OpenCardSearch" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" />
@@ -94,10 +107,25 @@
                         <DataTemplate>
                             <Border Background="Transparent" Padding="0,2,24,2" Cursor="Hand">
                                 <StackPanel Orientation="Horizontal">
-                                    <!-- The mark beside the open one. -->
+                                    <!-- The mark beside the open one: a square, or in the Console space look a glowing green bar. -->
                                     <Rectangle Width="11" Height="11" Margin="0,5,12,0" Fill="#F2F3F5" VerticalAlignment="Center"
+                                               Visibility="{DynamicResource ClassicOnly}"
                                                Opacity="{Binding Path=(local:OldSchoolListPanel.Open), RelativeSource={RelativeSource AncestorType=ContentPresenter}}" />
-                                    <TextBlock Text="{Binding Name}" FontSize="44" FontWeight="SemiBold" />
+                                    <Rectangle Width="6" Height="38" Margin="0,6,16,0" RadiusX="3" RadiusY="3" Fill="#5FD12A" VerticalAlignment="Center"
+                                               Visibility="{DynamicResource ConsoleOnly}"
+                                               Opacity="{Binding Path=(local:OldSchoolListPanel.Open), RelativeSource={RelativeSource AncestorType=ContentPresenter}}">
+                                        <Rectangle.Effect>
+                                            <DropShadowEffect Color="#6EDC3C" BlurRadius="14" ShadowDepth="0" Opacity="0.9" />
+                                        </Rectangle.Effect>
+                                    </Rectangle>
+                                    <!-- The others in silver, and the open one white over it, so the white fades in as it comes to the front. -->
+                                    <Grid>
+                                        <TextBlock Text="{Binding Name}" FontSize="44" FontWeight="SemiBold"
+                                                   FontFamily="{DynamicResource CategoryFont}" Foreground="{DynamicResource CategoryBrush}" />
+                                        <TextBlock Text="{Binding Name}" FontSize="44" FontWeight="SemiBold" Foreground="#FFFFFF"
+                                                   FontFamily="{DynamicResource CategoryFont}" Visibility="{DynamicResource ConsoleOnly}"
+                                                   Opacity="{Binding Path=(local:OldSchoolListPanel.Open), RelativeSource={RelativeSource AncestorType=ContentPresenter}}" />
+                                    </Grid>
                                 </StackPanel>
                             </Border>
                         </DataTemplate>
@@ -130,39 +158,66 @@
             rest are at the right, with View and Menu each above what it opens. Margins that keep the bar the
             height it was with everything in one line, so the Old School cards above it still fit.
         -->
-        <Grid Grid.Row="3" Margin="48,2,48,12">
+        <Grid Grid.Row="3" Margin="48,2,48,12" TextElement.FontFamily="{DynamicResource HintFont}">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
-                <Border Style="{StaticResource HintGlyph}" Margin="0,0,8,0" Background="#3FA34D">
-                    <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <Border Style="{StaticResource HintPill}" Margin="0" Background="{DynamicResource AcceptPillBackground}"
+                        BorderBrush="{DynamicResource AcceptPillBorder}">
+                    <StackPanel Orientation="Horizontal">
+                        <Border Style="{StaticResource HintGlyph}" Margin="0,0,8,0" Background="#3FA34D" Effect="{DynamicResource AcceptGlow}">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock x:Name="AcceptHint" Text="Play" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
                 </Border>
-                <TextBlock x:Name="AcceptHint" Text="Play" FontSize="15" VerticalAlignment="Center" />
-                <StackPanel x:Name="OptionsHint" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Style="{StaticResource HintGlyph}" Background="#2F6FD0">
-                        <TextBlock Text="X" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
-                    <TextBlock Text="Options" FontSize="15" VerticalAlignment="Center" />
-                </StackPanel>
+                <Border x:Name="OptionsHint" Style="{StaticResource HintPill}">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Style="{StaticResource HintGlyph}" Background="#2F6FD0">
+                            <TextBlock Text="X" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Options" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                 <!-- Only while the Old School layout's Not installed card is open, which B closes. -->
-                <StackPanel x:Name="BackHint" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
-                    <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
-                        <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
-                    <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
-                </StackPanel>
-                <StackPanel Margin="26,0,0,0" VerticalAlignment="Center">
+                <Border x:Name="BackHint" Style="{StaticResource HintPill}" Visibility="Collapsed">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+                <StackPanel Margin="26,0,0,0" VerticalAlignment="Center" Visibility="{DynamicResource ClassicOnly}">
                     <Border Style="{StaticResource BumperGlyph}" HorizontalAlignment="Center">
                         <TextBlock Text="VIEW" FontSize="11" FontWeight="Bold" />
                     </Border>
                     <TextBlock Text="Power" Margin="0,3,0,0" FontSize="15" HorizontalAlignment="Center" />
                 </StackPanel>
-                <StackPanel Margin="22,0,0,0" VerticalAlignment="Center">
+                <StackPanel Margin="22,0,0,0" VerticalAlignment="Center" Visibility="{DynamicResource ClassicOnly}">
                     <Border Style="{StaticResource BumperGlyph}" HorizontalAlignment="Center">
                         <TextBlock Text="MENU" FontSize="11" FontWeight="Bold" />
                     </Border>
                     <TextBlock Text="Settings" Margin="0,3,0,0" FontSize="15" HorizontalAlignment="Center" />
                 </StackPanel>
+                <!-- In the Console space look, the View button's mark (two windows) and the Menu button's (three lines). -->
+                <Border Style="{StaticResource HintPill}" Visibility="{DynamicResource ConsoleOnly}">
+                    <StackPanel Orientation="Horizontal" Margin="10,0,0,0">
+                        <Canvas Width="22" Height="18" Margin="0,0,10,0" VerticalAlignment="Center">
+                            <Rectangle Width="13" Height="10" RadiusX="2" RadiusY="2" Stroke="#FFFFFF" StrokeThickness="1.6" />
+                            <Rectangle Canvas.Left="8" Canvas.Top="7" Width="13" Height="10" RadiusX="2" RadiusY="2"
+                                       Stroke="#FFFFFF" StrokeThickness="1.6" Fill="#40FFFFFF" />
+                        </Canvas>
+                        <TextBlock Text="Power" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource HintPill}" Visibility="{DynamicResource ConsoleOnly}">
+                    <StackPanel Orientation="Horizontal" Margin="10,0,0,0">
+                        <Path Data="M1,1 H17 M1,7 H17 M1,13 H17" Stroke="#FFFFFF" StrokeThickness="2" StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round" Margin="0,0,10,0" VerticalAlignment="Center" />
+                        <TextBlock Text="Settings" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </Grid>
 
