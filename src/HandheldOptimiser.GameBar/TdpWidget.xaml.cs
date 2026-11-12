@@ -5,11 +5,14 @@ using HandheldOptimiser.PowerService;
 using Microsoft.Gaming.XboxGameBar;
 using Windows.Storage;
 using Windows.System.Power;
+using Windows.UI;
 using Windows.UI.Core;
 using Windows.UI.Xaml;
+using Windows.UI.Xaml.Automation;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
 using Windows.UI.Xaml.Documents;
+using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Navigation;
 
 namespace HandheldOptimiser.GameBar
@@ -40,6 +43,7 @@ namespace HandheldOptimiser.GameBar
         private bool _placingBatteryCare;
         private bool _placingRadeon;
         private bool _placingFrameRate;
+        private bool _placingOverlay;
 
         // The frame rate slider's five stops. In Auto the first is None, no target; in Manual it is Off.
         private static readonly int[] FrameRateStops = { 0, 30, 40, 45, 60 };
@@ -54,15 +58,28 @@ namespace HandheldOptimiser.GameBar
             (AutoTdpProtocol.PaddleMute, "Mute")
         };
 
+        // The stick colours, each a dot in the widget. The shades are for the screen: softer than the LEDs' own,
+        // which are AllyCommands.Rgb's, so the dots sit together on a dark card.
+        private static readonly (string Colour, string Name, Color Shade)[] StickColours =
+        {
+            (AutoTdpProtocol.ColourGreen, "Xbox green", Color.FromArgb(255, 0x10, 0x7C, 0x10)),
+            (AutoTdpProtocol.ColourWhite, "White", Color.FromArgb(255, 0xFF, 0xFF, 0xFF)),
+            (AutoTdpProtocol.ColourRed, "Red", Color.FromArgb(255, 0xEF, 0x44, 0x44)),
+            (AutoTdpProtocol.ColourOrange, "Orange", Color.FromArgb(255, 0xF9, 0x73, 0x16)),
+            (AutoTdpProtocol.ColourYellow, "Yellow", Color.FromArgb(255, 0xEA, 0xB3, 0x08)),
+            (AutoTdpProtocol.ColourBlue, "Blue", Color.FromArgb(255, 0x3B, 0x82, 0xF6)),
+            (AutoTdpProtocol.ColourCyan, "Cyan", Color.FromArgb(255, 0x22, 0xD3, 0xEE)),
+            (AutoTdpProtocol.ColourPurple, "Purple", Color.FromArgb(255, 0xA8, 0x55, 0xF7)),
+            (AutoTdpProtocol.ColourPink, "Pink", Color.FromArgb(255, 0xEC, 0x48, 0x99))
+        };
+
         // The frame rate is sent once the slider has stopped moving for this long, as the power limit is.
         private readonly DispatcherTimer _frameRatePause = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
         private bool _frameRateSliding;
 
-        // The fan curve, overlay size and stick lights, each a slider of named stops.
+        // The fan curve and the stick lights' brightness, each a slider of named stops.
         private readonly StepSlider _fans;
-        private readonly StepSlider _overlay;
         private readonly StepSlider _lighting;
-        private readonly StepSlider _colour;
 
         // The Radeon settings' numbers, each a slider over the range the driver gives.
         private readonly NumberSlider _rsrSharpness;
@@ -75,23 +92,30 @@ namespace HandheldOptimiser.GameBar
         private const string ModeSetting = "Mode";
         private const string ManualPowerSetting = "ManualPowerLimit";
         private const string ManualFansSetting = "ManualFans";
+
+        // The overlay's size while it was last on, which is the size its switch turns it on at.
+        private const string OverlaySizeSetting = "OverlaySize";
         private readonly ApplicationDataContainer _saved = ApplicationData.Current.LocalSettings;
         private string _mode;
         private int _manualPower;
         private string _manualFans;
+        private string _overlaySize;
 
         // Whether the player just picked a GPU memory size, which asks to restart.
         private bool _askRestart;
         private bool _sliding;
         private EngineStatus _status = EngineStatus.Off;
         private bool _busy;
+        private readonly ColumnNavigation _column;
 
         public TdpWidget()
         {
             InitializeComponent();
+            _column = new ColumnNavigation(PageRows);
             _mode = _saved.Values[ModeSetting] as string ?? AutoTdpProtocol.AutoModeName;
             _manualPower = _saved.Values[ManualPowerSetting] as int? ?? 0;
             _manualFans = _saved.Values[ManualFansSetting] as string;
+            _overlaySize = _saved.Values[OverlaySizeSetting] as string ?? AutoTdpProtocol.OverlaySmall;
             _timer.Tick += (sender, e) => Refresh();
             _sliderPause.Tick += (sender, e) => SendSlider();
             _frameRatePause.Tick += (sender, e) => SendFrameRate();
@@ -101,23 +125,24 @@ namespace HandheldOptimiser.GameBar
                 new[] { AutoTdpProtocol.DynamicFans, AutoTdpProtocol.QuietFans, "", AutoTdpProtocol.CoolFans, AutoTdpProtocol.FullFans },
                 new[] { "Auto", "Quiet", "Default", "Cool", "Max" },
                 fans => Change(CurrentFps, CurrentPower, fans));
-            _overlay = new StepSlider(OverlaySlider, OverlayValue,
-                new[] { AutoTdpProtocol.OverlayOff, AutoTdpProtocol.OverlaySmall, AutoTdpProtocol.OverlayMedium, AutoTdpProtocol.OverlayFull },
-                new[] { "Off", "Small", "Medium", "Full" },
-                level => Send(() => EngineClient.SetOverlay(level, null, null)));
             _lighting = new StepSlider(LightingSlider, LightingValue,
                 new[] { AutoTdpProtocol.LightingOff, AutoTdpProtocol.LightingLow, AutoTdpProtocol.LightingMedium, AutoTdpProtocol.LightingHigh, AutoTdpProtocol.LightingBattery },
                 new[] { "Off", "Low", "Medium", "High", "Battery" },
                 lighting => Send(() => EngineClient.SetLighting(lighting)));
-            _colour = new StepSlider(ColourSlider, ColourValue,
-                new[]
+
+            // A dot for each stick colour. A screen reader has only the name to go by.
+            foreach (var colour in StickColours)
+            {
+                var swatch = new ToggleButton
                 {
-                    AutoTdpProtocol.ColourGreen, AutoTdpProtocol.ColourWhite, AutoTdpProtocol.ColourRed, AutoTdpProtocol.ColourOrange,
-                    AutoTdpProtocol.ColourYellow, AutoTdpProtocol.ColourBlue, AutoTdpProtocol.ColourCyan, AutoTdpProtocol.ColourPurple,
-                    AutoTdpProtocol.ColourPink
-                },
-                new[] { "Xbox green", "White", "Red", "Orange", "Yellow", "Blue", "Cyan", "Purple", "Pink" },
-                colour => Send(() => EngineClient.SetLightingColour(colour)));
+                    Style = (Style)Resources["Swatch"],
+                    Tag = colour.Colour,
+                    Background = new SolidColorBrush(colour.Shade)
+                };
+                AutomationProperties.SetName(swatch, colour.Name);
+                swatch.Click += OnColour;
+                ColourSwatches.Children.Add(swatch);
+            }
 
             foreach (var choice in PaddleChoices)
             {
@@ -158,15 +183,15 @@ namespace HandheldOptimiser.GameBar
                 }
 
                 _fans.Flush();
-                _overlay.Flush();
                 _lighting.Flush();
-                _colour.Flush();
                 _rsrSharpness.Flush();
                 _chillMin.Flush();
                 _chillMax.Flush();
                 _sharpening.Flush();
             };
         }
+
+        private void OnPageKey(object sender, Windows.UI.Xaml.Input.KeyRoutedEventArgs e) => _column.OnKey(sender, e);
 
         // Game Bar keeps the widget loaded after it closes, so without this it would ask TDP Engine every two
         // seconds for as long as the player is signed in. Null when opened on its own, outside Game Bar.
@@ -229,7 +254,7 @@ namespace HandheldOptimiser.GameBar
         }
 
         /// <summary>True while the player moves any slider and the choice is not sent yet.</summary>
-        private bool Moving => _sliding || _frameRateSliding || _fans.Moving || _overlay.Moving || _lighting.Moving || _colour.Moving
+        private bool Moving => _sliding || _frameRateSliding || _fans.Moving || _lighting.Moving
             || _rsrSharpness.Moving || _chillMin.Moving || _chillMax.Moving || _sharpening.Moving;
 
         private void OnFrameRateSlider(object sender, RangeBaseValueChangedEventArgs e)
@@ -433,6 +458,40 @@ namespace HandheldOptimiser.GameBar
             Send(() => EngineClient.SetScreenStats(on));
         }
 
+        /// <summary>A stick colour's dot. The ring moves to it at once, and TDP Engine's answer confirms it.</summary>
+        private void OnColour(object sender, RoutedEventArgs e)
+        {
+            var colour = (string)((FrameworkElement)sender).Tag;
+            ShowColour(colour);
+            Send(() => EngineClient.SetLightingColour(colour));
+        }
+
+        /// <summary>The ring on the dot of this colour, and the colour's name beside the label.</summary>
+        private void ShowColour(string colour)
+        {
+            Check(ColourSwatches, colour);
+            ColourValue.Text = StickColours.FirstOrDefault(c => c.Colour == colour).Name ?? "";
+        }
+
+        /// <summary>The overlay's switch: on at the size it had last, or off.</summary>
+        private void OnOverlay(object sender, RoutedEventArgs e)
+        {
+            // Set from TDP Engine's answer, not by the player: nothing to send.
+            if (_placingOverlay)
+            {
+                return;
+            }
+
+            var level = OverlaySwitch.IsOn ? _overlaySize : AutoTdpProtocol.OverlayOff;
+            Send(() => EngineClient.SetOverlay(level, null, null));
+        }
+
+        private void OnOverlaySize(object sender, RoutedEventArgs e)
+        {
+            var level = (string)((FrameworkElement)sender).Tag;
+            Send(() => EngineClient.SetOverlay(level, null, null));
+        }
+
         private void OnOverlayCorner(object sender, RoutedEventArgs e)
         {
             var corner = (string)((FrameworkElement)sender).Tag;
@@ -559,7 +618,7 @@ namespace HandheldOptimiser.GameBar
             }
 
             _busy = true;
-            SetState("", "Applying…");
+            ShowBusy("Applying…");
             try
             {
                 Show(await Task.Run(change));
@@ -586,7 +645,7 @@ namespace HandheldOptimiser.GameBar
             }
 
             _busy = true;
-            SetState("", _status.Running ? "Applying…" : "Starting TDP Engine…");
+            ShowBusy(_status.Running ? "Applying…" : "Starting TDP Engine…");
             try
             {
                 Show(await Task.Run(() => EngineClient.Update(targetFps, powerLimit, fanCurve, start)));
@@ -615,7 +674,7 @@ namespace HandheldOptimiser.GameBar
             _placingMode = true;
             ModeSwitch.IsOn = Auto;
             _placingMode = false;
-            ModeNote.Text = Auto ? "TDP Engine sets power and fans" : "You set power and fans";
+            ModeNote.Text = Auto ? "Scales power and fans automatically" : "You set power and fans";
             PowerLabel.Visibility = manual;
             PowerRow.Visibility = manual;
             CoolingCard.Visibility = manual;
@@ -626,14 +685,13 @@ namespace HandheldOptimiser.GameBar
             _fans.Show(CurrentFans ?? "");
 
             // The controller is TDP Engine's only while it replaces Armoury Crate. A switch has no "not known",
-            // so while the mode is not known it shows off and the line under it says so.
+            // so while the mode is not known it shows off and a line under its name says so.
             ControllerRow.Visibility = status.Replacing ? Visibility.Visible : Visibility.Collapsed;
             _placingController = true;
             ControllerSwitch.IsOn = status.ControllerMode == AutoTdpProtocol.GamepadMode;
             _placingController = false;
-            ControllerNote.Text = status.ControllerMode == AutoTdpProtocol.GamepadMode ? "On: the controller plays games"
-                : status.ControllerMode == AutoTdpProtocol.DesktopMode ? "Off: the controller works the mouse"
-                : "Not known yet";
+            ControllerNote.Visibility = Shown(status.ControllerMode != AutoTdpProtocol.GamepadMode
+                && status.ControllerMode != AutoTdpProtocol.DesktopMode);
             _placingPaddle = true;
             var paddle = status.PaddleAction ?? AutoTdpProtocol.PaddleNone;
             PaddleActions.SelectedItem = PaddleActions.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == paddle);
@@ -645,7 +703,7 @@ namespace HandheldOptimiser.GameBar
                 LightingValue.Text = "Not set";
             }
 
-            _colour.Show(status.LightingColour ?? AutoTdpProtocol.ColourGreen);
+            ShowColour(status.LightingColour ?? AutoTdpProtocol.ColourGreen);
 
             ShowBoost(status.CpuBoost);
             if (status.Reachable)
@@ -655,7 +713,7 @@ namespace HandheldOptimiser.GameBar
                 _placingBatteryCare = false;
             }
             ShowRadeon(status);
-            _overlay.Show(status.OverlayLevel ?? AutoTdpProtocol.OverlayOff);
+            ShowOverlay(status.OverlayLevel ?? AutoTdpProtocol.OverlayOff);
             Check(OverlayCorners, status.OverlayCorner ?? "");
             Check(OverlayLayouts, status.OverlayLayout ?? "");
             _placingScreenStats = true;
@@ -667,8 +725,8 @@ namespace HandheldOptimiser.GameBar
             var readouts = status.Running && status.Error == null;
             Readouts.Visibility = readouts ? Visibility.Visible : Visibility.Collapsed;
 
-            // A small gap under the readouts, and none when they are hidden.
-            StateLine.Margin = new Thickness(0, readouts ? 4 : 0, 0, 0);
+            // A hairline between the readouts and the line under them, and none when it stands alone.
+            StateLine.BorderThickness = new Thickness(0, readouts ? 1 : 0, 0, 0);
 
             if (status.Error != null)
             {
@@ -684,14 +742,15 @@ namespace HandheldOptimiser.GameBar
 
             // With fans only, TDP Engine leaves the power limit to the Ally's power mode, which Armoury Crate sets
             // unless TDP Engine is replacing it, so there is no wattage of TDP Engine's to show.
-            SetReadout(WattsValue, WattsUnit, "W", status.Watts?.ToString() ?? "Auto", status.Watts != null);
-            SetReadout(FpsValue, FpsUnit, "fps", status.Fps is double fps ? Math.Round(fps).ToString() : "?", status.Fps != null);
-            SetReadout(TemperatureValue, TemperatureUnit, "°C", status.Temperature?.ToString() ?? "?", status.Temperature != null);
+            SetReadout(WattsValue, WattsUnit, " W", status.Watts?.ToString() ?? "Auto", status.Watts != null);
+            SetReadout(FpsValue, FpsUnit, " FPS", status.Fps is double fps ? Math.Round(fps).ToString() : "?", status.Fps != null);
+            SetReadout(TemperatureValue, TemperatureUnit, " °C", status.Temperature?.ToString() ?? "?", status.Temperature != null);
 
             if (Auto)
             {
-                SetState(status.TargetFps > 0 ? "Holding " + status.TargetFps + " fps" : "Most frames for the power",
-                    ". " + (status.Watts?.ToString() ?? "?") + " W, boost " + (status.CpuBoost == true ? "on" : "off") + ".");
+                // The readouts, the frame rate slider and the boost switch already say all of it, so no line:
+                // the player had it removed on 2026-11-11 to save the height.
+                StateLine.Visibility = Visibility.Collapsed;
             }
             else if (status.Watts == null)
             {
@@ -712,6 +771,26 @@ namespace HandheldOptimiser.GameBar
                     StateDetail.Text += " Using up to " + status.PowerLimit + " W.";
                 }
             }
+        }
+
+        /// <summary>
+        /// The overlay's switch and, while it is on, its size. The size it had last is kept for the next time
+        /// the switch turns it on, in the widget's own settings as TDP Engine's answer has only the size in use.
+        /// </summary>
+        private void ShowOverlay(string level)
+        {
+            var on = level != AutoTdpProtocol.OverlayOff;
+            if (on && level != _overlaySize)
+            {
+                _overlaySize = level;
+                _saved.Values[OverlaySizeSetting] = level;
+            }
+
+            _placingOverlay = true;
+            OverlaySwitch.IsOn = on;
+            _placingOverlay = false;
+            OverlayOptions.Visibility = Shown(on);
+            Check(OverlaySizes, _overlaySize);
         }
 
         /// <summary>
@@ -810,10 +889,8 @@ namespace HandheldOptimiser.GameBar
             RadeonBody.Visibility = Shown(open);
             RadeonChevron.Text = open ? "" : "";
 
-            // Open, the header looks like every other card's: a line under it and a gap before the rows.
-            RadeonHeader.BorderThickness = new Thickness(0, 0, 0, open ? 1 : 0);
-            RadeonHeader.Padding = new Thickness(0, 0, 0, open ? 8 : 0);
-            RadeonHeader.Margin = new Thickness(0, 0, 0, open ? 12 : 0);
+            // Shut, the header is all there is of the card, so it sits in the middle of it.
+            RadeonHeader.Margin = new Thickness(0, 0, 0, open ? 4 : 3);
         }
 
         private static void ShowSwitch(FrameworkElement row, ToggleSwitch toggle, bool? on)
@@ -831,11 +908,24 @@ namespace HandheldOptimiser.GameBar
             unit.Text = known ? unitText : "";
         }
 
-        /// <summary>The line under the readouts: the state's name in green, then the rest of the sentence.</summary>
+        /// <summary>The line under the readouts, or in their place: the state's name, then the rest of the sentence.</summary>
         private void SetState(string name, string detail)
         {
             StateName.Text = name;
             StateDetail.Text = detail;
+            StateLine.Visibility = Visibility.Visible;
+        }
+
+        /// <summary>
+        /// Says a change is on its way, where the line is already showing. Where it is not, the change takes a
+        /// moment and a line that came and went would move every card under it.
+        /// </summary>
+        private void ShowBusy(string text)
+        {
+            if (StateLine.Visibility == Visibility.Visible)
+            {
+                SetState("", text);
+            }
         }
 
         private static void Check(Panel row, string tag)

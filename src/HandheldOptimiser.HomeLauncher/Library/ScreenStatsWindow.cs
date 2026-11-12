@@ -5,13 +5,16 @@ using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using Path = System.Windows.Shapes.Path;
 
 namespace HandheldOptimiser.HomeLauncher.Library;
 
 /// <summary>
-/// The stats screen's window: it fills the handheld's panel with the time and six big tiles. It is drawn at
-/// 1280 by 720 and scaled to the panel, whatever its size and scaling. It never takes the keyboard or the
-/// controller from the game, and is not in the taskbar or Alt+Tab. Built in code with NXE Evolution styling.
+/// The stats screen's window: it fills the handheld's panel with the time, a row of badges (Wi-Fi, battery,
+/// Battery Care) and six tiles, each an icon, a name, a big value and a thin line that fills with it. It is
+/// drawn at 1280 by 720 and scaled to the panel, whatever its size and scaling. It never takes the keyboard or
+/// the controller from the game, and is not in the taskbar or Alt+Tab. Built in code: dark glass, hairlines,
+/// and one jade accent, the same as TDP Engine's widget.
 /// </summary>
 internal sealed partial class ScreenStatsWindow : Window
 {
@@ -23,78 +26,65 @@ internal sealed partial class ScreenStatsWindow : Window
     private const uint NoActivate = 0x0010;
     private const uint ShowWindowFlag = 0x0040;
 
-    private static readonly FontFamily Blocky = new("Bahnschrift, Segoe UI");
+    // A hairline: thinner than a pixel of the 720p drawing, so it reads as a faint, exact rule.
+    private const double Hairline = 0.5;
 
-    // Canvas background: NXE deep dimensional slate gradient
-    private static readonly Brush Page = FrozenLinearGradient(
-        new Point(0, 0), new Point(0, 1),
-        (0.0, Color.FromRgb(0x0C, 0x10, 0x18)),
-        (0.5, Color.FromRgb(0x08, 0x0A, 0x10)),
-        (1.0, Color.FromRgb(0x05, 0x06, 0x09)));
+    // The battery's picture: how wide its inside is when full.
+    private const double BatteryInside = 27;
 
-    // Standard card surfaces and borders
-    private static readonly Brush CardFill = FrozenLinearGradient(
-        new Point(0, 0), new Point(0, 1),
-        (0.0, Color.FromRgb(0x1B, 0x22, 0x30)),
-        (0.5, Color.FromRgb(0x13, 0x18, 0x23)),
-        (1.0, Color.FromRgb(0x0E, 0x12, 0x1A)));
+    // Names and the clock in a geometric face, values in a fixed width one so digits do not shift as they change.
+    private static readonly FontFamily Geometric = new("Bahnschrift, Segoe UI");
+    private static readonly FontFamily Mono = new("Cascadia Mono, Consolas");
 
-    private static readonly Brush CardBorder = FrozenLinearGradient(
-        new Point(0, 0), new Point(0, 1),
-        (0.0, Color.FromRgb(0x35, 0x43, 0x5C)),
-        (0.5, Color.FromRgb(0x23, 0x2D, 0x3E)),
-        (1.0, Color.FromRgb(0x16, 0x1D, 0x29)));
+    private static readonly Brush Page = Frozen(Color.FromRgb(0x0C, 0x0D, 0x11));
+    private static readonly Brush CardFill = Frozen(Color.FromArgb(0x0B, 0xFF, 0xFF, 0xFF));
+    private static readonly Brush CardEdge = Frozen(Color.FromArgb(0x24, 0xFF, 0xFF, 0xFF));
+    private static readonly Brush Rule = Frozen(Color.FromArgb(0x30, 0xFF, 0xFF, 0xFF));
+    private static readonly Brush Track = Frozen(Color.FromArgb(0x1C, 0xFF, 0xFF, 0xFF));
+    private static readonly Brush Dim = Frozen(Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF));
 
-    private static readonly Brush CardSheen = FrozenLinearGradient(
-        new Point(0, 0), new Point(1, 0),
-        (0.0, Color.FromArgb(0x70, 0x4F, 0x63, 0x82)),
-        (0.7, Color.FromArgb(0x25, 0x35, 0x43, 0x5C)),
-        (1.0, Color.FromArgb(0x00, 0x16, 0x1D, 0x29)));
-
-    // Hero card (FPS) surfaces and borders: signature Xbox Emerald Green accents
-    private static readonly Brush HeroCardFill = FrozenLinearGradient(
-        new Point(0, 0), new Point(0, 1),
-        (0.0, Color.FromRgb(0x15, 0x24, 0x1C)),
-        (0.4, Color.FromRgb(0x11, 0x1A, 0x20)),
-        (1.0, Color.FromRgb(0x0E, 0x13, 0x1A)));
-
-    private static readonly Brush HeroCardBorder = FrozenLinearGradient(
-        new Point(0, 0), new Point(0, 1),
-        (0.0, Color.FromRgb(0x1E, 0xD7, 0x60)),
-        (0.5, Color.FromRgb(0x10, 0x7C, 0x10)),
-        (1.0, Color.FromRgb(0x1B, 0x35, 0x24)));
-
-    private static readonly Brush HeroCardSheen = FrozenLinearGradient(
-        new Point(0, 0), new Point(1, 0),
-        (0.0, Color.FromRgb(0x1E, 0xD7, 0x60)),
-        (0.7, Color.FromRgb(0x10, 0x7C, 0x10)),
-        (1.0, Color.FromArgb(0x00, 0x10, 0x7C, 0x10)));
-
-    // Header divider: glowing Xbox emerald glow bar
-    private static readonly Brush HeaderDivider = FrozenLinearGradient(
-        new Point(0, 0), new Point(1, 0),
-        (0.0, Color.FromArgb(0x00, 0x10, 0x7C, 0x10)),
-        (0.15, Color.FromRgb(0x10, 0x7C, 0x10)),
-        (0.5, Color.FromRgb(0x1E, 0xD7, 0x60)),
-        (0.85, Color.FromRgb(0x10, 0x7C, 0x10)),
-        (1.0, Color.FromArgb(0x00, 0x10, 0x7C, 0x10)));
-
-    // Pill badge brushes
-    private static readonly Brush BadgeBackground = Frozen(Color.FromArgb(0xD8, 0x11, 0x23, 0x16));
-    private static readonly Brush BadgeBorder = Frozen(Color.FromRgb(0x10, 0x7C, 0x10));
-    private static readonly Brush GreenGlow = Frozen(Color.FromRgb(0x1E, 0xD7, 0x60));
-
-    // Text brushes
-    private static readonly Brush LabelBrush = Frozen(Color.FromRgb(0x94, 0xA3, 0xB8));
-    private static readonly Brush ValueBrush = Frozen(Color.FromRgb(0xF8, 0xFA, 0xFC));
-    private static readonly Brush UnitBrush = Frozen(Color.FromRgb(0x7A, 0x88, 0x9B));
-    private static readonly Brush FpsBrush = Frozen(Color.FromRgb(0x1E, 0xD7, 0x60));
+    // The one accent, a quiet jade, for what is live and for the frame rate. Amber and red are for heat and a low battery.
+    private static readonly Brush Jade = Frozen(Color.FromRgb(0x10, 0xB9, 0x81));
+    private static readonly Brush LabelBrush = Frozen(Color.FromRgb(0x9C, 0xA3, 0xAF));
+    private static readonly Brush ValueBrush = Frozen(Color.FromRgb(0xF3, 0xF4, 0xF6));
+    private static readonly Brush UnitBrush = Frozen(Color.FromRgb(0x6B, 0x72, 0x80));
     private static readonly Brush WarmBrush = Frozen(Color.FromRgb(0xFB, 0xBF, 0x24));
     private static readonly Brush HotBrush = Frozen(Color.FromRgb(0xF8, 0x71, 0x71));
 
-    private readonly TextBlock _clock = Text(150, FontWeights.Bold, ValueBrush);
-    private readonly TextBlock _date = Text(32, FontWeights.SemiBold, LabelBrush);
-    private readonly (TextBlock Label, TextBlock Value, TextBlock Unit)[] _tiles = new (TextBlock, TextBlock, TextBlock)[6];
+    // The icons, each drawn in a 24 by 24 square with a thin line. One for each tile, in the tiles' order:
+    // a target, a bolt, a thermometer, a chip, a pulse and a graphics card.
+    private static readonly Geometry[] TileIcons =
+    [
+        Outline(new EllipseGeometry(new Point(12, 12), 8, 8), new EllipseGeometry(new Point(12, 12), 3, 3),
+            Geometry.Parse("M12,1.5 V5 M12,19 V22.5 M1.5,12 H5 M19,12 H22.5")),
+        Outline(Geometry.Parse("M13.5,2 L5,13.5 H11.5 L10.5,22 L19,10.5 H12.5 Z")),
+        Outline(Geometry.Parse("M9.5,5 A2.5,2.5 0 0 1 14.5,5 V13.2 A5,5 0 1 1 9.5,13.2 Z M12,9 V15"),
+            new EllipseGeometry(new Point(12, 17), 1.6, 1.6)),
+        Outline(new RectangleGeometry(new Rect(5.5, 5.5, 13, 13), 2, 2), new RectangleGeometry(new Rect(9.5, 9.5, 5, 5), 0.8, 0.8),
+            Geometry.Parse("M9,2 V5.5 M15,2 V5.5 M9,18.5 V22 M15,18.5 V22 M2,9 H5.5 M2,15 H5.5 M18.5,9 H22 M18.5,15 H22")),
+        Outline(Geometry.Parse("M1.5,12 H7 L9.5,4.5 L14.5,19.5 L17,12 H22.5")),
+        Outline(new RectangleGeometry(new Rect(4.5, 6.5, 18, 10.5), 2, 2), new EllipseGeometry(new Point(16, 11.75), 3, 3),
+            Geometry.Parse("M1.5,4.5 V20 M7,20 H13 M8.5,10 V13.5"))
+    ];
+
+    private static readonly Geometry BoltIcon = TileIcons[1];
+    private static readonly Geometry ShieldIcon = Outline(
+        Geometry.Parse("M12,2.5 L19.5,5.5 V11 C19.5,16 16,19.8 12,21.5 C8,19.8 4.5,16 4.5,11 V5.5 Z M8.8,11.8 L11.2,14.2 L15.4,9.6"));
+
+    private readonly TextBlock _clock = Text(Geometric, 128, FontWeights.Light, ValueBrush);
+    private readonly TextBlock _period = Text(Geometric, 30, FontWeights.SemiBold, LabelBrush);
+    private readonly TextBlock _date = Text(Geometric, 21, FontWeights.SemiBold, LabelBrush);
+
+    private readonly Rectangle[] _wifiBars = new Rectangle[4];
+    private readonly TextBlock _wifiName = Text(Mono, 17, FontWeights.Normal, ValueBrush);
+    private readonly Border _wifiBadge;
+    private readonly Border _batteryFill = new() { CornerRadius = new CornerRadius(1.5), HorizontalAlignment = HorizontalAlignment.Left };
+    private readonly Path _batteryBolt = Glyph(BoltIcon, Jade, 18);
+    private readonly TextBlock _batteryText = Text(Mono, 17, FontWeights.Normal, ValueBrush);
+    private readonly Border _batteryBadge;
+    private readonly Border _careBadge;
+
+    private readonly TileParts[] _tiles = new TileParts[6];
     private ScreenRect? _placed;
 
     public ScreenStatsWindow()
@@ -110,8 +100,12 @@ internal sealed partial class ScreenStatsWindow : Window
         Focusable = false;
         Cursor = System.Windows.Input.Cursors.None;
 
-        var page = new Grid { Width = ScreenStatsLayout.PanelWidth, Height = ScreenStatsLayout.PanelHeight, Margin = new Thickness(0) };
-        page.RowDefinitions.Add(new RowDefinition { Height = new GridLength(190) });
+        _wifiBadge = Badge(WifiBars(), _wifiName);
+        _batteryBadge = Badge(BatteryPicture(), _batteryBolt, _batteryText);
+        _careBadge = Badge(Glyph(ShieldIcon, Jade, 20), BadgeText("CARE 80%"));
+
+        var page = new Grid { Width = ScreenStatsLayout.PanelWidth, Height = ScreenStatsLayout.PanelHeight };
+        page.RowDefinitions.Add(new RowDefinition { Height = new GridLength(188) });
         page.RowDefinitions.Add(new RowDefinition());
         page.RowDefinitions.Add(new RowDefinition());
         for (var column = 0; column < 3; column++)
@@ -119,145 +113,61 @@ internal sealed partial class ScreenStatsWindow : Window
             page.ColumnDefinitions.Add(new ColumnDefinition());
         }
 
-        // The time on the left, telemetry status pill and date on the right, along the top.
-        var header = new Grid { Margin = new Thickness(36, 12, 36, 14) };
-        _clock.VerticalAlignment = VerticalAlignment.Center;
-        _clock.Margin = new Thickness(0, -6, 0, 0);
-
-        var rightStack = new StackPanel
-        {
-            HorizontalAlignment = HorizontalAlignment.Right,
-            VerticalAlignment = VerticalAlignment.Center
-        };
-
-        var pillBeacon = new Ellipse
-        {
-            Width = 8,
-            Height = 8,
-            Fill = GreenGlow,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 8, 0)
-        };
-
-        var pillText = new TextBlock
-        {
-            Text = "LIVE TELEMETRY",
-            FontFamily = Blocky,
-            FontSize = 13,
-            FontWeight = FontWeights.Bold,
-            Foreground = GreenGlow,
-            VerticalAlignment = VerticalAlignment.Center
-        };
-
-        var pillContent = new StackPanel { Orientation = Orientation.Horizontal };
-        pillContent.Children.Add(pillBeacon);
-        pillContent.Children.Add(pillText);
-
-        var pill = new Border
-        {
-            Background = BadgeBackground,
-            BorderBrush = BadgeBorder,
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(10),
-            Padding = new Thickness(12, 4, 12, 4),
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(0, 0, 0, 8),
-            Child = pillContent
-        };
-
-        _date.HorizontalAlignment = HorizontalAlignment.Right;
-        _date.VerticalAlignment = VerticalAlignment.Center;
-
-        rightStack.Children.Add(pill);
-        rightStack.Children.Add(_date);
-
-        header.Children.Add(_clock);
-        header.Children.Add(rightStack);
+        var header = Header();
         Grid.SetColumnSpan(header, 3);
         page.Children.Add(header);
 
-        var divider = new Border
-        {
-            Height = 2,
-            Margin = new Thickness(24, 0, 24, 0),
-            VerticalAlignment = VerticalAlignment.Bottom,
-            Background = HeaderDivider
-        };
-        Grid.SetColumnSpan(divider, 3);
-        page.Children.Add(divider);
+        var rule = new Border { Height = Hairline, Margin = new Thickness(32, 0, 32, 0), VerticalAlignment = VerticalAlignment.Bottom, Background = Rule };
+        Grid.SetColumnSpan(rule, 3);
+        page.Children.Add(rule);
 
-        // Two rows of three NXE cards under it.
+        // Two rows of three tiles under it.
         for (var i = 0; i < _tiles.Length; i++)
         {
-            var isHero = i == 0;
-            var label = Text(24, FontWeights.Bold, isHero ? GreenGlow : LabelBrush);
-            label.Margin = new Thickness(0, 0, 0, 4);
-
-            var value = Text(136, FontWeights.Bold, isHero ? FpsBrush : ValueBrush);
-            var unit = Text(44, FontWeights.SemiBold, UnitBrush);
-            unit.Margin = new Thickness(8, 0, 0, 24);
-            unit.VerticalAlignment = VerticalAlignment.Bottom;
-
-            var reading = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
-            reading.Children.Add(value);
-            reading.Children.Add(unit);
-
-            var sheen = new Border
-            {
-                Height = 2,
-                CornerRadius = new CornerRadius(1),
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                Margin = new Thickness(0, 0, 0, 10),
-                Background = isHero ? HeroCardSheen : CardSheen
-            };
-
-            var inside = new DockPanel { LastChildFill = true };
-            DockPanel.SetDock(sheen, Dock.Top);
-            DockPanel.SetDock(label, Dock.Top);
-            inside.Children.Add(sheen);
-            inside.Children.Add(label);
-            inside.Children.Add(reading);
-
-            var tile = new Border
-            {
-                Background = isHero ? HeroCardFill : CardFill,
-                BorderBrush = isHero ? HeroCardBorder : CardBorder,
-                BorderThickness = new Thickness(1.5),
-                CornerRadius = new CornerRadius(16),
-                Padding = new Thickness(26, 16, 20, 4),
-                Margin = new Thickness(i % 3 == 0 ? 24 : 8, i < 3 ? 12 : 8, i % 3 == 2 ? 24 : 8, i < 3 ? 8 : 24),
-                Child = inside
-            };
-
+            var tile = Tile(i);
+            // The three columns are equal, so the middle tile takes the two gaps and all three come out the same width.
+            tile.Margin = new Thickness(i % 3 == 0 ? 32 : i % 3 == 1 ? 16 : 0, i < 3 ? 18 : 8, i % 3 == 2 ? 32 : i % 3 == 1 ? 16 : 0, i < 3 ? 8 : 28);
             Grid.SetRow(tile, 1 + i / 3);
             Grid.SetColumn(tile, i % 3);
             page.Children.Add(tile);
-            _tiles[i] = (label, value, unit);
         }
 
         Content = new Viewbox { Stretch = Stretch.Uniform, Child = page };
         TextOptions.SetTextFormattingMode(this, TextFormattingMode.Ideal);
     }
 
-    /// <summary>Shows this second's readings and the time.</summary>
-    public void ShowReadings(IReadOnlyList<StatTile> tiles, DateTime now)
+    /// <summary>Shows this second's readings, the badges and the time.</summary>
+    public void ShowReadings(IReadOnlyList<StatTile> tiles, StatsHeader header, DateTime now)
     {
         var culture = CultureInfo.CurrentCulture;
-        _clock.Text = ScreenStatsLayout.Clock(now, culture);
-        _date.Text = ScreenStatsLayout.Date(now, culture);
+        _clock.Text = ScreenStatsLayout.ClockTime(now, culture);
+        _period.Text = ScreenStatsLayout.ClockPeriod(now, culture);
+        _date.Text = Spaced(ScreenStatsLayout.Date(now, culture));
+        ShowBadges(header);
 
         for (var i = 0; i < _tiles.Length && i < tiles.Count; i++)
         {
-            var (label, value, unit) = _tiles[i];
-            label.Text = tiles[i].Label;
-            value.Text = tiles[i].Value;
-            unit.Text = tiles[i].Unit;
-            value.Foreground = tiles[i].Tone switch
+            var parts = _tiles[i];
+            var tile = tiles[i];
+            var tone = tile.Tone switch
             {
                 StatTone.Hot => HotBrush,
                 StatTone.Warm => WarmBrush,
-                _ => i == 0 ? FpsBrush : ValueBrush
+                _ => null
             };
+
+            parts.Label.Text = Spaced(tile.Label);
+            parts.Caption.Text = Spaced(tile.Caption);
+            parts.Value.Text = tile.Value;
+            parts.Unit.Text = tile.Unit;
+            parts.Value.Foreground = tone ?? (i == 0 ? Jade : ValueBrush);
+
+            // The line under the value: two columns sharing its width, the first as wide as the reading is far along.
+            var fraction = tile.Fraction ?? 0;
+            parts.Filled.Width = new GridLength(fraction, GridUnitType.Star);
+            parts.Empty.Width = new GridLength(1 - fraction, GridUnitType.Star);
+            parts.Fill.Background = tone ?? Jade;
+            parts.Line.Visibility = tile.Fraction is null ? Visibility.Hidden : Visibility.Visible;
         }
     }
 
@@ -302,9 +212,253 @@ internal sealed partial class ScreenStatsWindow : Window
         SetWindowLongPtrW(handle, ExStyle, style | ExToolWindow | ExNoActivate);
     }
 
-    private static TextBlock Text(double size, FontWeight weight, Brush brush) => new()
+    /// <summary>
+    /// The top of the screen: the time with its small "pm" over the date at the left, and at the right the
+    /// badges over the line that says the readings are live.
+    /// </summary>
+    private Grid Header()
     {
-        FontFamily = Blocky,
+        _period.VerticalAlignment = VerticalAlignment.Top;
+        _period.Margin = new Thickness(10, 30, 0, 0);
+        var time = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(-6, 0, 0, 0) };
+        time.Children.Add(_clock);
+        time.Children.Add(_period);
+
+        _date.Margin = new Thickness(2, -12, 0, 0);
+        var left = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        left.Children.Add(time);
+        left.Children.Add(_date);
+
+        var badges = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        badges.Children.Add(_wifiBadge);
+        badges.Children.Add(_batteryBadge);
+        badges.Children.Add(_careBadge);
+
+        var live = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 18, 2, 0) };
+        live.Children.Add(new Ellipse { Width = 7, Height = 7, Fill = Jade, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 9, 0) });
+        var liveText = Text(Geometric, 14, FontWeights.SemiBold, Jade);
+        liveText.Text = Spaced("LIVE TELEMETRY");
+        liveText.VerticalAlignment = VerticalAlignment.Center;
+        live.Children.Add(liveText);
+
+        var right = new StackPanel { HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
+        right.Children.Add(badges);
+        right.Children.Add(live);
+
+        var header = new Grid { Margin = new Thickness(36, 8, 36, 8) };
+        header.Children.Add(left);
+        header.Children.Add(right);
+        return header;
+    }
+
+    /// <summary>
+    /// One tile: its icon and name, with a few small words at the right, over a hairline; the big value and
+    /// its unit; and the thin line that fills with the reading. The frame rate's, the first, is in jade.
+    /// </summary>
+    private Border Tile(int index)
+    {
+        var accent = index == 0 ? Jade : LabelBrush;
+        var label = Text(Geometric, 19, FontWeights.SemiBold, accent);
+        label.VerticalAlignment = VerticalAlignment.Center;
+        label.Margin = new Thickness(11, 1, 0, 0);
+        var caption = Text(Geometric, 14, FontWeights.SemiBold, UnitBrush);
+        caption.HorizontalAlignment = HorizontalAlignment.Right;
+        caption.VerticalAlignment = VerticalAlignment.Center;
+
+        var name = new StackPanel { Orientation = Orientation.Horizontal };
+        name.Children.Add(Glyph(TileIcons[index], accent, 26));
+        name.Children.Add(label);
+        var top = new Grid();
+        top.Children.Add(name);
+        top.Children.Add(caption);
+
+        var rule = new Border { Height = Hairline, Background = Rule, Margin = new Thickness(0, 12, 0, 0) };
+
+        var value = Text(Mono, 104, FontWeights.SemiBold, ValueBrush);
+        var unit = Text(Geometric, 34, FontWeights.Normal, UnitBrush);
+        unit.Margin = new Thickness(12, 0, 0, 21);
+        unit.VerticalAlignment = VerticalAlignment.Bottom;
+        var reading = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(-5, 0, 0, 0) };
+        reading.Children.Add(value);
+        reading.Children.Add(unit);
+
+        var filled = new ColumnDefinition { Width = new GridLength(0, GridUnitType.Star) };
+        var empty = new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) };
+        var fill = new Border { Height = 3, CornerRadius = new CornerRadius(1.5), Background = Jade };
+        var line = new Grid { Height = 3 };
+        line.ColumnDefinitions.Add(filled);
+        line.ColumnDefinitions.Add(empty);
+        var track = new Border { Height = 3, CornerRadius = new CornerRadius(1.5), Background = Track };
+        Grid.SetColumnSpan(track, 2);
+        line.Children.Add(track);
+        line.Children.Add(fill);
+
+        var inside = new DockPanel { LastChildFill = true };
+        DockPanel.SetDock(top, Dock.Top);
+        DockPanel.SetDock(rule, Dock.Top);
+        DockPanel.SetDock(line, Dock.Bottom);
+        inside.Children.Add(top);
+        inside.Children.Add(rule);
+        inside.Children.Add(line);
+        inside.Children.Add(reading);
+
+        // No shadow under it: on a page this dark one cannot be seen, which the player confirmed on 2026-11-11.
+        _tiles[index] = new TileParts(label, caption, value, unit, line, fill, filled, empty);
+        return new Border
+        {
+            Background = CardFill,
+            BorderBrush = CardEdge,
+            BorderThickness = new Thickness(Hairline),
+            CornerRadius = new CornerRadius(14),
+            Padding = new Thickness(24, 16, 24, 18),
+            Child = inside
+        };
+    }
+
+    /// <summary>The badges as they stand now. One with nothing to say is left out: no Wi-Fi adapter, no battery, Battery Care off.</summary>
+    private void ShowBadges(StatsHeader header)
+    {
+        _wifiBadge.Visibility = header.WifiQuality is null ? Visibility.Collapsed : Visibility.Visible;
+        for (var bar = 0; bar < _wifiBars.Length; bar++)
+        {
+            _wifiBars[bar].Fill = bar < header.WifiBars ? ValueBrush : Dim;
+        }
+
+        _wifiName.Text = header.WifiText;
+        _wifiName.Foreground = header.WifiQuality is > 0 ? ValueBrush : LabelBrush;
+
+        _batteryBadge.Visibility = header.Battery is null ? Visibility.Collapsed : Visibility.Visible;
+        _batteryFill.Width = BatteryInside * header.BatteryFraction;
+        _batteryFill.Background = header.BatteryLow ? HotBrush : header.Charging ? Jade : ValueBrush;
+        _batteryBolt.Visibility = header.Charging ? Visibility.Visible : Visibility.Collapsed;
+        _batteryText.Text = header.Battery is { } percent ? percent.ToString(CultureInfo.InvariantCulture) + "%" : string.Empty;
+
+        _careBadge.Visibility = header.BatteryCare ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>Four bars of rising height, lit from the left by the signal's strength.</summary>
+    private StackPanel WifiBars()
+    {
+        var bars = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        for (var bar = 0; bar < _wifiBars.Length; bar++)
+        {
+            _wifiBars[bar] = new Rectangle
+            {
+                Width = 4,
+                Height = 6 + bar * 4,
+                RadiusX = 1,
+                RadiusY = 1,
+                Fill = Dim,
+                VerticalAlignment = VerticalAlignment.Bottom,
+                Margin = new Thickness(0, 0, 2.5, 0)
+            };
+            bars.Children.Add(_wifiBars[bar]);
+        }
+
+        return bars;
+    }
+
+    /// <summary>A battery: an outline with its cap at the right, filled from the left by the charge.</summary>
+    private StackPanel BatteryPicture()
+    {
+        _batteryFill.Height = 10;
+        var body = new Border
+        {
+            Width = BatteryInside + 6,
+            Height = 16,
+            CornerRadius = new CornerRadius(3.5),
+            BorderBrush = LabelBrush,
+            BorderThickness = new Thickness(1.2),
+            Padding = new Thickness(1.8),
+            Child = _batteryFill
+        };
+        var cap = new Border { Width = 2.5, Height = 7, CornerRadius = new CornerRadius(0, 1.5, 1.5, 0), Background = LabelBrush, Margin = new Thickness(1.5, 0, 0, 0) };
+
+        var picture = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        picture.Children.Add(body);
+        picture.Children.Add(cap);
+        return picture;
+    }
+
+    /// <summary>A badge: a faint pill with a hairline edge round an icon and its words.</summary>
+    private static Border Badge(params FrameworkElement[] parts)
+    {
+        var row = new StackPanel { Orientation = Orientation.Horizontal };
+        foreach (var part in parts)
+        {
+            part.VerticalAlignment = VerticalAlignment.Center;
+            if (row.Children.Count > 0)
+            {
+                part.Margin = new Thickness(9, 0, 0, 0);
+            }
+
+            if (part is TextBlock words)
+            {
+                // A long network name is cut short rather than pushing the badges into the clock.
+                words.MaxWidth = 250;
+                words.TextTrimming = TextTrimming.CharacterEllipsis;
+            }
+
+            row.Children.Add(part);
+        }
+
+        return new Border
+        {
+            Background = CardFill,
+            BorderBrush = CardEdge,
+            BorderThickness = new Thickness(Hairline),
+            CornerRadius = new CornerRadius(17),
+            Height = 34,
+            Padding = new Thickness(14, 0, 14, 0),
+            Margin = new Thickness(10, 0, 0, 0),
+            Child = row
+        };
+    }
+
+    private static TextBlock BadgeText(string text)
+    {
+        var words = Text(Mono, 17, FontWeights.Normal, ValueBrush);
+        words.Text = text;
+        return words;
+    }
+
+    /// <summary>An icon's lines, drawn at this size in this colour.</summary>
+    private static Path Glyph(Geometry shape, Brush brush, double size) => new()
+    {
+        Data = shape,
+        Stroke = brush,
+        StrokeThickness = 1.6,
+        StrokeLineJoin = PenLineJoin.Round,
+        StrokeStartLineCap = PenLineCap.Round,
+        StrokeEndLineCap = PenLineCap.Round,
+        Width = size,
+        Height = size,
+        Stretch = Stretch.Uniform,
+        VerticalAlignment = VerticalAlignment.Center
+    };
+
+    /// <summary>Several shapes as one icon. The first is always the full square, so every icon scales alike.</summary>
+    private static Geometry Outline(params Geometry[] parts)
+    {
+        var group = new GeometryGroup();
+
+        // Nothing to see: it only makes each icon's bounds the same 24 by 24 square.
+        group.Children.Add(Geometry.Parse("M0,0 M24,24"));
+        foreach (var part in parts)
+        {
+            group.Children.Add(part);
+        }
+
+        group.Freeze();
+        return group;
+    }
+
+    /// <summary>Capitals set a little apart, with a hair space between each, as WPF has no letter spacing.</summary>
+    private static string Spaced(string text) => string.Join(' ', text.ToCharArray());
+
+    private static TextBlock Text(FontFamily family, double size, FontWeight weight, Brush brush) => new()
+    {
+        FontFamily = family,
         FontSize = size,
         FontWeight = weight,
         Foreground = brush,
@@ -318,16 +472,9 @@ internal sealed partial class ScreenStatsWindow : Window
         return brush;
     }
 
-    private static LinearGradientBrush FrozenLinearGradient(Point start, Point end, params (double offset, Color color)[] stops)
-    {
-        var brush = new LinearGradientBrush { StartPoint = start, EndPoint = end };
-        foreach (var (offset, color) in stops)
-        {
-            brush.GradientStops.Add(new GradientStop(color, offset));
-        }
-        brush.Freeze();
-        return brush;
-    }
+    /// <summary>The parts of a tile that change with its reading.</summary>
+    private sealed record TileParts(TextBlock Label, TextBlock Caption, TextBlock Value, TextBlock Unit, Grid Line,
+        Border Fill, ColumnDefinition Filled, ColumnDefinition Empty);
 
     [LibraryImport("user32.dll")]
     private static partial nint GetWindowLongPtrW(nint window, int index);

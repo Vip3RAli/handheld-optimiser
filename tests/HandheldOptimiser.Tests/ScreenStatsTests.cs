@@ -63,8 +63,60 @@ public class ScreenStatsTests
     public void The_time_follows_the_players_own_format()
     {
         var evening = new DateTime(2026, 10, 25, 21, 7, 30);
-        Assert.Equal("21:07", ScreenStatsLayout.Clock(evening, CultureInfo.InvariantCulture));
-        Assert.Equal("Sunday 25 October", ScreenStatsLayout.Date(evening, CultureInfo.InvariantCulture));
+        Assert.Equal("21:07", ScreenStatsLayout.ClockTime(evening, CultureInfo.InvariantCulture));
+        Assert.Equal("", ScreenStatsLayout.ClockPeriod(evening, CultureInfo.InvariantCulture));
+        Assert.Equal("SUNDAY 25 OCTOBER", ScreenStatsLayout.Date(evening, CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
+    public void A_twelve_hour_time_gives_its_pm_apart_to_be_set_small()
+    {
+        var evening = new DateTime(2026, 10, 25, 21, 7, 30);
+        var american = CultureInfo.GetCultureInfo("en-US");
+        Assert.Equal("9:07", ScreenStatsLayout.ClockTime(evening, american));
+        Assert.Equal("pm", ScreenStatsLayout.ClockPeriod(evening, american));
+    }
+
+    [Fact]
+    public void Each_line_under_a_value_fills_by_how_near_its_most_the_reading_is()
+    {
+        var tiles = ScreenStatsLayout.Tiles(Everything);
+        Assert.Null(tiles[0].Fraction);
+        Assert.Equal(0.5, tiles[1].Fraction!.Value, 3);
+        Assert.Equal(71 / 95.0, tiles[2].Fraction!.Value, 3);
+        Assert.Equal(0.424, tiles[3].Fraction!.Value, 3);
+        Assert.Equal(4.138 / 5, tiles[4].Fraction!.Value, 3);
+        Assert.Equal(0.978, tiles[5].Fraction!.Value, 3);
+        Assert.All(ScreenStatsLayout.Tiles(new OverlayReading()), t => Assert.Null(t.Fraction));
+    }
+
+    [Fact]
+    public void A_frame_rate_aimed_for_is_named_and_measured_against()
+    {
+        var tile = ScreenStatsLayout.Tiles(Everything with { Fps = 45 }, targetFps: 60)[0];
+        Assert.Equal("TARGET 60", tile.Caption);
+        Assert.Equal(0.75, tile.Fraction!.Value, 3);
+        Assert.Equal(1, ScreenStatsLayout.Tiles(Everything with { Fps = 90 }, targetFps: 60)[0].Fraction);
+        Assert.Equal("", ScreenStatsLayout.Tiles(Everything)[0].Caption);
+    }
+
+    [Fact]
+    public void The_header_says_which_network_or_that_there_is_none()
+    {
+        Assert.Equal("Home", new StatsHeader(WifiQuality: 80, WifiName: "Home").WifiText);
+        Assert.Equal(4, new StatsHeader(WifiQuality: 80, WifiName: "Home").WifiBars);
+        Assert.Equal("WI-FI", new StatsHeader(WifiQuality: 30).WifiText);
+        Assert.Equal("OFFLINE", new StatsHeader(WifiQuality: 0).WifiText);
+        Assert.Equal(0, new StatsHeader(WifiQuality: 0).WifiBars);
+    }
+
+    [Fact]
+    public void The_battery_is_low_only_while_it_is_not_charging()
+    {
+        Assert.True(new StatsHeader(Battery: 12).BatteryLow);
+        Assert.False(new StatsHeader(Battery: 12, Charging: true).BatteryLow);
+        Assert.False(new StatsHeader(Battery: 64).BatteryLow);
+        Assert.Equal(0.64, new StatsHeader(Battery: 64).BatteryFraction, 3);
     }
 
     // ----- The panel's size and place -----
