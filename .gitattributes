@@ -1,0 +1,2 @@
+# Text is kept with LF in the repository and checked out with CRLF, whichever tool wrote the file.
+* text=auto eol=crlf

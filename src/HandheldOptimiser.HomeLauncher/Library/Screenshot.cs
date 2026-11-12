@@ -2,6 +2,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
 namespace HandheldOptimiser.HomeLauncher.Library;
@@ -11,6 +12,8 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 /// Windows' own Win+PrtScn puts them. It is taken here, not through Game Bar, because Game Bar's captures
 /// are switched off by the app's own "Turn off background game recording" tweak (AllowGameDVR 0 stops its
 /// screenshots too), and that is how it was on this Ally when the paddle was first tried on 2026-11-11.
+/// The picture comes from <see cref="ScreenCapture"/>, which also sees a game that owns the screen, and
+/// from a GDI copy of the desktop only when that is refused.
 /// </summary>
 internal static partial class Screenshot
 {
@@ -39,6 +42,54 @@ internal static partial class Screenshot
         var width = bounds.Right - bounds.Left;
         var height = bounds.Bottom - bounds.Top;
 
+        try
+        {
+            // Duplication first: it is the only one of the two that sees a game that owns the screen.
+            BitmapSource? image = null;
+            if (ScreenCapture.Capture(monitor, out var why) is { } picture)
+            {
+                image = BitmapSource.Create(picture.Width, picture.Height, 96, 96, PixelFormats.Bgr32, null,
+                    picture.Pixels, picture.Stride);
+            }
+            else
+            {
+                Program.Log($"Screenshot: {why}, so the desktop is copied instead");
+                image = CopyDesktop(bounds, width, height);
+            }
+
+            if (image is null)
+            {
+                return null;
+            }
+
+            var folder = Folder();
+            Directory.CreateDirectory(folder);
+            var path = Path.Combine(folder, FileName(WindowTitle(window), DateTime.Now));
+
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(image));
+            using (var file = File.Create(path))
+            {
+                encoder.Save(file);
+            }
+
+            MessageBeep(BeepOk);
+            Program.Log($"Screenshot saved: {path}");
+            return path;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or COMException or ExternalException)
+        {
+            Program.Log($"Screenshot failed: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// The GDI copy of the desktop, kept for when the screen cannot be duplicated (a rotated screen, a
+    /// remote session). It comes out black over a game that owns the screen.
+    /// </summary>
+    private static BitmapSource? CopyDesktop(Rect bounds, int width, int height)
+    {
         nint screen = 0, memory = 0, bitmap = 0, old = 0;
         try
         {
@@ -61,26 +112,10 @@ internal static partial class Screenshot
             SelectObject(memory, old);
             old = 0;
 
+            // Frozen so the picture owns its pixels before the bitmap behind it is deleted.
             var image = Imaging.CreateBitmapSourceFromHBitmap(bitmap, 0, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
-            var folder = Folder();
-            Directory.CreateDirectory(folder);
-            var path = Path.Combine(folder, FileName(WindowTitle(window), DateTime.Now));
-
-            var encoder = new PngBitmapEncoder();
-            encoder.Frames.Add(BitmapFrame.Create(image));
-            using (var file = File.Create(path))
-            {
-                encoder.Save(file);
-            }
-
-            MessageBeep(BeepOk);
-            Program.Log($"Screenshot saved: {path}");
-            return path;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or COMException or ExternalException)
-        {
-            Program.Log($"Screenshot failed: {ex.Message}");
-            return null;
+            image.Freeze();
+            return image;
         }
         finally
         {

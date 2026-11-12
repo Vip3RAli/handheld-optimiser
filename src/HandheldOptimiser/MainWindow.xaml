@@ -213,7 +213,8 @@
 
                 <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,6">
                     <ui:Button Content="Clear" Command="{Binding ClearLogCommand}" Margin="0,0,8,0" />
-                    <ui:Button Content="Open log file" Command="{Binding OpenLogFileCommand}" />
+                    <ui:Button Content="Open log file" Command="{Binding OpenLogFileCommand}" Margin="0,0,8,0" />
+                    <ui:Button Content="Copy diagnostics" Command="{Binding CopyDiagnosticsCommand}" />
                     <TextBlock Text="{Binding LogFilePath}" Opacity="0.5" FontSize="11"
                                VerticalAlignment="Center" Margin="12,0,0,0"
                                TextTrimming="CharacterEllipsis" />

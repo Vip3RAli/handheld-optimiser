@@ -61,6 +61,10 @@ internal sealed class OverlayHost
     /// <summary>Whether the overlay is on, which keeps the service running.</summary>
     public bool Wanted => Level != AutoTdpProtocol.OverlayOff;
 
+    /// <summary>The status with the overlay's level, corner and layout.</summary>
+    public AutoTdpStatus AddTo(AutoTdpStatus status) =>
+        status with { OverlayLevel = Level, OverlayCorner = Corner, OverlayLayout = Layout };
+
     /// <summary>Toggles the overlay between Off and the last level it was shown at.</summary>
     public void Toggle() =>
         Set(Wanted ? AutoTdpProtocol.OverlayOff : _lastActiveLevel, null, null);
