@@ -1,4 +1,4 @@
-<Page
+﻿<Page
     x:Class="HandheldOptimiser.GameBar.TdpWidget"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
@@ -408,7 +408,15 @@
             <!-- ===== Performance and power ===== -->
             <Border Style="{StaticResource Card}">
                 <StackPanel>
-                    <TextBlock Style="{StaticResource CardTitle}" Text="PERFORMANCE &amp; POWER" />
+                    <Button Style="{StaticResource Fold}" Click="OnFold" Tag="PerformanceBody">
+                        <Grid Margin="0,0,0,4">
+                            <TextBlock Style="{StaticResource CardTitle}" Margin="0" Text="PERFORMANCE &amp; POWER" />
+                            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center"
+                                       FontFamily="Segoe MDL2 Assets" FontSize="11" Foreground="{StaticResource Muted}" Text="&#xE70E;" />
+                        </Grid>
+                    </Button>
+
+                    <StackPanel x:Name="PerformanceBody" Visibility="Visible">
 
                     <!-- On is Auto: TDP Engine picks the power limit and fans, and the frame rate and CPU boost are
                          the player's. Off is Manual: the player picks them. Saved by TDP Engine, for every game. -->
@@ -511,6 +519,7 @@
                             </Border>
                         </StackPanel>
                     </StackPanel>
+                    </StackPanel>
                 </StackPanel>
             </Border>
 
@@ -518,7 +527,15 @@
                  Ally's controller. ===== -->
             <Border x:Name="ControllerRow" Style="{StaticResource Card}" Visibility="Collapsed">
                 <StackPanel>
-                    <TextBlock Style="{StaticResource CardTitle}" Text="HARDWARE &amp; INPUT" />
+                    <Button Style="{StaticResource Fold}" Click="OnFold" Tag="HardwareBody">
+                        <Grid Margin="0,0,0,4">
+                            <TextBlock Style="{StaticResource CardTitle}" Margin="0" Text="HARDWARE &amp; INPUT" />
+                            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center"
+                                       FontFamily="Segoe MDL2 Assets" FontSize="11" Foreground="{StaticResource Muted}" Text="&#xE70E;" />
+                        </Grid>
+                    </Button>
+
+                    <StackPanel x:Name="HardwareBody" Visibility="Visible">
 
                     <!-- On is Gamepad, off is Desktop (the controller works the mouse and keyboard). The line under
                          the name shows only while the mode is not known, when the switch's off means nothing. -->
@@ -557,26 +574,26 @@
                         <TextBlock x:Name="ColourValue" Style="{StaticResource Amount}" />
                     </Grid>
                     <StackPanel x:Name="ColourSwatches" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,-4,-6,6" />
+                    </StackPanel>
                 </StackPanel>
             </Border>
 
-            <!-- ===== AMD Radeon: the same settings as in Radeon Software, for every game. Each row shows only where
+            <!-- ===== Graphics & Upscaling (AMD Radeon): the same settings as in Radeon Software, for every game. Each row shows only where
                  the driver offers it, once TDP Engine has read them (see RadeonHost), and the card only when one
                  does. A setting's slider shows while it is on. The switches' Tags and the sliders' names are
                  RadeonState's names. The lines under the names stay: they say which other setting a switch turns off. ===== -->
             <Border x:Name="RadeonCard" Style="{StaticResource Card}" Visibility="Collapsed">
                 <StackPanel>
-                    <!-- The header folds the card open and shut. It starts shut each time the widget loads, which the
-                         player asked for on 2026-10-28. -->
-                    <Button x:Name="RadeonFold" Style="{StaticResource Fold}" Click="OnRadeonFold">
-                        <Grid x:Name="RadeonHeader" Margin="0,0,0,3">
-                            <TextBlock Style="{StaticResource CardTitle}" Margin="0" Text="AMD RADEON" />
-                            <TextBlock x:Name="RadeonChevron" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                       FontFamily="Segoe MDL2 Assets" FontSize="11" Foreground="{StaticResource Muted}" Text="&#xE70D;" />
+                    <!-- The header folds the card open and shut. Like every card it starts open (2026-11-14). -->
+                    <Button Style="{StaticResource Fold}" Click="OnFold" Tag="RadeonBody">
+                        <Grid Margin="0,0,0,4">
+                            <TextBlock Style="{StaticResource CardTitle}" Margin="0" Text="GRAPHICS &amp; UPSCALING" />
+                            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center"
+                                       FontFamily="Segoe MDL2 Assets" FontSize="11" Foreground="{StaticResource Muted}" Text="&#xE70E;" />
                         </Grid>
                     </Button>
 
-                    <StackPanel x:Name="RadeonBody" Visibility="Collapsed">
+                    <StackPanel x:Name="RadeonBody" Visibility="Visible">
                         <StackPanel x:Name="RsrRow" Visibility="Collapsed">
                             <Grid Style="{StaticResource Row}">
                                 <StackPanel VerticalAlignment="Center" Margin="0,0,60,0">
@@ -694,7 +711,15 @@
             <!-- ===== Overlay ===== -->
             <Border Style="{StaticResource Card}">
                 <StackPanel>
-                    <TextBlock Style="{StaticResource CardTitle}" Text="OVERLAY" />
+                    <Button Style="{StaticResource Fold}" Click="OnFold" Tag="OverlayBody">
+                        <Grid Margin="0,0,0,4">
+                            <TextBlock Style="{StaticResource CardTitle}" Margin="0" Text="OVERLAY" />
+                            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center"
+                                       FontFamily="Segoe MDL2 Assets" FontSize="11" Foreground="{StaticResource Muted}" Text="&#xE70E;" />
+                        </Grid>
+                    </Button>
+
+                    <StackPanel x:Name="OverlayBody" Visibility="Visible">
 
                     <!-- On shows the overlay at the size it had last. Off while TDP Engine is not running. -->
                     <Grid Style="{StaticResource Row}">
@@ -749,11 +774,19 @@
                         </Grid>
                     </Grid>
 
-                    <!-- Big stats and the time on the handheld's own screen while it sits under a monitor. -->
+                    <!-- The Docked HUD: big stats and the time on the handheld's own screen while it sits under a
+                         monitor. The user named it on 2026-11-14. -->
                     <Grid Style="{StaticResource Row}">
-                        <TextBlock Style="{StaticResource Label}" Margin="0,0,60,0" Text="Show on Handheld (Docked)" />
+                        <TextBlock Style="{StaticResource Label}" Margin="0,0,60,0" Text="Docked HUD" />
                         <ToggleSwitch x:Name="ScreenStatsSwitch" Style="{StaticResource RowSwitch}" Toggled="OnScreenStats" />
                     </Grid>
+
+                    <!-- Its lime background with circles, or plain black. -->
+                    <Grid Style="{StaticResource Row}">
+                        <TextBlock Style="{StaticResource Label}" Margin="0,0,60,0" Text="Docked HUD Lime Background" />
+                        <ToggleSwitch x:Name="ScreenStatsLimeSwitch" Style="{StaticResource RowSwitch}" Toggled="OnScreenStatsLime" />
+                    </Grid>
+                    </StackPanel>
                 </StackPanel>
             </Border>
         </StackPanel>

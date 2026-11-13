@@ -377,36 +377,15 @@
                                                Opacity="{Binding Path=(local:OldSchoolPanel.Front), RelativeSource={RelativeSource AncestorType=ContentPresenter}}" />
                                 </Border>
                                 <!--
-                                    The Console space look's front card: a pane of frosted glass across the bottom, the
-                                    artwork blurred behind it, with the name and the store on it. The blur is drawn once
-                                    and kept (BitmapCache), so a card moving costs nothing more for it.
+                                    The Console space look's front card: the name on the card's own shade at the bottom.
+                                    The user had the glass pane under it and the store's name dropped (2026-11-14): the
+                                    store's logo at the bottom right says it.
                                 -->
-                                <Grid Visibility="{DynamicResource ConsoleOnly}" Width="396" Height="92" Margin="12"
-                                      HorizontalAlignment="Left" VerticalAlignment="Bottom"
-                                      Opacity="{Binding Path=(local:OldSchoolPanel.Front), RelativeSource={RelativeSource AncestorType=ContentPresenter}}">
-                                    <Grid.Clip>
-                                        <RectangleGeometry Rect="0,0,396,92" RadiusX="10" RadiusY="10" />
-                                    </Grid.Clip>
-                                    <Border Width="420" Height="320" Margin="-12,-216,0,0" HorizontalAlignment="Left" VerticalAlignment="Top"
-                                            RenderOptions.BitmapScalingMode="Linear">
-                                        <Border.Background>
-                                            <ImageBrush ImageSource="{Binding Wide}" Stretch="UniformToFill" />
-                                        </Border.Background>
-                                        <Border.Effect>
-                                            <BlurEffect Radius="22" />
-                                        </Border.Effect>
-                                        <Border.CacheMode>
-                                            <BitmapCache />
-                                        </Border.CacheMode>
-                                    </Border>
-                                    <Border CornerRadius="10" Background="#7A0A140A" />
-                                    <StackPanel Style="{StaticResource HiddenByNotice}" Margin="18,0,56,0" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding Title}" FontFamily="{DynamicResource CardTitleFont}" FontSize="30" FontWeight="SemiBold"
-                                                   TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Text="{Binding StoreName}" FontFamily="{DynamicResource CardTitleFont}" FontSize="15"
-                                                   Margin="0,1,0,0" Opacity="0.78" TextTrimming="CharacterEllipsis" />
-                                    </StackPanel>
-                                </Grid>
+                                <Border Visibility="{DynamicResource ConsoleOnly}" Margin="20,0,56,16" VerticalAlignment="Bottom"
+                                        Opacity="{Binding Path=(local:OldSchoolPanel.Front), RelativeSource={RelativeSource AncestorType=ContentPresenter}}">
+                                    <TextBlock Style="{StaticResource HiddenByNotice}" Text="{Binding Title}" FontFamily="{DynamicResource CardTitleFont}"
+                                               FontSize="30" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                </Border>
                                 <!-- A notice takes the name's place, on as many lines as it needs. -->
                                 <TextBlock Style="{StaticResource ShownByNotice}" Text="{Binding Notice}" Margin="20,0,56,16"
                                            FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap"
@@ -668,10 +647,6 @@
                                 </LinearGradientBrush>
                             </Border.Background>
                         </Border>
-                        <!-- The Console space look's pane of glass under the front card's name. -->
-                        <Border Visibility="{DynamicResource ConsoleOnly}" Height="76" Margin="12" VerticalAlignment="Bottom"
-                                CornerRadius="10" Background="#55102A08"
-                                Opacity="{Binding Path=(local:OldSchoolPanel.Front), RelativeSource={RelativeSource AncestorType=ContentPresenter}}" />
                         <!-- A shape and not text: text this big is not drawn at all on the small cards at the back. -->
                         <Path Data="{Binding Icon}" Fill="#FFFFFF" Stretch="Uniform" Width="116" Height="116"
                               Margin="0,0,48,34" HorizontalAlignment="Right" VerticalAlignment="Center" Opacity="0.95" />

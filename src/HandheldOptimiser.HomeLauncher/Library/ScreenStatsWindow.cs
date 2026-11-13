@@ -89,11 +89,14 @@ internal sealed partial class ScreenStatsWindow : Window
     private readonly Border _careBadge;
 
     private readonly TileParts[] _tiles = new TileParts[6];
+
+    // The lime and its circles, behind everything.
+    private readonly Grid _lime = new();
     private ScreenRect? _placed;
 
     public ScreenStatsWindow()
     {
-        Title = "Handheld Optimiser - Stats on Handheld Screen";
+        Title = "Handheld Optimiser - Docked HUD";
         WindowStyle = WindowStyle.None;
         ResizeMode = ResizeMode.NoResize;
         WindowStartupLocation = WindowStartupLocation.Manual;
@@ -139,14 +142,26 @@ internal sealed partial class ScreenStatsWindow : Window
         // The lime and its circles fill the whole panel, behind the page scaled into it. The circles are
         // never set moving: the screen is up while a game runs, and is drawn without the graphics card.
         // They keep out of the clock and the badges, which sit straight on the lime.
+        // Switched off from the widget, the window's own black shows instead (SetLime).
         var circles = new CircleField { KeepClear = [new Rect(0, 0, 0.3, 0.27), new Rect(0.62, 0.05, 0.38, 0.14)] };
         circles.SizeChanged += (_, e) => circles.Build(e.NewSize);
+        LimeBackdrop.AddTo(_lime);
+        _lime.Children.Add(circles);
         var back = new Grid();
-        LimeBackdrop.AddTo(back);
-        back.Children.Add(circles);
+        back.Children.Add(_lime);
         back.Children.Add(new Viewbox { Stretch = Stretch.Uniform, Child = page });
         Content = back;
         TextOptions.SetTextFormattingMode(this, TextFormattingMode.Ideal);
+    }
+
+    /// <summary>Draws the screen on the lime background with its circles, or on plain black, as set in the widget.</summary>
+    public void SetLime(bool lime)
+    {
+        var shown = lime ? Visibility.Visible : Visibility.Collapsed;
+        if (_lime.Visibility != shown)
+        {
+            _lime.Visibility = shown;
+        }
     }
 
     /// <summary>Shows this second's readings, the badges and the time.</summary>

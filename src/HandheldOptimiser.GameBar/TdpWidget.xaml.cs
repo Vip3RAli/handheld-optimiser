@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
 using HandheldOptimiser.PowerService;
@@ -458,6 +458,18 @@ namespace HandheldOptimiser.GameBar
             Send(() => EngineClient.SetScreenStats(on));
         }
 
+        private void OnScreenStatsLime(object sender, RoutedEventArgs e)
+        {
+            // Set from TDP Engine's answer, not by the player: nothing to send.
+            if (_placingScreenStats)
+            {
+                return;
+            }
+
+            var lime = ScreenStatsLimeSwitch.IsOn;
+            Send(() => EngineClient.SetScreenStatsLime(lime));
+        }
+
         /// <summary>A stick colour's dot. The ring moves to it at once, and TDP Engine's answer confirms it.</summary>
         private void OnColour(object sender, RoutedEventArgs e)
         {
@@ -718,6 +730,7 @@ namespace HandheldOptimiser.GameBar
             Check(OverlayLayouts, status.OverlayLayout ?? "");
             _placingScreenStats = true;
             ScreenStatsSwitch.IsOn = status.ScreenStats;
+            ScreenStatsLimeSwitch.IsOn = status.ScreenStatsLime;
             _placingScreenStats = false;
             ShowGpuMemory(status);
 
@@ -880,17 +893,27 @@ namespace HandheldOptimiser.GameBar
                 || status.Chill != null || status.Sharpening != null);
         }
 
-        /// <summary>Folds the AMD Radeon card open or shut. It starts shut each time the widget loads.</summary>
-        private void OnRadeonFold(object sender, RoutedEventArgs e) =>
-            ShowRadeonFold(RadeonBody.Visibility != Visibility.Visible);
-
-        private void ShowRadeonFold(bool open)
+        /// <summary>
+        /// Folds a card open or shut: Performance and Power, Hardware and Input, Graphics and Upscaling, and Overlay.
+        /// The header button's Tag names the card's body. Each starts open: the player tried them all shut on
+        /// 2026-11-14 and asked for open, with folding still there for those who want it.
+        /// </summary>
+        private void OnFold(object sender, RoutedEventArgs e)
         {
-            RadeonBody.Visibility = Shown(open);
-            RadeonChevron.Text = open ? "" : "";
-
-            // Shut, the header is all there is of the card, so it sits in the middle of it.
-            RadeonHeader.Margin = new Thickness(0, 0, 0, open ? 4 : 3);
+            if (sender is Button fold && fold.Tag is string name && FindName(name) is FrameworkElement body)
+            {
+                var open = body.Visibility != Visibility.Visible;
+                body.Visibility = Shown(open);
+                if (fold.Content is Grid header)
+                {
+                    // Shut, the header is all there is of the card, so it sits in the middle of it.
+                    header.Margin = new Thickness(0, 0, 0, open ? 4 : 3);
+                    if (header.Children.Count > 1 && header.Children[1] is TextBlock chevron)
+                    {
+                        chevron.Text = open ? "\uE70E" : "\uE70D";
+                    }
+                }
+            }
         }
 
         private static void ShowSwitch(FrameworkElement row, ToggleSwitch toggle, bool? on)

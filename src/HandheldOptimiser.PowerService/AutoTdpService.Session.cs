@@ -28,6 +28,11 @@ internal sealed partial class AutoTdpService
             _screenStats.Set(on);
         }
 
+        if (request.ScreenStatsLime is { } lime)
+        {
+            _screenStats.SetLime(lime);
+        }
+
         _idleSince = DateTime.UtcNow;
         return _error is not null && _control is null ? new AutoTdpStatus(false, Error: _error) : _last;
     }

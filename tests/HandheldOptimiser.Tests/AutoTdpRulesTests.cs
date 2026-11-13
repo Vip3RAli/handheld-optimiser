@@ -201,6 +201,18 @@ public class AutoTdpRulesTests
     }
 
     [Fact]
+    public void The_stats_screen_is_on_the_lime_unless_the_service_says_otherwise()
+    {
+        // An older service sends no ScreenStatsLime, and the stats screen keeps the lime it had.
+        Assert.True(AutoTdpProtocol.Read<AutoTdpStatus>("{\"Running\":false}")?.ScreenStatsLime);
+        Assert.False(AutoTdpProtocol.Read<AutoTdpStatus>("{\"Running\":false,\"ScreenStatsLime\":false}")?.ScreenStatsLime);
+
+        var request = AutoTdpProtocol.Read<AutoTdpRequest>("{\"Command\":\"set-screen-stats\",\"ScreenStatsLime\":false}");
+        Assert.False(request?.ScreenStatsLime);
+        Assert.Null(request?.ScreenStats);
+    }
+
+    [Fact]
     public void A_request_round_trips()
     {
         var sent = new AutoTdpRequest(AutoTdpProtocol.Start, 60, 7, 25, 80, 14, @"C:\Games\Foo");
