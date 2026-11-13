@@ -20,6 +20,18 @@ internal sealed partial class AutoTdpService
         return _error is not null && _control is null ? new AutoTdpStatus(false, Error: _error) : _last;
     }
 
+    // The YouTube Music player, started once when the widget asks. It is not kept running: it ends when the
+    // player closes it from the widget, and nothing starts it again until they ask.
+    private readonly SessionProgram _music = new("Music player", AutoTdpProtocol.Music.Argument, AutoTdpProtocol.Music.MutexName, uiAccess: false);
+
+    /// <summary>Starts the YouTube Music player in the player's session, unless it is running.</summary>
+    private AutoTdpStatus StartMusic(AutoTdpStatus last)
+    {
+        _music.TryNow();
+        _music.Keep();
+        return last;
+    }
+
     /// <summary>The stats screen switched on or off, from the widget. Called under the gate.</summary>
     private AutoTdpStatus SetScreenStats(AutoTdpRequest request)
     {

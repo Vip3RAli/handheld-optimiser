@@ -117,5 +117,10 @@
       </ProxyStub>
     </Extension>
   </Extensions>
-  
+
+  <!-- For the Music card's album art, which YouTube Music serves from the web. Nothing else is fetched. -->
+  <Capabilities>
+    <Capability Name="internetClient" />
+  </Capabilities>
+
 </Package>

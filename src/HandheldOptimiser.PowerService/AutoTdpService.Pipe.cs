@@ -173,6 +173,7 @@ internal sealed partial class AutoTdpService
             [AutoTdpProtocol.SetBoost] = new((request, last, _) => CpuBoost.Answer(request, last)),
             [AutoTdpProtocol.SetBatteryCare] = new((request, last, _) => _batteryCare.Answer(request, last), KeepsAwake: true),
             [AutoTdpProtocol.SetRadeon] = new((request, last, _) => _radeon.Answer(request, last), KeepsAwake: true),
+            [AutoTdpProtocol.StartMusic] = new((_, last, _) => StartMusic(last)),
             [AutoTdpProtocol.GpuMemoryRequest] = gpuMemory,
             [AutoTdpProtocol.SetGpuMemory] = gpuMemory,
 

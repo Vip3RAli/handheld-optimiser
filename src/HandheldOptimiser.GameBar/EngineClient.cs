@@ -236,6 +236,10 @@ namespace HandheldOptimiser.GameBar
             return SendStarting(request);
         }
 
+        /// <summary>Asks TDP Engine to start the YouTube Music player in the player's session, starting TDP Engine if need be.</summary>
+        public static EngineStatus StartMusic() =>
+            SendStarting(new JsonObject { [AutoTdpProtocol.Fields.Command] = JsonValue.CreateStringValue(AutoTdpProtocol.StartMusic) }.Stringify());
+
         public static EngineStatus SetScreenStatsLime(bool lime)
         {
             var request = new JsonObject
@@ -444,9 +448,13 @@ namespace HandheldOptimiser.GameBar
             json.TryGetValue(name, out var value) && value.ValueType == JsonValueType.String ? value.GetString() : null;
 
         /// <returns>The answer line, or null when the service is not running.</returns>
-        private static string Send(string request)
+        private static string Send(string request) => Send(request, PipePath);
+
+        /// <summary>Sends one line to the pipe at that path and reads one back, as to the service. Also the music player's.</summary>
+        /// <returns>The answer line, or null when nothing answers there.</returns>
+        internal static string Send(string request, string pipePath)
         {
-            var pipe = Open();
+            var pipe = Open(pipePath);
             if (pipe == InvalidHandle)
             {
                 return null;
@@ -482,12 +490,12 @@ namespace HandheldOptimiser.GameBar
             }
         }
 
-        private static IntPtr Open()
+        private static IntPtr Open(string pipePath)
         {
             // The service takes one request at a time, so a busy pipe is tried again shortly.
             for (var tries = 0; tries < 20; tries++)
             {
-                var pipe = CreateFile2(PipePath, GenericRead | GenericWrite, 0, OpenExisting, IntPtr.Zero);
+                var pipe = CreateFile2(pipePath, GenericRead | GenericWrite, 0, OpenExisting, IntPtr.Zero);
                 if (pipe != InvalidHandle)
                 {
                     return pipe;

@@ -71,6 +71,8 @@
   <ItemGroup>
     <!-- The screen brightness control in quick settings, which Windows only offers through WMI. -->
     <PackageReference Include="System.Management" Version="10.0.12" />
+    <!-- The YouTube Music player (MusicPlayerWindow), in the Edge browser Windows 11 already has. -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
   </ItemGroup>
 
 </Project>
