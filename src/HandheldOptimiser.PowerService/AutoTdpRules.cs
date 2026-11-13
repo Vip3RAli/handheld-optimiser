@@ -86,6 +86,33 @@ internal static class AutoTdpRules
     }
 
     /// <summary>
+    /// The frames a second of the program in front, for the overlay and the stats screen: the most of any
+    /// process running the same program as the window's own. A browser draws a video from a process of its
+    /// own, a second copy of the same program, so the window's process alone showed nothing while the
+    /// widget showed the video's frames (2026-11-13). 0 when none of them presents.
+    /// </summary>
+    /// <param name="processId">The process that owns the window in front.</param>
+    /// <param name="pathOf">A program's full path from its process id, or null when it cannot be read.</param>
+    public static double ProgramFps(IReadOnlyDictionary<int, double> frames, int processId, Func<int, string?> pathOf)
+    {
+        var best = frames.GetValueOrDefault(processId);
+        if (pathOf(processId) is not { } program)
+        {
+            return best;
+        }
+
+        foreach (var (other, fps) in frames)
+        {
+            if (fps > best && other != processId && string.Equals(pathOf(other), program, StringComparison.OrdinalIgnoreCase))
+            {
+                best = fps;
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>
     /// One line from the pipe, read no further than a limit so a client cannot make the service hold an
     /// endless line in memory. Null when the line runs past the limit, or nothing came.
     /// </summary>

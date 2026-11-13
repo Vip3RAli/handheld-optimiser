@@ -307,7 +307,7 @@ internal sealed class SettingsMenu
 
         // How the Old School layout is drawn, and whether the Console space look's background moves.
         var console = LibrarySettings.OldSchoolLook == OldSchoolLook.ConsoleSpace;
-        view.OldSchoolLookSetting.Tag = console ? "Console space" : "Classic";
+        view.OldSchoolLookSetting.Tag = console ? "Modern" : "Classic";
         view.MovingBackgroundSetting.IsEnabled = console;
         view.MovingBackgroundSetting.Tag = SettingSteps.OnOff(LibrarySettings.MovingBackground);
     }

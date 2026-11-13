@@ -237,7 +237,7 @@ internal sealed class SleepAndCleanUpMenu
             });
         }
 
-        _menu.Show(_view.AppsToCloseItems, "Programs to close", "Only your own programs are listed. Windows is never touched", focus);
+        _menu.Show(_view.AppsToCloseItems, "Close programs", "Only your own programs are listed. Windows is never touched", focus);
     }
 
     private static string AppDetail(bool close) => close ? "Closed" : "Left running";
@@ -279,7 +279,7 @@ internal sealed class SleepAndCleanUpMenu
         _menu.Armed = null;
         view.TempItem.Tag = view.ShaderItem.Tag = view.RecycleItem.Tag = "Measuring...";
         view.StartupGroup.Tag = null;
-        _menu.Show(view.MaintenanceItems, "Storage Clean-up", StorageSummary(), focus);
+        _menu.Show(view.MaintenanceItems, "Clean up & Startup apps", StorageSummary(), focus);
         _ = MeasureAsync();
     }
 

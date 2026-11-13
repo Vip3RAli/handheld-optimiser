@@ -33,12 +33,16 @@ internal sealed partial class AutoTdpService
     }
 
     /// <summary>
-    /// What the overlay shows from here, each second: the frame rate of the program in front, the power limit
-    /// TDP Engine holds (none when it holds none), and the temperature. Called under the gate.
+    /// What the overlay and the stats screen show from here, each second: the frame rate, the power limit
+    /// TDP Engine holds (none when it holds none), and the temperature. While a session runs the frame rate
+    /// is the one the widget shows, the program TDP Engine follows, so the three always agree; otherwise it
+    /// is the program in front's. Called under the gate.
     /// </summary>
     private AutoTdpStatus OverlayStatus(AutoTdpRequest request)
     {
-        double? fps = _lastFrames is { } frames ? frames.GetValueOrDefault(request.ProcessId) : null;
+        double? fps = _control is not null && _last is { Running: true, Fps: { } followed } ? followed
+            : _lastFrames is { } frames ? AutoTdpRules.ProgramFps(frames, request.ProcessId, ProcessPath)
+            : null;
         int? watts = _control is { } control ? WattsNow(control) : null;
         return _last with { Fps = fps, Watts = watts, Temperature = _overlayTemperature };
     }

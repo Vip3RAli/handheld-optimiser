@@ -856,8 +856,8 @@ public sealed class LibraryFeatureTests : IDisposable
 
     [Theory]
     [InlineData(800, 1)]
-    [InlineData(1183.4, 1)]
-    [InlineData(1775.1, 1.5)]
+    [InlineData(1123.4, 1)]
+    [InlineData(1685.1, 1.5)]
     [InlineData(5000, 1.75)]
     [InlineData(double.PositiveInfinity, 1)]
     public void OldSchoolStack_GrowsToFillAWideScreenButNeverShrinks(double width, double fit) =>

@@ -100,6 +100,33 @@ public class AutoTdpRulesTests
     private static string? PathOf(int processId) => Paths.GetValueOrDefault(processId);
 
     [Fact]
+    public void The_program_in_front_counts_a_second_copy_of_itself_that_draws_for_it()
+    {
+        // 4 is the browser's window, 6 its own process drawing the video.
+        Dictionary<int, string> paths = new(Paths) { [6] = @"C:\PROGRAM FILES\Browser\browser.exe" };
+        var frames = new Dictionary<int, double> { [1] = 240, [2] = 90, [6] = 30 };
+
+        Assert.Equal(30, AutoTdpRules.ProgramFps(frames, 4, id => paths.GetValueOrDefault(id)));
+    }
+
+    [Fact]
+    public void The_program_in_front_does_not_take_another_programs_frames()
+    {
+        var frames = new Dictionary<int, double> { [1] = 240, [2] = 90 };
+
+        Assert.Equal(0, AutoTdpRules.ProgramFps(frames, 4, PathOf));
+        Assert.Equal(90, AutoTdpRules.ProgramFps(frames, 2, PathOf));
+    }
+
+    [Fact]
+    public void A_program_whose_path_cannot_be_read_counts_its_own_frames_only()
+    {
+        var frames = new Dictionary<int, double> { [9] = 45, [4] = 60 };
+
+        Assert.Equal(45, AutoTdpRules.ProgramFps(frames, 9, PathOf));
+    }
+
+    [Fact]
     public void With_a_folder_the_busiest_program_inside_it_counts()
     {
         var frames = new Dictionary<int, double> { [1] = 240, [2] = 58, [4] = 120, [5] = 30 };

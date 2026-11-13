@@ -26,9 +26,9 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <!-- The Old School panel's fine lines, out to the box's edges over its padding. -->
-            <Rectangle x:Name="MenuLines" Grid.ColumnSpan="2" Visibility="Collapsed" IsHitTestVisible="False"
-                       Fill="{StaticResource MenuPanelLines}" RadiusX="5" RadiusY="5" />
+            <!-- The Old School panel's sheen, out to the box's edges over its padding. -->
+            <Rectangle x:Name="MenuSheen" Grid.ColumnSpan="2" Visibility="Collapsed" IsHitTestVisible="False"
+                       Fill="{StaticResource MenuPanelSheen}" RadiusX="5" RadiusY="5" />
             <!-- Scrolls when the list is taller than the screen, as on a small or heavily scaled display. -->
             <ScrollViewer x:Name="MenuScroller" VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly" Focusable="False">
             <StackPanel>
@@ -41,38 +41,38 @@
                 <StackPanel x:Name="GameItems">
                     <!-- Only for a game that is not installed, which has none of the other rows but Hide. -->
                     <Button x:Name="InstallItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE896;" Content="Install"
-                            local:MenuRow.About="Install this game from its store. The store opens on its page."
+                            local:MenuRow.About="Install this game from its store. Opens the store's page."
                             Visibility="Collapsed" />
                     <Button x:Name="FavouriteItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE734;"
-                            local:MenuRow.About="Pin this game to Favourites, so it is always near the front." />
+                            local:MenuRow.About="Pin this game to Favourites, so it shows up first." />
                     <Button x:Name="TagsItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE8EC;" Content="Tags &amp; collections"
-                            local:MenuRow.About="Put this game in collections of your own, and see the tags its store gives it." />
+                            local:MenuRow.About="Create your own collections and add this game to them." />
                     <Button x:Name="ProfileItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE713;" Content="Game profile"
-                            local:MenuRow.About="Settings used only while this game is running: power mode, resolution, refresh rate, brightness, TDP Engine and the fan." />
+                            local:MenuRow.About="Settings used only while this game runs." />
                     <!-- Only for a game on the recommended settings list. -->
                     <Button x:Name="RecommendedItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE945;" Content="Optimised settings"
-                            local:MenuRow.About="Settings known to run this game well on a handheld, which you can apply in one go."
+                            local:MenuRow.About="Known good settings for this game on a handheld."
                             Visibility="Collapsed" />
                     <Button x:Name="AchievementsItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE8E1;" Content="Achievements"
-                            local:MenuRow.About="The achievements you have unlocked in this game, and the ones still to get." />
+                            local:MenuRow.About="Browse your unlocked and locked achievements." />
                     <Button x:Name="SaveSnapshotsItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE74E;" Content="Save snapshots"
-                            local:MenuRow.About="Save Guard keeps copies of this game's saves. Back one up now or choose where its saves are." />
+                            local:MenuRow.About="Save Guard keeps copies of this game's saves, so you can restore one if it is lost or deleted by accident." />
                     <!-- Only for a program the player added: moves it between the games and Apps. -->
                     <Button x:Name="MoveItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE8AB;"
                             local:MenuRow.About="Move this program between your games and Apps." />
                     <Button x:Name="ArgumentsItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE943;" Content="Launch arguments"
                             local:MenuRow.About="Extra options passed to the game each time it starts." />
                     <Button x:Name="FolderItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE8B7;" Content="Open install folder"
-                            local:MenuRow.About="Open the folder the game is installed in on the desktop." />
+                            local:MenuRow.About="Open the folder the game is installed in." />
                     <Button x:Name="PropertiesItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE946;" Content="Executable properties"
-                            local:MenuRow.About="The game's executable file: its version, publisher and size." />
+                            local:MenuRow.About="The game's executable file properties." />
                     <Button x:Name="ArtworkItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE8B9;" Content="Artwork"
-                            local:MenuRow.About="Choose different artwork for this game's card." />
+                            local:MenuRow.About="Change the artwork for this game's card." />
                     <Button x:Name="CloseGameItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE711;" Content="Close game"
-                            local:MenuRow.About="Close the game that is running. Anything not saved is lost."
+                            local:MenuRow.About="Close the game. Unsaved progress will be lost."
                             Visibility="Collapsed" />
                     <Button x:Name="HideItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xED1A;"
-                            local:MenuRow.About="Take this game out of the library. Hidden games can be shown again from Settings." />
+                            local:MenuRow.About="Take this game out of the library. Restore it from Settings." />
 
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
                         <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
@@ -89,16 +89,16 @@
                 <!-- The library's settings: a short list of categories, each with its groups of settings behind it. -->
                 <StackPanel x:Name="SettingsItems" Visibility="Collapsed">
                     <Button x:Name="UpdateSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE895;" Content="Update now"
-                            local:MenuRow.About="A newer Handheld Optimiser is ready. Install it now."
+                            local:MenuRow.About="A new version is ready to install."
                             Visibility="Collapsed" />
                     <Button x:Name="LibraryDisplayGroup" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE790;" Content="Appearance &amp; Layout"
-                            local:MenuRow.About="How the library looks: artwork, theme, layout and what is shown on screen." />
+                            local:MenuRow.About="How the library looks: artwork, theme and layout." />
                     <Button x:Name="GamesAppsGroup" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE8F1;" Content="Catalog &amp; Content"
-                            local:MenuRow.About="What is in the library: store accounts, games ready to install, deals, emulators and your own apps." />
+                            local:MenuRow.About="Store accounts, games ready to install, deals, emulators and custom apps." />
                     <Button x:Name="SleepTweaksGroup" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE945;" Content="Performance &amp; Power"
-                            local:MenuRow.About="What happens while you play: game mode, TDP Engine, the fan, Quick Resume and storage clean up." />
+                            local:MenuRow.About="Game mode, TDP Engine, fan profiles, Quick Resume and clean up." />
                     <Button x:Name="RescanItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE72C;" Content="Refresh library"
-                            local:MenuRow.About="Look for new and removed games in every store now." />
+                            local:MenuRow.About="Scan every store for new and removed games." />
                     <Button x:Name="QuitSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE7E8;" Content="Close library"
                             local:MenuRow.About="Close the library and go to the Windows desktop." />
 
@@ -117,11 +117,11 @@
                 <!-- Library display: how the library looks, on the built-in screen and docked. -->
                 <StackPanel x:Name="LibraryDisplayItems" Visibility="Collapsed">
                     <Button x:Name="BackgroundGroup" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE8B9;" Content="Artwork &amp; Theme"
-                            local:MenuRow.About="The background behind the library, its artwork, and the Old School layout's look." />
+                            local:MenuRow.About="The background, game artwork and NXE theme." />
                     <Button x:Name="DisplayGroup" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE80A;" Content="Library Elements"
-                            local:MenuRow.About="The layout, and what the library shows: last played, game info, battery and Wi-Fi, hints and sorting." />
+                            local:MenuRow.About="Choose the layout, and turn on or off what the library shows." />
                     <Button x:Name="TvGroup" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE7F4;" Content="Docked Display"
-                            local:MenuRow.About="How the library looks on a TV or monitor while the handheld is docked." />
+                            local:MenuRow.About="Custom settings for when the handheld is docked to a monitor or TV." />
                     <!-- For touch, which has no B button. -->
                     <Button x:Name="LibraryDisplaySettingsBackItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE72B;" Content="Back"
                             local:MenuRow.About="Back to Settings." />
@@ -141,15 +141,15 @@
                 <!-- Games and apps: what the library lists besides the installed games. -->
                 <StackPanel x:Name="GamesAppsItems" Visibility="Collapsed">
                     <Button x:Name="AccountsGroup" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE77B;" Content="Store Accounts &amp; Achievements"
-                            local:MenuRow.About="Your store accounts, and syncing achievements from them." />
+                            local:MenuRow.About="Sign in to your game stores and sync achievements." />
                     <Button x:Name="OwnedGroup" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE896;" Content="Ready to Install"
-                            local:MenuRow.About="Games you own that are not installed yet, shown so you can install them from the library." />
+                            local:MenuRow.About="Every game you own that is ready to install, in one place." />
                     <Button x:Name="DealsGroup" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE719;" Content="Deals &amp; Free Games"
-                            local:MenuRow.About="Game deals and the Epic Games Store's free games of the week." />
+                            local:MenuRow.About="Free games from the Epic Games Store, and deals from IsThereAnyDeal." />
                     <Button x:Name="EmulatorsGroup" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE7FC;" Content="Emulators &amp; ROMs"
-                            local:MenuRow.About="Emulators and the folders your ROMs are in, so the games show in the library." />
+                            local:MenuRow.About="Choose where your emulators are and which ROM folders to add to the library." />
                     <Button x:Name="AddProgramGroup" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE710;" Content="Add Custom App"
-                            local:MenuRow.About="Add a program that is not from a store, so it can be started from the library." />
+                            local:MenuRow.About="Add a program to start from the library." />
                     <!-- For touch, which has no B button. -->
                     <Button x:Name="GamesAppsSettingsBackItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE72B;" Content="Back"
                             local:MenuRow.About="Back to Settings." />
@@ -169,11 +169,11 @@
                 <!-- Sleep and clean-up: what happens around a game and sleep, clean-ups, and the main app. -->
                 <StackPanel x:Name="SleepTweaksItems" Visibility="Collapsed">
                     <Button x:Name="WhilePlayingGroup" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE7FC;" Content="Game Mode &amp; Optimisation"
-                            local:MenuRow.About="What the library does as a game starts and ends: closing programs, TDP Engine, the fan, Quick Resume and Save Guard." />
-                    <Button x:Name="MaintenanceGroup" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE74D;" Content="Storage Clean-up"
-                            local:MenuRow.About="Free up space: temporary files, shader caches, the Recycle Bin and startup apps." />
-                    <Button x:Name="OpenMainAppSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE8A7;" Content="Launch Handheld Optimiser App"
-                            local:MenuRow.About="Open the Handheld Optimiser app on the desktop for the rest of its tuning." />
+                            local:MenuRow.About="Set up what happens when a game starts and quits." />
+                    <Button x:Name="MaintenanceGroup" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE74D;" Content="Clean up &amp; Startup apps"
+                            local:MenuRow.About="Free up space from temporary files, shader caches and the Recycle Bin, and choose your startup apps." />
+                    <Button x:Name="OpenMainAppSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE8A7;" Content="Open Handheld Optimiser App"
+                            local:MenuRow.About="Open Handheld Optimiser to tune Windows." />
                     <!-- For touch, which has no B button. -->
                     <Button x:Name="SleepTweaksSettingsBackItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE72B;" Content="Back"
                             local:MenuRow.About="Back to Settings." />
@@ -192,20 +192,20 @@
 
                 <!-- The background settings. A steps a row to its next value. -->
                 <StackPanel x:Name="BackgroundItems" Visibility="Collapsed">
-                    <Button x:Name="BackgroundSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE8B9;" Content="Background"
-                            local:MenuRow.About="What is behind the library: the focused game's artwork, its colours, or plain." />
+                    <Button x:Name="BackgroundSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE8B9;" Content="Background &amp; Art"
+                            local:MenuRow.About="Change the library's background and game artwork." />
                     <Button x:Name="StrengthSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE790;" Content="Colour strength"
-                            local:MenuRow.About="How strongly the game's colours tint the background." />
+                            local:MenuRow.About="Choose how strongly the background is tinted." />
                     <Button x:Name="BlurSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE8B9;" Content="Artwork blur"
-                            local:MenuRow.About="Blur the artwork behind the library, so the games in front stand out." />
+                            local:MenuRow.About="Blur the background so the game cards stand out." />
                     <Button x:Name="PositionSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE8B9;" Content="Artwork position"
-                            local:MenuRow.About="Which part of the artwork is shown behind the library." />
+                            local:MenuRow.About="Choose which part of the artwork shows behind the library." />
                     <Button x:Name="ArtworkKeySetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE8D7;" Content="SteamGridDB API key"
                             local:MenuRow.About="A free SteamGridDB key lets the library fetch artwork for games that have none." />
-                    <Button x:Name="OldSchoolLookSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE7FC;" Content="Old School look"
-                            local:MenuRow.About="Console space draws the Old School layout in a glowing room, with a floor the cards stand on. Classic is the flat look." />
-                    <Button x:Name="MovingBackgroundSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE768;" Content="Moving background"
-                            local:MenuRow.About="Waves and drifting light behind the Console space look. Off keeps it still and uses less power." />
+                    <Button x:Name="OldSchoolLookSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE7FC;" Content="NXE Theme"
+                            local:MenuRow.About="Choose Modern or Classic." />
+                    <Button x:Name="MovingBackgroundSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE768;" Content="Animated background"
+                            local:MenuRow.About="Circles that come and go behind the Modern theme. Uses more power, so best turned off on battery." />
                     <!-- For touch, which has no B button. -->
                     <Button x:Name="BackgroundSettingsBackItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE72B;" Content="Back"
                             local:MenuRow.About="Back to Appearance &amp; Layout." />
@@ -225,21 +225,21 @@
                 <!-- What the library shows and which buttons it offers. A switches a row on or off. -->
                 <StackPanel x:Name="DisplayItems" Visibility="Collapsed">
                     <Button x:Name="LayoutSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE80A;" Content="Layout"
-                            local:MenuRow.About="Grid, Row or Old School: how the games are laid out." />
+                            local:MenuRow.About="Change the library's layout." />
                     <Button x:Name="ContinueSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE81C;" Content="Show last played"
                             local:MenuRow.About="Show the last game you played at the front, ready to carry on." />
                     <Button x:Name="ContinueInfoSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE946;" Content="Game info"
                             local:MenuRow.About="Show the last game's play time, size and profile beside it." />
                     <Button x:Name="StoreDetailsSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE8A5;" Content="Store details"
-                            local:MenuRow.About="Show the last game's description from its store page." />
+                            local:MenuRow.About="Show or hide the game's store details." />
                     <Button x:Name="StatusSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE701;" Content="Battery and Wi-Fi"
-                            local:MenuRow.About="Show the battery and Wi-Fi at the top of the screen." />
+                            local:MenuRow.About="Show or hide the battery and Wi-Fi at the top of the screen." />
                     <Button x:Name="FilterSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE71C;" Content="Store filter"
-                            local:MenuRow.About="Tabs at the top for each store, to show one store's games at a time." />
+                            local:MenuRow.About="Filter games by store." />
                     <Button x:Name="QuickActionsSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE7FC;" Content="Controller guide hints"
-                            local:MenuRow.About="Show which controller buttons do what along the bottom of the screen." />
+                            local:MenuRow.About="Show or hide the controller button hints." />
                     <Button x:Name="HiddenSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE7B3;" Content="Show hidden games"
-                            local:MenuRow.About="Show games you have hidden, so they can be put back." />
+                            local:MenuRow.About="Show hidden games, so you can restore them." />
                     <Button x:Name="SortSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE8CB;" Content="Sort games"
                             local:MenuRow.About="The order games are shown in." />
                     <!-- For touch, which has no B button. -->
@@ -261,13 +261,13 @@
                 <!-- The power menu. Restart and Shut down take a second press, so a stray A cannot end a session. -->
                 <StackPanel x:Name="PowerItems" Visibility="Collapsed">
                     <Button x:Name="SleepItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE708;" Content="Sleep"
-                            local:MenuRow.About="Put the handheld to sleep. It wakes in a moment where you left it." />
+                            local:MenuRow.About="Put the handheld to sleep." />
                     <Button x:Name="HibernateItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE823;" Content="Hibernate"
-                            local:MenuRow.About="Save everything to storage and turn off. Uses no battery, and takes longer to wake." />
+                            local:MenuRow.About="Save a snapshot of the system, then shut down. Slower to start than sleep." />
                     <Button x:Name="RestartItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE777;" Content="Restart"
-                            local:MenuRow.About="Restart the handheld. Press again to confirm." />
+                            local:MenuRow.About="Restart the handheld. Confirmation required." />
                     <Button x:Name="ShutDownItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE7E8;" Content="Shut down"
-                            local:MenuRow.About="Turn the handheld off. Press again to confirm." />
+                            local:MenuRow.About="Turn the handheld off. Confirmation required." />
 
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
                         <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
@@ -287,17 +287,17 @@
                 -->
                 <StackPanel x:Name="QuickItems" Visibility="Collapsed">
                     <Button x:Name="VolumeSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE767;" Content="Volume"
-                            local:MenuRow.About="The sound's volume. Left and right change it." />
+                            local:MenuRow.About="Adjust the system volume." />
                     <Button x:Name="BrightnessSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE706;" Content="Brightness"
-                            local:MenuRow.About="The screen's brightness. Left and right change it." />
+                            local:MenuRow.About="Adjust the handheld's screen brightness." />
                     <Button x:Name="PowerModeSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE945;" Content="Power mode"
-                            local:MenuRow.About="Windows' power mode: more battery life, or more performance." />
+                            local:MenuRow.About="Switch between Windows power modes." />
                     <Button x:Name="ResolutionSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE7F4;" Content="Resolution"
-                            local:MenuRow.About="The screen's resolution. A lower one can run games faster." />
+                            local:MenuRow.About="Switch screen resolution." />
                     <Button x:Name="RefreshRateSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE916;" Content="Refresh rate"
-                            local:MenuRow.About="How many times a second the screen is drawn." />
+                            local:MenuRow.About="Switch refresh rate." />
                     <Button x:Name="CloseAppsNowItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE71D;" Content="Close background programs"
-                            local:MenuRow.About="Close programs running in the background now, to free memory for games." />
+                            local:MenuRow.About="Close background programs now, to free up memory." />
 
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
                         <Border Style="{StaticResource BumperGlyph}" Margin="22,0,8,0">
@@ -324,9 +324,9 @@
                     <Button x:Name="ProfileRefreshSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE916;" Content="Refresh rate"
                             local:MenuRow.About="The refresh rate used while this game runs." />
                     <Button x:Name="ProfileBrightnessSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE706;" Content="Brightness"
-                            local:MenuRow.About="The brightness used while this game runs." />
+                            local:MenuRow.About="The handheld's screen brightness while this game runs." />
                     <Button x:Name="ProfileAppsSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE71D;" Content="Background programs"
-                            local:MenuRow.About="Whether background programs are closed as this game starts." />
+                            local:MenuRow.About="Choose whether background programs are closed as this game starts." />
                     <Button x:Name="ProfileAutoTdpSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE950;" Content="TDP Engine"
                             local:MenuRow.About="How TDP Engine sets the power limit while this game runs." />
                     <Button x:Name="ProfileFanSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE9CA;" Content="Fan curve"
@@ -363,7 +363,7 @@
                 <StackPanel x:Name="RecommendedItems" Visibility="Collapsed">
                     <TextBlock x:Name="RecommendedNote" Margin="4,0,4,14" FontSize="14.5" TextWrapping="Wrap" Opacity="0.85" />
                     <Button x:Name="RecommendedApplyItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE945;" Content="Apply optimised settings"
-                            local:MenuRow.About="Apply the settings listed here to this game's profile." />
+                            local:MenuRow.About="Apply these settings to this game's profile." />
                     <TextBlock x:Name="RecommendedDevice" Margin="4,2,4,16" FontSize="13.5" TextWrapping="Wrap" Opacity="0.6" />
                     <TextBlock Text="Set these in the game" Margin="4,0,4,8" FontSize="16" FontWeight="SemiBold" />
                     <ItemsControl x:Name="RecommendedList" Margin="4,0,4,12" Focusable="False">
@@ -401,7 +401,7 @@
                 <!-- Programs from the Start menu are added as rows above the hints once they are found. -->
                 <StackPanel x:Name="AddItems" Visibility="Collapsed">
                     <Button x:Name="BrowseItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE8E5;" Content="Browse for a program"
-                            local:MenuRow.About="Choose a program on the desktop to add to the library." />
+                            local:MenuRow.About="Choose a program to add to the library." />
                     <!-- For touch, which has no B button. -->
                     <Button x:Name="AddBackItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE72B;" Content="Back"
                             local:MenuRow.About="Back to Catalog &amp; Content." />
@@ -421,29 +421,29 @@
                 <!-- Around games: closing background programs as one starts, and the store's app once it ends. -->
                 <StackPanel x:Name="WhilePlayingItems" Visibility="Collapsed">
                     <Button x:Name="GameModeSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE71D;" Content="Close background programs"
-                            local:MenuRow.About="Close programs running in the background as a game starts, to free memory for it." />
+                            local:MenuRow.About="Close programs running in the background as a game starts, to free memory." />
                     <Button x:Name="WindowsGameModeSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE770;" Content="Optimise Windows processes"
-                            local:MenuRow.About="Turn down Windows' own background work while a game runs." />
-                    <Button x:Name="AppsToCloseGroup" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE71D;" Content="Programs to close"
-                            local:MenuRow.About="The programs that are closed as a game starts." />
-                    <Button x:Name="ReopenSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE7A7;" Content="Restore apps on game exit"
-                            local:MenuRow.About="Open the programs that were closed again once the game ends." />
+                            local:MenuRow.About="Turn down background processes while gaming." />
+                    <Button x:Name="AppsToCloseGroup" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE71D;" Content="Close programs"
+                            local:MenuRow.About="Choose which programs to close when a game starts." />
+                    <Button x:Name="ReopenSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE7A7;" Content="Restore on game exit"
+                            local:MenuRow.About="Reopen the programs that were closed once the game ends." />
                     <Button x:Name="AutoTdpSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE950;" Content="TDP Engine"
-                            local:MenuRow.About="TDP Engine sets the power limit as you play, aiming for the frame rate chosen here." />
+                            local:MenuRow.About="TDP Engine adjusts the power limit to reach the FPS target you choose." />
                     <Button x:Name="AutoTdpTemperatureSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE9CA;" Content="TDP Engine temperature limit"
-                            local:MenuRow.About="TDP Engine lowers the power limit before the handheld gets hotter than this." />
+                            local:MenuRow.About="TDP Engine lowers the power limit to keep the handheld under this temperature." />
                     <Button x:Name="AutoTdpWattsSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE945;" Content="TDP Engine maximum power"
-                            local:MenuRow.About="The most power TDP Engine will give a game." />
+                            local:MenuRow.About="The most watts TDP Engine may give a game." />
                     <Button x:Name="FanCurveSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE9CA;" Content="Fan curve"
-                            local:MenuRow.About="How fast the fan spins as the handheld warms up." />
-                    <Button x:Name="StoreClosingSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE711;" Content="Exit game launchers on game exit"
+                            local:MenuRow.About="Choose a fan profile." />
+                    <Button x:Name="StoreClosingSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE711;" Content="Quit game launcher on game exit"
                             local:MenuRow.About="Close the store's launcher when its game ends." />
                     <Button x:Name="StoreStartupItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE768;" Content="Store apps at startup"
-                            local:MenuRow.About="Which store launchers start with Windows." />
+                            local:MenuRow.About="Which stores start with Windows." />
                     <Button x:Name="QuickResumeSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE769;" Content="Quick Resume"
-                            local:MenuRow.About="Pause the game being played while the library is in front, until it is picked again." />
-                    <Button x:Name="ResumeSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE768;" Content="Resume game on wake"
-                            local:MenuRow.About="Carry on with the game you were playing after the handheld wakes." />
+                            local:MenuRow.About="Instantly pauses the game when you switch back to the library. Does not work with online or anti-cheat games." />
+                    <Button x:Name="ResumeSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE768;" Content="Resume on wake"
+                            local:MenuRow.About="Jump back into the game you were playing." />
                     <Button x:Name="SaveGuardSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE74E;" Content="Save Guard backups"
                             local:MenuRow.About="Back up game saves before a game starts and when it closes, keeping up to three snapshots." />
                     <!-- For touch, which has no B button. -->
@@ -488,7 +488,7 @@
                 <StackPanel x:Name="RunningAppsItems" Visibility="Collapsed">
                     <!-- For touch, which has no B button. -->
                     <Button x:Name="RunningAppsBackItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE72B;" Content="Back"
-                            local:MenuRow.About="Back to Programs to close." />
+                            local:MenuRow.About="Back to Close programs." />
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
                         <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
                             <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
@@ -504,13 +504,13 @@
                 <!-- Clean-ups a standard user may run, and the startup apps. Clearing takes a second press. -->
                 <StackPanel x:Name="MaintenanceItems" Visibility="Collapsed">
                     <Button x:Name="TempItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE74D;" Content="Clear temporary files"
-                            local:MenuRow.About="Delete temporary files Windows and programs left behind. Press again to confirm." />
+                            local:MenuRow.About="Delete temporary files. Confirmation required." />
                     <Button x:Name="ShaderItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE74D;" Content="Clear shader caches"
-                            local:MenuRow.About="Delete the shader caches games build. They are built again as games run, so the first minutes may stutter." />
+                            local:MenuRow.About="Delete every game's shader caches. Each is rebuilt as its game starts." />
                     <Button x:Name="RecycleItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE74D;" Content="Empty the Recycle Bin"
-                            local:MenuRow.About="Delete everything in the Recycle Bin for good. Press again to confirm." />
+                            local:MenuRow.About="Empty the Recycle Bin. Confirmation required." />
                     <Button x:Name="StartupGroup" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE768;" Content="Startup apps"
-                            local:MenuRow.About="Programs that start with Windows. Fewer means a faster start." />
+                            local:MenuRow.About="Choose which programs start with Windows." />
                     <!-- For touch, which has no B button. -->
                     <Button x:Name="MaintenanceSettingsBackItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE72B;" Content="Back"
                             local:MenuRow.About="Back to Performance &amp; Power." />
@@ -530,7 +530,7 @@
                 <StackPanel x:Name="StartupItems" Visibility="Collapsed">
                     <!-- For touch, which has no B button. -->
                     <Button x:Name="StartupBackItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE72B;" Content="Back"
-                            local:MenuRow.About="Back to Storage Clean-up." />
+                            local:MenuRow.About="Back to Clean up &amp; Startup apps." />
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
                         <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
                             <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
@@ -546,11 +546,11 @@
                 <!-- A row per console found and per ROM folder, added when the list opens. -->
                 <StackPanel x:Name="EmulatorItems" Visibility="Collapsed">
                     <Button x:Name="AddRomFolderItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE8F4;" Content="Add a ROM folder"
-                            local:MenuRow.About="Add a folder of ROMs, so its games show in the library." />
+                            local:MenuRow.About="Add ROMs to the game library." />
                     <Button x:Name="AddEmulatorItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE721;" Content="Find an emulator"
-                            local:MenuRow.About="Look for an emulator installed on the handheld." />
+                            local:MenuRow.About="Add your emulator to the game library." />
                     <Button x:Name="RescanEmulatorsItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE72C;" Content="Look again"
-                            local:MenuRow.About="Look again for emulators and ROMs." />
+                            local:MenuRow.About="Rescan for emulators and ROMs." />
                     <!-- For touch, which has no B button. -->
                     <Button x:Name="EmulatorsBackItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE72B;" Content="Back"
                             local:MenuRow.About="Back to Catalog &amp; Content." />
@@ -573,11 +573,11 @@
                 <!-- Docked mode: a layout and size of its own on a TV or monitor. -->
                 <StackPanel x:Name="TvItems" Visibility="Collapsed">
                     <Button x:Name="DockedSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE7F4;" Content="Docked mode"
-                            local:MenuRow.About="Use different settings while the handheld is connected to a TV or monitor." />
+                            local:MenuRow.About="Use different settings when docked to a TV or monitor." />
                     <Button x:Name="DockedLayoutSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE80A;" Content="Layout"
                             local:MenuRow.About="The layout used while docked." />
                     <Button x:Name="DockedSizeSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE71E;" Content="Zoom"
-                            local:MenuRow.About="How large the library is drawn on a TV or monitor." />
+                            local:MenuRow.About="Make everything bigger if it looks small on a monitor or TV." />
                     <!-- For touch, which has no B button. -->
                     <Button x:Name="TvSettingsBackItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE72B;" Content="Back"
                             local:MenuRow.About="Back to Appearance &amp; Layout." />
@@ -599,8 +599,8 @@
 
                 <!-- Owned games that are not installed, in a tab of their own. -->
                 <StackPanel x:Name="OwnedItems" Visibility="Collapsed">
-                    <Button x:Name="NotInstalledSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE896;" Content="Show games ready to install"
-                            local:MenuRow.About="Show games you own but have not installed, so they can be installed from the library." />
+                    <Button x:Name="NotInstalledSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE896;" Content="Ready to install"
+                            local:MenuRow.About="Show or hide the Ready to install category." />
                     <Button x:Name="SteamKeySetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE8D7;" Content="Steam Web API key"
                             local:MenuRow.About="A Steam Web API key lets the library see every Steam game you own." />
                     <Button x:Name="OwnedRefreshItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE72C;" Content="Look again"
@@ -625,13 +625,13 @@
                     <Button x:Name="DealsSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE719;" Content="Show game deals"
                             local:MenuRow.About="Show a row of deals on games." />
                     <Button x:Name="EpicFreeSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE719;" Content="Epic's free games"
-                            local:MenuRow.About="The Epic Games Store's free games of the week at the front of the deals. Needs no key." />
+                            local:MenuRow.About="Show or hide the Epic Games Store's free games of the week." />
                     <Button x:Name="DealsKeySetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE8D7;" Content="IsThereAnyDeal API key"
-                            local:MenuRow.About="An IsThereAnyDeal key lets the library find deals on games." />
+                            local:MenuRow.About="An IsThereAnyDeal key lets the library show deals on games." />
                     <Button x:Name="WishlistDealsSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE734;" Content="Wishlist deals first"
                             local:MenuRow.About="Show deals on games in your wishlist first." />
                     <Button x:Name="DealsRefreshItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE72C;" Content="Look again"
-                            local:MenuRow.About="Look again for deals." />
+                            local:MenuRow.About="Rescan for deals." />
                     <!-- For touch, which has no B button. -->
                     <Button x:Name="DealsSettingsBackItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE72B;" Content="Back"
                             local:MenuRow.About="Back to Catalog &amp; Content." />
@@ -652,7 +652,7 @@
                     <Button x:Name="AccountsSteamKeyItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE8D7;" Content="Steam Web API key"
                             local:MenuRow.About="A Steam Web API key lets the library read your Steam games and achievements." />
                     <Button x:Name="AccountsSyncAchievementsItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE895;" Content="Sync achievements now"
-                            local:MenuRow.About="Read your achievements from your store accounts now." />
+                            local:MenuRow.About="Rescan your achievements from every supported store." />
                     <Button x:Name="AccountsBackItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE72B;" Content="Back"
                             local:MenuRow.About="Back to Catalog &amp; Content." />
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
@@ -670,7 +670,7 @@
                 <!-- Achievements for one game, added when the list opens. -->
                 <StackPanel x:Name="AchievementsItems" Visibility="Collapsed">
                     <Button x:Name="AchievementsSyncItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE895;" Content="Sync achievements"
-                            local:MenuRow.About="Read this game's achievements from its store again." />
+                            local:MenuRow.About="Rescan this game's achievements from its store." />
                     <Button x:Name="AchievementsBackItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE72B;" Content="Back"
                             local:MenuRow.About="Back to the game's menu." />
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
@@ -688,11 +688,11 @@
                 <!-- Save Guard snapshots for one game. -->
                 <StackPanel x:Name="SaveSnapshotsItems" Visibility="Collapsed">
                     <Button x:Name="BackupSaveNowItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE74E;" Content="Back up save now"
-                            local:MenuRow.About="Copy this game's saves now, as a snapshot to go back to." />
+                            local:MenuRow.About="Keep a copy of this game's saves, ready to restore." />
                     <Button x:Name="SaveFolderSettingItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE8B7;" Content="Save folder"
-                            local:MenuRow.About="The folder this game keeps its saves in. Type its path." />
+                            local:MenuRow.About="Type or paste the save folder's full path." />
                     <Button x:Name="BrowseSaveFolderItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE838;" Content="Browse for save folder"
-                            local:MenuRow.About="Find the folder this game keeps its saves in on the desktop." />
+                            local:MenuRow.About="Choose the save folder yourself." />
                     <Button x:Name="SaveSnapshotsBackItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE72B;" Content="Back"
                             local:MenuRow.About="Back to the game's menu." />
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
@@ -710,7 +710,7 @@
                 <!-- Tags and collections for one game. -->
                 <StackPanel x:Name="TagsItems" Visibility="Collapsed">
                     <Button x:Name="AddCustomTagItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE710;" Content="Add custom tag"
-                            local:MenuRow.About="Make a collection of your own and put this game in it." />
+                            local:MenuRow.About="Create a collection of your own and add this game to it." />
                     <Button x:Name="TagsBackItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE72B;" Content="Back"
                             local:MenuRow.About="Back to the game's menu." />
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">

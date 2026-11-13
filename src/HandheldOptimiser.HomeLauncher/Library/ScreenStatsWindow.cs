@@ -13,8 +13,9 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 /// The stats screen's window: it fills the handheld's panel with the time, a row of badges (Wi-Fi, battery,
 /// Battery Care) and six tiles, each an icon, a name, a big value and a thin line that fills with it. It is
 /// drawn at 1280 by 720 and scaled to the panel, whatever its size and scaling. It never takes the keyboard or
-/// the controller from the game, and is not in the taskbar or Alt+Tab. Built in code: dark glass, hairlines,
-/// and one jade accent, the same as TDP Engine's widget.
+/// the controller from the game, and is not in the taskbar or Alt+Tab. Built in code: the NXE lime of the
+/// library's Console space look with its circles held still, dark glass tiles with hairlines, and one jade
+/// accent, the same as TDP Engine's widget.
 /// </summary>
 internal sealed partial class ScreenStatsWindow : Window
 {
@@ -36,8 +37,8 @@ internal sealed partial class ScreenStatsWindow : Window
     private static readonly FontFamily Geometric = new("Bahnschrift, Segoe UI");
     private static readonly FontFamily Mono = new("Cascadia Mono, Consolas");
 
-    private static readonly Brush Page = Frozen(Color.FromRgb(0x0C, 0x0D, 0x11));
-    private static readonly Brush CardFill = Frozen(Color.FromArgb(0x0B, 0xFF, 0xFF, 0xFF));
+    // Dark glass over the lime, dark enough for grey words and the jade to read on it.
+    private static readonly Brush CardFill = Frozen(Color.FromArgb(0xA6, 0x0C, 0x14, 0x06));
     private static readonly Brush CardEdge = Frozen(Color.FromArgb(0x24, 0xFF, 0xFF, 0xFF));
     private static readonly Brush Rule = Frozen(Color.FromArgb(0x30, 0xFF, 0xFF, 0xFF));
     private static readonly Brush Track = Frozen(Color.FromArgb(0x1C, 0xFF, 0xFF, 0xFF));
@@ -48,6 +49,9 @@ internal sealed partial class ScreenStatsWindow : Window
     private static readonly Brush LabelBrush = Frozen(Color.FromRgb(0x9C, 0xA3, 0xAF));
     private static readonly Brush ValueBrush = Frozen(Color.FromRgb(0xF3, 0xF4, 0xF6));
     private static readonly Brush UnitBrush = Frozen(Color.FromRgb(0x6B, 0x72, 0x80));
+
+    // Words straight on the lime, outside the tiles: white, a little softened.
+    private static readonly Brush OnLime = Frozen(Color.FromRgb(0xF4, 0xFA, 0xE8));
     private static readonly Brush WarmBrush = Frozen(Color.FromRgb(0xFB, 0xBF, 0x24));
     private static readonly Brush HotBrush = Frozen(Color.FromRgb(0xF8, 0x71, 0x71));
 
@@ -72,8 +76,8 @@ internal sealed partial class ScreenStatsWindow : Window
         Geometry.Parse("M12,2.5 L19.5,5.5 V11 C19.5,16 16,19.8 12,21.5 C8,19.8 4.5,16 4.5,11 V5.5 Z M8.8,11.8 L11.2,14.2 L15.4,9.6"));
 
     private readonly TextBlock _clock = Text(Geometric, 128, FontWeights.Light, ValueBrush);
-    private readonly TextBlock _period = Text(Geometric, 30, FontWeights.SemiBold, LabelBrush);
-    private readonly TextBlock _date = Text(Geometric, 21, FontWeights.SemiBold, LabelBrush);
+    private readonly TextBlock _period = Text(Geometric, 30, FontWeights.SemiBold, OnLime);
+    private readonly TextBlock _date = Text(Geometric, 21, FontWeights.SemiBold, OnLime);
 
     private readonly Rectangle[] _wifiBars = new Rectangle[4];
     private readonly TextBlock _wifiName = Text(Mono, 17, FontWeights.Normal, ValueBrush);
@@ -93,7 +97,7 @@ internal sealed partial class ScreenStatsWindow : Window
         WindowStyle = WindowStyle.None;
         ResizeMode = ResizeMode.NoResize;
         WindowStartupLocation = WindowStartupLocation.Manual;
-        Background = Page;
+        Background = Brushes.Black;
         Topmost = true;
         ShowInTaskbar = false;
         ShowActivated = false;
@@ -132,7 +136,16 @@ internal sealed partial class ScreenStatsWindow : Window
             page.Children.Add(tile);
         }
 
-        Content = new Viewbox { Stretch = Stretch.Uniform, Child = page };
+        // The lime and its circles fill the whole panel, behind the page scaled into it. The circles are
+        // never set moving: the screen is up while a game runs, and is drawn without the graphics card.
+        // They keep out of the clock and the badges, which sit straight on the lime.
+        var circles = new CircleField { KeepClear = [new Rect(0, 0, 0.3, 0.27), new Rect(0.62, 0.05, 0.38, 0.14)] };
+        circles.SizeChanged += (_, e) => circles.Build(e.NewSize);
+        var back = new Grid();
+        LimeBackdrop.AddTo(back);
+        back.Children.Add(circles);
+        back.Children.Add(new Viewbox { Stretch = Stretch.Uniform, Child = page });
+        Content = back;
         TextOptions.SetTextFormattingMode(this, TextFormattingMode.Ideal);
     }
 
@@ -213,8 +226,9 @@ internal sealed partial class ScreenStatsWindow : Window
     }
 
     /// <summary>
-    /// The top of the screen: the time with its small "pm" over the date at the left, and at the right the
-    /// badges over the line that says the readings are live.
+    /// The top of the screen: the time with its small "pm" over the date at the left, and the badges at the
+    /// right. The line under the badges saying the readings were live was taken away, as the player found the
+    /// corner busy (2026-11-13).
     /// </summary>
     private Grid Header()
     {
@@ -229,25 +243,14 @@ internal sealed partial class ScreenStatsWindow : Window
         left.Children.Add(time);
         left.Children.Add(_date);
 
-        var badges = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        var badges = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
         badges.Children.Add(_wifiBadge);
         badges.Children.Add(_batteryBadge);
         badges.Children.Add(_careBadge);
 
-        var live = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 18, 2, 0) };
-        live.Children.Add(new Ellipse { Width = 7, Height = 7, Fill = Jade, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 9, 0) });
-        var liveText = Text(Geometric, 14, FontWeights.SemiBold, Jade);
-        liveText.Text = Spaced("LIVE TELEMETRY");
-        liveText.VerticalAlignment = VerticalAlignment.Center;
-        live.Children.Add(liveText);
-
-        var right = new StackPanel { HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
-        right.Children.Add(badges);
-        right.Children.Add(live);
-
         var header = new Grid { Margin = new Thickness(36, 8, 36, 8) };
         header.Children.Add(left);
-        header.Children.Add(right);
+        header.Children.Add(badges);
         return header;
     }
 
@@ -302,7 +305,7 @@ internal sealed partial class ScreenStatsWindow : Window
         inside.Children.Add(line);
         inside.Children.Add(reading);
 
-        // No shadow under it: on a page this dark one cannot be seen, which the player confirmed on 2026-11-11.
+        // No shadow under it, as the player chose on 2026-11-11.
         _tiles[index] = new TileParts(label, caption, value, unit, line, fill, filled, empty);
         return new Border
         {

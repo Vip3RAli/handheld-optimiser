@@ -65,13 +65,13 @@
             which the page below is laid out inside for as long as it is open, so the games that are not
             installed scroll within it. The search is moved into its heading from the top bar. See
             OldSchoolPresenter.cs, which has the page's edges to match the sizes here. It is drawn as the
-            menu's panel is, the slate of the Xbox 360's settings with its fine lines, and the game in
-            focus is ringed in the menu's green.
+            menu's panel is, the polished slate of the Xbox 360's settings, and the game in focus is
+            ringed in the menu's green.
         -->
         <Grid x:Name="OpenCard" Grid.Row="2" Margin="24,0,24,0" Visibility="Collapsed">
             <Border x:Name="OpenCardBack" CornerRadius="5" Background="{StaticResource MenuPanelBack}"
                     BorderBrush="#47FFFFFF" BorderThickness="1">
-                <Rectangle Fill="{StaticResource MenuPanelLines}" RadiusX="5" RadiusY="5" IsHitTestVisible="False" />
+                <Rectangle Fill="{StaticResource MenuPanelSheen}" RadiusX="5" RadiusY="5" IsHitTestVisible="False" />
             </Border>
             <Grid x:Name="OpenCardHeading" Height="60" Margin="14,0,14,0" VerticalAlignment="Top" Visibility="Collapsed">
                 <!-- The hairline under the heading, as under each of the menu's rows. -->
@@ -97,7 +97,7 @@
                     open one's name just above its cards, and the others stacked above it, smaller and
                     fainter the further they are. A press on a name opens it.
                 -->
-                <ItemsControl x:Name="Categories" Margin="14,0,0,4" Focusable="False" Visibility="Collapsed">
+                <ItemsControl x:Name="Categories" Margin="4,0,0,4" Focusable="False" Visibility="Collapsed">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <local:OldSchoolListPanel />
@@ -106,19 +106,12 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Border Background="Transparent" Padding="0,2,24,2" Cursor="Hand">
-                                <StackPanel Orientation="Horizontal">
-                                    <!-- The mark beside the open one: a square, or in the Console space look a glowing green bar. -->
-                                    <Rectangle Width="11" Height="11" Margin="0,5,12,0" Fill="#F2F3F5" VerticalAlignment="Center"
-                                               Visibility="{DynamicResource ClassicOnly}"
-                                               Opacity="{Binding Path=(local:OldSchoolListPanel.Open), RelativeSource={RelativeSource AncestorType=ContentPresenter}}" />
-                                    <Rectangle Width="6" Height="38" Margin="0,6,16,0" RadiusX="3" RadiusY="3" Fill="#5FD12A" VerticalAlignment="Center"
-                                               Visibility="{DynamicResource ConsoleOnly}"
-                                               Opacity="{Binding Path=(local:OldSchoolListPanel.Open), RelativeSource={RelativeSource AncestorType=ContentPresenter}}">
-                                        <Rectangle.Effect>
-                                            <DropShadowEffect Color="#6EDC3C" BlurRadius="14" ShadowDepth="0" Opacity="0.9" />
-                                        </Rectangle.Effect>
-                                    </Rectangle>
-                                    <!-- The others in silver, and the open one white over it, so the white fades in as it comes to the front. -->
+                                <!--
+                                    No mark beside the open one: its size and its white say which it is, and its
+                                    name lines up with the left edge of the front card, as on the NXE dashboard.
+                                    The others in silver, and the open one white over it, so the white fades in
+                                    as it comes to the front.
+                                -->
                                     <Grid>
                                         <TextBlock Text="{Binding Name}" FontSize="44" FontWeight="SemiBold"
                                                    FontFamily="{DynamicResource CategoryFont}" Foreground="{DynamicResource CategoryBrush}" />
@@ -126,7 +119,6 @@
                                                    FontFamily="{DynamicResource CategoryFont}" Visibility="{DynamicResource ConsoleOnly}"
                                                    Opacity="{Binding Path=(local:OldSchoolListPanel.Open), RelativeSource={RelativeSource AncestorType=ContentPresenter}}" />
                                     </Grid>
-                                </StackPanel>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>

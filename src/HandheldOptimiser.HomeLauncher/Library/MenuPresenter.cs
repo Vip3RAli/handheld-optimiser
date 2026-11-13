@@ -373,7 +373,7 @@ internal sealed class MenuPresenter
     {
         var view = _view;
         _panel = _oldSchool();
-        view.MenuLines.Visibility = _panel ? Visibility.Visible : Visibility.Collapsed;
+        view.MenuSheen.Visibility = _panel ? Visibility.Visible : Visibility.Collapsed;
         view.MenuDetail.Visibility = _panel ? Visibility.Visible : Visibility.Collapsed;
         if (!_panel)
         {
@@ -433,8 +433,8 @@ internal sealed class MenuPresenter
         view.MenuTitle.FontSize = MenuTitleSize;
         view.MenuStore.Margin = MenuStoreMargin;
 
-        // The fine lines run out to the panel's edges, over its padding.
-        view.MenuLines.Margin = new Thickness(-PanelPadding.Left, -PanelPadding.Top, -PanelPadding.Right, -PanelPadding.Bottom);
+        // The sheen runs out to the panel's edges, over its padding.
+        view.MenuSheen.Margin = new Thickness(-PanelPadding.Left, -PanelPadding.Top, -PanelPadding.Right, -PanelPadding.Bottom);
         view.MenuDetail.Width = Math.Round(width * PanelDetailShare);
         view.MenuDetail.Margin = PanelDetailMargin;
     }

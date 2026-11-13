@@ -258,23 +258,12 @@
     <FontFamily x:Key="HintFont">Convection, /HandheldOptimiser.HomeLauncher;component/Fonts/#Open Sans, Segoe UI Variable Text, Segoe UI</FontFamily>
 
     <!--
-        Behind a card in the Console space look: the shadow it casts to the right onto the card behind, the
-        darker one where it meets the floor, and its reflection in the floor, which is the card itself (the
-        element in Tag) turned upside down and fading away. The frame is invisible and only keeps room: it
-        is the picture CardTilt is given, so it must hold everything the card draws, and OldSchoolStack's
-        Frame numbers must match its margins.
+        Behind a card in the Console space look: the dark shadow where it meets the floor (the user had the
+        one to its right dropped, 2026-11-13), and its reflection in the floor, which is the card itself (the
+        element in Tag) turned upside down and fading away. The cards stand flat, as the NXE dashboard's did.
     -->
     <ControlTemplate x:Key="ConsoleCardBack" TargetType="ContentControl">
         <Grid Visibility="{DynamicResource ConsoleOnly}">
-            <Rectangle Margin="-60,-60,-80,-380" Fill="Transparent" />
-            <Rectangle Width="46" Margin="0,10,-46,8" HorizontalAlignment="Right">
-                <Rectangle.Fill>
-                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                        <GradientStop Color="#80000000" Offset="0" />
-                        <GradientStop Color="#00000000" Offset="1" />
-                    </LinearGradientBrush>
-                </Rectangle.Fill>
-            </Rectangle>
             <Ellipse Height="48" Margin="20,0,20,-30" VerticalAlignment="Bottom">
                 <Ellipse.Fill>
                     <RadialGradientBrush>
@@ -296,7 +285,7 @@
                 </Rectangle.Fill>
                 <Rectangle.OpacityMask>
                     <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                        <GradientStop Color="#4CFFFFFF" Offset="0" />
+                        <GradientStop Color="#A6FFFFFF" Offset="0" />
                         <GradientStop Color="#00FFFFFF" Offset="0.32" />
                     </LinearGradientBrush>
                 </Rectangle.OpacityMask>
@@ -306,7 +295,7 @@
 
     <!--
         Over a card in the Console space look, as on a glossy case: a highlight across the top left, a lit
-        top edge, a fine light edge all round, and a darker spine down the left.
+        top edge and a darker spine down the left. The user had the fine edge all round dropped (2026-11-13).
     -->
     <ControlTemplate x:Key="ConsoleCardGloss" TargetType="ContentControl">
         <Grid Visibility="{DynamicResource ConsoleOnly}" IsHitTestVisible="False">
@@ -328,7 +317,6 @@
                     </LinearGradientBrush>
                 </Border.Background>
             </Border>
-            <Border CornerRadius="12" BorderThickness="1" BorderBrush="#38FFFFFF" />
             <Border CornerRadius="12" BorderThickness="0,1.5,0,0" BorderBrush="#80FFFFFF" />
         </Grid>
     </ControlTemplate>
@@ -411,8 +399,7 @@
                                             <BitmapCache />
                                         </Border.CacheMode>
                                     </Border>
-                                    <Border CornerRadius="10" Background="#7A0A140A" BorderBrush="#33FFFFFF" BorderThickness="1" />
-                                    <Border CornerRadius="10" BorderBrush="#40FFFFFF" BorderThickness="0,1,0,0" Margin="1" />
+                                    <Border CornerRadius="10" Background="#7A0A140A" />
                                     <StackPanel Style="{StaticResource HiddenByNotice}" Margin="18,0,56,0" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding Title}" FontFamily="{DynamicResource CardTitleFont}" FontSize="30" FontWeight="SemiBold"
                                                    TextTrimming="CharacterEllipsis" />
@@ -683,7 +670,7 @@
                         </Border>
                         <!-- The Console space look's pane of glass under the front card's name. -->
                         <Border Visibility="{DynamicResource ConsoleOnly}" Height="76" Margin="12" VerticalAlignment="Bottom"
-                                CornerRadius="10" Background="#55102A08" BorderBrush="#33FFFFFF" BorderThickness="1"
+                                CornerRadius="10" Background="#55102A08"
                                 Opacity="{Binding Path=(local:OldSchoolPanel.Front), RelativeSource={RelativeSource AncestorType=ContentPresenter}}" />
                         <!-- A shape and not text: text this big is not drawn at all on the small cards at the back. -->
                         <Path Data="{Binding Icon}" Fill="#FFFFFF" Stretch="Uniform" Width="116" Height="116"
@@ -789,21 +776,21 @@
         <Setter Property="Template" Value="{DynamicResource MenuRowTemplate}" />
     </Style>
 
-    <!-- The Old School layout's menu panel: slate, lighter at the top left, with fine level lines across it. -->
-    <LinearGradientBrush x:Key="MenuPanelBack" StartPoint="0,0" EndPoint="0.7,1">
-        <GradientStop Color="#4C535B" Offset="0" />
-        <GradientStop Color="#383E45" Offset="0.45" />
-        <GradientStop Color="#2A2F35" Offset="1" />
+    <!--
+        The Old School layout's menu panel: the polished blue grey slate of the Xbox 360's NXE settings,
+        smooth from a lighter top to a deeper foot, with a soft sheen of light over its top left.
+    -->
+    <LinearGradientBrush x:Key="MenuPanelBack" StartPoint="0,0" EndPoint="0.25,1">
+        <GradientStop Color="#56636F" Offset="0" />
+        <GradientStop Color="#45515D" Offset="0.35" />
+        <GradientStop Color="#36414C" Offset="0.75" />
+        <GradientStop Color="#2E3842" Offset="1" />
     </LinearGradientBrush>
-    <DrawingBrush x:Key="MenuPanelLines" TileMode="Tile" Viewport="0,0,4,4" ViewportUnits="Absolute"
-                  Viewbox="0,0,4,4" ViewboxUnits="Absolute">
-        <DrawingBrush.Drawing>
-            <DrawingGroup>
-                <GeometryDrawing Brush="#00000000" Geometry="M0,0 H4 V4 H0 Z" />
-                <GeometryDrawing Brush="#0EFFFFFF" Geometry="M0,0 H4 V1 H0 Z" />
-            </DrawingGroup>
-        </DrawingBrush.Drawing>
-    </DrawingBrush>
+    <RadialGradientBrush x:Key="MenuPanelSheen" Center="0.3,0" GradientOrigin="0.3,0" RadiusX="0.75" RadiusY="0.9">
+        <GradientStop Color="#1CFFFFFF" Offset="0" />
+        <GradientStop Color="#0AFFFFFF" Offset="0.5" />
+        <GradientStop Color="#00FFFFFF" Offset="1" />
+    </RadialGradientBrush>
 
     <!-- The menu panel's row in focus: a glossy green bar, lit along its top half. -->
     <LinearGradientBrush x:Key="MenuPanelBar" StartPoint="0,0" EndPoint="0,1">

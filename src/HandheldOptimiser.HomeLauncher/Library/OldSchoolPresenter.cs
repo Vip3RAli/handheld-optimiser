@@ -538,7 +538,7 @@ internal sealed class OldSchoolPresenter
         ConsoleSpaceLook.Apply(console);
         SetPageEdges();
 
-        // Every stack is laid out again: the cards are drawn a little smaller, and turned or not.
+        // Every stack is laid out again: the cards are drawn a little smaller in Console space.
         foreach (var stack in new[] { _parts.Tiles, _parts.DealTiles, _parts.ActionCards })
         {
             Visuals.Child<OldSchoolPanel>(stack)?.InvalidateMeasure();
@@ -557,9 +557,14 @@ internal sealed class OldSchoolPresenter
     {
         var oldSchool = _layouts.IsOldSchool;
         var under = OldSchoolPanel.ConsoleSpace && oldSchool && !_layouts.IsBrowsing;
-        _parts.Scroller.Padding = _layouts.IsBrowsing ? OpenCardEdges : oldSchool ? (OldSchoolPanel.ConsoleSpace ? ConsoleCardEdges : CardEdges) : PageEdges;
+        var edges = _layouts.IsBrowsing ? OpenCardEdges : oldSchool ? (OldSchoolPanel.ConsoleSpace ? ConsoleCardEdges : CardEdges) : PageEdges;
+        _parts.Scroller.Padding = edges;
         Grid.SetRowSpan(_parts.Scroller, under ? 2 : 1);
     }
+
+    /// <summary>The width the cards have inside the page with those edges.</summary>
+    private double PageWidth(Thickness edges) =>
+        _parts.Scroller.ActualWidth - edges.Left - edges.Right - _parts.Tiles.Margin.Left - _parts.Tiles.Margin.Right;
 
     /// <summary>
     /// Keeps the Console space floor under the cards on screen, wherever docked mode and the screen's
@@ -823,12 +828,15 @@ internal sealed class OldSchoolPresenter
     /// <summary>Draws the names as much bigger as the cards are drawn to fill a wide screen, so the two keep their proportions.</summary>
     public void FitCategories()
     {
-        if (!_layouts.IsOldSchool || _parts.Scroller.ViewportWidth <= 0)
+        if (!_layouts.IsOldSchool || _parts.Scroller.ActualWidth <= 0)
         {
             return;
         }
 
-        var fit = OldSchoolStack.Fit(_parts.Scroller.ViewportWidth - _parts.Tiles.Margin.Left - _parts.Tiles.Margin.Right, OldSchoolPanel.ConsoleSpace);
+        // The edges first, which in Console space depend on the screen's width. The width is worked out
+        // from them rather than read from the viewport, which only catches up at the next layout pass.
+        SetPageEdges();
+        var fit = OldSchoolStack.Fit(PageWidth(_parts.Scroller.Padding), OldSchoolPanel.ConsoleSpace);
         if (_parts.Categories.LayoutTransform is not ScaleTransform scale || Math.Abs(scale.ScaleX - fit) > 0.005)
         {
             _parts.Categories.LayoutTransform = new ScaleTransform(fit, fit);
