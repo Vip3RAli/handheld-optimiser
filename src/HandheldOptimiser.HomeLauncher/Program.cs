@@ -53,6 +53,21 @@ internal static class Program
             return 0;
         }
 
+        // The YouTube Music player, which TDP Engine starts when the widget asks for it.
+        if (args.Contains(PowerService.AutoTdpProtocol.Music.Argument, StringComparer.OrdinalIgnoreCase))
+        {
+            try
+            {
+                Library.MusicApp.Run();
+            }
+            catch (Exception ex)
+            {
+                Log($"Music player failed: {ex}");
+            }
+
+            return 0;
+        }
+
         // The Radeon settings for the widget, which TDP Engine starts as the player, reading what it prints.
         if (args.Length > 0 && string.Equals(args[0], PowerService.RadeonState.Argument, StringComparison.OrdinalIgnoreCase))
         {
