@@ -95,10 +95,12 @@ internal static class GogScript
 
             if (action.Arguments.GetValueOrDefault("type") == "file")
             {
-                if (source is not null && File.Exists(source))
+                // A file that is there and not to be overwritten is left: copying over it throws, which stopped
+                // an update or a check of the game's files at this step every time.
+                if (source is not null && File.Exists(source) && (overwrite || !File.Exists(target)))
                 {
                     Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-                    File.Copy(source, target, overwrite);
+                    File.Copy(source, target, overwrite: true);
                 }
 
                 continue;

@@ -276,6 +276,66 @@ public sealed class GogInstallTests : IDisposable
     }
 
     [Fact]
+    public void A_script_step_that_must_not_overwrite_leaves_the_players_file_alone()
+    {
+        const string script = """
+            {"actions":[{"name":"settings","install":{"action":"supportData","arguments":
+              {"type":"file","source":"{supportDir}/game.cfg","target":"{app}/game.cfg","overwrite":"false"}}}]}
+            """;
+        var app = Path.Combine(_folder, "Kept");
+        var support = Path.Combine(app, "__support");
+        Directory.CreateDirectory(support);
+        File.WriteAllText(Path.Combine(support, "game.cfg"), "default");
+        File.WriteAllText(Path.Combine(app, "game.cfg"), "mine");
+
+        // As an update or a check of the files runs it: the file is already there.
+        var left = GogScript.Run(GogScript.Parse(script), app, support, "1");
+
+        Assert.Empty(left);
+        Assert.Equal("mine", File.ReadAllText(Path.Combine(app, "game.cfg")));
+    }
+
+    [Fact]
+    public void Uninstalling_takes_GOGs_files_and_keeps_the_players()
+    {
+        var before = NativeInstalls.Folder;
+        NativeInstalls.Folder = Path.Combine(_folder, "uninstall-record");
+        try
+        {
+            var game = Path.Combine(_folder, "Games", "GOG", "Old Dungeon");
+            Directory.CreateDirectory(Path.Combine(game, "data"));
+            Directory.CreateDirectory(Path.Combine(game, "saves"));
+            File.WriteAllText(Path.Combine(game, "game.exe"), "exe");
+            File.WriteAllText(Path.Combine(game, "data", "level.dat"), "level");
+            File.WriteAllText(Path.Combine(game, "saves", "slot1.sav"), "mine");
+            Directory.CreateDirectory(NativeInstalls.Folder);
+            File.WriteAllText(GogInstaller.FilesPath("100"), """{"game.exe":"a","data\\level.dat":"b"}""");
+            var install = new NativeInstall(GameStore.Gog, "100", "Old Dungeon", "1", "1.0", game, "game.exe", null, null, 8, DateTimeOffset.UtcNow);
+            NativeInstalls.Save(install);
+
+            var kept = GogInstaller.Uninstall(install);
+
+            Assert.True(kept);
+            Assert.False(File.Exists(Path.Combine(game, "game.exe")));
+            Assert.False(Directory.Exists(Path.Combine(game, "data")));
+            Assert.Equal("mine", File.ReadAllText(Path.Combine(game, "saves", "slot1.sav")));
+            Assert.Null(NativeInstalls.Find("gog:100"));
+            Assert.False(File.Exists(GogInstaller.FilesPath("100")));
+
+            // With nothing of the player's in it, the folder goes too.
+            File.Delete(Path.Combine(game, "saves", "slot1.sav"));
+            File.WriteAllText(Path.Combine(game, "game.exe"), "exe");
+            File.WriteAllText(GogInstaller.FilesPath("100"), """{"game.exe":"a"}""");
+            Assert.False(GogInstaller.Uninstall(install));
+            Assert.False(Directory.Exists(game));
+        }
+        finally
+        {
+            NativeInstalls.Folder = before;
+        }
+    }
+
+    [Fact]
     public void A_script_cannot_reach_outside_the_games_folder()
     {
         var app = Path.Combine(_folder, "Game");

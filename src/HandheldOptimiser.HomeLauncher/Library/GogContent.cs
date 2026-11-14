@@ -36,13 +36,24 @@ internal static class GogContent
 {
     private static HttpClient Http => GogAuth.Http;
 
-    /// <summary>The game's newest public Windows build in GOG's current format, or null when it has none.</summary>
-    public static async Task<GogBuild?> LatestBuildAsync(string productId, CancellationToken cancel = default)
+    /// <summary>The game's newest public Windows build in GOG's current format, or null when it has none or GOG could not be asked.</summary>
+    public static async Task<GogBuild?> LatestBuildAsync(string productId, CancellationToken cancel = default) =>
+        (await BuildsAsync(productId, cancel))?.FirstOrDefault();
+
+    /// <summary>
+    /// The game's public Windows builds, newest first: none when GOG has none, and null when GOG could not be
+    /// asked, which an install waits out rather than giving up.
+    /// </summary>
+    public static async Task<List<GogBuild>?> BuildsAsync(string productId, CancellationToken cancel = default)
     {
         try
         {
             var json = await Http.GetStringAsync($"https://content-system.gog.com/products/{Uri.EscapeDataString(productId)}/os/windows/builds?generation=2", cancel);
-            return ParseBuilds(json).FirstOrDefault();
+            return ParseBuilds(json);
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return [];
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {

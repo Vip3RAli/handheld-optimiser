@@ -299,21 +299,23 @@ internal sealed class GogInstaller(HttpClient http)
     /// </summary>
     public async Task<NativeInstall> RunAsync(Job job, CancellationToken cancel)
     {
-        if (await GogAccountApi.FreshAsync(cancel) is not { AccessToken: { } } session)
+        // GOG not answering is not GOG saying no: the library starts before the Wi-Fi is up, and a download
+        // picked up then was dropped, with how far it had got. Those are waited out and tried again.
+        if (await GogAccountApi.FreshAsync(cancel) is not { AccessToken: { } })
         {
-            throw new InstallException("Sign in to GOG again, under Store Accounts.");
+            throw StoreSessions.SignedIn(GameStore.Gog) ? Unreachable(cancel) : new InstallException("Sign in to GOG again, under Store Accounts.");
         }
 
-        var build = await GogContent.LatestBuildAsync(job.ProductId, cancel) ?? throw new InstallException("GOG has no Windows build of it to download.");
-        var manifest = await GogContent.ManifestAsync(build, cancel) ?? throw new InstallException("GOG's list of its files could not be read.");
+        var builds = await GogContent.BuildsAsync(job.ProductId, cancel) ?? throw Unreachable(cancel);
+        var build = builds.FirstOrDefault() ?? throw new InstallException("GOG has no Windows build of it to download.");
+        var manifest = await GogContent.ManifestAsync(build, cancel) ?? throw Unreachable(cancel);
 
         // The game's files, from every depot it needs; a later depot's copy of a file wins. Support files go in
         // the game's support folder, where its script copies them from.
         var files = new Dictionary<string, GogFile>(StringComparer.OrdinalIgnoreCase);
         foreach (var depot in GogDepots.Choose(manifest, GogDepots.WindowsLanguage()))
         {
-            var json = await GogContent.ZlibJsonAsync(GogContent.MetaUrl(depot.Manifest), "depot", cancel)
-                ?? throw new InstallException("GOG's list of its files could not be read.");
+            var json = await GogContent.ZlibJsonAsync(GogContent.MetaUrl(depot.Manifest), "depot", cancel) ?? throw Unreachable(cancel);
             foreach (var file in GogDepots.ParseDepot(json))
             {
                 var placed = file.Support ? file with { Path = $@"{SupportFolder}\{file.Path}" } : file;
@@ -326,6 +328,12 @@ internal sealed class GogInstaller(HttpClient http)
         if (manifest.Dependencies.Count > 0)
         {
             var repository = await GogContent.DependenciesAsync(cancel);
+            if (repository.Count == 0)
+            {
+                // Not read, rather than empty: going on would leave a game without its DOSBox.
+                throw Unreachable(cancel);
+            }
+
             foreach (var id in manifest.Dependencies)
             {
                 if (repository.FirstOrDefault(d => string.Equals(d.Id, id, StringComparison.OrdinalIgnoreCase)) is not { Internal: true } dependency)
@@ -334,8 +342,7 @@ internal sealed class GogInstaller(HttpClient http)
                     continue;
                 }
 
-                var json = await GogContent.ZlibJsonAsync(GogDepots.DependencyMetaUrl(dependency.Manifest), "dependency", cancel)
-                    ?? throw new InstallException($"GOG's {id} could not be read.");
+                var json = await GogContent.ZlibJsonAsync(GogDepots.DependencyMetaUrl(dependency.Manifest), "dependency", cancel) ?? throw Unreachable(cancel);
                 foreach (var file in GogDepots.ParseDepot(json, dependency: true).Where(f => !f.Support))
                 {
                     files.TryAdd(file.Path, file);
@@ -452,6 +459,13 @@ internal sealed class GogInstaller(HttpClient http)
         return record;
     }
 
+    /// <summary>GOG did not answer, which the queue tries again in a while. A stop asked for meanwhile comes first.</summary>
+    private static HttpRequestException Unreachable(CancellationToken cancel)
+    {
+        cancel.ThrowIfCancellationRequested();
+        return new HttpRequestException("GOG could not be reached.");
+    }
+
     /// <summary>Where a new install goes: the install folder's GOG folder, under the game's own name.</summary>
     private static string ChooseFolder(GogBuildManifest manifest)
     {
@@ -459,26 +473,71 @@ internal sealed class GogInstaller(HttpClient http)
         var name = GogDepots.FolderName(manifest.InstallDirectory);
         var folder = Path.Combine(root, name);
 
-        // A folder of that name that is not this game's install, or a half-finished one, is left alone.
-        return !Directory.Exists(folder) || !Directory.EnumerateFileSystemEntries(folder).Any() || File.Exists(StatePath(manifest.BaseProductId))
+        // A folder of that name holding a game installed some other way is left alone. One holding only what
+        // an uninstall kept (saves, settings) is this game's, and is installed into again; so is a half-finished one.
+        return !Directory.Exists(folder) || File.Exists(StatePath(manifest.BaseProductId))
+            || !Directory.EnumerateFiles(folder, "goggame-*.info").Any()
             ? folder
             : Path.Combine(root, $"{name} ({manifest.BaseProductId})");
     }
 
-    /// <summary>Takes away a game the library installed: its folder, its working files and its record.</summary>
-    public static void Uninstall(NativeInstall install)
+    /// <summary>
+    /// Takes away a game the library installed, as GOG Galaxy does: the files GOG's build listed, the folders
+    /// that leaves empty, the game's working files and its record. Anything else in the folder is the
+    /// player's (saves and settings, which old DOS games keep beside the game) and stays. The user asked for
+    /// this on 2026-11-14; before, the whole folder went.
+    /// </summary>
+    /// <returns>Whether anything was kept in the game's folder.</returns>
+    public static bool Uninstall(NativeInstall install)
     {
         // Only a folder the record names, and never a drive or a top folder.
+        var kept = false;
         var folder = Path.GetFullPath(install.Folder);
         if (Path.GetPathRoot(folder) is { } root && folder.TrimEnd('\\').Length > root.Length
             && folder.Count(c => c == '\\') >= 2 && Directory.Exists(folder))
         {
-            Directory.Delete(folder, recursive: true);
+            var files = ReadFiles(install.Id);
+            if (files.Count == 0)
+            {
+                // No list of what was installed: nothing says which files are the player's.
+                Directory.Delete(folder, recursive: true);
+            }
+            else
+            {
+                foreach (var path in files.Keys)
+                {
+                    if (GogDepots.SafePath(path) is { } safe)
+                    {
+                        File.Delete(Path.Combine(folder, safe));
+                    }
+                }
+
+                kept = !RemoveEmptyFolders(folder);
+            }
         }
 
         TryDelete(FilesPath(install.Id));
         TryDelete(StatePath(install.Id));
         NativeInstalls.Remove(install.Key);
+        return kept;
+    }
+
+    /// <summary>Deletes a folder's empty folders, deepest first, and the folder itself if that empties it. True when it went.</summary>
+    private static bool RemoveEmptyFolders(string folder)
+    {
+        var empty = true;
+        foreach (var inner in Directory.GetDirectories(folder))
+        {
+            empty &= RemoveEmptyFolders(inner);
+        }
+
+        if (!empty || Directory.EnumerateFileSystemEntries(folder).Any())
+        {
+            return false;
+        }
+
+        Directory.Delete(folder);
+        return true;
     }
 
     /// <summary>Takes away a download that was cancelled before it finished: its files and how far it got.</summary>
@@ -640,7 +699,7 @@ internal sealed class GogInstaller(HttpClient http)
 
                 if (await GogAccountApi.FreshAsync(cancel) is not { AccessToken: { } access })
                 {
-                    throw new InstallException("Sign in to GOG again, under Store Accounts.");
+                    throw StoreSessions.SignedIn(GameStore.Gog) ? Unreachable(cancel) : new InstallException("Sign in to GOG again, under Store Accounts.");
                 }
 
                 using var request = new HttpRequestMessage(HttpMethod.Get,
@@ -650,9 +709,9 @@ internal sealed class GogInstaller(HttpClient http)
                 if (!answer.IsSuccessStatusCode)
                 {
                     Program.Log($"GOG answered {(int)answer.StatusCode} for the download addresses");
-                    throw new InstallException(answer.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.NotFound
-                        ? "GOG says this account cannot download it."
-                        : "GOG could not be reached.");
+                    throw answer.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.NotFound
+                        ? new InstallException("GOG says this account cannot download it.")
+                        : Unreachable(cancel);
                 }
 
                 _endpoints = GogDepots.ParseSecureLink(await answer.Content.ReadAsStringAsync(cancel));

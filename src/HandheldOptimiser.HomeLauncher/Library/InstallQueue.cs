@@ -36,6 +36,9 @@ internal sealed class InstallQueue
 
         public DateTime RetryAt { get; set; }
 
+        /// <summary>The player has been told it stopped, so the tries that follow fail quietly until one gets further.</summary>
+        public bool Told { get; set; }
+
         public string Key => $"gog:{Job.ProductId}";
     }
 
@@ -220,6 +223,7 @@ internal sealed class InstallQueue
 
         entry.Status = Status.Waiting;
         entry.Problem = null;
+        entry.Told = false;
         _notices.Show($"{entry.Job.Title} will carry on downloading.");
         Save();
         _timer.Start();
@@ -277,17 +281,18 @@ internal sealed class InstallQueue
         {
             try
             {
-                GogInstaller.Uninstall(install);
-                return null;
+                var kept = GogInstaller.Uninstall(install);
+                Program.Log($"Uninstalled {install.Key}{(kept ? ", keeping what was not GOG's in its folder" : string.Empty)}");
+                return kept ? $"{install.Title} is uninstalled. Your saves and settings in its folder were kept." : $"{install.Title} is uninstalled.";
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 Program.Log($"Could not uninstall {install.Key}: {ex.Message}");
-                return ex.Message;
+                return $"{install.Title} could not be fully deleted: a file is in use.";
             }
         }).ContinueWith(done =>
         {
-            _notices.Show(done.Result is null ? $"{install.Title} is uninstalled." : $"{install.Title} could not be fully deleted: a file is in use.");
+            _notices.Show(done.Result);
             _ = _rescan();
         }, TaskScheduler.FromCurrentSynchronizationContext());
         return true;
@@ -328,8 +333,10 @@ internal sealed class InstallQueue
             }
         }
 
-        // One at a time, in the order they were asked for.
-        if (!playing && !_entries.Any(e => e.Status == Status.Running) && _entries.FirstOrDefault(e => e.Status == Status.Waiting) is { } next)
+        // One at a time, in the order they were asked for. A run that was stopped holds its files until it has
+        // wound up, so nothing starts while one still is: paused and carried on at once, the same game was
+        // otherwise run twice over the same files.
+        if (!playing && !_entries.Any(e => e.Status == Status.Running || e.Run is not null) && _entries.FirstOrDefault(e => e.Status == Status.Waiting) is { } next)
         {
             _ = RunAsync(next);
         }
@@ -348,6 +355,7 @@ internal sealed class InstallQueue
         var run = new CancellationTokenSource();
         entry.Run = run;
         var job = entry.Job;
+        var doneBefore = Interlocked.Read(ref job.Done);
         Program.Log($"Downloading {entry.Key} ({job.Mode.ToString().ToLowerInvariant()})");
 
         try
@@ -364,11 +372,13 @@ internal sealed class InstallQueue
             });
             await _rescan();
         }
-        catch (Exception ex) when (run.IsCancellationRequested && ex is OperationCanceledException or GogInstaller.InstallException)
+        catch (Exception ex) when (run.IsCancellationRequested
+            && ex is OperationCanceledException or GogInstaller.InstallException or HttpRequestException or IOException or InvalidDataException)
         {
             // Paused, paused for a game, or cancelled: whoever stopped it has set what comes next. Stopped while
             // GOG's lists were being read, the read fails rather than being cancelled, which is no failure: on
-            // 2026-11-14 that dropped a download paused for a game.
+            // 2026-11-14 that dropped a download paused for a game. A piece failing as it is stopped is the
+            // same, and must not turn a pause into a try again in a minute.
             Save();
         }
         catch (GogInstaller.InstallException ex)
@@ -389,7 +399,14 @@ internal sealed class InstallQueue
             entry.RetryAt = DateTime.UtcNow + RetryAfter;
             entry.Problem = ex is IOException { HResult: unchecked((int)0x80070070) } ? "The disk is full." : "The connection dropped.";
             Program.Log($"The download of {entry.Key} stopped: {ex.GetType().Name}: {ex.Message}");
-            _notices.Show($"{job.Title} stopped downloading. {entry.Problem} It will try again in a minute.");
+
+            // Said once, not every minute for as long as the connection is down.
+            if (!entry.Told || Interlocked.Read(ref job.Done) > doneBefore)
+            {
+                _notices.Show($"{job.Title} stopped downloading. {entry.Problem} It will keep trying.");
+                entry.Told = true;
+            }
+
             Save();
         }
         finally
