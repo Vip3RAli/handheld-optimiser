@@ -22,7 +22,10 @@ internal enum LibraryLayer
     Menu,
 
     /// <summary>The menu's text box is open.</summary>
-    Editing
+    Editing,
+
+    /// <summary>A store's sign-in is over everything, with its QR code or its own web page.</summary>
+    SigningIn
 }
 
 /// <summary>Where a press of the controller or a key goes.</summary>
@@ -38,7 +41,10 @@ internal enum InputTarget
     SearchBox,
 
     Menu,
-    Page
+    Page,
+
+    /// <summary>A store's sign-in, which passes the controller on to its web page as keys.</summary>
+    SignIn
 }
 
 /// <summary>
@@ -77,8 +83,12 @@ internal sealed class LibraryNavigation(Action<string>? log = null)
             LibraryLayer.Editing => InputTarget.TextBox,
             LibraryLayer.Typing => InputTarget.SearchBox,
             LibraryLayer.Menu => InputTarget.Menu,
+            LibraryLayer.SigningIn => InputTarget.SignIn,
             _ => InputTarget.Page
         };
+
+    /// <summary>Whether a store's sign-in is open.</summary>
+    public bool SigningIn => Layer == LibraryLayer.SigningIn;
 
     /// <summary>
     /// Whether the focus may be put back on the page. Something finishing in the background may only do
@@ -136,10 +146,10 @@ internal sealed class LibraryNavigation(Action<string>? log = null)
         }
     }
 
-    /// <summary>The search box has taken the keyboard. Not while the menu is open.</summary>
+    /// <summary>The search box has taken the keyboard. Not while the menu or a sign-in is open.</summary>
     public bool BeginTyping()
     {
-        if (MenuOpen)
+        if (MenuOpen || SigningIn)
         {
             return Refuse("type in the search box");
         }
@@ -152,6 +162,30 @@ internal sealed class LibraryNavigation(Action<string>? log = null)
     public void EndTyping()
     {
         if (Layer == LibraryLayer.Typing)
+        {
+            Layer = LibraryLayer.None;
+        }
+    }
+
+    /// <summary>
+    /// A store's sign-in opens, from the menu (which it replaces) or the page. Not while typing in the search
+    /// box or the menu's text box, and not twice.
+    /// </summary>
+    public bool BeginSignIn()
+    {
+        if (Layer is LibraryLayer.Typing or LibraryLayer.Editing or LibraryLayer.SigningIn)
+        {
+            return Refuse("open a sign-in");
+        }
+
+        Layer = LibraryLayer.SigningIn;
+        return true;
+    }
+
+    /// <summary>The sign-in has closed. Nothing happens when none was open.</summary>
+    public void EndSignIn()
+    {
+        if (Layer == LibraryLayer.SigningIn)
         {
             Layer = LibraryLayer.None;
         }

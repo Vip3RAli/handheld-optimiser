@@ -17,8 +17,10 @@ internal enum InstallPhase
 
 /// <summary>
 /// How far a Steam game's install has got, read from its <c>appmanifest_&lt;app&gt;.acf</c>. Steam writes
-/// that file as soon as an install is confirmed in its dialog and keeps the byte counts in it up to date
-/// as it downloads, so the library can follow an install it handed to Steam without asking Steam anything.
+/// that file as soon as an install is confirmed in its dialog, with the sizes to download and to write, and
+/// again when the download pauses, stops or finishes. It does not write the counts while it downloads: seen
+/// on the Ally on 2026-11-14, when House Flipper's file still said 0 bytes with 1.3 GB downloaded. So while
+/// Steam is at work, <see cref="Live"/> adds what Steam has written to disk since the file was last written.
 /// </summary>
 internal readonly partial record struct SteamInstallProgress(InstallPhase Phase, long Done, long Total)
 {
@@ -94,6 +96,50 @@ internal readonly partial record struct SteamInstallProgress(InstallPhase Phase,
         return (flags & UpdateStarted) != 0 || toDownload > 0
             ? new(InstallPhase.Waiting, 0, toDownload)
             : new(InstallPhase.Waiting, 0, 0);
+    }
+
+    /// <summary>
+    /// The bytes Steam has written of the game's files, and the bytes it will write in all, from a manifest.
+    /// Steam's own progress bar ("Downloading 1 of 1, 23%") is the first over the second.
+    /// </summary>
+    public static (long Staged, long ToStage) StageCounts(string acf) =>
+        (Number(acf, "BytesStaged") ?? 0, Number(acf, "BytesToStage") ?? 0);
+
+    /// <summary>
+    /// What the tile says while Steam is at work, which the manifest does not keep up with.
+    /// </summary>
+    /// <param name="fromFile">What the manifest says.</param>
+    /// <param name="steamUpdating">Steam's own flag for this game, in the registry: it is being downloaded now.</param>
+    /// <param name="stagedAtStart">The bytes written when the manifest was last written.</param>
+    /// <param name="toStage">The bytes to write in all.</param>
+    /// <param name="writtenSince">What Steam has written to disk since then, or null when that is not known
+    /// (the library opened part way through the download, or Steam was restarted).</param>
+    public static SteamInstallProgress Live(SteamInstallProgress fromFile, bool steamUpdating, long stagedAtStart, long toStage, long? writtenSince)
+    {
+        if (fromFile.Phase is InstallPhase.Paused or InstallPhase.Installed)
+        {
+            return fromFile;
+        }
+
+        // Pausing in Steam does not set the paused flag. Steam stops working on the game, which clears its
+        // flag in the registry, and writes how far it got (Tomb Raider on the Ally, 2026-11-14: StateFlags
+        // 1042 and half its bytes). A game with bytes down that Steam is not working on is paused, or queued
+        // behind another after being started, which is the same to the player. One with none is waiting.
+        if (!steamUpdating)
+        {
+            return fromFile.Phase is InstallPhase.Downloading or InstallPhase.Installing
+                ? toStage > 0 ? new(InstallPhase.Paused, Math.Min(stagedAtStart, toStage), toStage) : fromFile with { Phase = InstallPhase.Paused }
+                : fromFile;
+        }
+
+        if (writtenSince is not { } written || toStage <= 0)
+        {
+            return new(InstallPhase.Downloading, 0, 0);
+        }
+
+        // Steam writes a little of its own as well, so the count stops short of done until the file says so.
+        var done = Math.Min(stagedAtStart + Math.Max(written, 0), toStage * 99 / 100);
+        return new(InstallPhase.Downloading, done, toStage);
     }
 
     private static long? Number(string vdf, string name)

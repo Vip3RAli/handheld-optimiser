@@ -215,5 +215,8 @@
 
         <local:MenuView x:Name="Menu" Grid.RowSpan="4" />
         </Grid>
+
+        <!-- A store's sign-in, over everything. Not drawn bigger when docked: its web page cannot be. -->
+        <local:SignInView x:Name="SignIn" />
     </Grid>
 </Window>

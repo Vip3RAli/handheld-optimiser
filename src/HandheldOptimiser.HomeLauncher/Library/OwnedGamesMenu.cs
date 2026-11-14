@@ -42,7 +42,7 @@ internal sealed class OwnedGamesMenu
     /// </summary>
     public async Task RefreshAsync(bool force)
     {
-        if (_refreshing || !LibrarySettings.ShowNotInstalled || LibrarySettings.SteamKey is null)
+        if (_refreshing || !LibrarySettings.ShowNotInstalled || (LibrarySettings.SteamKey is null && !StoreSessions.SignedIn(GameStore.Steam)))
         {
             return;
         }
@@ -119,7 +119,9 @@ internal sealed class OwnedGamesMenu
         _view.NotInstalledSetting.Tag = SettingSteps.OnOff(on);
 
         _view.SteamKeySetting.IsEnabled = on;
-        _view.SteamKeySetting.Tag = LibrarySettings.SteamKey is null ? "Not set" : _error is null ? "Set" : "Not working";
+        // Signed in to Steam inside the library, the key is not used for the list.
+        _view.SteamKeySetting.Tag = StoreSessions.SignedIn(GameStore.Steam) ? "Not needed"
+            : LibrarySettings.SteamKey is null ? "Not set" : _error is null ? "Set" : "Not working";
 
         _view.OwnedRefreshItem.IsEnabled = on;
     }

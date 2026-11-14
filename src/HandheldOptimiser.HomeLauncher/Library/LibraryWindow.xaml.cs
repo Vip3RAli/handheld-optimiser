@@ -53,6 +53,9 @@ public partial class LibraryWindow : Window, ILibraryHost
     // Steam installs under way, shown on their tiles in Ready to install.
     private readonly SteamInstallWatcher _steamInstalls;
 
+    // Signing in to a store inside the library.
+    private readonly SignInPresenter _signIn;
+
     // The Old School layout: its categories, its stacks of cards and the open Not installed card.
     private readonly OldSchoolPresenter _oldSchool;
 
@@ -86,9 +89,17 @@ public partial class LibraryWindow : Window, ILibraryHost
 
         _play = new GameSessionController(this, _state, _navigation, _notices, _continue, this, ScreenOff, ScreenOn, ShowLibrary);
         _steamInstalls = new SteamInstallWatcher(_state, _notices, () => ScanAsync(), Dispatcher);
+
+        // The downloads in the status pill and their list, so Ready to install need not be opened to see them.
+        var downloads = new DownloadsPresenter(Menu, _menu, TopBar, _notices);
+        _steamInstalls.Changed += downloads.Update;
         _power = new PowerMenu(Menu, _menu, _notices, this);
         _owned = new OwnedGamesMenu(Menu, _menu, _notices, _state, this);
-        _ = new AccountsMenu(Menu, _menu, _notices, _state, _continue);
+
+        // Once signed in to a store, its games are asked for at once, and the library looks again.
+        _signIn = new SignInPresenter(SignIn, _navigation, _notices, () => new WindowInteropHelper(this).Handle,
+            () => RestoreFocus(), session => _ = _owned.RefreshAsync(force: true));
+        _ = new AccountsMenu(Menu, _menu, _notices, _state, _continue, _signIn, _owned);
         _gameActions = new GameActionsMenu(Menu, _menu, _notices, _state, _options, _artwork, _backdrop, _continue, this);
         _settings = new SettingsMenu(Menu, _menu, _notices, _state, _options, _backdrop, _artwork, _topBar, _continue, OptionsHint, this);
         _ = new AddProgramMenu(Menu, _menu, _notices, _state, this);
@@ -109,7 +120,7 @@ public partial class LibraryWindow : Window, ILibraryHost
         _input = new LibraryNavigationCoordinator(_grid,
             new InputParts(Tiles, TilesScroller, Scroller, AcceptHint, Continue.ContinueCard, TopBar, Menu),
             _navigation, _state, _options, _layouts, _menu, _search, _topBar, _continue, _deals, _oldSchool, _gameActions, _settings,
-            _power, _play, _artwork, _backdrop, this);
+            _power, _play, _artwork, _backdrop, _signIn, this);
         _topBar.SettingsPressed += _settings.Open;
         _topBar.PowerPressed += _power.Open;
 

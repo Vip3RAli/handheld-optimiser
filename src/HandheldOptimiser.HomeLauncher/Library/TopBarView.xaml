@@ -85,9 +85,78 @@
             Wi-Fi, the battery and the clock stay at the right. In the Old School layout's Console space look
             they sit together in one capsule of glass (ConsoleSpaceLook sets its resources).
         -->
-        <Border Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" CornerRadius="22" BorderThickness="1"
+        <Border x:Name="Hud" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" CornerRadius="22" BorderThickness="1"
                 Background="{DynamicResource HudBackground}" BorderBrush="{DynamicResource HudBorder}" Padding="{DynamicResource HudPadding}">
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+
+            <!--
+                Downloads under way: an arrow and how far they have got, only while there are any. A tap opens
+                the panel below; the controller reaches the Downloads list in Catalog & Content instead.
+            -->
+            <Button x:Name="DownloadsButton" Margin="0,0,20,0" VerticalAlignment="Center" Visibility="Collapsed"
+                    Focusable="False" Cursor="Hand">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="Transparent">
+                            <ContentPresenter />
+                        </Border>
+                    </ControlTemplate>
+                </Button.Template>
+                <StackPanel Orientation="Horizontal">
+                    <Path Data="M7,1 V11 M2.5,7 L7,11.5 L11.5,7 M1,15.5 H13" Stroke="#F2F3F5" StrokeThickness="2"
+                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Opacity="0.9"
+                          VerticalAlignment="Center" />
+                    <!-- A button's own text is black by default, so the colour is given here. -->
+                    <TextBlock x:Name="DownloadsText" Margin="8,0,0,0" FontSize="16" Opacity="0.8" Foreground="#F2F3F5"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+
+            <!--
+                The panel the arrow opens: a row per game with its progress, and a way to Steam's own downloads.
+                A tap anywhere else closes it. DownloadsPresenter fills it and places it under the capsule.
+            -->
+            <Popup x:Name="DownloadsPopup" Placement="Custom" StaysOpen="False" AllowsTransparency="True"
+                   PopupAnimation="Fade">
+                <Border Width="440" Margin="0,0,12,16" CornerRadius="16" BorderThickness="1" BorderBrush="#40FFFFFF"
+                        Background="{StaticResource MenuPanelBack}" TextElement.Foreground="#F2F3F5">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="18" ShadowDepth="4" Opacity="0.45" />
+                    </Border.Effect>
+                    <Border CornerRadius="16" Background="{StaticResource MenuPanelSheen}" Padding="20,16,20,16">
+                        <StackPanel>
+                            <TextBlock Text="Downloads" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10" />
+                            <ItemsControl x:Name="DownloadsList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Margin="0,4,0,12">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding Title}" FontSize="15" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Grid.Column="1" Text="{Binding Progress.Text}" FontSize="14" Opacity="0.75"
+                                                           Margin="12,0,0,0" />
+                                            </Grid>
+                                            <Grid Height="4" Margin="0,8,0,0">
+                                                <Border CornerRadius="2" Background="#33FFFFFF" />
+                                                <Border CornerRadius="2" Background="{StaticResource MenuPanelRing}" RenderTransformOrigin="0,0.5">
+                                                    <Border.RenderTransform>
+                                                        <ScaleTransform ScaleX="{Binding Progress.Fraction}" />
+                                                    </Border.RenderTransform>
+                                                </Border>
+                                            </Grid>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Button x:Name="DownloadsPopupSteam" Style="{StaticResource PillButton}" Margin="0,2,0,0"
+                                    HorizontalAlignment="Left" Focusable="False" Content="Open Steam's downloads" />
+                        </StackPanel>
+                    </Border>
+                </Border>
+            </Popup>
 
             <!-- Wi-Fi signal: four bars, lit up to the current strength. -->
             <StackPanel x:Name="WifiBars" Orientation="Horizontal" Height="16" Margin="0,0,20,0"

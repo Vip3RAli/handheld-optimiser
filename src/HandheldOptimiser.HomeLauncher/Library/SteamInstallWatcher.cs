@@ -3,22 +3,38 @@ using System.Windows.Threading;
 
 namespace HandheldOptimiser.HomeLauncher.Library;
 
+/// <summary>A game Steam is downloading, as the Downloads list and the status pill show it.</summary>
+internal sealed record DownloadRow(string AppId, string Title, SteamInstallProgress Progress);
+
 /// <summary>
 /// Follows Steam installs, so a game started from Ready to install shows how far it has got on its tile
 /// and moves to the installed games by itself when it is done.
 ///
-/// Steam writes a game's <c>appmanifest_&lt;app&gt;.acf</c> as soon as its install is confirmed and keeps
-/// the byte counts in it up to date, so the library only has to watch Steam's library folders for those
-/// files. Nothing is asked of Steam and no sign-in is needed. An install started in Steam itself is
-/// followed the same way.
+/// Steam writes a game's <c>appmanifest_&lt;app&gt;.acf</c> as soon as its install is confirmed, and again
+/// when it pauses or finishes, so the library watches Steam's library folders for those files. Steam does
+/// not write the byte counts while it downloads, so the progress in between is what the Steam process has
+/// written to disk since the manifest was last written, which Windows counts as it goes. Steam's own flag
+/// in the registry says which game it is working on. Nothing is asked of Steam and no sign-in is needed.
+/// An install started in Steam itself is followed the same way.
 /// </summary>
 internal sealed class SteamInstallWatcher(LibraryState state, NoticePresenter notices, Func<Task> rescan, Dispatcher dispatcher)
 {
-    // Steam rewrites a manifest every few seconds while it downloads; reading it more often shows nothing new.
     private static readonly TimeSpan Every = TimeSpan.FromSeconds(2);
 
-    // The installs being followed: app id, and where its manifest is.
-    private readonly Dictionary<string, string> _following = [];
+    /// <summary>A followed install: its manifest, and Steam's write count when the manifest was last written.</summary>
+    private sealed class Followed(string path)
+    {
+        public string Path { get; set; } = path;
+
+        /// <summary>The Steam process and its bytes written then, or null when not known.</summary>
+        public (int ProcessId, long Written)? Baseline { get; set; }
+
+        /// <summary>What was shown last, for a look that finds the manifest being written.</summary>
+        public DownloadRow? LastRow { get; set; }
+    }
+
+    // The installs being followed, by app id.
+    private readonly Dictionary<string, Followed> _following = [];
     private readonly List<FileSystemWatcher> _watchers = [];
     private DispatcherTimer? _timer;
 
@@ -54,12 +70,14 @@ internal sealed class SteamInstallWatcher(LibraryState state, NoticePresenter no
             }
         }
 
-        // Installs already under way as the library opened: started in Steam, or before a restart.
+        // Installs already under way as the library opened: started in Steam, or before a restart. How much
+        // Steam had written when their manifests were written is not known, so they show no figure until
+        // Steam writes the manifest again.
         _ = Task.Run(() => UnderWay(folders)).ContinueWith(found =>
         {
             foreach (var (appId, path) in found.Result)
             {
-                Follow(appId, path);
+                Follow(appId, path, justWritten: false);
             }
         }, CancellationToken.None, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.FromCurrentSynchronizationContext());
     }
@@ -107,15 +125,19 @@ internal sealed class SteamInstallWatcher(LibraryState state, NoticePresenter no
     {
         if (e.Name is { } name && SteamInstallProgress.AppIdFromFileName(name) is { } appId)
         {
-            dispatcher.BeginInvoke(() => Follow(appId, e.FullPath));
+            // Counted at once: a moment later Steam has written more, which would be counted twice.
+            var written = SteamWrites();
+            dispatcher.BeginInvoke(() => Follow(appId, e.FullPath, justWritten: true, written));
         }
     }
 
-    private void Follow(string appId, string path)
+    private void Follow(string appId, string path, bool justWritten, (int, long)? written = null)
     {
-        if (_following.ContainsKey(appId))
+        if (_following.TryGetValue(appId, out var followed))
         {
-            _following[appId] = path;
+            // The manifest has been written again, with counts that are true now.
+            followed.Path = path;
+            followed.Baseline = justWritten ? written : followed.Baseline;
             return;
         }
 
@@ -126,7 +148,7 @@ internal sealed class SteamInstallWatcher(LibraryState state, NoticePresenter no
             return;
         }
 
-        _following[appId] = path;
+        _following[appId] = new Followed(path) { Baseline = justWritten ? written : null };
         if (_timer is null)
         {
             _timer = new DispatcherTimer(Every, DispatcherPriority.Background, (_, _) => Check(), dispatcher);
@@ -137,8 +159,11 @@ internal sealed class SteamInstallWatcher(LibraryState state, NoticePresenter no
 
     private void Check()
     {
-        foreach (var (appId, path) in _following.ToList())
+        var steamNow = SteamWrites();
+        var rows = new List<DownloadRow>();
+        foreach (var (appId, followed) in _following.ToList())
         {
+            var path = followed.Path;
             var tile = state.AllTiles.FirstOrDefault(t => !t.IsInstalled && t.Game.Key == $"steam:{appId}");
 
             // Cancelled in Steam, or the game uninstalled: Steam deletes the manifest.
@@ -149,9 +174,14 @@ internal sealed class SteamInstallWatcher(LibraryState state, NoticePresenter no
                 continue;
             }
 
-            // Being written by Steam this moment; the next look will have it.
+            // Being written by Steam this moment; the next look will have it, and the last row stands meanwhile.
             if (ReadManifest(path) is not { } text || SteamInstallProgress.Read(text) is not { } progress)
             {
+                if (followed.LastRow is { } last)
+                {
+                    rows.Add(last);
+                }
+
                 continue;
             }
 
@@ -169,12 +199,69 @@ internal sealed class SteamInstallWatcher(LibraryState state, NoticePresenter no
                 continue;
             }
 
-            tile?.ShowInstall(progress.Text, progress.Fraction);
+            // Written since the manifest was, by the same Steam process: a restarted Steam counts from nothing.
+            long? since = followed.Baseline is { } baseline && steamNow is { } current && baseline.ProcessId == current.ProcessId
+                ? current.Written - baseline.Written
+                : null;
+            var (staged, toStage) = SteamInstallProgress.StageCounts(text);
+            var live = SteamInstallProgress.Live(progress, SteamUpdating(appId), staged, toStage, since);
+            tile?.ShowInstall(live.Text, live.Fraction);
+
+            followed.LastRow = new DownloadRow(appId, tile?.Title ?? GameName(text) ?? $"Steam app {appId}", live);
+            rows.Add(followed.LastRow);
         }
+
+        // The one being downloaded first, then the queue.
+        Changed?.Invoke(rows.OrderBy(r => r.Progress.Phase == InstallPhase.Waiting).ToList());
 
         if (_following.Count == 0)
         {
             _timer?.Stop();
+        }
+    }
+
+    /// <summary>Told after each look at the installs followed, with each one's progress. Empty once none are left.</summary>
+    public event Action<IReadOnlyList<DownloadRow>>? Changed;
+
+    private static string? GameName(string acf) =>
+        System.Text.RegularExpressions.Regex.Match(acf, "\"name\"\\s+\"([^\"]+)\"") is { Success: true } m ? m.Groups[1].Value : null;
+
+    /// <summary>The Steam process and how many bytes it has written to disk, or null when Steam is not running.</summary>
+    private static (int ProcessId, long Written)? SteamWrites()
+    {
+        var processes = System.Diagnostics.Process.GetProcessesByName("steam");
+        try
+        {
+            foreach (var process in processes)
+            {
+                if (Native.BytesWritten(process.Id) is { } written)
+                {
+                    return (process.Id, written);
+                }
+            }
+
+            return null;
+        }
+        finally
+        {
+            foreach (var process in processes)
+            {
+                process.Dispose();
+            }
+        }
+    }
+
+    /// <summary>Steam's own flag that it is downloading or updating a game now, which it keeps in the registry.</summary>
+    private static bool SteamUpdating(string appId)
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey($@"Software\Valve\Steam\Apps\{appId}");
+            return key?.GetValue("Updating") is int updating && updating != 0;
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+        {
+            return false;
         }
     }
 

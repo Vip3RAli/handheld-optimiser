@@ -140,6 +140,9 @@
 
                 <!-- Games and apps: what the library lists besides the installed games. -->
                 <StackPanel x:Name="GamesAppsItems" Visibility="Collapsed">
+                    <!-- Only while something is downloading. -->
+                    <Button x:Name="DownloadsGroup" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE118;" Content="Downloads"
+                            Visibility="Collapsed" local:MenuRow.About="The games Steam is downloading now, and how far each has got." />
                     <Button x:Name="AccountsGroup" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE77B;" Content="Store Accounts &amp; Achievements"
                             local:MenuRow.About="Sign in to your game stores and sync achievements." />
                     <Button x:Name="OwnedGroup" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE896;" Content="Ready to Install"
@@ -655,6 +658,24 @@
                             local:MenuRow.About="Rescan your achievements from every supported store." />
                     <Button x:Name="AccountsBackItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE72B;" Content="Back"
                             local:MenuRow.About="Back to Catalog &amp; Content." />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Select" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Downloads under way: a row per game, added and kept up to date by DownloadsPresenter. -->
+                <StackPanel x:Name="DownloadsItems" Visibility="Collapsed">
+                    <Button x:Name="DownloadsSteamItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE8A7;" Content="Open Steam's downloads"
+                            local:MenuRow.About="Steam's own downloads page, to pause, reorder or cancel a download." />
+                    <Button x:Name="DownloadsBackItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE72B;" Content="Back"
+                            local:MenuRow.About="Close the list." />
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
                         <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
                             <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />

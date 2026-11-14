@@ -12,8 +12,9 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 /// opens its store's install page.
 ///
 /// Epic and GOG Galaxy keep the list on the device, so it is read from there and nothing is sent anywhere.
-/// Steam only lists owned games through its Web API, which needs the player's own key; the answer is kept
-/// on disk and asked for again at most every few hours.
+/// Steam lists owned games through its Web API, with the account signed in inside the library or the
+/// player's own key; the answer is kept on disk and asked for again at most every few hours. Without
+/// either, what the Steam app keeps on the device is read.
 /// </summary>
 internal static class OwnedGames
 {
@@ -130,7 +131,9 @@ internal static class OwnedGames
     /// <returns>Whether the list changed, and a message for the player when Steam could not be asked.</returns>
     public static async Task<(bool Changed, string? Error)> RefreshSteamAsync(bool force)
     {
-        if (LibrarySettings.SteamKey is not { } key)
+        var signedIn = StoreSessions.SignedIn(GameStore.Steam);
+        var key = LibrarySettings.SteamKey;
+        if (!signedIn && key is null)
         {
             return (false, null);
         }
@@ -148,16 +151,37 @@ internal static class OwnedGames
                 return (false, null);
             }
 
-            var url = "https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/"
-                + $"?key={Uri.EscapeDataString(key)}&steamid={steamId}&include_appinfo=1&include_played_free_games=1&format=json";
-            using var response = await Http.GetAsync(url);
-            if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            string json;
+            if (signedIn)
             {
-                return (false, "Steam did not accept the Web API key.");
-            }
+                // The account signed in inside the library: its own token, so no key and no public profile needed.
+                if (await SteamAccountApi.FreshAsync() is not { } session)
+                {
+                    return (false, StoreSessions.SignedIn(GameStore.Steam)
+                        ? "Steam could not be reached. The last list is kept."
+                        : "Steam wants you to sign in again, under Store Accounts.");
+                }
 
-            response.EnsureSuccessStatusCode();
-            var json = await response.Content.ReadAsStringAsync();
+                if (await SteamAccountApi.OwnedGamesJsonAsync(session) is not { } answer)
+                {
+                    return (false, "Steam could not be reached. The last list is kept.");
+                }
+
+                json = answer;
+            }
+            else
+            {
+                var url = "https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/"
+                    + $"?key={Uri.EscapeDataString(key!)}&steamid={steamId}&include_appinfo=1&include_played_free_games=1&format=json";
+                using var response = await Http.GetAsync(url);
+                if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+                {
+                    return (false, "Steam did not accept the Web API key.");
+                }
+
+                response.EnsureSuccessStatusCode();
+                json = await response.Content.ReadAsStringAsync();
+            }
             if (ParseSteamOwned(json, null).Count == 0)
             {
                 // A private profile answers with no games at all. The last good list is kept.
@@ -191,9 +215,9 @@ internal static class OwnedGames
         var steamDir = SteamLibrary.SteamDirectory();
         var artDir = steamDir is null ? null : Path.Combine(steamDir, "appcache", "librarycache");
 
-        // Steam's own answer is the exact list, for a player who has given a key.
+        // Steam's own answer is the exact list, for a player who has signed in or given a key.
         var answer = SteamCachePath(steamId);
-        if (LibrarySettings.SteamKey is not null && File.Exists(answer))
+        if ((StoreSessions.SignedIn(GameStore.Steam) || LibrarySettings.SteamKey is not null) && File.Exists(answer))
         {
             return Cached(answer, path => ParseSteamOwned(File.ReadAllText(path), artDir));
         }
@@ -480,9 +504,17 @@ internal static class OwnedGames
         return latest.SteamId;
     }
 
-    /// <summary>The Steam id of the account signed in now, or else of the one that signed in last.</summary>
+    /// <summary>
+    /// The Steam id of the account signed in inside the library, or else of the one signed in to the Steam
+    /// app now, or else of the one that signed in to it last.
+    /// </summary>
     public static ulong? SteamAccount()
     {
+        if (StoreSessions.Get(GameStore.Steam) is { NeedsSignIn: false } session && ulong.TryParse(session.AccountId, out var signedIn))
+        {
+            return signedIn;
+        }
+
         try
         {
             using (var active = Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam\ActiveProcess"))
