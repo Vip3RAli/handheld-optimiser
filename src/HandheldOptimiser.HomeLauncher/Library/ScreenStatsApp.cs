@@ -162,6 +162,7 @@ internal static class ScreenStatsApp
 
                 var reading = readings.Read(status) with { Fps = fps.Add(process, status.Fps) };
                 var header = new StatsHeader(reading.Battery, reading.Charging, status.BatteryCare == true, wifi.Quality, wifi.Name);
+                window.SetLime(status.ScreenStatsLime);
                 window.ShowReadings(ScreenStatsLayout.Tiles(reading, status.Running ? status.TargetFps : 0), header, DateTime.Now);
                 window.ShowOn(bounds);
                 guard.Keep(bounds);

@@ -9,24 +9,27 @@
                     xmlns:sys="clr-namespace:System;assembly=System.Runtime">
     <BooleanToVisibilityConverter x:Key="BoolToVis" />
 
-    <!--
-        A row of the menu, and the row in focus. Dark, for the menu over the dimmed library. On the
-        back of an Old School card the menu has its own, see-through, so the card's colours show.
-    -->
+    <!-- A row of the menu over the dimmed library, and the row in focus. -->
     <SolidColorBrush x:Key="MenuRowBrush" Color="#222630" />
     <SolidColorBrush x:Key="MenuRowFocusBrush" Color="#2C3240" />
 
-    <!-- How much room a row of the menu takes, which is less on the back of a card. -->
+    <!-- How much room a row of the menu over the dimmed library takes. -->
     <Thickness x:Key="MenuRowPadding">16,10</Thickness>
     <Thickness x:Key="MenuRowMargin">0,0,0,8</Thickness>
     <sys:Double x:Key="MenuRowHeight">46</sys:Double>
 
-    <!-- The back of a green Old School card: the card's own green, a shade deeper so white text reads on it. -->
-    <LinearGradientBrush x:Key="OldSchoolGreenBack" StartPoint="0,0" EndPoint="0,1">
-        <GradientStop Color="#8DBE22" Offset="0" />
-        <GradientStop Color="#5E9412" Offset="0.5" />
-        <GradientStop Color="#2F5708" Offset="1" />
-    </LinearGradientBrush>
+    <!--
+        The ring round a game tile in focus: white, or in the open Ready to install card the green of the
+        menu panel's bar, which OldSchoolPresenter puts in the page's resources while the card is open.
+    -->
+    <SolidColorBrush x:Key="TileRingBrush" Color="#F2F3F5" />
+    <SolidColorBrush x:Key="MenuPanelRing" Color="#9BD94A" />
+
+    <!--
+        How faded a game that is not installed is drawn among the installed ones. In the open Ready to
+        install card every game is one, so there they are drawn at full strength against the slate.
+    -->
+    <sys:Double x:Key="NotInstalledArtOpacity">0.6</sys:Double>
 
     <!--
         A notice is what the library has to say about a game, a deal or a green card, such as that the
@@ -106,7 +109,7 @@
                                 <TextBlock Text="{Binding Notice}" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap" />
                             </Border>
                             <Border x:Name="Ring" CornerRadius="10" Margin="-4" BorderThickness="3"
-                                    BorderBrush="#F2F3F5" Opacity="0" />
+                                    BorderBrush="{DynamicResource TileRingBrush}" Opacity="0" />
                         </Grid>
                         <TextBlock Text="{Binding Title}" Margin="2,8,2,0" FontSize="14" FontWeight="SemiBold"
                                    TextTrimming="CharacterEllipsis" />
@@ -120,7 +123,7 @@
                             <Setter TargetName="Art" Property="Opacity" Value="0.4" />
                         </DataTrigger>
                         <DataTrigger Binding="{Binding IsInstalled}" Value="False">
-                            <Setter TargetName="Art" Property="Opacity" Value="0.6" />
+                            <Setter TargetName="Art" Property="Opacity" Value="{DynamicResource NotInstalledArtOpacity}" />
                             <Setter TargetName="InstallMark" Property="Visibility" Value="Visible" />
                         </DataTrigger>
                         <Trigger Property="IsMouseOver" Value="True">
@@ -233,6 +236,92 @@
     </Style>
 
     <!--
+        The Old School layout's Console space look, which ConsoleSpaceLook switches on through the dynamic
+        resources below; their values here are the Classic look's, which leaves every card as it was.
+    -->
+    <Visibility x:Key="ConsoleOnly">Collapsed</Visibility>
+    <Visibility x:Key="ClassicOnly">Visible</Visibility>
+    <SolidColorBrush x:Key="CardRingBrush" Color="#F2F3F5" />
+    <SolidColorBrush x:Key="CategoryBrush" Color="#F2F3F5" />
+    <SolidColorBrush x:Key="HudBackground" Color="Transparent" />
+    <SolidColorBrush x:Key="HudBorder" Color="Transparent" />
+    <Thickness x:Key="HudPadding">0</Thickness>
+    <Thickness x:Key="HudEnd">0</Thickness>
+    <SolidColorBrush x:Key="PillBackground" Color="Transparent" />
+    <SolidColorBrush x:Key="PillBorder" Color="Transparent" />
+    <Thickness x:Key="PillPadding">0</Thickness>
+    <Thickness x:Key="PillGap">0</Thickness>
+    <SolidColorBrush x:Key="AcceptPillBackground" Color="Transparent" />
+    <SolidColorBrush x:Key="AcceptPillBorder" Color="Transparent" />
+    <FontFamily x:Key="CardTitleFont">Convection, /HandheldOptimiser.HomeLauncher;component/Fonts/#Open Sans, Segoe UI Variable Text, Segoe UI</FontFamily>
+    <FontFamily x:Key="CategoryFont">Convection, /HandheldOptimiser.HomeLauncher;component/Fonts/#Open Sans, Segoe UI Variable Text, Segoe UI</FontFamily>
+    <FontFamily x:Key="HintFont">Convection, /HandheldOptimiser.HomeLauncher;component/Fonts/#Open Sans, Segoe UI Variable Text, Segoe UI</FontFamily>
+
+    <!--
+        Behind a card in the Console space look: the dark shadow where it meets the floor (the user had the
+        one to its right dropped, 2026-11-13), and its reflection in the floor, which is the card itself (the
+        element in Tag) turned upside down and fading away. The cards stand flat, as the NXE dashboard's did.
+    -->
+    <ControlTemplate x:Key="ConsoleCardBack" TargetType="ContentControl">
+        <Grid Visibility="{DynamicResource ConsoleOnly}">
+            <Ellipse Height="48" Margin="20,0,20,-30" VerticalAlignment="Bottom">
+                <Ellipse.Fill>
+                    <RadialGradientBrush>
+                        <GradientStop Color="#C0000000" Offset="0" />
+                        <GradientStop Color="#00000000" Offset="1" />
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+            </Ellipse>
+            <Rectangle Height="320" VerticalAlignment="Top" RadiusX="12" RadiusY="12">
+                <Rectangle.RenderTransform>
+                    <TranslateTransform Y="328" />
+                </Rectangle.RenderTransform>
+                <Rectangle.Fill>
+                    <VisualBrush Visual="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" Stretch="Fill">
+                        <VisualBrush.RelativeTransform>
+                            <ScaleTransform ScaleY="-1" CenterY="0.5" />
+                        </VisualBrush.RelativeTransform>
+                    </VisualBrush>
+                </Rectangle.Fill>
+                <Rectangle.OpacityMask>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#A6FFFFFF" Offset="0" />
+                        <GradientStop Color="#00FFFFFF" Offset="0.32" />
+                    </LinearGradientBrush>
+                </Rectangle.OpacityMask>
+            </Rectangle>
+        </Grid>
+    </ControlTemplate>
+
+    <!--
+        Over a card in the Console space look, as on a glossy case: a highlight across the top left, a lit
+        top edge and a darker spine down the left. The user had the fine edge all round dropped (2026-11-13).
+    -->
+    <ControlTemplate x:Key="ConsoleCardGloss" TargetType="ContentControl">
+        <Grid Visibility="{DynamicResource ConsoleOnly}" IsHitTestVisible="False">
+            <Border CornerRadius="12">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0.8">
+                        <GradientStop Color="#4CFFFFFF" Offset="0" />
+                        <GradientStop Color="#14FFFFFF" Offset="0.18" />
+                        <GradientStop Color="#00FFFFFF" Offset="0.34" />
+                    </LinearGradientBrush>
+                </Border.Background>
+            </Border>
+            <Border Width="11" HorizontalAlignment="Left" CornerRadius="12,0,0,12">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                        <GradientStop Color="#73000000" Offset="0" />
+                        <GradientStop Color="#1AFFFFFF" Offset="0.6" />
+                        <GradientStop Color="#00FFFFFF" Offset="1" />
+                    </LinearGradientBrush>
+                </Border.Background>
+            </Border>
+            <Border CornerRadius="12" BorderThickness="0,1.5,0,0" BorderBrush="#80FFFFFF" />
+        </Grid>
+    </ControlTemplate>
+
+    <!--
         A game's card in the Old School layout: its wide artwork with its name along the bottom, as
         the Xbox 360's cards were. OldSchoolPanel sizes and places each one, so the focused card does
         not grow by itself (OldSchoolStack in OldSchoolPanel.cs has the card's size). A game with no
@@ -246,6 +335,9 @@
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Grid Width="420" Height="320">
+                        <!-- The Console space look's shadows and reflection, behind the card. See ConsoleCardBack. -->
+                        <ContentControl Template="{StaticResource ConsoleCardBack}" Focusable="False" IsTabStop="False"
+                                        Tag="{Binding ElementName=Art}" />
                         <Border x:Name="Art" CornerRadius="12" Background="{Binding CardBrush}">
                             <Grid>
                                 <!-- Under the wide artwork, and so only seen without it. -->
@@ -276,11 +368,24 @@
                                         </LinearGradientBrush>
                                     </Border.Background>
                                 </Border>
+                                <ContentControl Template="{StaticResource ConsoleCardGloss}" Focusable="False" IsTabStop="False" />
                                 <!-- Only on the front card: the ones behind have theirs half covered. -->
-                                <TextBlock Style="{StaticResource HiddenByNotice}" Text="{Binding Title}" Margin="20,0,56,16"
-                                           FontSize="26" FontWeight="SemiBold"
-                                           VerticalAlignment="Bottom" TextTrimming="CharacterEllipsis"
-                                           Opacity="{Binding Path=(local:OldSchoolPanel.Front), RelativeSource={RelativeSource AncestorType=ContentPresenter}}" />
+                                <Border Visibility="{DynamicResource ClassicOnly}">
+                                    <TextBlock Style="{StaticResource HiddenByNotice}" Text="{Binding Title}" Margin="20,0,56,16"
+                                               FontSize="26" FontWeight="SemiBold"
+                                               VerticalAlignment="Bottom" TextTrimming="CharacterEllipsis"
+                                               Opacity="{Binding Path=(local:OldSchoolPanel.Front), RelativeSource={RelativeSource AncestorType=ContentPresenter}}" />
+                                </Border>
+                                <!--
+                                    The Console space look's front card: the name on the card's own shade at the bottom.
+                                    The user had the glass pane under it and the store's name dropped (2026-11-14): the
+                                    store's logo at the bottom right says it.
+                                -->
+                                <Border Visibility="{DynamicResource ConsoleOnly}" Margin="20,0,56,16" VerticalAlignment="Bottom"
+                                        Opacity="{Binding Path=(local:OldSchoolPanel.Front), RelativeSource={RelativeSource AncestorType=ContentPresenter}}">
+                                    <TextBlock Style="{StaticResource HiddenByNotice}" Text="{Binding Title}" FontFamily="{DynamicResource CardTitleFont}"
+                                               FontSize="30" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                </Border>
                                 <!-- A notice takes the name's place, on as many lines as it needs. -->
                                 <TextBlock Style="{StaticResource ShownByNotice}" Text="{Binding Notice}" Margin="20,0,56,16"
                                            FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap"
@@ -302,7 +407,7 @@
                                        Foreground="#F5C542" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <Border x:Name="Ring" CornerRadius="14" Margin="-4" BorderThickness="3"
-                                BorderBrush="#F2F3F5" Opacity="0" />
+                                BorderBrush="{DynamicResource CardRingBrush}" Effect="{DynamicResource CardRingEffect}" Opacity="0" />
                     </Grid>
                     <ControlTemplate.Triggers>
                         <DataTrigger Binding="{Binding StoreLogo}" Value="{x:Null}">
@@ -440,6 +545,9 @@
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Grid Width="420" Height="320">
+                        <ContentControl Template="{StaticResource ConsoleCardBack}" Focusable="False" IsTabStop="False"
+                                        Tag="{Binding ElementName=Body}" />
+                        <Grid x:Name="Body">
                         <Border CornerRadius="12">
                             <Border.Background>
                                 <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
@@ -474,7 +582,7 @@
                             <StackPanel Style="{StaticResource HiddenByNotice}">
                                 <TextBlock Text="{Binding Badge}" Margin="0,0,0,2" FontSize="13" FontWeight="SemiBold" Foreground="#F5C542"
                                            Visibility="{Binding HasBadge, Converter={StaticResource BoolToVis}}" />
-                                <TextBlock Text="{Binding Title}" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding Title}" FontFamily="{DynamicResource CardTitleFont}" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                 <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
                                     <TextBlock Text="{Binding Price}" FontSize="16" FontWeight="SemiBold" />
                                     <TextBlock Text="{Binding Regular}" Margin="10,0,0,0" FontSize="14" Opacity="0.6"
@@ -486,8 +594,10 @@
                             <TextBlock Style="{StaticResource ShownByNotice}" Text="{Binding Notice}" FontSize="20"
                                        FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Bottom" />
                         </Grid>
+                        <ContentControl Template="{StaticResource ConsoleCardGloss}" Focusable="False" IsTabStop="False" />
+                        </Grid>
                         <Border x:Name="Ring" CornerRadius="14" Margin="-4" BorderThickness="3"
-                                BorderBrush="#F2F3F5" Opacity="0" />
+                                BorderBrush="{DynamicResource CardRingBrush}" Effect="{DynamicResource CardRingEffect}" Opacity="0" />
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsKeyboardFocused" Value="True">
@@ -515,6 +625,9 @@
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Grid Width="420" Height="320">
+                        <ContentControl Template="{StaticResource ConsoleCardBack}" Focusable="False" IsTabStop="False"
+                                        Tag="{Binding ElementName=Body}" />
+                        <Grid x:Name="Body">
                         <Border CornerRadius="12">
                             <Border.Background>
                                 <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
@@ -541,7 +654,7 @@
                         <Grid Margin="20,0,20,18" VerticalAlignment="Bottom"
                               Opacity="{Binding Path=(local:OldSchoolPanel.Front), RelativeSource={RelativeSource AncestorType=ContentPresenter}}">
                             <StackPanel Style="{StaticResource HiddenByNotice}">
-                                <TextBlock Text="{Binding Title}" FontSize="26" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding Title}" FontFamily="{DynamicResource CardTitleFont}" FontSize="26" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                 <TextBlock Text="{Binding Detail}" Margin="0,2,0,0" FontSize="14" Opacity="0.9" TextWrapping="Wrap"
                                            TextTrimming="CharacterEllipsis" MaxHeight="40"
                                            Visibility="{Binding HasDetail, Converter={StaticResource BoolToVis}}" />
@@ -549,8 +662,10 @@
                             <TextBlock Style="{StaticResource ShownByNotice}" Text="{Binding Notice}" FontSize="20"
                                        FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Bottom" />
                         </Grid>
+                        <ContentControl Template="{StaticResource ConsoleCardGloss}" Focusable="False" IsTabStop="False" />
+                        </Grid>
                         <Border x:Name="Ring" CornerRadius="14" Margin="-4" BorderThickness="3"
-                                BorderBrush="#F2F3F5" Opacity="0" />
+                                BorderBrush="{DynamicResource CardRingBrush}" Effect="{DynamicResource CardRingEffect}" Opacity="0" />
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsKeyboardFocused" Value="True">
@@ -571,6 +686,17 @@
         <Setter Property="Height" Value="26" />
         <Setter Property="CornerRadius" Value="13" />
         <Setter Property="Margin" Value="22,0,8,0" />
+    </Style>
+
+    <!-- A button hint's pill: nothing in the Classic look, a pane of glass in the Console space look. -->
+    <Style x:Key="HintPill" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource PillBackground}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource PillBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="22" />
+        <Setter Property="Padding" Value="{DynamicResource PillPadding}" />
+        <Setter Property="Margin" Value="{DynamicResource PillGap}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
     <!-- Bumper hint at either end of the store filter. -->
@@ -614,49 +740,127 @@
         </Setter>
     </Style>
 
-    <!-- A row in the quick actions menu: the action, and under it what it applies to. -->
+    <!--
+        A row of the menu. Over the dimmed library it is a rounded dark row; the Old School layout's panel
+        puts its own in place of it (MenuPresenter), the row of the Xbox 360's settings panel.
+    -->
     <Style x:Key="MenuButton" TargetType="Button">
         <Setter Property="Foreground" Value="#F2F3F5" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="Button">
-                    <Border x:Name="Row" CornerRadius="8" Padding="{DynamicResource MenuRowPadding}" Margin="{DynamicResource MenuRowMargin}"
-                            MinHeight="{DynamicResource MenuRowHeight}"
-                            Background="{DynamicResource MenuRowBrush}" BorderThickness="2" BorderBrush="Transparent">
-                        <!--
-                            One line: the row's name, and at the right what it is set to now, which is
-                            its Tag. A row that only opens something or does something has no Tag.
-                        -->
-                        <Grid VerticalAlignment="Center">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
-                                       FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="1" Text="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
-                                       Margin="18,0,0,0" FontSize="14.5" Opacity="0.75" TextTrimming="CharacterEllipsis"
-                                       HorizontalAlignment="Right" VerticalAlignment="Center" />
-                        </Grid>
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Row" Property="Background" Value="{DynamicResource MenuRowFocusBrush}" />
-                        </Trigger>
-                        <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="Row" Property="Background" Value="{DynamicResource MenuRowFocusBrush}" />
-                            <Setter TargetName="Row" Property="BorderBrush" Value="#F2F3F5" />
-                        </Trigger>
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="Row" Property="Opacity" Value="0.45" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
+        <Setter Property="Template" Value="{DynamicResource MenuRowTemplate}" />
     </Style>
+
+    <!--
+        The Old School layout's menu panel: the polished blue grey slate of the Xbox 360's NXE settings,
+        smooth from a lighter top to a deeper foot, with a soft sheen of light over its top left.
+    -->
+    <LinearGradientBrush x:Key="MenuPanelBack" StartPoint="0,0" EndPoint="0.25,1">
+        <GradientStop Color="#56636F" Offset="0" />
+        <GradientStop Color="#45515D" Offset="0.35" />
+        <GradientStop Color="#36414C" Offset="0.75" />
+        <GradientStop Color="#2E3842" Offset="1" />
+    </LinearGradientBrush>
+    <RadialGradientBrush x:Key="MenuPanelSheen" Center="0.3,0" GradientOrigin="0.3,0" RadiusX="0.75" RadiusY="0.9">
+        <GradientStop Color="#1CFFFFFF" Offset="0" />
+        <GradientStop Color="#0AFFFFFF" Offset="0.5" />
+        <GradientStop Color="#00FFFFFF" Offset="1" />
+    </RadialGradientBrush>
+
+    <!-- The menu panel's row in focus: a glossy green bar, lit along its top half. -->
+    <LinearGradientBrush x:Key="MenuPanelBar" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#A8DC4E" Offset="0" />
+        <GradientStop Color="#86C634" Offset="0.48" />
+        <GradientStop Color="#6AB01E" Offset="0.52" />
+        <GradientStop Color="#5FA41A" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="MenuPanelGloss" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#55FFFFFF" Offset="0" />
+        <GradientStop Color="#14FFFFFF" Offset="1" />
+    </LinearGradientBrush>
+
+    <!--
+        The row of the Old School menu panel: an icon and the row's name, what it is set to at the right,
+        and a hairline under it. The row in focus is the green bar, its words in white with a dark edge
+        under them. The edge is a second line of text, not a shadow effect: an effect would be drawn again
+        every frame while the moving background runs behind the panel.
+    -->
+    <ControlTemplate x:Key="MenuPanelRowTemplate" TargetType="Button">
+        <Grid x:Name="Row" Background="Transparent" MinHeight="44">
+            <Rectangle Height="1" VerticalAlignment="Bottom" Margin="6,0" Fill="#30FFFFFF" />
+            <Border x:Name="Bar" CornerRadius="3" Margin="0,1,0,1" BorderThickness="1" BorderBrush="#B4E86E"
+                    Background="{StaticResource MenuPanelBar}" Opacity="0">
+                <Border CornerRadius="2,2,0,0" Height="20" VerticalAlignment="Top" Background="{StaticResource MenuPanelGloss}" />
+            </Border>
+            <Grid Margin="10,0,14,0" VerticalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="36" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="Icon" Text="{Binding (local:MenuRow.Icon), RelativeSource={RelativeSource TemplatedParent}}"
+                           FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="18" Foreground="#C9D0D6"
+                           VerticalAlignment="Center" />
+                <TextBlock x:Name="Edge" Grid.Column="1" Margin="1,1,0,0" Foreground="#5A2E5410" Visibility="Hidden"
+                           Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}" FontSize="17" VerticalAlignment="Center" />
+                <TextBlock x:Name="Label" Grid.Column="1" Foreground="#EEF1F3"
+                           Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}" FontSize="17" VerticalAlignment="Center" />
+                <TextBlock x:Name="Value" Grid.Column="2" Text="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
+                           Margin="18,0,0,0" FontSize="15" Foreground="#B8C0C6" TextTrimming="CharacterEllipsis"
+                           HorizontalAlignment="Right" VerticalAlignment="Center" />
+            </Grid>
+        </Grid>
+        <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Bar" Property="Opacity" Value="0.3" />
+            </Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="Bar" Property="Opacity" Value="1" />
+                <Setter TargetName="Edge" Property="Visibility" Value="Visible" />
+                <Setter TargetName="Label" Property="Foreground" Value="White" />
+                <Setter TargetName="Icon" Property="Foreground" Value="White" />
+                <Setter TargetName="Value" Property="Foreground" Value="#F4FFF0" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="Row" Property="Opacity" Value="0.45" />
+            </Trigger>
+        </ControlTemplate.Triggers>
+    </ControlTemplate>
+
+    <!-- The row of the menu over the dimmed library: its name, and at the right what it is set to now. -->
+    <ControlTemplate x:Key="MenuRowTemplate" TargetType="Button">
+        <Border x:Name="Row" CornerRadius="8" Padding="{DynamicResource MenuRowPadding}" Margin="{DynamicResource MenuRowMargin}"
+                MinHeight="{DynamicResource MenuRowHeight}"
+                Background="{DynamicResource MenuRowBrush}" BorderThickness="2" BorderBrush="Transparent">
+            <!--
+                One line: the row's name, and at the right what it is set to now, which is
+                its Tag. A row that only opens something or does something has no Tag.
+            -->
+            <Grid VerticalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
+                           FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
+                           Margin="18,0,0,0" FontSize="14.5" Opacity="0.75" TextTrimming="CharacterEllipsis"
+                           HorizontalAlignment="Right" VerticalAlignment="Center" />
+            </Grid>
+        </Border>
+        <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Row" Property="Background" Value="{DynamicResource MenuRowFocusBrush}" />
+            </Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="Row" Property="Background" Value="{DynamicResource MenuRowFocusBrush}" />
+                <Setter TargetName="Row" Property="BorderBrush" Value="#F2F3F5" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="Row" Property="Opacity" Value="0.45" />
+            </Trigger>
+        </ControlTemplate.Triggers>
+    </ControlTemplate>
 
     <!-- A round glyph button in the top bar. Only the ones the d-pad can reach are focusable. -->
     <Style x:Key="IconButton" TargetType="Button">

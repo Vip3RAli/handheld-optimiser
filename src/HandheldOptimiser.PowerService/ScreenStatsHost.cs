@@ -17,6 +17,7 @@ internal sealed class ScreenStatsHost
 
     private const string SettingsKey = @"SOFTWARE\HandheldOptimiser\ScreenStats";
     private const string OnValue = "On";
+    private const string LimeValue = "Lime";
 
     // Given UIAccess so it can move windows of programs run as administrator, this app's own among them, off
     // the Ally's screen. Without it Windows refuses, and those windows stay on the panel.
@@ -28,6 +29,7 @@ internal sealed class ScreenStatsHost
         {
             using var key = Registry.LocalMachine.OpenSubKey(SettingsKey);
             On = key?.GetValue(OnValue) is 1;
+            Lime = key?.GetValue(LimeValue) is not 0;
         }
         catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
         {
@@ -38,8 +40,33 @@ internal sealed class ScreenStatsHost
     /// <summary>Whether it is switched on, which keeps the service running.</summary>
     public bool On { get; private set; }
 
-    /// <summary>The status with whether the stats screen is on.</summary>
-    public AutoTdpStatus AddTo(AutoTdpStatus status) => status with { ScreenStats = On };
+    /// <summary>Whether it is drawn on the lime background, rather than black. On unless switched off.</summary>
+    public bool Lime { get; private set; } = true;
+
+    /// <summary>The status with whether the stats screen is on, and on the lime.</summary>
+    public AutoTdpStatus AddTo(AutoTdpStatus status) => status with { ScreenStats = On, ScreenStatsLime = Lime };
+
+    /// <summary>The lime background switched on or off from the widget. Saved; the stats screen reads it each second.</summary>
+    public void SetLime(bool lime)
+    {
+        if (lime == Lime)
+        {
+            return;
+        }
+
+        Lime = lime;
+        Log.Write($"Stats screen background: {(lime ? "lime" : "black")}");
+
+        try
+        {
+            using var key = Registry.LocalMachine.CreateSubKey(SettingsKey);
+            key.SetValue(LimeValue, lime ? 1 : 0, RegistryValueKind.DWord);
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+        {
+            Log.Write($"Could not save the stats screen background: {ex.Message}");
+        }
+    }
 
     /// <summary>Switched on or off from the widget. Saved, and started at once.</summary>
     public void Set(bool on)

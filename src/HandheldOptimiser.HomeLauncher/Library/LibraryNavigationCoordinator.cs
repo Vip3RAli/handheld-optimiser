@@ -457,8 +457,8 @@ internal sealed class LibraryNavigationCoordinator
     {
         if (_options.QuickActions && sender is Button { DataContext: GameTile tile } button)
         {
-            // An Old School card turns over to show its quick actions, which it does at the front. One
-            // behind the front comes forward first, and the next press and hold turns it.
+            // An Old School card shows its quick actions from the front. One behind the front comes
+            // forward first, and the next press and hold opens them.
             if (_layouts.IsOldSchool && _state.Tiles.IndexOf(tile) != _oldSchool.GameCards.Front)
             {
                 button.Focus();

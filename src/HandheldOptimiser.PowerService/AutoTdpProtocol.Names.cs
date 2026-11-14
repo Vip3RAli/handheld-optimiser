@@ -28,7 +28,8 @@ namespace HandheldOptimiser.PowerService
         /// <summary>From the overlay, each second: the frame rate of ProcessId, and what else it shows.</summary>
         public const string Overlay = "overlay";
 
-        /// <summary>From the widget: show the stats screen on the Ally's own panel while docked, or not, named by ScreenStats.</summary>
+        /// <summary>From the widget: show the stats screen on the Ally's own panel while docked, or not, named by
+        /// ScreenStats, and draw it on the lime or on black, named by ScreenStatsLime. Either may come alone.</summary>
         public const string SetScreenStats = "set-screen-stats";
 
         /// <summary>From the widget or the app: the GPU memory Windows has now, any size waiting for a restart, and the sizes on offer.</summary>
@@ -163,6 +164,7 @@ namespace HandheldOptimiser.PowerService
             public const string OverlayCorner = "OverlayCorner";
             public const string OverlayLayout = "OverlayLayout";
             public const string ScreenStats = "ScreenStats";
+            public const string ScreenStatsLime = "ScreenStatsLime";
             public const string GpuMemory = "GpuMemory";
             public const string GpuMemoryNow = "GpuMemoryNow";
             public const string GpuMemoryNext = "GpuMemoryNext";

@@ -72,7 +72,7 @@ public partial class LibraryWindow : Window, ILibraryHost
 
         _notices = new NoticePresenter(Menu.MenuNotice, _navigation, NoticeHost);
         _backdrop = new BackdropPresenter(BackdropFront, BackdropBack, _state, _options, _navigation, () => _layouts.IsBrowsing);
-        _menu = new MenuPresenter(Menu, _navigation, _notices, CardToTurn, () => _layouts.IsBrowsing, ScaledContent, () => RestoreFocus());
+        _menu = new MenuPresenter(Menu, _navigation, _notices, () => _layouts.IsOldSchool, () => RestoreFocus());
         _search = new SearchPresenter(TopBar, _navigation, _state, _options, () => new WindowInteropHelper(this).Handle,
             ShowFound, ApplyFilter, leaving => RestoreFocus(leaving), IsTopBarButton);
         _topBar = new TopBarPresenter(TopBar, UpdateBanner, UpdateText, UpdateNowButton, DismissUpdateButton, AcceptHint,
@@ -97,7 +97,7 @@ public partial class LibraryWindow : Window, ILibraryHost
         _oldSchool = new OldSchoolPresenter(this,
             new OldSchoolParts(Categories, Tiles, DealRow.DealTiles, ActionCards, Scroller, TilesScroller, Page, OpenCard, OpenCardBack,
                 OpenCardHeading, OpenCardCount, OpenCardSearch, CloseOpenCardButton, BackHint, ScaledContent, AcceptHint, OptionsHint,
-                TopBar, Menu),
+                TopBar, Menu, ConsoleSpace),
             _state, _options, _navigation, _layouts, _notices, _backdrop, _artwork, _topBar, _settings, _power, this,
             DealsShown, FocusedDealId, UpdateDeals, UpdateEmptyText);
         _deals = new DealsPresenter(DealRow, this, Scroller, AcceptHint, Menu, _menu, _notices, _state, _navigation, _layouts,
@@ -568,16 +568,6 @@ public partial class LibraryWindow : Window, ILibraryHost
     private bool IsTopBarButton(object? element) => _topBar.IsButton(element);
 
     /// <summary>
-    /// In the Old School layout, the open category's panel and the card at its front, which turns over to
-    /// show the menu. Null in the other layouts.
-    /// </summary>
-    private (OldSchoolPanel Panel, Button Card)? CardToTurn() =>
-        _layouts.IsOldSchool && _oldSchool.OpenStack is { Panel: { } panel } stack
-            && ItemContainers.At(stack.Items, stack.Front) is { } container && Visuals.Child<Button>(container) is { } card
-            ? (panel, card)
-            : null;
-
-    /// <summary>
     /// Whether the focus may go back to the page now: the library is in front with nothing over the page,
     /// and the d-pad is not on the top bar, unless it is the top bar or the search box asking to leave.
     /// </summary>
@@ -683,6 +673,8 @@ public partial class LibraryWindow : Window, ILibraryHost
             ApplyLayout();
         }
     }
+
+    void ILibraryHost.OldSchoolLookChanged() => _oldSchool.UpdateLook();
 
     void ILibraryHost.ResumeGame(GameSession session) => _play.ResumeGame(session);
 

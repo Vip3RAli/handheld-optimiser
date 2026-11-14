@@ -72,6 +72,7 @@ public partial class LibraryWindow
 
         _oldSchool.RefreshCategories();
         _oldSchool.UpdateRenderMode();
+        _menu.Reshape();
         if (_layouts.IsOldSchool)
         {
             _oldSchool.GameCards.Fresh = true;

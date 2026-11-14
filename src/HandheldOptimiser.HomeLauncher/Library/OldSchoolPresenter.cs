@@ -39,7 +39,8 @@ internal sealed record OldSchoolParts(
     TextBlock AcceptHint,
     FrameworkElement OptionsHint,
     TopBarView TopBar,
-    MenuView Menu);
+    MenuView Menu,
+    ConsoleSpaceLayer ConsoleSpace);
 
 /// <summary>
 /// The Old School layout, the Xbox 360's look: a list of categories above one stack of staggered cards. Up
@@ -104,6 +105,7 @@ internal sealed class OldSchoolPresenter
         Visuals.OnItemButtons(parts.ActionCards, OnActionClick, OnActionFocused);
         parts.Categories.AddHandler(UIElement.MouseLeftButtonDownEvent, new MouseButtonEventHandler(OnCategoryPressed));
         parts.CloseOpenCardButton.Click += (_, _) => LeaveNotInstalled();
+        window.LayoutUpdated += (_, _) => PlaceFloor();
     }
 
     // ===== OldSchool =====
@@ -502,6 +504,7 @@ internal sealed class OldSchoolPresenter
     /// </summary>
     public void UpdateRenderMode()
     {
+        UpdateLook();
         var mode = _layouts.Layout == LibraryLayout.OldSchool && _window.IsActive ? RenderMode.Default : RenderMode.SoftwareOnly;
         if (RenderOptions.ProcessRenderMode == mode)
         {
@@ -514,10 +517,95 @@ internal sealed class OldSchoolPresenter
         Program.Log($"Drawing {(mode == RenderMode.Default ? "with the GPU" : "in software")}, at {process.PrivateMemorySize64 / (1024 * 1024)} MB");
     }
 
+    // ===== Console space =====
+
+    /// <summary>
+    /// Puts the Old School layout in the look the player chose, and everything else back as it always was:
+    /// Console space only while the Old School layout is on screen. Its lines and motes move only while the
+    /// library is in front. Called with the GPU switch, which runs on every change of layout and focus.
+    /// </summary>
+    public void UpdateLook()
+    {
+        var console = _layouts.Layout == LibraryLayout.OldSchool && LibrarySettings.OldSchoolLook == OldSchoolLook.ConsoleSpace;
+        _parts.ConsoleSpace.Show(console, _window.IsActive);
+        if (console == OldSchoolPanel.ConsoleSpace && console == ConsoleSpaceLook.On)
+        {
+            return;
+        }
+
+        OldSchoolPanel.ConsoleSpace = console;
+        OldSchoolListPanel.Recede = console;
+        ConsoleSpaceLook.Apply(console);
+        SetPageEdges();
+
+        // Every stack is laid out again: the cards are drawn a little smaller in Console space.
+        foreach (var stack in new[] { _parts.Tiles, _parts.DealTiles, _parts.ActionCards })
+        {
+            Visuals.Child<OldSchoolPanel>(stack)?.InvalidateMeasure();
+        }
+
+        Visuals.Child<OldSchoolListPanel>(_parts.Categories)?.InvalidateArrange();
+        FitCategories();
+    }
+
+    /// <summary>
+    /// The page's edges for what is on screen. In the Console space look the page also runs on down under
+    /// the button hints, so the cards' reflections go on under the hints' glass rather than stopping above
+    /// them, which keeps room above the cards for the categories on the handheld's own screen.
+    /// </summary>
+    private void SetPageEdges()
+    {
+        var oldSchool = _layouts.IsOldSchool;
+        var under = OldSchoolPanel.ConsoleSpace && oldSchool && !_layouts.IsBrowsing;
+        var edges = _layouts.IsBrowsing ? OpenCardEdges : oldSchool ? (OldSchoolPanel.ConsoleSpace ? ConsoleCardEdges : CardEdges) : PageEdges;
+        _parts.Scroller.Padding = edges;
+        Grid.SetRowSpan(_parts.Scroller, under ? 2 : 1);
+    }
+
+    /// <summary>The width the cards have inside the page with those edges.</summary>
+    private double PageWidth(Thickness edges) =>
+        _parts.Scroller.ActualWidth - edges.Left - edges.Right - _parts.Tiles.Margin.Left - _parts.Tiles.Margin.Right;
+
+    /// <summary>
+    /// Keeps the Console space floor under the cards on screen, wherever docked mode and the screen's
+    /// size put them: it runs away to the line through the cards' middles and is dark below the front card.
+    /// </summary>
+    private void PlaceFloor()
+    {
+        if (!OldSchoolPanel.ConsoleSpace || !_window.IsActive)
+        {
+            return;
+        }
+
+        var stack = _parts.TilesScroller.IsVisible ? _parts.Tiles
+            : _parts.ActionCards.IsVisible ? _parts.ActionCards
+            : _parts.DealTiles;
+        if (Visuals.Child<OldSchoolPanel>(stack) is not { IsVisible: true, ActualHeight: > 0 } panel)
+        {
+            return;
+        }
+
+        try
+        {
+            var card = panel.FrontCard;
+            var toLayer = panel.TransformToVisual(_parts.ConsoleSpace);
+            var middle = toLayer.Transform(new Point(0, card.Top + (card.Height / 2))).Y;
+            var bottom = toLayer.Transform(new Point(0, card.Bottom)).Y;
+            _parts.ConsoleSpace.PlaceFloor(middle, bottom);
+        }
+        catch (InvalidOperationException)
+        {
+            // Not in the window just now, as while the layout changes; the next pass puts it right.
+        }
+    }
+
     // ===== Categories =====
 
     /// <summary>One name in the list. A tab of games carries the filter that shows them.</summary>
     private sealed record Category(string Name, CategoryKind Kind, TileFilter Filter = default);
+
+    /// <summary>What the Old School layout calls the games owned and not installed, the player's name for them.</summary>
+    private const string ReadyToInstall = "Ready to install";
 
     private static readonly Duration CategoryMove = TimeSpan.FromMilliseconds(240);
 
@@ -565,7 +653,7 @@ internal sealed class OldSchoolPresenter
         }
 
         categories.AddRange(TileFilter.Options(_state.Shown(_options.ShowHidden), _options.ShowFilter)
-            .Select(f => f.NotInstalled ? new Category(f.Name, CategoryKind.NotInstalled, f) : new Category(f.Name, CategoryKind.Games, f)));
+            .Select(f => f.NotInstalled ? new Category(ReadyToInstall, CategoryKind.NotInstalled, f) : new Category(f.Name, CategoryKind.Games, f)));
 
         categories.Add(new Category("Settings", CategoryKind.Settings));
         categories.Add(new Category("Power", CategoryKind.Power));
@@ -713,7 +801,7 @@ internal sealed class OldSchoolPresenter
         // so a finger moving up or down is free to move between the categories.
         _parts.Page.VerticalAlignment = oldSchool ? VerticalAlignment.Bottom : VerticalAlignment.Stretch;
         _parts.Scroller.PanningMode = oldSchool ? PanningMode.None : PanningMode.VerticalOnly;
-        _parts.Scroller.Padding = _layouts.IsBrowsing ? OpenCardEdges : oldSchool ? CardEdges : PageEdges;
+        SetPageEdges();
 
         var games = !oldSchool || kind == CategoryKind.Games;
         _parts.TilesScroller.Visibility = games ? Visibility.Visible : Visibility.Collapsed;
@@ -740,12 +828,15 @@ internal sealed class OldSchoolPresenter
     /// <summary>Draws the names as much bigger as the cards are drawn to fill a wide screen, so the two keep their proportions.</summary>
     public void FitCategories()
     {
-        if (!_layouts.IsOldSchool || _parts.Scroller.ViewportWidth <= 0)
+        if (!_layouts.IsOldSchool || _parts.Scroller.ActualWidth <= 0)
         {
             return;
         }
 
-        var fit = OldSchoolStack.Fit(_parts.Scroller.ViewportWidth - _parts.Tiles.Margin.Left - _parts.Tiles.Margin.Right);
+        // The edges first, which in Console space depend on the screen's width. The width is worked out
+        // from them rather than read from the viewport, which only catches up at the next layout pass.
+        SetPageEdges();
+        var fit = OldSchoolStack.Fit(PageWidth(_parts.Scroller.Padding), OldSchoolPanel.ConsoleSpace);
         if (_parts.Categories.LayoutTransform is not ScaleTransform scale || Math.Abs(scale.ScaleX - fit) > 0.005)
         {
             _parts.Categories.LayoutTransform = new ScaleTransform(fit, fit);
@@ -761,7 +852,7 @@ internal sealed class OldSchoolPresenter
         {
             case CategoryKind.NotInstalled:
                 var owned = _state.Shown(_options.ShowHidden).Count(t => !t.IsInstalled);
-                cards.Add(new ActionCard("", "Ready to Install",
+                cards.Add(new ActionCard("", ReadyToInstall,
                     owned == 1 ? "1 game you own, ready to install" : $"{owned} games you own, ready to install", BrowseNotInstalled));
                 break;
 
@@ -929,6 +1020,11 @@ internal sealed class OldSchoolPresenter
     // Under the Old School cards there is only the button hints, so the page runs nearly down to them,
     // which is the room the list of categories needs above the cards on the handheld's own screen.
     private static readonly Thickness CardEdges = new(38, 4, 38, 8);
+
+    // In the Console space look the stack itself keeps the room for the reflections under the cards
+    // (OldSchoolStack.ReflectionRoom), and the page runs on under the button hints, so the cards stand
+    // just above the hints with their reflections running on under them.
+    private static readonly Thickness ConsoleCardEdges = new(38, 4, 38, 0);
     private static readonly Thickness OpenCardPage = new(24, 60, 24, 10);
     private static readonly Thickness OpenCardEdges = new(14, 4, 14, 10);
 
@@ -1076,6 +1172,19 @@ internal sealed class OldSchoolPresenter
 
         _parts.OpenCardHeading.Visibility = _parts.BackHint.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
         _parts.Scroller.Margin = open ? OpenCardPage : default;
+
+        // Inside the open card the game in focus is ringed in the menu panel's green, and the games, none
+        // of them installed, are drawn at full strength rather than faded as they are among installed ones.
+        if (open)
+        {
+            _parts.Scroller.Resources["TileRingBrush"] = _parts.Scroller.FindResource("MenuPanelRing");
+            _parts.Scroller.Resources["NotInstalledArtOpacity"] = 1d;
+        }
+        else
+        {
+            _parts.Scroller.Resources.Remove("TileRingBrush");
+            _parts.Scroller.Resources.Remove("NotInstalledArtOpacity");
+        }
         MoveSearch(open ? _parts.OpenCardSearch : _parts.TopBar.TopBarCentre);
     }
 

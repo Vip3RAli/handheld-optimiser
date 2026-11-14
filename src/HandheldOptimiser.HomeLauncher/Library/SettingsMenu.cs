@@ -67,6 +67,13 @@ internal sealed class SettingsMenu
         view.BlurSetting.Click += (_, _) => StepBlur(1);
         view.PositionSetting.Click += (_, _) => StepPosition(1);
         view.ArtworkKeySetting.Click += (_, _) => EditArtworkKey();
+        view.OldSchoolLookSetting.Click += (_, _) => StepOldSchoolLook();
+        view.MovingBackgroundSetting.Click += (_, _) =>
+        {
+            LibrarySettings.MovingBackground = !LibrarySettings.MovingBackground;
+            Refresh();
+            _host.OldSchoolLookChanged();
+        };
 
         // What it shows.
         view.LayoutSetting.Click += (_, _) => StepLayout(1);
@@ -161,8 +168,8 @@ internal sealed class SettingsMenu
     }
 
     /// <summary>
-    /// One of the three categories, opened from its own Old School card, which turns over to show it. Back
-    /// turns it over again, as there is no settings list behind it.
+    /// One of the three categories, opened from its own Old School card. Back closes the menu, as there is
+    /// no settings list behind it.
     /// </summary>
     public void OpenCategoryFromCard(StackPanel category)
     {
@@ -297,6 +304,22 @@ internal sealed class SettingsMenu
         // Where to get a key is on the screen it is typed in.
         view.ArtworkKeySetting.Visibility = _options.Background == BackgroundKind.Artwork ? Visibility.Visible : Visibility.Collapsed;
         view.ArtworkKeySetting.Tag = LibrarySettings.ArtworkKey is null ? "Not set" : "Set";
+
+        // How the Old School layout is drawn, and whether the Console space look's background moves.
+        var console = LibrarySettings.OldSchoolLook == OldSchoolLook.ConsoleSpace;
+        view.OldSchoolLookSetting.Tag = console ? "Modern" : "Classic";
+        view.MovingBackgroundSetting.IsEnabled = console;
+        view.MovingBackgroundSetting.Tag = SettingSteps.OnOff(LibrarySettings.MovingBackground);
+    }
+
+    /// <summary>Between the Classic look and Console space. There are only the two, so either way is the other.</summary>
+    private void StepOldSchoolLook()
+    {
+        LibrarySettings.OldSchoolLook = LibrarySettings.OldSchoolLook == OldSchoolLook.ConsoleSpace
+            ? OldSchoolLook.Classic
+            : OldSchoolLook.ConsoleSpace;
+        Refresh();
+        _host.OldSchoolLookChanged();
     }
 
     // ----- Art and background -----
@@ -401,6 +424,10 @@ internal sealed class SettingsMenu
         else if (ReferenceEquals(row, view.LayoutSetting))
         {
             StepLayout(step);
+        }
+        else if (ReferenceEquals(row, view.OldSchoolLookSetting))
+        {
+            StepOldSchoolLook();
         }
         else if (ReferenceEquals(row, view.SortSetting))
         {

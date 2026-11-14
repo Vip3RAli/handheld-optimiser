@@ -23,18 +23,36 @@ internal static class OldSchoolStack
     /// The size, left edge and opacity at each whole depth, with 0 the front card. The card just passed
     /// (-1) has grown towards the player and faded, and the one at the far end (5) has yet to fade in.
     /// The card passed barely moves left: the page cuts off anything past its edge, which would show.
-    /// The front card covers only a strip down the left edge of the one behind it, so that one is seen
-    /// nearly whole, and the rest are spread as far as the handheld's own screen has room for.
+    /// As on the NXE dashboard, the card behind the front one starts at its right edge and is seen
+    /// whole, and each one further back is smaller and starts a little inside the right edge of the
+    /// one before it, so a strip of every card shows.
     /// </summary>
     private static readonly (double Scale, double Left, double Opacity)[] Stops =
     [
         (1.12, -40, 0),
         (1.00, 0, 1),
-        (0.86, 396, 1),
-        (0.66, 700, 1),
-        (0.50, 925, 1),
-        (0.37, 1028, 1),
-        (0.28, 1110, 0)
+        (0.74, 410, 1),
+        (0.59, 667, 1),
+        (0.49, 832, 1),
+        (0.42, 947, 1),
+        (0.36, 1040, 0)
+    ];
+
+    /// <summary>
+    /// The same stops spread out as far as the Modern look takes them on a wide page: the cards behind
+    /// shrink less and sit further apart, each still tucked a little behind the one before. The Modern look
+    /// goes part way here, by as much as it needs for the last card on show to reach the page's right edge,
+    /// so the stack spans the screen with the front card at its usual size (the user asked, 2026-11-13).
+    /// </summary>
+    private static readonly (double Scale, double Left, double Opacity)[] WideStops =
+    [
+        (1.12, -40, 0),
+        (1.00, 0, 1),
+        (0.84, 410, 1),
+        (0.71, 730, 1),
+        (0.60, 990, 1),
+        (0.51, 1205, 1),
+        (0.44, 1380, 0)
     ];
 
     // The depth of the first of the stops.
@@ -43,8 +61,22 @@ internal static class OldSchoolStack
     // The furthest back of the cards that are fully on show.
     private const int LastShown = 4;
 
-    // The most the cards are enlarged to fill a wide screen.
+    // The most the cards are enlarged to fill a wide screen. Less in the Console space look, which keeps
+    // room under the cards for the floor they are reflected in.
     private const double MostFit = 1.75;
+    private const double MostConsoleFit = 1.35;
+
+    // The Modern look's cards are a tenth smaller than the Classic look's at the same width, and the stack
+    // starts at the page's left edge and spreads out to its right (WideStops). The user asked for both on
+    // 2026-11-13: moved in from the left instead, the stack looked as if someone had pressed Tab.
+    private const double ConsoleSize = 0.9;
+
+    /// <summary>
+    /// The room under the cards for their reflections in the Console space look, as a part of a card's
+    /// height: the reflection fades out at 32% of it, 8 under the card. The stack is that much taller, as
+    /// the scroll viewer it sits in cuts off anything drawn outside it.
+    /// </summary>
+    public const double ReflectionRoom = 0.34;
 
     /// <summary>How much bigger than a card the tallest one is drawn: the one sliding out, which grows as it goes.</summary>
     public static readonly double Tallest = Stops.Max(s => s.Scale);
@@ -54,24 +86,61 @@ internal static class OldSchoolStack
     /// screen. Never smaller than they are designed, for the handheld's own screen.
     /// </summary>
     /// <param name="width">The room across, in the units the cards are sized in.</param>
-    public static double Fit(double width)
+    /// <param name="console">Whether the Console space look is on, which enlarges them less.</param>
+    public static double Fit(double width, bool console = false) =>
+        console ? Math.Clamp(double.IsFinite(width) ? width * ConsoleSize / StackWidth : 0, ConsoleSize, MostConsoleFit)
+            : double.IsFinite(width) ? Math.Clamp(width / StackWidth, 1, MostFit) : 1;
+
+    /// <summary>
+    /// How far towards the wide stops the Modern look spreads the cards on a page that wide: just enough
+    /// for the last card on show to end at the right edge, from 0 (as designed) to 1 (as wide as they go).
+    /// </summary>
+    /// <param name="width">The room across, in the units the cards are sized in.</param>
+    public static double Spread(double width)
     {
-        var (scale, left, _) = Stops[LastShown - FirstDepth];
-        return double.IsFinite(width) ? Math.Clamp(width / (left + (scale * CardWidth)), 1, MostFit) : 1;
+        if (!double.IsFinite(width) || width <= 0)
+        {
+            return 0;
+        }
+
+        var room = width / Fit(width, console: true);
+        return Math.Clamp((room - StackWidth) / (Right(WideStops) - StackWidth), 0, 1);
+    }
+
+    /// <summary>How wide the stack is at its designed size, from the front card's left edge to the right edge of the last card fully on show.</summary>
+    private static double StackWidth => Right(Stops);
+
+    private static double Right((double Scale, double Left, double Opacity)[] stops)
+    {
+        var (scale, left, _) = stops[LastShown - FirstDepth];
+        return left + (scale * CardWidth);
     }
 
     /// <summary>The size, left edge and opacity of a card that many places behind the front one.</summary>
     /// <param name="depth">Its place less the front card's, which is part way between two while they move.</param>
-    public static (double Scale, double Left, double Opacity) Place(double depth)
+    /// <param name="spread">How far towards the wide stops, from Spread.</param>
+    public static (double Scale, double Left, double Opacity) Place(double depth, double spread = 0)
     {
         var at = Math.Clamp(depth - FirstDepth, 0, Stops.Length - 1);
         var before = (int)Math.Floor(at);
         var after = Math.Min(before + 1, Stops.Length - 1);
         var share = at - before;
 
-        var (scale, left, opacity) = Stops[before];
-        var (nextScale, nextLeft, nextOpacity) = Stops[after];
+        var (scale, left, opacity) = Stop(before, spread);
+        var (nextScale, nextLeft, nextOpacity) = Stop(after, spread);
         return (scale + ((nextScale - scale) * share), left + ((nextLeft - left) * share), opacity + ((nextOpacity - opacity) * share));
+    }
+
+    private static (double Scale, double Left, double Opacity) Stop(int index, double spread)
+    {
+        var (scale, left, opacity) = Stops[index];
+        if (spread <= 0)
+        {
+            return (scale, left, opacity);
+        }
+
+        var (wideScale, wideLeft, _) = WideStops[index];
+        return (scale + ((wideScale - scale) * spread), left + ((wideLeft - left) * spread), opacity);
     }
 
     /// <summary>
@@ -89,6 +158,12 @@ internal static class OldSchoolStack
 /// </summary>
 internal sealed class OldSchoolPanel : Panel
 {
+    /// <summary>
+    /// Whether the Console space look is on, which every stack of cards draws in. Set by ConsoleSpace,
+    /// which then lays the stacks out again.
+    /// </summary>
+    public static bool ConsoleSpace { get; set; }
+
     public static readonly DependencyProperty PositionProperty = DependencyProperty.Register(
         nameof(Position), typeof(double), typeof(OldSchoolPanel),
         new FrameworkPropertyMetadata(0d, (panel, _) => ((OldSchoolPanel)panel).PlaceCards()));
@@ -114,6 +189,9 @@ internal sealed class OldSchoolPanel : Panel
     /// <summary>How much bigger than designed the cards are drawn, to fill the width of the screen.</summary>
     public double Fit { get; private set; } = 1;
 
+    /// <summary>How far the Modern look spreads the cards out to reach the right edge. See OldSchoolStack.Spread.</summary>
+    public double Spread { get; private set; }
+
     /// <summary>
     /// How tall the cards in this panel are, as its tiles are drawn. The games' cards are the stack's own
     /// height; the deals' are shorter, the shape of a store's banner.
@@ -135,14 +213,16 @@ internal sealed class OldSchoolPanel : Panel
         }
 
         // As wide as there is room for, and tall enough for the card sliding out, which grows as it goes.
-        Fit = OldSchoolStack.Fit(availableSize.Width);
+        Fit = OldSchoolStack.Fit(availableSize.Width, ConsoleSpace);
         var width = double.IsInfinity(availableSize.Width) ? card.Width : availableSize.Width;
-        return new Size(width, card.Height * Fit * OldSchoolStack.Tallest);
+        var reflections = ConsoleSpace ? card.Height * Fit * OldSchoolStack.ReflectionRoom : 0;
+        return new Size(width, (card.Height * Fit * OldSchoolStack.Tallest) + reflections);
     }
 
     protected override Size ArrangeOverride(Size finalSize)
     {
-        Fit = OldSchoolStack.Fit(finalSize.Width);
+        Fit = OldSchoolStack.Fit(finalSize.Width, ConsoleSpace);
+        Spread = ConsoleSpace ? OldSchoolStack.Spread(finalSize.Width) : 0;
         var card = new Rect(0, 0, OldSchoolStack.CardWidth, CardHeight);
         var children = InternalChildren;
         for (var i = 0; i < children.Count; i++)
@@ -161,12 +241,13 @@ internal sealed class OldSchoolPanel : Panel
     {
         var position = Position;
         var fit = Fit;
+        var spread = Spread;
         var height = CardHeight * fit;
         var children = InternalChildren;
         for (var i = 0; i < children.Count; i++)
         {
             var child = children[i];
-            var (scale, left, opacity) = OldSchoolStack.Place(i - position);
+            var (scale, left, opacity) = OldSchoolStack.Place(i - position, spread);
             SetFront(child, Math.Max(0, 1 - Math.Abs(i - position)));
 
             // Most cards are out of sight, and stay as they are.
@@ -188,6 +269,7 @@ internal sealed class OldSchoolPanel : Panel
             child.IsHitTestVisible = opacity > 0.5;
         }
     }
+
 }
 
 /// <summary>
@@ -277,6 +359,9 @@ internal static class OldSchoolList
 /// </summary>
 internal sealed class OldSchoolListPanel : Panel
 {
+    /// <summary>Whether the names other than the open one fade further back, as the Console space look has them.</summary>
+    public static bool Recede { get; set; }
+
     public static readonly DependencyProperty PositionProperty = DependencyProperty.Register(
         nameof(Position), typeof(double), typeof(OldSchoolListPanel),
         new FrameworkPropertyMetadata(0d, (panel, _) => ((OldSchoolListPanel)panel).PlaceNames()));
@@ -347,7 +432,7 @@ internal sealed class OldSchoolListPanel : Panel
 
             // Sized about its bottom left corner, so every name starts at the same edge.
             transform.Matrix = new Matrix(scale, 0, 0, scale, 0, (child.DesiredSize.Height * (1 - scale)) - up);
-            child.Opacity = opacity;
+            child.Opacity = Recede ? opacity * (1 - (0.35 * Math.Clamp(place, 0, 1))) : opacity;
             child.IsHitTestVisible = opacity > 0.3;
         }
     }

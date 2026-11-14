@@ -66,6 +66,9 @@ namespace HandheldOptimiser.GameBar
         /// <summary>Whether the stats screen on the Ally's own panel is switched on.</summary>
         public bool ScreenStats;
 
+        /// <summary>Whether the stats screen is drawn on the lime background, rather than black.</summary>
+        public bool ScreenStatsLime;
+
         /// <summary>"auto" or "manual", or null when TDP Engine did not say, as when it is not running.</summary>
         public string Mode;
 
@@ -233,6 +236,17 @@ namespace HandheldOptimiser.GameBar
             return SendStarting(request);
         }
 
+        public static EngineStatus SetScreenStatsLime(bool lime)
+        {
+            var request = new JsonObject
+            {
+                [AutoTdpProtocol.Fields.Command] = JsonValue.CreateStringValue(AutoTdpProtocol.SetScreenStats),
+                [AutoTdpProtocol.Fields.ScreenStatsLime] = JsonValue.CreateBooleanValue(lime)
+            }.Stringify();
+
+            return SendStarting(request);
+        }
+
         /// <summary>The GPU memory now, any size waiting for a restart, and the sizes on offer, starting the service if need be.</summary>
         public static EngineStatus GpuMemory() =>
             SendStarting(new JsonObject
@@ -385,6 +399,7 @@ namespace HandheldOptimiser.GameBar
                 OverlayCorner = Text(json, AutoTdpProtocol.Fields.OverlayCorner),
                 OverlayLayout = Text(json, AutoTdpProtocol.Fields.OverlayLayout),
                 ScreenStats = json.GetNamedBoolean(AutoTdpProtocol.Fields.ScreenStats, false),
+                ScreenStatsLime = json.GetNamedBoolean(AutoTdpProtocol.Fields.ScreenStatsLime, true),
                 GpuMemoryNow = (int?)Number(json, AutoTdpProtocol.Fields.GpuMemoryNow),
                 GpuMemoryNext = (int?)Number(json, AutoTdpProtocol.Fields.GpuMemoryNext),
                 GpuMemoryOffered = Numbers(json, AutoTdpProtocol.Fields.GpuMemoryOffered),

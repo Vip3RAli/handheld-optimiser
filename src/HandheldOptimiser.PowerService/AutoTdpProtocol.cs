@@ -133,12 +133,14 @@ internal partial class AutoTdpJsonContext : JsonSerializerContext
 /// <param name="PaddleAction">With set-paddle: one of <see cref="AutoTdpProtocol.PaddleActions"/>.</param>
 /// <param name="ControllerLighting">With set-lighting: one of <see cref="AutoTdpProtocol.LightingModes"/>.</param>
 /// <param name="LightingColour">With set-lighting-colour: one of <see cref="AutoTdpProtocol.LightingColours"/>.</param>
+/// <param name="ScreenStatsLime">With set-screen-stats: true to draw the stats screen on the lime background, false for black.</param>
 internal sealed record AutoTdpRequest(string Command, int TargetFps = 0, int MinWatts = 0, int MaxWatts = 0,
     int TemperatureLimit = 0, int StartWatts = 0, string? GameFolder = null, string? FanCurve = null, int PowerLimit = 0,
     string? ControllerMode = null, bool Temporary = false, bool? CpuBoost = null, string? OverlayLevel = null,
     string? OverlayCorner = null, int ProcessId = 0, string? OverlayLayout = null, bool? ScreenStats = null,
     int? GpuMemory = null, string? Mode = null, string? RadeonFeature = null, bool? RadeonOn = null, int? RadeonValue = null,
-    bool? BatteryCare = null, string? PaddleAction = null, string? ControllerLighting = null, string? LightingColour = null);
+    bool? BatteryCare = null, string? PaddleAction = null, string? ControllerLighting = null, string? LightingColour = null,
+    bool? ScreenStatsLime = null);
 
 /// <param name="Running">Whether it is setting the power limit or the fans right now.</param>
 /// <param name="State">One of the AutoTdpState names.</param>
@@ -177,6 +179,7 @@ internal sealed record AutoTdpRequest(string Command, int TargetFps = 0, int Min
 /// <param name="PaddleAction">What the back paddles do while replacing Armoury Crate, one of <see cref="AutoTdpProtocol.PaddleActions"/>.</param>
 /// <param name="ControllerLighting">The thumbstick light ring mode while replacing Armoury Crate, one of <see cref="AutoTdpProtocol.LightingModes"/>.</param>
 /// <param name="LightingColour">The thumbstick light ring colour while replacing Armoury Crate, one of <see cref="AutoTdpProtocol.LightingColours"/>.</param>
+/// <param name="ScreenStatsLime">Whether the stats screen is drawn on the lime background, rather than black.</param>
 internal sealed record AutoTdpStatus(bool Running, double? Fps = null, int? Watts = null, int? Temperature = null,
     string? State = null, string? Error = null, int TargetFps = 0, string? FanCurve = null, int PowerLimit = 0,
     bool Replacing = false, bool ControllerConnected = false, string? ControllerMode = null, bool? CpuBoost = null,
@@ -186,4 +189,5 @@ internal sealed record AutoTdpStatus(bool Running, double? Fps = null, int? Watt
     int? RsrSharpness = null, int[]? RsrSharpnessRange = null, bool? AntiLag = null, bool? Chill = null,
     int? ChillMin = null, int? ChillMax = null, int[]? ChillRange = null, bool? Sharpening = null,
     int? SharpeningStrength = null, int[]? SharpeningRange = null, bool? BatteryCare = null,
-    string? PaddleAction = null, string? ControllerLighting = null, string? LightingColour = null);
+    string? PaddleAction = null, string? ControllerLighting = null, string? LightingColour = null,
+    bool ScreenStatsLime = true);

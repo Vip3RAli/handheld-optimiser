@@ -57,6 +57,16 @@ internal enum LibraryLayout
     OldSchool
 }
 
+/// <summary>
+/// How the Old School layout is drawn: Classic, its flat green wall and cards, or Console space, a lit
+/// green space with cards turned in perspective over a glass floor that reflects them.
+/// </summary>
+internal enum OldSchoolLook
+{
+    ConsoleSpace,
+    Classic
+}
+
 /// <summary>The layout on a TV or monitor.</summary>
 internal enum DockedLayout
 {
@@ -102,6 +112,8 @@ internal static class LibrarySettings
     private const string PausedValue = "PausedProcesses";
     private const string DockedValue = "DockedMode";
     private const string DockedLayoutValue = "DockedLayout";
+    private const string OldSchoolLookValue = "OldSchoolLook";
+    private const string MovingBackgroundValue = "MovingBackground";
     private const string DockedSizeValue = "DockedSize";
     private const string NotInstalledValue = "ShowNotInstalled";
     private const string SteamKeyValue = "SteamWebApiKey";
@@ -297,6 +309,22 @@ internal static class LibrarySettings
             ? layout
             : DockedLayout.Row;
         set => Write(DockedLayoutValue, value.ToString().ToLowerInvariant());
+    }
+
+    /// <summary>How the Old School layout is drawn. Console space unless the player chose Classic.</summary>
+    public static OldSchoolLook OldSchoolLook
+    {
+        get => string.Equals(Read(OldSchoolLookValue), "classic", StringComparison.OrdinalIgnoreCase)
+            ? OldSchoolLook.Classic
+            : OldSchoolLook.ConsoleSpace;
+        set => Write(OldSchoolLookValue, value == OldSchoolLook.Classic ? "classic" : "consolespace");
+    }
+
+    /// <summary>The waves and the motes drifting behind the Console space look's cards.</summary>
+    public static bool MovingBackground
+    {
+        get => ReadSwitch(MovingBackgroundValue);
+        set => WriteSwitch(MovingBackgroundValue, value);
     }
 
     /// <summary>One of <see cref="DockedSizes"/>; 0, the default, fits the library to the screen.</summary>

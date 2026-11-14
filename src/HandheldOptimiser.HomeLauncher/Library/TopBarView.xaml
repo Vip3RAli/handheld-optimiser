@@ -81,8 +81,13 @@
             </Border>
         </StackPanel>
 
-        <!-- Wi-Fi, the battery and the clock stay at the right. -->
-        <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+        <!--
+            Wi-Fi, the battery and the clock stay at the right. In the Old School layout's Console space look
+            they sit together in one capsule of glass (ConsoleSpaceLook sets its resources).
+        -->
+        <Border Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" CornerRadius="22" BorderThickness="1"
+                Background="{DynamicResource HudBackground}" BorderBrush="{DynamicResource HudBorder}" Padding="{DynamicResource HudPadding}">
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
 
             <!-- Wi-Fi signal: four bars, lit up to the current strength. -->
             <StackPanel x:Name="WifiBars" Orientation="Horizontal" Height="16" Margin="0,0,20,0"
@@ -106,7 +111,9 @@
                 <TextBlock x:Name="BatteryText" Margin="8,0,0,0" FontSize="16" Opacity="0.8" VerticalAlignment="Center" />
             </StackPanel>
 
-            <TextBlock x:Name="ClockText" FontSize="20" Opacity="0.8" VerticalAlignment="Center" />
+            <TextBlock x:Name="ClockText" FontSize="20" Opacity="0.8" VerticalAlignment="Center" Margin="{DynamicResource HudEnd}"
+                       FontFamily="{DynamicResource HintFont}" />
         </StackPanel>
+        </Border>
     </Grid>
 </UserControl>
