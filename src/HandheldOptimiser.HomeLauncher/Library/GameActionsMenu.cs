@@ -111,6 +111,9 @@ internal sealed class GameActionsMenu
         menu.AddStepper(StepProfile);
     }
 
+    /// <summary>The library's own installs, whose rows (pause, cancel, update, check files, uninstall) a game's menu shows.</summary>
+    public InstallQueue? Installs { get; init; }
+
     public void Open(GameTile tile)
     {
         if (!_menu.Open(_view.GameItems, tile.Title, Subtitle(tile), tile))
@@ -154,6 +157,28 @@ internal sealed class GameActionsMenu
         // A game that is not installed can only be installed or hidden.
         var installed = tile.IsInstalled;
         view.InstallItem.Visibility = installed ? Visibility.Collapsed : Visibility.Visible;
+
+        // A download the library is doing for this game, or a game it installed: pause, cancel, update,
+        // check files and uninstall, under Install.
+        _menu.ClearRows(view.GameItems);
+        var downloading = false;
+        foreach (var (label, value, press) in Installs?.ActionsFor(tile) ?? [])
+        {
+            // Cancel and Uninstall want a second press; the menu stays open for it and closes once done.
+            _menu.AddRow(view.GameItems, view.FavouriteItem, label, value, () =>
+            {
+                if (press())
+                {
+                    _menu.Close();
+                }
+            });
+            downloading |= label is "Pause download" or "Carry on downloading";
+        }
+
+        if (downloading)
+        {
+            view.InstallItem.Visibility = Visibility.Collapsed;
+        }
         foreach (var row in new[] { view.FavouriteItem, view.ProfileItem, view.ArgumentsItem, view.FolderItem, view.PropertiesItem })
         {
             row.Visibility = installed ? Visibility.Visible : Visibility.Collapsed;

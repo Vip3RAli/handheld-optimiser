@@ -213,6 +213,16 @@
             </StackPanel>
         </Grid>
 
+        <!--
+            A notice about a game whose tile is not on show, such as the game being played while Ready to install
+            is open. It sits here rather than on another game's tile. NoticePresenter shows and hides it.
+        -->
+        <Border x:Name="NoticePanel" Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="48,0,48,18"
+                MaxWidth="900" CornerRadius="14" BorderThickness="1" BorderBrush="#40FFFFFF" Padding="22,12"
+                Background="{StaticResource MenuPanelBack}" IsHitTestVisible="False" Visibility="Collapsed">
+            <TextBlock x:Name="NoticePanelText" FontSize="18" Foreground="#F2F3F5" TextWrapping="Wrap" TextAlignment="Center" />
+        </Border>
+
         <local:MenuView x:Name="Menu" Grid.RowSpan="4" />
         </Grid>
 

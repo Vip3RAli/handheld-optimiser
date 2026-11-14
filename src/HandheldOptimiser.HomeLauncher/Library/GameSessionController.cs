@@ -61,6 +61,9 @@ internal sealed class GameSessionController
     /// <summary>The game being played, paused or not, or null.</summary>
     public GameSession? Session => _session;
 
+    /// <summary>The games the library installs itself, which a press on a GOG game that is not installed goes to.</summary>
+    public InstallQueue? Installs { get; set; }
+
     /// <summary>Whether the screen is off, when the controller and the clock are left stopped.</summary>
     public bool DisplayOff => _displayOff;
 
@@ -130,6 +133,13 @@ internal sealed class GameSessionController
         _launchBlockedUntil = DateTime.UtcNow + LaunchCooldown;
         _state.FocusedKey = tile.Game.Key;
         _closeArmed = null;
+
+        // A GOG game, signed in to GOG here, is downloaded by the library itself.
+        if (!tile.IsInstalled && Installs is { } installs && InstallQueue.InstallsHere(tile.Game))
+        {
+            installs.Add(tile.Game);
+            return;
+        }
 
         // A game that is not installed opens its store's install page, with nothing else to set up.
         if (!tile.IsInstalled)
@@ -270,11 +280,18 @@ internal sealed class GameSessionController
     /// <summary>What TDP Engine is doing, as the library comes back in front of a game it is holding.</summary>
     private async Task ShowAutoTdpAsync()
     {
-        if (_autoTdpGame is not null && await AutoTdp.DescribeAsync() is { } line && _autoTdpGame is not null)
+        if (_autoTdpGame is not null && await AutoTdp.DescribeAsync() is { } line && _autoTdpGame is { } game)
         {
-            _notices.Show(line);
+            ShowAbout(game, line);
         }
     }
+
+    /// <summary>
+    /// A notice about the game being played: on its tile when that is on show, and in the panel above the
+    /// hints otherwise, never on the tile of another game the focus happens to be on.
+    /// </summary>
+    private void ShowAbout(Game game, string text) =>
+        _notices.ShowAbout(text, _state.Tiles.FirstOrDefault(t => t.Game.Key == game.Key));
 
     private async Task CloseAppsForAsync(GameSession session)
     {
@@ -602,18 +619,18 @@ internal sealed class GameSessionController
         {
             case PauseOutcome.Paused:
                 WatchForeground();
-                _notices.Show($"{title} is paused. Press A on it to carry on.");
+                ShowAbout(session.Game, $"{title} is paused. Press A on it to carry on.");
                 _continue.Update();
                 break;
 
             case PauseOutcome.AntiCheat when !ReferenceEquals(_toldNotPaused, session):
                 _toldNotPaused = session;
-                _notices.Show($"{title} keeps running behind the library: it uses {session.AntiCheat}, and pausing it could get you flagged.");
+                ShowAbout(session.Game, $"{title} keeps running behind the library: it uses {session.AntiCheat}, and pausing it could get you flagged.");
                 break;
 
             case PauseOutcome.Refused when !ReferenceEquals(_toldNotPaused, session):
                 _toldNotPaused = session;
-                _notices.Show($"{title} keeps running behind the library: Windows would not let it be paused.");
+                ShowAbout(session.Game, $"{title} keeps running behind the library: Windows would not let it be paused.");
                 break;
         }
     }

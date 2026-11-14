@@ -608,6 +608,11 @@
                             local:MenuRow.About="A Steam Web API key lets the library see every Steam game you own." />
                     <Button x:Name="OwnedRefreshItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE72C;" Content="Look again"
                             local:MenuRow.About="Look again for games you own." />
+                    <!-- Games the library installs itself: GOG, once signed in under Store Accounts. -->
+                    <Button x:Name="InstallFolderSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE8B7;" Content="Install folder"
+                            local:MenuRow.About="Where the library puts the GOG games it installs itself, each in a GOG folder of its own." />
+                    <Button x:Name="DownloadWhilePlayingSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE896;" Content="Download while playing"
+                            local:MenuRow.About="Off: the library's own downloads pause while you play, and carry on when you come back to the library." />
                     <!-- For touch, which has no B button. -->
                     <Button x:Name="OwnedSettingsBackItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE72B;" Content="Back"
                             local:MenuRow.About="Back to Catalog &amp; Content." />

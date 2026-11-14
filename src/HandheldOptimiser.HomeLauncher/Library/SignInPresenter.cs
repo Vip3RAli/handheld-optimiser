@@ -9,8 +9,8 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 
 /// <summary>
 /// Signs in to a store inside the library, over everything else, and keeps what the store hands back in
-/// <see cref="StoreSessions"/>. Steam is first (stage 1 of the store sign-in work): a QR code approved in the
-/// Steam app on a phone, with Steam's own sign-in page as the fallback.
+/// <see cref="StoreSessions"/>. Steam (stage 1 of the store sign-in work) is a QR code approved in the Steam
+/// app on a phone, with Steam's own sign-in page as the fallback. GOG (stage 2) is GOG's own page.
 ///
 /// The page is a WebView2 inside the library's own window, made when the page is asked for and disposed as
 /// the sign-in closes. A second window would take the library out of the front, which stops the controller
@@ -29,6 +29,9 @@ internal sealed class SignInPresenter
     private CancellationTokenSource? _run;
     private WebView2? _web;
     private bool _onWebPage;
+
+    // The store being signed in to. Only Steam has a QR code to switch to.
+    private GameStore _store = GameStore.Steam;
 
     /// <summary>The store's cookies, so its page remembers the device, kept apart from the music player's.</summary>
     internal static string WebDataFolder => Path.Combine(
@@ -60,6 +63,8 @@ internal sealed class SignInPresenter
             return;
         }
 
+        _store = GameStore.Steam;
+        _view.SwitchButton.Visibility = Visibility.Visible;
         _view.Heading.Text = "Sign in to Steam";
         _view.QrHeading.Text = "Scan this with the Steam app on your phone";
         _view.QrSteps.Text = "In the Steam app, open Steam Guard and tap the QR code button, then point your phone at this code and approve.";
@@ -69,10 +74,29 @@ internal sealed class SignInPresenter
         ShowQr();
     }
 
+    /// <summary>
+    /// Opens GOG's own sign-in page. GOG has no QR code, so the page is all there is; it goes to a page with
+    /// a code on it once signed in, which is swapped for the account's tokens.
+    /// </summary>
+    public void OpenGog()
+    {
+        if (!_navigation.BeginSignIn())
+        {
+            return;
+        }
+
+        _store = GameStore.Gog;
+        _view.SwitchButton.Visibility = Visibility.Collapsed;
+        _view.Heading.Text = "Sign in to GOG";
+        _view.Visibility = Visibility.Visible;
+        Program.Log("GOG sign-in opened");
+        ShowWebPage();
+    }
+
     /// <summary>The QR code, or the web page: X, or the button for a finger.</summary>
     public void Switch()
     {
-        if (!IsOpen)
+        if (!IsOpen || _store != GameStore.Steam)
         {
             return;
         }
@@ -275,39 +299,86 @@ internal sealed class SignInPresenter
         _view.WebPart.Visibility = Visibility.Visible;
         _view.KeyboardButton.Visibility = Visibility.Visible;
         _view.SwitchText.Text = "Use the QR code instead";
-        _view.Status.Text = "Opening Steam's sign-in page...";
+        _view.Status.Text = $"Opening {Game.NameOf(_store)}'s sign-in page...";
         _ = RunWebPageAsync(run);
+    }
+
+    /// <summary>The page in the sign-in, made fresh, with links that would open a window kept inside it.</summary>
+    private async Task<CoreWebView2?> OpenPageAsync(CancellationToken cancel)
+    {
+        var web = new WebView2();
+        _web = web;
+        _view.WebPart.Child = web;
+        var environment = await CoreWebView2Environment.CreateAsync(null, WebDataFolder);
+        await web.EnsureCoreWebView2Async(environment);
+        if (cancel.IsCancellationRequested || !ReferenceEquals(_web, web))
+        {
+            return null;
+        }
+
+        var core = web.CoreWebView2;
+        core.Settings.AreDevToolsEnabled = false;
+        core.Settings.IsStatusBarEnabled = false;
+        core.Settings.AreDefaultContextMenusEnabled = false;
+
+        // A link that would open a window of its own opens here instead, so nothing leaves the library.
+        core.NewWindowRequested += (_, e) =>
+        {
+            e.Handled = true;
+            core.Navigate(e.Uri);
+        };
+
+        web.Focus();
+        return core;
+    }
+
+    private async Task RunGogPageAsync(CancellationToken cancel)
+    {
+        if (await OpenPageAsync(cancel) is not { } core)
+        {
+            return;
+        }
+
+        // GOG's page goes to on_login_success with the code once signed in. That page is never loaded: the
+        // code is all that is wanted from it.
+        var code = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        core.NavigationStarting += (_, e) =>
+        {
+            if (Uri.TryCreate(e.Uri, UriKind.Absolute, out var uri) && GogAuth.CodeFrom(uri) is { } found)
+            {
+                e.Cancel = true;
+                code.TrySetResult(found);
+            }
+        };
+
+        core.Navigate(GogAuth.SignInUrl);
+        _view.Status.Text = "Sign in as you would on GOG's site.";
+
+        using (cancel.Register(() => code.TrySetCanceled()))
+        {
+            var got = await code.Task;
+            _view.Status.Text = "Signed in. Finishing...";
+            await FinishGogAsync(got, cancel);
+        }
     }
 
     private async Task RunWebPageAsync(CancellationToken cancel)
     {
         try
         {
-            var web = new WebView2();
-            _web = web;
-            _view.WebPart.Child = web;
-            var environment = await CoreWebView2Environment.CreateAsync(null, WebDataFolder);
-            await web.EnsureCoreWebView2Async(environment);
-            if (cancel.IsCancellationRequested || !ReferenceEquals(_web, web))
+            if (_store == GameStore.Gog)
+            {
+                await RunGogPageAsync(cancel);
+                return;
+            }
+
+            if (await OpenPageAsync(cancel) is not { } core)
             {
                 return;
             }
 
-            var core = web.CoreWebView2;
-            core.Settings.AreDevToolsEnabled = false;
-            core.Settings.IsStatusBarEnabled = false;
-            core.Settings.AreDefaultContextMenusEnabled = false;
-
-            // A link that would open a window of its own opens here instead, so nothing leaves the library.
-            core.NewWindowRequested += (_, e) =>
-            {
-                e.Handled = true;
-                core.Navigate(e.Uri);
-            };
-
             core.Navigate("https://store.steampowered.com/login/");
             _view.Status.Text = "Sign in as you would on Steam's site. Steam Guard asks as usual.";
-            web.Focus();
 
             // Signed in once the store's sign-in cookie is set. Steam Guard and captchas are the page's business.
             while (!cancel.IsCancellationRequested)
@@ -338,10 +409,12 @@ internal sealed class SignInPresenter
         }
         catch (Exception ex) when (ex is WebView2RuntimeNotFoundException or InvalidOperationException or System.Runtime.InteropServices.COMException)
         {
-            Program.Log($"Steam's sign-in page could not open: {ex.GetType().Name}: {ex.Message}");
+            Program.Log($"{Game.NameOf(_store)}'s sign-in page could not open: {ex.GetType().Name}: {ex.Message}");
             if (!cancel.IsCancellationRequested)
             {
-                _view.Status.Text = "The sign-in page could not open here. Press X to use the QR code.";
+                _view.Status.Text = _store == GameStore.Steam
+                    ? "The sign-in page could not open here. Press X to use the QR code."
+                    : "The sign-in page could not open here.";
             }
         }
     }
@@ -369,6 +442,10 @@ internal sealed class SignInPresenter
         [
             "https://store.steampowered.com", "https://login.steampowered.com", "https://steamcommunity.com",
             "https://help.steampowered.com", "https://checkout.steampowered.com", "https://steam.tv",
+        ],
+        [GameStore.Gog] =
+        [
+            "https://auth.gog.com", "https://login.gog.com", "https://www.gog.com", "https://embed.gog.com", "https://gog.com",
         ],
     };
 
@@ -453,6 +530,50 @@ internal sealed class SignInPresenter
         _notices.Show(name is { Length: > 0 }
             ? $"Signed in to Steam as {name}. Finding your games..."
             : "Signed in to Steam. Finding your games...");
+        _signedIn(session);
+    }
+
+    private async Task FinishGogAsync(string code, CancellationToken cancel)
+    {
+        var (tokens, _) = await GogAuth.ExchangeAsync(code, cancel);
+        if (cancel.IsCancellationRequested)
+        {
+            return;
+        }
+
+        if (tokens is null)
+        {
+            _view.Status.Text = "GOG did not finish the sign-in. Press B and try again.";
+            return;
+        }
+
+        var name = await GogAccountApi.UserNameAsync(tokens.AccessToken, cancel);
+        if (cancel.IsCancellationRequested)
+        {
+            return;
+        }
+
+        var session = new StoreSession
+        {
+            Store = GameStore.Gog,
+            AccountId = tokens.UserId,
+            AccountName = name,
+            RefreshToken = tokens.RefreshToken,
+            AccessToken = tokens.AccessToken,
+            AccessExpires = tokens.Expires,
+        };
+
+        if (!StoreSessions.Save(session))
+        {
+            _view.Status.Text = "Signed in, but Windows would not keep the sign-in safely, so it was not saved.";
+            return;
+        }
+
+        Program.Log("Signed in to GOG inside the library");
+        Close();
+        _notices.Show(name is { Length: > 0 }
+            ? $"Signed in to GOG as {name}. Finding your games..."
+            : "Signed in to GOG. Finding your games...");
         _signedIn(session);
     }
 

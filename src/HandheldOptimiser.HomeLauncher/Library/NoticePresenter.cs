@@ -20,6 +20,32 @@ internal interface INoticeHost
 /// <param name="lookingAt">The tile or card the player is looking at, for a notice that names none.</param>
 internal sealed class NoticePresenter(TextBlock menuNotice, LibraryNavigation navigation, Func<INoticeHost?> lookingAt)
 {
+    /// <summary>
+    /// The panel above the button hints, for a notice about a game whose tile is not on show. Without it such a
+    /// notice went on whatever tile had the focus: on 2026-11-14 "AdVenture Capitalist is paused" sat on
+    /// GWENT's tile in Ready to install.
+    /// </summary>
+    public (Border Panel, TextBlock Text)? Panel { get; init; }
+
+    // The notice belongs in the panel rather than on a tile.
+    private bool _inPanel;
+
+    /// <summary>
+    /// Shows a notice about a game: on its tile when the tile is on show, and in the panel otherwise, never on
+    /// another game's tile.
+    /// </summary>
+    public void ShowAbout(string? text, INoticeHost? tile, TimeSpan? shownFor = null)
+    {
+        if (tile is null && Panel is not null)
+        {
+            Show(text, null, shownFor);
+            _inPanel = _notice is not null;
+            Place();
+            return;
+        }
+
+        Show(text, tile, shownFor);
+    }
     public static readonly TimeSpan ShownFor = TimeSpan.FromSeconds(5);
 
     /// <summary>A game takes a while to come to the front, and the library going behind it clears the notice.</summary>
@@ -37,6 +63,7 @@ internal sealed class NoticePresenter(TextBlock menuNotice, LibraryNavigation na
     {
         _notice = string.IsNullOrWhiteSpace(text) ? null : text;
         _for = on;
+        _inPanel = false;
         Place();
 
         _timer?.Stop();
@@ -68,6 +95,11 @@ internal sealed class NoticePresenter(TextBlock menuNotice, LibraryNavigation na
         }
 
         menuNotice.Visibility = Visibility.Collapsed;
+        if (Panel is { } hidden)
+        {
+            hidden.Panel.Visibility = Visibility.Collapsed;
+        }
+
         if (_notice is null)
         {
             return;
@@ -77,6 +109,11 @@ internal sealed class NoticePresenter(TextBlock menuNotice, LibraryNavigation na
         {
             menuNotice.Text = _notice;
             menuNotice.Visibility = Visibility.Visible;
+        }
+        else if (_inPanel && Panel is { } panel)
+        {
+            panel.Text.Text = _notice;
+            panel.Panel.Visibility = Visibility.Visible;
         }
         else if ((_for ?? lookingAt()) is { } host)
         {

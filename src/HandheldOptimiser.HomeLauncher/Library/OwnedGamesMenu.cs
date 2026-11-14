@@ -1,3 +1,5 @@
+using System.IO;
+
 namespace HandheldOptimiser.HomeLauncher.Library;
 
 /// <summary>
@@ -32,6 +34,45 @@ internal sealed class OwnedGamesMenu
             _ = RefreshNowAsync();
         };
         view.OwnedSettingsBackItem.Click += (_, _) => menu.Back();
+        view.InstallFolderSetting.Click += (_, _) => EditInstallFolder();
+        view.DownloadWhilePlayingSetting.Click += (_, _) =>
+        {
+            LibrarySettings.DownloadWhilePlaying = !LibrarySettings.DownloadWhilePlaying;
+            Refresh();
+        };
+    }
+
+    private void EditInstallFolder() =>
+        _menu.BeginEdit("Install folder",
+            @"A folder for the games the library installs itself, such as C:\Games or D:\Games. Games already installed stay where they are.",
+            LibrarySettings.InstallFolder, text =>
+            {
+                var folder = text.Trim().TrimEnd('\\');
+                if (folder.Length > 0 && !IsUsableFolder(folder))
+                {
+                    _notices.Show("That is not a folder the library can use. Give a full path, such as D:\\Games.");
+                }
+                else
+                {
+                    LibrarySettings.InstallFolder = folder;
+                }
+
+                Refresh();
+                _menu.ShowItems(_view.InstallFolderSetting);
+            });
+
+    /// <summary>A full path on a drive that is there, and not a drive's top folder alone.</summary>
+    internal static bool IsUsableFolder(string folder)
+    {
+        try
+        {
+            return Path.IsPathFullyQualified(folder) && Path.GetPathRoot(folder) is { } root
+                && folder.Length > root.TrimEnd('\\').Length + 1 && Directory.Exists(root);
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
     }
 
     private bool Showing => ReferenceEquals(_menu.List, _view.OwnedItems);
@@ -42,7 +83,9 @@ internal sealed class OwnedGamesMenu
     /// </summary>
     public async Task RefreshAsync(bool force)
     {
-        if (_refreshing || !LibrarySettings.ShowNotInstalled || (LibrarySettings.SteamKey is null && !StoreSessions.SignedIn(GameStore.Steam)))
+        var steam = LibrarySettings.SteamKey is not null || StoreSessions.SignedIn(GameStore.Steam);
+        var gog = StoreSessions.Get(GameStore.Gog) is not null;
+        if (_refreshing || !LibrarySettings.ShowNotInstalled || (!steam && !gog))
         {
             return;
         }
@@ -50,7 +93,15 @@ internal sealed class OwnedGamesMenu
         _refreshing = true;
         try
         {
-            var (changed, error) = await OwnedGames.RefreshSteamAsync(force);
+            var (changed, error) = steam ? await OwnedGames.RefreshSteamAsync(force) : (false, null);
+
+            if (gog)
+            {
+                var (gogChanged, gogError) = await OwnedGames.RefreshGogAsync(force);
+                changed |= gogChanged;
+                error ??= gogError;
+            }
+
             _error = error;
             if (error is not null && Showing)
             {
@@ -124,5 +175,8 @@ internal sealed class OwnedGamesMenu
             : LibrarySettings.SteamKey is null ? "Not set" : _error is null ? "Set" : "Not working";
 
         _view.OwnedRefreshItem.IsEnabled = on;
+
+        _view.InstallFolderSetting.Tag = LibrarySettings.InstallFolder;
+        _view.DownloadWhilePlayingSetting.Tag = SettingSteps.OnOff(LibrarySettings.DownloadWhilePlaying);
     }
 }

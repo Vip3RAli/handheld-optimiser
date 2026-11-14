@@ -3,13 +3,16 @@ using System.Windows.Controls;
 namespace HandheldOptimiser.HomeLauncher.Library;
 
 /// <summary>
-/// Store accounts and achievement syncing under Catalog &amp; Content. Steam is signed in to inside the
-/// library (<see cref="SignInPresenter"/>), which gives the library the account's games and achievements;
-/// pressed once signed in, its row syncs them, and a row below signs out. The other stores show what their
-/// own apps say on this device and open their apps' sign-in, until their own stages of the work.
+/// Store accounts and achievement syncing under Catalog &amp; Content. Steam and GOG are signed in to inside
+/// the library (<see cref="SignInPresenter"/>), which gives the library the account's games and achievements;
+/// pressed once signed in, a store's row syncs them, and a row below it signs out. The other stores show what
+/// their own apps say on this device and open their apps' sign-in, until their own stages of the work.
 /// </summary>
 internal sealed class AccountsMenu
 {
+    /// <summary>The stores signed in to inside the library, in the order their rows are shown.</summary>
+    private static readonly GameStore[] SignedInHere = [GameStore.Steam, GameStore.Gog];
+
     private readonly MenuView _view;
     private readonly MenuPresenter _menu;
     private readonly NoticePresenter _notices;
@@ -19,7 +22,9 @@ internal sealed class AccountsMenu
     private readonly OwnedGamesMenu _owned;
 
     private bool _syncing;
-    private Button? _signOutRow;
+
+    // Each store's Sign out row, which a first press arms.
+    private readonly Dictionary<GameStore, Button> _signOutRows = [];
 
     public AccountsMenu(MenuView view, MenuPresenter menu, NoticePresenter notices, LibraryState state, ContinuePresenter continuePresenter,
         SignInPresenter signIn, OwnedGamesMenu owned)
@@ -48,24 +53,29 @@ internal sealed class AccountsMenu
     private void RefreshRows()
     {
         _menu.ClearRows(_view.AccountsItems);
+        _signOutRows.Clear();
         var before = _view.AccountsSteamKeyItem;
 
-        // Steam: the library's own sign-in.
-        var steam = StoreSessions.Get(GameStore.Steam);
-        var steamRow = _menu.AddRow(_view.AccountsItems, before, "Steam", steam?.Describe() ?? "Not signed in", PressSteam);
-        MenuRow.SetAbout(steamRow, steam is { NeedsSignIn: false }
-            ? "Signed in inside the library: your Steam games are listed and their achievements synced. Press to sync now. Steam itself still needs to be signed in to install and play."
-            : "Sign in with the Steam app on your phone, or on Steam's own page, to list your Steam games and sync their achievements without a Web API key.");
-
-        _signOutRow = null;
-        if (steam is not null)
+        // The library's own sign-ins.
+        foreach (var store in SignedInHere)
         {
-            _signOutRow = _menu.AddRow(_view.AccountsItems, before, "Sign out of Steam", null, SignOutSteam);
-            MenuRow.SetAbout(_signOutRow, "Forgets the library's Steam sign-in on this device. The Steam app stays signed in.");
+            var session = StoreSessions.Get(store);
+            var row = _menu.AddRow(_view.AccountsItems, before, Game.NameOf(store), session?.Describe() ?? "Not signed in", () => Press(store));
+            MenuRow.SetAbout(row, About(store, session is { NeedsSignIn: false }));
+
+            if (session is not null)
+            {
+                var name = Game.NameOf(store);
+                var signOut = _menu.AddRow(_view.AccountsItems, before, $"Sign out of {name}", null, () => SignOut(store));
+                MenuRow.SetAbout(signOut, store == GameStore.Steam
+                    ? "Forgets the library's Steam sign-in on this device. The Steam app stays signed in."
+                    : $"Forgets the library's {name} sign-in on this device.");
+                _signOutRows[store] = signOut;
+            }
         }
 
         // The other stores, as their apps on this device have them, until they are signed in to here too.
-        foreach (var status in StoreAccounts.ReadAll().Where(s => s.Store != GameStore.Steam))
+        foreach (var status in StoreAccounts.ReadAll().Where(s => !SignedInHere.Contains(s.Store)))
         {
             var store = status.Store;
             _menu.AddRow(_view.AccountsItems, before, status.StoreName, status.Describe(), () => SignInWithApp(store));
@@ -76,26 +86,42 @@ internal sealed class AccountsMenu
         _view.AccountsSyncAchievementsItem.Tag = _syncing ? "Syncing..." : null;
     }
 
-    private void PressSteam()
+    private static string About(GameStore store, bool signedIn) => (store, signedIn) switch
     {
-        if (StoreSessions.SignedIn(GameStore.Steam))
+        (GameStore.Steam, true) => "Signed in inside the library: your Steam games are listed and their achievements synced. Press to sync now. Steam itself still needs to be signed in to install and play.",
+        (GameStore.Steam, false) => "Sign in with the Steam app on your phone, or on Steam's own page, to list your Steam games and sync their achievements without a Web API key.",
+        (_, true) => $"Signed in inside the library: your {Game.NameOf(store)} games are listed and their achievements synced. Press to sync now.",
+        _ => $"Sign in on {Game.NameOf(store)}'s own page to list your games and sync their achievements, without {Game.NameOf(store)}'s app.",
+    };
+
+    private void Press(GameStore store)
+    {
+        if (StoreSessions.SignedIn(store))
         {
-            _ = SyncSteamAsync();
+            _ = SyncAsync(store);
             return;
         }
 
-        // Not signed in, or Steam wants it done again.
+        // Not signed in, or the store wants it done again.
         _menu.Close();
-        _signIn.OpenSteam();
+        if (store == GameStore.Gog)
+        {
+            _signIn.OpenGog();
+        }
+        else
+        {
+            _signIn.OpenSteam();
+        }
     }
 
-    private void SignOutSteam()
+    private void SignOut(GameStore store)
     {
         // Pressed twice, as Restart is: once arms it, the second press acts.
-        if (!ReferenceEquals(_menu.Armed, _signOutRow))
+        var row = _signOutRows.GetValueOrDefault(store);
+        if (!ReferenceEquals(_menu.Armed, row))
         {
-            _menu.Armed = _signOutRow;
-            if (_signOutRow is { } row)
+            _menu.Armed = row;
+            if (row is not null)
             {
                 row.Content = "Press again to sign out";
             }
@@ -104,15 +130,18 @@ internal sealed class AccountsMenu
         }
 
         _menu.Armed = null;
-        StoreSessions.Delete(GameStore.Steam);
-        _ = _signIn.ForgetCookiesAsync(GameStore.Steam);
-        Program.Log("Signed out of Steam inside the library");
-        _notices.Show("Signed out of Steam in the library. The Steam app is still signed in.");
+        StoreSessions.Delete(store);
+        _ = _signIn.ForgetCookiesAsync(store);
+        var name = Game.NameOf(store);
+        Program.Log($"Signed out of {name} inside the library");
+        _notices.Show(store == GameStore.Steam
+            ? "Signed out of Steam in the library. The Steam app is still signed in."
+            : $"Signed out of {name} in the library.");
         RefreshRows();
         _menu.ShowItems();
     }
 
-    private async Task SyncSteamAsync()
+    private async Task SyncAsync(GameStore store)
     {
         if (_syncing)
         {
@@ -120,20 +149,21 @@ internal sealed class AccountsMenu
         }
 
         _syncing = true;
-        _notices.Show("Syncing your Steam games and achievements...");
+        var name = Game.NameOf(store);
+        _notices.Show($"Syncing your {name} games and achievements...");
         try
         {
             await _owned.RefreshAsync(force: true);
-            var games = _state.AllTiles.Select(t => t.Game).Where(g => g.Store == GameStore.Steam).ToList();
+            var games = _state.AllTiles.Select(t => t.Game).Where(g => g.Store == store).ToList();
             var (withAchievements, unlocked) = await Achievements.SyncAllAsync(games);
             _continue.ForgetInfo();
             _continue.Update();
 
-            _notices.Show(!StoreSessions.SignedIn(GameStore.Steam)
-                ? "Steam wants you to sign in again. Press Steam to do it."
+            _notices.Show(!StoreSessions.SignedIn(store)
+                ? $"{name} wants you to sign in again. Press {name} to do it."
                 : withAchievements == 0
-                    ? "Steam games synced. None of the installed ones have achievements yet."
-                    : $"Steam synced: {unlocked} achievements unlocked across {withAchievements} {(withAchievements == 1 ? "game" : "games")}.");
+                    ? $"{name} games synced. None of the installed ones have achievements yet."
+                    : $"{name} synced: {unlocked} achievements unlocked across {withAchievements} {(withAchievements == 1 ? "game" : "games")}.");
         }
         finally
         {
@@ -185,7 +215,7 @@ internal sealed class AccountsMenu
             _continue.Update();
 
             _notices.Show(withAchievements == 0
-                ? "No achievements found yet. Sign in to Steam above, or to GOG Galaxy."
+                ? "No achievements found yet. Sign in to Steam or GOG above."
                 : $"Synced {unlocked} unlocked achievements across {withAchievements} {(withAchievements == 1 ? "game" : "games")}.");
         }
         finally

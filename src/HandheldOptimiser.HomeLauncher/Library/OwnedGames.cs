@@ -90,7 +90,7 @@ internal static class OwnedGames
         {
             ("Steam", SteamGames),
             ("Epic", () => Cached(EpicCatalog, path => ParseEpicCatalog(File.ReadAllText(path)))),
-            ("GOG", () => Cached(GalaxyDatabase, GogGames))
+            ("GOG", GogOwned)
         })
         {
             try
@@ -359,6 +359,24 @@ internal static class OwnedGames
 
         return games;
     }
+
+    /// <summary>
+    /// The GOG games: the account's own list once signed in inside the library and listed, or else what GOG
+    /// Galaxy keeps on the device. Both give a game the same key.
+    /// </summary>
+    private static List<Game> GogOwned()
+    {
+        if (StoreSessions.Get(GameStore.Gog) is { } session && GogAccountApi.OwnedPath(session.AccountId) is var path && File.Exists(path))
+        {
+            return Cached(path, p => GogAccountApi.AsGames(GogAccountApi.ReadOwned(p)));
+        }
+
+        return Cached(GalaxyDatabase, GogGames);
+    }
+
+    /// <summary>Lists the GOG account's games again, when signed in inside the library.</summary>
+    public static Task<(bool Changed, string? Error)> RefreshGogAsync(bool force) =>
+        StoreSessions.Get(GameStore.Gog) is null ? Task.FromResult<(bool, string?)>((false, null)) : GogAccountApi.RefreshOwnedAsync(force);
 
     private static List<Game> GogGames(string path)
     {

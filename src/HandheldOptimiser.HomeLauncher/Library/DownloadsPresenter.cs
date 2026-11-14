@@ -21,6 +21,14 @@ internal sealed class DownloadsPresenter
 
     private IReadOnlyList<DownloadRow> _rows = [];
 
+    // Each source's latest rows: Steam's own installs, and the library's (GOG).
+    private readonly Dictionary<string, IReadOnlyList<DownloadRow>> _bySource = [];
+
+    /// <summary>The library's own installs, which a GOG row pauses and carries on.</summary>
+    public InstallQueue? Queue { get; init; }
+
+    private static bool IsLibraryDownload(DownloadRow row) => row.AppId.StartsWith("gog:", StringComparison.Ordinal);
+
     // The list's rows, by app id, so a new reading changes their text in place and the focus stays put.
     private readonly Dictionary<string, Button> _shown = [];
 
@@ -57,11 +65,14 @@ internal sealed class DownloadsPresenter
 
     private bool Showing => ReferenceEquals(_menu.List, _view.DownloadsItems);
 
-    /// <summary>A new look at the downloads, from <see cref="SteamInstallWatcher"/>.</summary>
-    public void Update(IReadOnlyList<DownloadRow> rows)
+    /// <summary>A new look at one source's downloads: <see cref="SteamInstallWatcher"/>'s or <see cref="InstallQueue"/>'s.</summary>
+    public void Update(string source, IReadOnlyList<DownloadRow> rows)
     {
-        _rows = rows;
+        _bySource[source] = rows;
+        _rows = rows = _bySource.Values.SelectMany(r => r).ToList();
         var any = rows.Count > 0;
+        _topBar.DownloadsPopupSteam.Visibility = rows.Any(r => !IsLibraryDownload(r)) ? Visibility.Visible : Visibility.Collapsed;
+        _view.DownloadsSteamItem.Visibility = _topBar.DownloadsPopupSteam.Visibility;
         _topBar.DownloadsButton.Visibility = any ? Visibility.Visible : Visibility.Collapsed;
         _topBar.DownloadsText.Text = PillText(rows);
         _view.DownloadsGroup.Visibility = any ? Visibility.Visible : Visibility.Collapsed;
@@ -116,7 +127,7 @@ internal sealed class DownloadsPresenter
     /// <summary>The Downloads list in Catalog &amp; Content, for the controller.</summary>
     private void OpenList()
     {
-        _menu.Show(_view.DownloadsItems, "Downloads", "Catalog & Content");
+        _menu.Show(_view.DownloadsItems, "Downloads", SettingsMenu.GamesApps);
         _menu.ClearRows(_view.DownloadsItems);
         _shown.Clear();
         Fill();
@@ -136,8 +147,13 @@ internal sealed class DownloadsPresenter
         {
             if (!_shown.TryGetValue(row.AppId, out var button))
             {
-                button = _menu.AddRow(_view.DownloadsItems, _view.DownloadsSteamItem, row.Title, null, OpenSteam);
-                MenuRow.SetAbout(button, "Open Steam's downloads to pause, resume or cancel it.");
+                var key = row.AppId;
+                var library = IsLibraryDownload(row);
+                button = _menu.AddRow(_view.DownloadsItems, _view.DownloadsSteamItem, row.Title, null,
+                    library ? () => Queue?.Toggle(key) : OpenSteam);
+                MenuRow.SetAbout(button, library
+                    ? "Downloading here, from GOG. Press to pause or carry on. Cancel it from the game's own menu."
+                    : "Open Steam's downloads to pause, resume or cancel it.");
                 _shown[row.AppId] = button;
             }
 

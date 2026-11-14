@@ -81,6 +81,16 @@ internal static class Achievements
             }
         }
 
+        // GOG signed in inside the library: the game's own achievements service, with unlock times. GOG
+        // Galaxy's database, read below, covers the rest.
+        if (game.Store == GameStore.Gog && game.Key.StartsWith("gog:", StringComparison.Ordinal)
+            && await GogAccountApi.FreshAsync() is { } gog
+            && await GogAccountApi.AchievementsAsync(gog, game.Key, game.Key[4..]) is { Total: > 0 } fromGog)
+        {
+            WriteCache(fromGog);
+            return fromGog;
+        }
+
         var local = await Task.Run(() => ReadLocal(game));
         if (local is { Total: > 0 })
         {
