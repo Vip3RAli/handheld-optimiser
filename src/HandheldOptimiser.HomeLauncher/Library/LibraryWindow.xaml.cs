@@ -50,6 +50,9 @@ public partial class LibraryWindow : Window, ILibraryHost
     // The game being played, from the press that starts it to the moment it closes.
     private readonly GameSessionController _play;
 
+    // Steam installs under way, shown on their tiles in Ready to install.
+    private readonly SteamInstallWatcher _steamInstalls;
+
     // The Old School layout: its categories, its stacks of cards and the open Not installed card.
     private readonly OldSchoolPresenter _oldSchool;
 
@@ -82,6 +85,7 @@ public partial class LibraryWindow : Window, ILibraryHost
             () => _layouts.Docked, IsPausedGame, () => _grid.Container(0));
 
         _play = new GameSessionController(this, _state, _navigation, _notices, _continue, this, ScreenOff, ScreenOn, ShowLibrary);
+        _steamInstalls = new SteamInstallWatcher(_state, _notices, () => ScanAsync(), Dispatcher);
         _power = new PowerMenu(Menu, _menu, _notices, this);
         _owned = new OwnedGamesMenu(Menu, _menu, _notices, _state, this);
         _ = new AccountsMenu(Menu, _menu, _notices, _state, _continue);
@@ -125,12 +129,14 @@ public partial class LibraryWindow : Window, ILibraryHost
         Closed += (_, _) => _layouts.StopWatching();
         Closed += (_, _) => _play.StopWatchingWake();
         Closed += (_, _) => _play.StopWatchingForeground();
+        Closed += (_, _) => _steamInstalls.Stop();
 
         // Scan on load, not only on activation: Windows can start the home app without giving it focus.
         Loaded += (_, _) => _ = ScanAsync();
         Loaded += (_, _) => _ = _topBar.CheckForUpdateAsync();
         Loaded += (_, _) => _ = RefreshGameSettingsAsync();
         Loaded += (_, _) => WatchScreens();
+        Loaded += (_, _) => _steamInstalls.Start();
         SourceInitialized += (_, _) => _play.WatchWake();
         Activated += OnActivated;
         Deactivated += OnDeactivated;
