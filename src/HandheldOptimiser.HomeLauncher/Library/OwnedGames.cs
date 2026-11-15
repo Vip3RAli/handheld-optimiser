@@ -89,7 +89,7 @@ internal static class OwnedGames
         foreach (var (store, read) in new (string, Func<List<Game>>)[]
         {
             ("Steam", SteamGames),
-            ("Epic", () => Cached(EpicCatalog, path => ParseEpicCatalog(File.ReadAllText(path)))),
+            ("Epic", EpicOwned),
             ("GOG", GogOwned)
         })
         {
@@ -359,6 +359,25 @@ internal static class OwnedGames
 
         return games;
     }
+
+    /// <summary>
+    /// The Epic games: the account's own list once signed in inside the library and listed, or else what the
+    /// Epic Games Launcher keeps on the device, which is only as new as the launcher's last run. Both give a
+    /// game the same key.
+    /// </summary>
+    private static List<Game> EpicOwned()
+    {
+        if (StoreSessions.Get(GameStore.Epic) is { } session && EpicAccountApi.OwnedPath(session.AccountId) is var path && File.Exists(path))
+        {
+            return Cached(path, p => EpicAccountApi.AsGames(EpicAccountApi.ReadOwned(p)));
+        }
+
+        return Cached(EpicCatalog, p => ParseEpicCatalog(File.ReadAllText(p)));
+    }
+
+    /// <summary>Lists the Epic account's games again, when signed in inside the library.</summary>
+    public static Task<(bool Changed, string? Error)> RefreshEpicAsync(bool force) =>
+        StoreSessions.Get(GameStore.Epic) is null ? Task.FromResult<(bool, string?)>((false, null)) : EpicAccountApi.RefreshOwnedAsync(force);
 
     /// <summary>
     /// The GOG games: the account's own list once signed in inside the library and listed, or else what GOG

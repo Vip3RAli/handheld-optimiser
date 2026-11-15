@@ -79,7 +79,7 @@ public partial class LibraryWindow : Window, ILibraryHost
         _layouts.ScreenChanged += ApplyLayout;
         _grid = new TileGrid(Tiles, _state, _layouts);
 
-        _notices = new NoticePresenter(Menu.MenuNotice, _navigation, NoticeHost) { Panel = (NoticePanel, NoticePanelText) };
+        _notices = new NoticePresenter(Menu.MenuNotice, _navigation, NoticeHost) { Panel = (NoticePanel, NoticePanelText), InFront = () => IsActive };
         _backdrop = new BackdropPresenter(BackdropFront, BackdropBack, _state, _options, _navigation, () => _layouts.IsBrowsing);
         _menu = new MenuPresenter(Menu, _navigation, _notices, () => _layouts.IsOldSchool, () => RestoreFocus());
         _search = new SearchPresenter(TopBar, _navigation, _state, _options, () => new WindowInteropHelper(this).Handle,
@@ -183,6 +183,9 @@ public partial class LibraryWindow : Window, ILibraryHost
     private void OnActivated(object? sender, EventArgs e)
     {
         _navigation.Return();
+
+        // A notice that came while a store app was in front, once everything below has settled.
+        Dispatcher.BeginInvoke(_notices.Back, System.Windows.Threading.DispatcherPriority.Background);
 
         // About fifteen settings are read below and in what it calls; the registry key is opened once for them.
         using var settings = LibrarySettings.ReadOnce();

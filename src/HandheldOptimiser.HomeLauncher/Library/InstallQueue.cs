@@ -9,7 +9,7 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 /// The games the library is installing itself, one at a time and the rest waiting, as the spec's "Native
 /// installs" asks: shown on their tiles and in the Downloads list, paused while a game is played unless the
 /// player says otherwise, and carried on where they stopped after a pause, a lost connection or the library
-/// closing. GOG only for now (stage 2); Epic will use the same queue.
+/// closing. GOG games (stage 2) and Epic games (stage 3b) share it.
 /// </summary>
 internal sealed class InstallQueue
 {
@@ -23,9 +23,9 @@ internal sealed class InstallQueue
     }
 
     /// <summary>One game in the queue.</summary>
-    private sealed class Entry(GogInstaller.Job job)
+    private sealed class Entry(InstallJob job)
     {
-        public GogInstaller.Job Job { get; } = job;
+        public InstallJob Job { get; } = job;
 
         public Status Status { get; set; }
 
@@ -39,11 +39,12 @@ internal sealed class InstallQueue
         /// <summary>The player has been told it stopped, so the tries that follow fail quietly until one gets further.</summary>
         public bool Told { get; set; }
 
-        public string Key => $"gog:{Job.ProductId}";
+        public string Key => $"{Job.Store.ToString().ToLowerInvariant()}:{Job.ProductId}";
     }
 
     /// <summary>The queue as kept between runs of the library.</summary>
-    private sealed record Saved(string ProductId, string Title, string? Cover, InstallMode Mode, string? Folder, bool Paused);
+    private sealed record Saved(string ProductId, string Title, string? Cover, InstallMode Mode, string? Folder, bool Paused,
+        GameStore? Store = null, string? Namespace = null, string? CatalogItemId = null);
 
     private static readonly TimeSpan RetryAfter = TimeSpan.FromMinutes(1);
 
@@ -81,13 +82,17 @@ internal sealed class InstallQueue
             var saved = File.Exists(QueuePath) ? JsonSerializer.Deserialize<List<Saved>>(File.ReadAllText(QueuePath)) ?? [] : [];
             foreach (var item in saved)
             {
-                _entries.Add(new Entry(new GogInstaller.Job
+                _entries.Add(new Entry(new InstallJob
                 {
+                    // A queue kept before Epic games were installed here names no store: those are GOG's.
+                    Store = item.Store ?? GameStore.Gog,
                     ProductId = item.ProductId,
                     Title = item.Title,
                     Cover = item.Cover,
                     Mode = item.Mode,
                     Folder = item.Folder,
+                    Namespace = item.Namespace,
+                    CatalogItemId = item.CatalogItemId,
                 })
                 { Status = item.Paused ? Status.Paused : Status.Waiting });
             }
@@ -118,27 +123,38 @@ internal sealed class InstallQueue
 
     /// <summary>Whether a press on a game that is not installed should install it here rather than open its store.</summary>
     public static bool InstallsHere(Game game) =>
-        game.Store == GameStore.Gog && !game.Installed && game.Key.StartsWith("gog:", StringComparison.Ordinal)
-        && StoreSessions.SignedIn(GameStore.Gog);
+        !game.Installed && game.Store switch
+        {
+            GameStore.Gog => game.Key.StartsWith("gog:", StringComparison.Ordinal) && StoreSessions.SignedIn(GameStore.Gog),
+
+            // An Epic game has to be in the account's own list, which is where its ids come from.
+            GameStore.Epic => game.Key.StartsWith("epic:", StringComparison.Ordinal) && StoreSessions.SignedIn(GameStore.Epic)
+                && EpicAccountApi.Find(game.Key[5..]) is not null,
+            _ => false,
+        };
 
     /// <summary>Puts a game in the queue to install, update or repair.</summary>
     public void Add(Game game, InstallMode mode = InstallMode.Install)
     {
-        var id = game.Key[4..];
-        if (_entries.Any(e => e.Job.ProductId == id))
+        var id = game.Key[(game.Key.IndexOf(':') + 1)..];
+        if (_entries.Any(e => e.Key == game.Key))
         {
             _notices.Show($"{game.Title} is already in the downloads.");
             return;
         }
 
         var installed = NativeInstalls.Find(game.Key);
-        _entries.Add(new Entry(new GogInstaller.Job
+        var epic = game.Store == GameStore.Epic ? EpicAccountApi.Find(id) : null;
+        _entries.Add(new Entry(new InstallJob
         {
+            Store = game.Store,
             ProductId = id,
             Title = game.Title,
             Cover = game.CoverUrl ?? installed?.Cover,
             Mode = mode,
             Folder = installed?.Folder,
+            Namespace = installed?.Namespace ?? epic?.Namespace,
+            CatalogItemId = installed?.CatalogItemId ?? epic?.CatalogItemId,
         }));
         Program.Log($"Queued {mode.ToString().ToLowerInvariant()} of {game.Key}");
         _notices.Show(mode switch
@@ -178,6 +194,23 @@ internal sealed class InstallQueue
 
             yield return ("Check files", null, () => Done(() => Add(tile.Game, InstallMode.Repair)));
             yield return ("Uninstall", CleanResult.Size(install.Size), () => Uninstall(tile));
+            yield break;
+        }
+
+        // An Epic game the library would install itself can still be handed to Epic's own launcher, for a
+        // game that needs the launcher's anti-cheat set-up or its overlay.
+        if (tile.Game.Store == GameStore.Epic && InstallsHere(tile.Game))
+        {
+            yield return ("Install with the Epic launcher", null, () => Done(() =>
+            {
+                var log = EpicLauncherLog.Length();
+                var problem = GameCatalog.Launch(tile.Game);
+                _notices.Show(problem ?? $"Opening Epic Games to install {tile.Title}...");
+                if (problem is null)
+                {
+                    _ = EpicLauncherLog.TellIfRefusedAsync(log, tile.Title, _notices);
+                }
+            }));
         }
     }
 
@@ -253,7 +286,7 @@ internal sealed class InstallQueue
             await Task.Delay(1500);
             if (job.Mode == InstallMode.Install)
             {
-                GogInstaller.Discard(job.ProductId, job.Folder);
+                NativeInstalls.Discard(job.Store, job.ProductId, job.Folder);
             }
         });
         Program.Log($"Cancelled the download of {key}");
@@ -281,7 +314,7 @@ internal sealed class InstallQueue
         {
             try
             {
-                var kept = GogInstaller.Uninstall(install);
+                var kept = NativeInstalls.Uninstall(install);
                 Program.Log($"Uninstalled {install.Key}{(kept ? ", keeping what was not GOG's in its folder" : string.Empty)}");
                 return kept ? $"{install.Title} is uninstalled. Your saves and settings in its folder were kept." : $"{install.Title} is uninstalled.";
             }
@@ -360,7 +393,7 @@ internal sealed class InstallQueue
 
         try
         {
-            var record = await Task.Run(() => _installer.RunAsync(job, run.Token));
+            var record = await Task.Run(() => job.Store == GameStore.Epic ? EpicInstaller.RunAsync(job, run.Token) : _installer.RunAsync(job, run.Token));
             _entries.Remove(entry);
             Save();
             Program.Log($"Installed {entry.Key}, build {record.BuildId}");
@@ -373,7 +406,7 @@ internal sealed class InstallQueue
             await _rescan();
         }
         catch (Exception ex) when (run.IsCancellationRequested
-            && ex is OperationCanceledException or GogInstaller.InstallException or HttpRequestException or IOException or InvalidDataException)
+            && ex is OperationCanceledException or InstallException or HttpRequestException or IOException or InvalidDataException)
         {
             // Paused, paused for a game, or cancelled: whoever stopped it has set what comes next. Stopped while
             // GOG's lists were being read, the read fails rather than being cancelled, which is no failure: on
@@ -381,7 +414,7 @@ internal sealed class InstallQueue
             // same, and must not turn a pause into a try again in a minute.
             Save();
         }
-        catch (GogInstaller.InstallException ex)
+        catch (InstallException ex)
         {
             _entries.Remove(entry);
             Save();
@@ -389,7 +422,7 @@ internal sealed class InstallQueue
             _notices.Show($"{job.Title} could not be installed. {ex.Message}");
             if (job.Mode == InstallMode.Install && job.Done == 0)
             {
-                GogInstaller.Discard(job.ProductId, job.Folder);
+                NativeInstalls.Discard(job.Store, job.ProductId, job.Folder);
             }
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException or UnauthorizedAccessException or InvalidDataException or OperationCanceledException)
@@ -454,7 +487,7 @@ internal sealed class InstallQueue
         }
 
         // Tiles of installs that have just left the queue go back to how they were.
-        foreach (var tile in _state.AllTiles.Where(t => t.IsInstalling && t.Game.Store == GameStore.Gog && !_entries.Any(e => e.Key == t.Game.Key)))
+        foreach (var tile in _state.AllTiles.Where(t => t.IsInstalling && t.Game.Store is GameStore.Gog or GameStore.Epic && !_entries.Any(e => e.Key == t.Game.Key)))
         {
             tile.ShowInstall(null, 0);
         }
@@ -467,7 +500,8 @@ internal sealed class InstallQueue
         try
         {
             Directory.CreateDirectory(NativeInstalls.Folder);
-            var saved = _entries.Select(e => new Saved(e.Job.ProductId, e.Job.Title, e.Job.Cover, e.Job.Mode, e.Job.Folder, e.Status == Status.Paused)).ToList();
+            var saved = _entries.Select(e => new Saved(e.Job.ProductId, e.Job.Title, e.Job.Cover, e.Job.Mode, e.Job.Folder, e.Status == Status.Paused,
+                e.Job.Store, e.Job.Namespace, e.Job.CatalogItemId)).ToList();
             File.WriteAllText(QueuePath, JsonSerializer.Serialize(saved));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -479,11 +513,13 @@ internal sealed class InstallQueue
     // ----- Updates -----
 
     /// <summary>
-    /// Asks GOG for the newest build of each game the library installed, and marks those with a newer one, so
-    /// their menu offers Update. GOG games are DRM free and run whatever their version, so nothing is forced.
+    /// Asks GOG and Epic for the newest build of each game the library installed, and marks those with a
+    /// newer one, so their menu offers Update. Nothing is forced: GOG games are DRM free and run whatever
+    /// their version, and an online Epic game says so itself when it is behind.
     /// </summary>
     public async Task CheckUpdatesAsync()
     {
+        await CheckEpicUpdatesAsync();
         var installs = NativeInstalls.All().Where(i => i.Store == GameStore.Gog).ToList();
         if (installs.Count == 0 || !StoreSessions.SignedIn(GameStore.Gog))
         {
@@ -508,6 +544,35 @@ internal sealed class InstallQueue
         if (found > 0)
         {
             Program.Log($"{found} GOG games installed by the library have updates");
+        }
+    }
+
+    private static async Task CheckEpicUpdatesAsync()
+    {
+        var installs = NativeInstalls.All().Where(i => i is { Store: GameStore.Epic, Namespace: not null, CatalogItemId: not null }).ToList();
+        if (installs.Count == 0 || await EpicAccountApi.FreshAsync() is not { AccessToken: { } access })
+        {
+            return;
+        }
+
+        var found = 0;
+        foreach (var install in installs)
+        {
+            if (await EpicContent.LatestVersionAsync(access, install.Namespace!, install.CatalogItemId!, install.Id) is { } version)
+            {
+                var update = version != install.BuildId ? version : null;
+                if (update != install.UpdateBuildId)
+                {
+                    NativeInstalls.Save(install with { UpdateBuildId = update });
+                }
+
+                found += update is null ? 0 : 1;
+            }
+        }
+
+        if (found > 0)
+        {
+            Program.Log($"{found} Epic games installed by the library have updates");
         }
     }
 }

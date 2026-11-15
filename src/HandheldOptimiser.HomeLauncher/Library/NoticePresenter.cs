@@ -46,6 +46,39 @@ internal sealed class NoticePresenter(TextBlock menuNotice, LibraryNavigation na
 
         Show(text, tile, shownFor);
     }
+
+    /// <summary>Whether the library is in front, where a notice can be read.</summary>
+    public Func<bool>? InFront { get; init; }
+
+    // A notice that came while another window was in front, kept for when the library is back.
+    private string? _whenBack;
+
+    /// <summary>
+    /// Shows a notice now when the library is in front, and as it comes back otherwise: the library going
+    /// behind another window clears whatever notice is up, so news about a store app it has just opened
+    /// would never be read.
+    /// </summary>
+    public void ShowWhenInFront(string text)
+    {
+        if (InFront?.Invoke() == false)
+        {
+            _whenBack = text;
+            return;
+        }
+
+        ShowAbout(text, null, TimeSpan.FromSeconds(12));
+    }
+
+    /// <summary>The library is in front again: a notice kept for it is shown.</summary>
+    public void Back()
+    {
+        if (_whenBack is { } text)
+        {
+            _whenBack = null;
+            ShowAbout(text, null, TimeSpan.FromSeconds(12));
+        }
+    }
+
     public static readonly TimeSpan ShownFor = TimeSpan.FromSeconds(5);
 
     /// <summary>A game takes a while to come to the front, and the library going behind it clears the notice.</summary>

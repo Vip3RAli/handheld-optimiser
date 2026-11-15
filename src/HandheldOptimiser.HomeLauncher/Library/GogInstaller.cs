@@ -263,41 +263,17 @@ internal sealed class GogInstaller(HttpClient http)
 
     // ----- Over the network -----
 
-    /// <summary>What a run of the installer needs from the queue, and tells it.</summary>
-    internal sealed class Job
-    {
-        public required string ProductId { get; init; }
-
-        public required string Title { get; init; }
-
-        public string? Cover { get; init; }
-
-        public InstallMode Mode { get; init; }
-
-        /// <summary>The game's folder, once known.</summary>
-        public string? Folder { get; set; }
-
-        public long Total;
-        public long Done;
-
-        /// <summary>Checking the files already there, for Repair, before anything is fetched.</summary>
-        public bool Checking { get; set; }
-    }
-
-    /// <summary>The ways a run can end other than by finishing.</summary>
-    internal sealed class InstallException(string message) : Exception(message);
-
     /// <summary>Where each install keeps how far it has got.</summary>
-    internal static string StatePath(string productId) => Path.Combine(NativeInstalls.Folder, $"gog-{productId}.state.json");
+    internal static string StatePath(string productId) => NativeInstalls.StatePath(GameStore.Gog, productId);
 
     /// <summary>The installed build's files and their pieces, which an update compares against.</summary>
-    internal static string FilesPath(string productId) => Path.Combine(NativeInstalls.Folder, $"gog-{productId}.files.json");
+    internal static string FilesPath(string productId) => NativeInstalls.FilesPath(GameStore.Gog, productId);
 
     /// <summary>
     /// Installs, updates or repairs a game. Stops with <see cref="OperationCanceledException"/> when paused
     /// or cancelled, having kept how far it got, and with <see cref="InstallException"/> when it cannot go on.
     /// </summary>
-    public async Task<NativeInstall> RunAsync(Job job, CancellationToken cancel)
+    public async Task<NativeInstall> RunAsync(InstallJob job, CancellationToken cancel)
     {
         // GOG not answering is not GOG saying no: the library starts before the Wi-Fi is up, and a download
         // picked up then was dropped, with how far it had got. Those are waited out and tried again.
@@ -481,85 +457,8 @@ internal sealed class GogInstaller(HttpClient http)
             : Path.Combine(root, $"{name} ({manifest.BaseProductId})");
     }
 
-    /// <summary>
-    /// Takes away a game the library installed, as GOG Galaxy does: the files GOG's build listed, the folders
-    /// that leaves empty, the game's working files and its record. Anything else in the folder is the
-    /// player's (saves and settings, which old DOS games keep beside the game) and stays. The user asked for
-    /// this on 2026-11-14; before, the whole folder went.
-    /// </summary>
-    /// <returns>Whether anything was kept in the game's folder.</returns>
-    public static bool Uninstall(NativeInstall install)
-    {
-        // Only a folder the record names, and never a drive or a top folder.
-        var kept = false;
-        var folder = Path.GetFullPath(install.Folder);
-        if (Path.GetPathRoot(folder) is { } root && folder.TrimEnd('\\').Length > root.Length
-            && folder.Count(c => c == '\\') >= 2 && Directory.Exists(folder))
-        {
-            var files = ReadFiles(install.Id);
-            if (files.Count == 0)
-            {
-                // No list of what was installed: nothing says which files are the player's.
-                Directory.Delete(folder, recursive: true);
-            }
-            else
-            {
-                foreach (var path in files.Keys)
-                {
-                    if (GogDepots.SafePath(path) is { } safe)
-                    {
-                        File.Delete(Path.Combine(folder, safe));
-                    }
-                }
-
-                kept = !RemoveEmptyFolders(folder);
-            }
-        }
-
-        TryDelete(FilesPath(install.Id));
-        TryDelete(StatePath(install.Id));
-        NativeInstalls.Remove(install.Key);
-        return kept;
-    }
-
-    /// <summary>Deletes a folder's empty folders, deepest first, and the folder itself if that empties it. True when it went.</summary>
-    private static bool RemoveEmptyFolders(string folder)
-    {
-        var empty = true;
-        foreach (var inner in Directory.GetDirectories(folder))
-        {
-            empty &= RemoveEmptyFolders(inner);
-        }
-
-        if (!empty || Directory.EnumerateFileSystemEntries(folder).Any())
-        {
-            return false;
-        }
-
-        Directory.Delete(folder);
-        return true;
-    }
-
-    /// <summary>Takes away a download that was cancelled before it finished: its files and how far it got.</summary>
-    public static void Discard(string productId, string? folder)
-    {
-        if (NativeInstalls.Find($"gog:{productId}") is null && folder is not null)
-        {
-            try
-            {
-                if (Directory.Exists(folder) && folder.Count(c => c == '\\') >= 2)
-                {
-                    Directory.Delete(folder, recursive: true);
-                }
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                Program.Log($"Could not take away the cancelled download's files: {ex.Message}");
-            }
-        }
-
-        TryDelete(StatePath(productId));
-    }
+    /// <summary>Takes away a game the library installed. See <see cref="NativeInstalls.Uninstall"/>.</summary>
+    public static bool Uninstall(NativeInstall install) => NativeInstalls.Uninstall(install);
 
     private static long? FreeSpace(string folder)
     {
