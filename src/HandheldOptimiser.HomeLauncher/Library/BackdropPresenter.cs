@@ -126,7 +126,10 @@ internal sealed class BackdropPresenter(Rectangle front, Rectangle back, Library
             return;
         }
 
-        var background = options.Background;
+        // Games not installed have no artwork on the device, so each one's would be fetched as the focus
+        // passes, which made moving through Ready to install slow. Their colours are shown instead; the user
+        // asked for this on 2026-11-14.
+        var background = options.Background == BackgroundKind.Artwork && !tile.IsInstalled ? BackgroundKind.Colours : options.Background;
         var blur = options.Blur;
         var position = options.Position;
         var (width, height) = Pixels();

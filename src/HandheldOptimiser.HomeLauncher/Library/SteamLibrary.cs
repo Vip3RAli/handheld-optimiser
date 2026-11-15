@@ -60,7 +60,8 @@ internal static partial class SteamLibrary
         return key?.GetValue("SteamExe") is string exe && File.Exists(exe) ? Path.GetFullPath(exe) : null;
     }
 
-    private static IEnumerable<string> LibraryFolders(string steamDir)
+    /// <summary>Every Steam library folder, the one Steam is installed in first.</summary>
+    internal static IEnumerable<string> LibraryFolders(string steamDir)
     {
         var folders = new List<string> { steamDir };
 

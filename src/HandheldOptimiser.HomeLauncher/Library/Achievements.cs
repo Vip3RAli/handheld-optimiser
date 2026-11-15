@@ -26,7 +26,8 @@ internal sealed record GameAchievements(
 }
 
 /// <summary>
-/// Syncs and reads achievements for Steam games (the Web API, or Steam's own stats files), GOG games (GOG
+/// Syncs and reads achievements for Steam games (the account signed in inside the library, the Web API
+/// key, or Steam's own stats files), GOG games (GOG
 /// Galaxy's database) and games with an achievements.json in their folder. Synced achievements are kept
 /// in <c>%LOCALAPPDATA%\HandheldOptimiser\achievements</c> so the library shows them at once.
 /// </summary>
@@ -56,9 +57,20 @@ internal static class Achievements
     {
         if (game.Store == GameStore.Steam && SteamAppId(game) is { } appId)
         {
+            // Signed in inside the library: the account's own sign-in, with unlock times, and no key needed.
+            // The key asks the same of Steam, so it is only tried when not signed in. It also earns a 400 for
+            // a game with no achievements, which Tiny Glade showed on 2026-11-14.
+            var session = await SteamAccountApi.FreshAsync();
+            if (session is not null
+                && await SteamAccountApi.AchievementsAsync(session, game.Key, appId) is { Total: > 0 } signedIn)
+            {
+                WriteCache(signedIn);
+                return signedIn;
+            }
+
             var apiKey = LibrarySettings.SteamKey;
             var steamId = StoreAccounts.Read(GameStore.Steam).UserId ?? FirstSteamId64();
-            if (!string.IsNullOrWhiteSpace(apiKey) && !string.IsNullOrWhiteSpace(steamId))
+            if (session is null && !string.IsNullOrWhiteSpace(apiKey) && !string.IsNullOrWhiteSpace(steamId))
             {
                 var remote = await FetchSteamAchievementsAsync(game.Key, appId, steamId, apiKey);
                 if (remote is { Total: > 0 })
@@ -67,6 +79,16 @@ internal static class Achievements
                     return remote;
                 }
             }
+        }
+
+        // GOG signed in inside the library: the game's own achievements service, with unlock times. GOG
+        // Galaxy's database, read below, covers the rest.
+        if (game.Store == GameStore.Gog && game.Key.StartsWith("gog:", StringComparison.Ordinal)
+            && await GogAccountApi.FreshAsync() is { } gog
+            && await GogAccountApi.AchievementsAsync(gog, game.Key, game.Key[4..]) is { Total: > 0 } fromGog)
+        {
+            WriteCache(fromGog);
+            return fromGog;
         }
 
         var local = await Task.Run(() => ReadLocal(game));
