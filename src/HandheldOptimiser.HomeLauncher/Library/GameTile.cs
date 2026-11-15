@@ -80,6 +80,9 @@ internal sealed class GameTile : INotifyPropertyChanged, INoticeHost
         set => Set(ref _isLastPlayed, value);
     }
 
+    /// <summary>The same game on other stores, shown as this one tile and played from its Options menu.</summary>
+    public IReadOnlyList<GameTile> OtherCopies { get; set; } = [];
+
     /// <summary>
     /// Its play time or achievements, drawn on its picture: on the last game played in the grid, and on the
     /// focused card in the NXE layout. Null when there is nothing to show.

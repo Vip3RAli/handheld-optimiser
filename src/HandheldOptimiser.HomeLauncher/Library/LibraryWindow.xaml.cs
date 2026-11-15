@@ -439,9 +439,23 @@ public partial class LibraryWindow : Window, ILibraryHost
             _state.Tiles = HomeOrder.Arrange(_state.Tiles, lastPlayed);
         }
 
+        // A game owned on two stores is one tile, the copy first in the order, with the other in its Options menu.
+        // Not on Ready to install, whose games are each a store's to install, nor while searching, which shows all.
         foreach (var tile in _state.AllTiles)
         {
             tile.IsLastPlayed = ReferenceEquals(tile, lastPlayed);
+            tile.OtherCopies = [];
+        }
+
+        if (!_search.IsOpen && !_state.Filter.NotInstalled)
+        {
+            var (merged, others) = SameGame.Merge(_state.Tiles, t => t.Title, t => t.StoreName, t => t.IsInstalled && !t.IsApp);
+            foreach (var (tile, copies) in others)
+            {
+                tile.OtherCopies = copies;
+            }
+
+            _state.Tiles = merged;
         }
 
         _continue.UpdateCoverDetails(_state.AllTiles, lastPlayed);

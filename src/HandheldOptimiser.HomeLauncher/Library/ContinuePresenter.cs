@@ -323,6 +323,55 @@ internal static class HomeOrder
             : [lastPlayed, .. games.Where(g => !ReferenceEquals(g, lastPlayed))];
 }
 
+/// <summary>
+/// One tile for a game owned on more than one store, which the user asked for on 2026-11-16: Fortnite on Epic and
+/// on another store showed twice. The first copy in the order stays, the most recent or a favourite, and plays on A;
+/// the others are listed on it, to play from its Options menu.
+/// </summary>
+internal static class SameGame
+{
+    /// <summary>A title as compared across stores: no case, no trademark signs, nothing but letters and digits.</summary>
+    public static string Key(string title) =>
+        new(title.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+
+    /// <summary>
+    /// The games with every later copy of a game on another store left out, and each kept one's other copies.
+    /// Two games of one name on the same store are both kept: they are different games, or different editions.
+    /// </summary>
+    public static (List<T> Games, Dictionary<T, List<T>> Others) Merge<T>(List<T> games, Func<T, string> title, Func<T, string> store,
+        Func<T, bool> mergeable) where T : class
+    {
+        var kept = new List<T>();
+        var others = new Dictionary<T, List<T>>(ReferenceEqualityComparer.Instance);
+        var first = new Dictionary<string, T>();
+        foreach (var game in games)
+        {
+            var key = mergeable(game) ? Key(title(game)) : "";
+            if (key.Length > 0 && first.TryGetValue(key, out var keeper)
+                && store(keeper) != store(game)
+                && !(others.TryGetValue(keeper, out var already) && already.Any(o => store(o) == store(game))))
+            {
+                if (!others.TryGetValue(keeper, out var list))
+                {
+                    others[keeper] = list = [];
+                }
+
+                list.Add(game);
+                continue;
+            }
+
+            if (key.Length > 0)
+            {
+                first.TryAdd(key, game);
+            }
+
+            kept.Add(game);
+        }
+
+        return (kept, others);
+    }
+}
+
 internal static class RecentGames
 {
     /// <summary>The games played, most recent first, up to <paramref name="count"/> of them.</summary>
