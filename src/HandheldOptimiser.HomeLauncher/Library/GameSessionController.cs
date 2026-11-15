@@ -196,7 +196,9 @@ internal sealed class GameSessionController
             }
 
             var problem = GameCatalog.Launch(tile.Game);
-            _notices.Show(problem ?? $"Opening {Game.NameOf(tile.Game.Store)} to install {tile.Title}...", tile);
+            // A played Xbox game is installed from its Microsoft Store page, which is what opens.
+            var opening = tile.Game.Store == GameStore.Xbox ? "the Microsoft Store" : Game.NameOf(tile.Game.Store);
+            _notices.Show(problem ?? $"Opening {opening} to install {tile.Title}...", tile);
             if (problem is not null)
             {
                 _launchBlockedUntil = DateTime.MinValue;

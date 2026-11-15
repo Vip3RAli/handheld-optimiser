@@ -3,7 +3,7 @@ using System.Windows.Controls;
 namespace HandheldOptimiser.HomeLauncher.Library;
 
 /// <summary>
-/// Store accounts and achievement syncing under Catalog &amp; Content. Steam, GOG and Epic are signed in to inside
+/// Store accounts and achievement syncing under Catalog &amp; Content. Steam, GOG, Epic and Xbox are signed in to inside
 /// the library (<see cref="SignInPresenter"/>), which gives the library the account's games and achievements;
 /// pressed once signed in, a store's row syncs them, and a row below it signs out. The other stores show what
 /// their own apps say on this device and open their apps' sign-in, until their own stages of the work.
@@ -11,7 +11,7 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 internal sealed class AccountsMenu
 {
     /// <summary>The stores signed in to inside the library, in the order their rows are shown.</summary>
-    private static readonly GameStore[] SignedInHere = [GameStore.Steam, GameStore.Gog, GameStore.Epic];
+    private static readonly GameStore[] SignedInHere = [GameStore.Steam, GameStore.Gog, GameStore.Epic, GameStore.Xbox];
 
     private readonly MenuView _view;
     private readonly MenuPresenter _menu;
@@ -90,6 +90,10 @@ internal sealed class AccountsMenu
     {
         (GameStore.Steam, true) => "Signed in inside the library: your Steam games are listed and their achievements synced. Press to sync now. Steam itself still needs to be signed in to install and play.",
         (GameStore.Steam, false) => "Sign in with the Steam app on your phone, or on Steam's own page, to list your Steam games and sync their achievements without a Web API key.",
+        // Xbox Live does not say which games an account owns, so the row says what is listed instead.
+        (GameStore.Xbox, true) => "Signed in inside the library: the Xbox games for PC you have played before are listed, and their achievements synced. Press to sync now. The Microsoft Store still installs them.",
+        (GameStore.Xbox, false) => "Sign in with your Microsoft account to list the Xbox games for PC you have played before and sync their achievements. With the account Windows uses, it needs no password.",
+
         // Epic has no achievements service the library can ask, so its row promises none.
         (GameStore.Epic, true) => "Signed in inside the library: your Epic games are listed. Press to list them again now. The Epic Games Launcher still installs and starts them.",
         (GameStore.Epic, false) => "Sign in on Epic's own page to list your Epic games, without opening the Epic Games Launcher first.",
@@ -114,6 +118,10 @@ internal sealed class AccountsMenu
         else if (store == GameStore.Epic)
         {
             _signIn.OpenEpic();
+        }
+        else if (store == GameStore.Xbox)
+        {
+            _signIn.OpenXbox();
         }
         else
         {
