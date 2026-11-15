@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace HandheldOptimiser.HomeLauncher.Library;
 
@@ -16,6 +17,9 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 internal sealed class DealsPresenter
 {
     private readonly DealsView _view;
+    private readonly Border _dock;
+    private readonly StackPanel _page;
+    private readonly UIElement _tilesScroller;
     private readonly Window _window;
     private readonly ScrollViewer _scroller;
     private readonly TextBlock _acceptHint;
@@ -32,16 +36,22 @@ internal sealed class DealsPresenter
     private readonly Func<int, ContentPresenter?> _tileContainer;
     private readonly Action<int> _focusTile;
 
-    /// <param name="scroller">The page, which the row scrolls with.</param>
+    /// <param name="dock">The place at the bottom of the screen, above the button hints, for the deals in the grid and the row layouts.</param>
+    /// <param name="page">The page, where the Old School layout's deal cards are, below the games.</param>
+    /// <param name="tilesScroller">The games in the page, which the deals go below there.</param>
+    /// <param name="scroller">The page's scroll viewer.</param>
     /// <param name="columnCount">How many games are in a row of the grid.</param>
     /// <param name="tileContainer">A game's tile in the grid, by its place.</param>
     /// <param name="focusTile">Gives a game's tile the focus, by its place.</param>
-    public DealsPresenter(DealsView view, Window window, ScrollViewer scroller, TextBlock acceptHint, MenuView menuView,
+    public DealsPresenter(DealsView view, Border dock, StackPanel page, UIElement tilesScroller, Window window, ScrollViewer scroller, TextBlock acceptHint, MenuView menuView,
         MenuPresenter menu, NoticePresenter notices, LibraryState state, LibraryNavigation navigation, LibraryLayoutManager layouts,
         OldSchoolPresenter oldSchool, BackdropPresenter backdrop, GameSessionController play, Func<int> columnCount,
         Func<int, ContentPresenter?> tileContainer, Action<int> focusTile)
     {
         _view = view;
+        _dock = dock;
+        _page = page;
+        _tilesScroller = tilesScroller;
         _window = window;
         _scroller = scroller;
         _acceptHint = acceptHint;
@@ -59,7 +69,9 @@ internal sealed class DealsPresenter
         _focusTile = focusTile;
 
         Visuals.OnItemButtons(view.DealTiles, OnDealClick, OnDealFocused);
-        Visuals.OnItemButtons(view.DealSources, OnDealSourceClick, OnDealSourceFocused);
+
+        // The games stop above the deals at the bottom, rather than scrolling on under them.
+        dock.SizeChanged += (_, _) => FitPage();
         view.DealsScroller.PreviewMouseWheel += OnDealsWheel;
 
         menuView.DealsGroup.Click += OnOpenDealsSettings;
@@ -67,14 +79,26 @@ internal sealed class DealsPresenter
         menuView.EpicFreeSetting.Click += OnToggleEpicFreeGames;
         menuView.DealsKeySetting.Click += OnEditDealsKey;
         menuView.WishlistDealsSetting.Click += OnToggleWishlistDeals;
+        menuView.DealsScrollSetting.Click += (_, _) =>
+        {
+            LibrarySettings.ScrollDeals = !LibrarySettings.ScrollDeals;
+            RefreshDealsSettings();
+            Drift();
+        };
+
+        // The row of deals moves by itself only while the library is in front.
+        window.Activated += (_, _) => Drift();
+        window.Deactivated += (_, _) => Drift();
         menuView.DealsRefreshItem.Click += OnRefreshDeals;
+        menuView.DealsCreditItem.Click += (_, _) => notices.Show(
+            "Sale prices and links are from IsThereAnyDeal, isthereanydeal.com. Free games are from the Epic Games Store.");
         menuView.DealsSettingsBackItem.Click += (_, _) => menu.Back();
     }
 
     /// <summary>The deals on show, or null when there are none or the row is off.</summary>
     public List<DealTile>? Shown => Wanted ? _deals : null;
 
-    /// <summary>The deal or card the focus was last on in the row.</summary>
+    /// <summary>The deal the focus was last on in the row.</summary>
     public string? FocusedDealId => _focusedDealId;
 
     /// <summary>Whether the focus was in the row, to put it back there. The tiles say when it has left.</summary>
@@ -97,12 +121,146 @@ internal sealed class DealsPresenter
 
     // Whether the focus is in the Deals row, and on which deal or card, to put it back there.
     private bool _focusInDeals;
-    private string? _focusedDealId;
 
-    // The cards for where the deals are from, the deals they were made for, and the one that is open.
-    private List<DealSourceTile>? _dealSources;
-    private List<DealTile>? _dealSourcesOf;
-    private string? _openDealSource;
+    // The row of deals moving slowly across by itself, there and back, which the user asked for on 2026-11-15.
+    // It moves on every frame by the time since the last, so it glides: a timer stepping it 0.6 of a pixel
+    // every 40 ms looked jerky to the user. While the player is on the row or a menu is open it waits on a
+    // slow timer instead, since asking for every frame keeps WPF drawing every frame even when nothing moves.
+    private const double DriftSpeed = 30; // DIPs a second
+    private bool _driftOn;
+    private bool _gliding;
+    private DispatcherTimer? _driftWait;
+
+    // Where the row is, unrounded, which way it is going, and the frame it was last moved on.
+    private double _driftAt = -1;
+    private int _driftWay = 1;
+    private TimeSpan _driftLast;
+
+    /// <summary>
+    /// Starts or stops the row of deals moving by itself: only when switched on, in the grid or the row, with
+    /// the library in front.
+    /// </summary>
+    private void Drift()
+    {
+        _driftOn = LibrarySettings.ScrollDeals && _window.IsActive && !_layouts.IsOldSchool
+            && _view.DealsPanel.Visibility == Visibility.Visible && _view.DealsScroller.Visibility == Visibility.Visible;
+        if (!_driftOn)
+        {
+            Glide(false);
+            _driftWait?.Stop();
+            return;
+        }
+
+        if (DriftHeld())
+        {
+            WaitToDrift();
+        }
+        else
+        {
+            Glide(true);
+        }
+    }
+
+    /// <summary>Whether the row is left alone: the player is on it, with the controller, a finger or the mouse, a menu is open, or every deal fits.</summary>
+    private bool DriftHeld()
+    {
+        var scroller = _view.DealsScroller;
+        return _navigation.MenuOpen || _view.DealTiles.IsKeyboardFocusWithin || scroller.IsMouseOver || scroller.AreAnyTouchesOver
+            || scroller.ScrollableWidth <= 0;
+    }
+
+    /// <summary>Stops the row and looks four times a second for when it can move again.</summary>
+    private void WaitToDrift()
+    {
+        Glide(false);
+        if (_driftWait is null)
+        {
+            _driftWait = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(250) };
+            _driftWait.Tick += (_, _) =>
+            {
+                if (!_driftOn)
+                {
+                    _driftWait.Stop();
+                }
+                else if (!DriftHeld())
+                {
+                    _driftWait.Stop();
+                    Glide(true);
+                }
+            };
+        }
+
+        _driftWait.Start();
+    }
+
+    /// <summary>Moves the row on every frame, or stops it on a whole pixel, where the cards are sharp.</summary>
+    private void Glide(bool on)
+    {
+        if (on == _gliding)
+        {
+            return;
+        }
+
+        _gliding = on;
+        if (on)
+        {
+            _driftLast = default;
+            _driftAt = -1;
+            CompositionTarget.Rendering += OnDriftFrame;
+            return;
+        }
+
+        CompositionTarget.Rendering -= OnDriftFrame;
+        var scroller = _view.DealsScroller;
+        var whole = Math.Round(scroller.HorizontalOffset);
+        if (whole != scroller.HorizontalOffset)
+        {
+            scroller.ScrollToHorizontalOffset(whole);
+        }
+    }
+
+    private void OnDriftFrame(object? sender, EventArgs e)
+    {
+        if (DriftHeld())
+        {
+            WaitToDrift();
+            return;
+        }
+
+        // WPF can call this more than once for a frame; only a new frame moves the row.
+        var now = e is RenderingEventArgs frame ? frame.RenderingTime : default;
+        if (now == _driftLast)
+        {
+            return;
+        }
+
+        // The first frame, or one after a stall, moves it no further than a short one would.
+        var seconds = _driftLast == default ? 0 : Math.Min((now - _driftLast).TotalSeconds, 0.05);
+        _driftLast = now;
+
+        // Carried on from wherever the player left it.
+        var scroller = _view.DealsScroller;
+        if (_driftAt < 0 || Math.Abs(_driftAt - scroller.HorizontalOffset) > 2)
+        {
+            _driftAt = scroller.HorizontalOffset;
+        }
+
+        _driftAt += _driftWay * DriftSpeed * seconds;
+        if (_driftAt >= scroller.ScrollableWidth)
+        {
+            _driftAt = scroller.ScrollableWidth;
+            _driftWay = -1;
+        }
+        else if (_driftAt <= 0)
+        {
+            _driftAt = 0;
+            _driftWay = 1;
+        }
+
+        scroller.ScrollToHorizontalOffset(_driftAt);
+    }
+
+    private string? _focusedDealId;
 
     /// <summary>Whether the row is on and has somewhere to get deals from: Epic's free games, or a key for the sales.</summary>
     public static bool Wanted =>
@@ -174,6 +332,7 @@ internal sealed class DealsPresenter
     /// <summary>Fills the Deals row, or hides it when it is off or does not apply.</summary>
     public void UpdateDeals()
     {
+        Dock(!_layouts.IsOldSchool);
         if (!Wanted)
         {
             _view.DealsPanel.Visibility = Visibility.Collapsed;
@@ -201,59 +360,27 @@ internal sealed class DealsPresenter
         var show = _deals.Count > 0 && (_layouts.Layout == LibraryLayout.OldSchool ? _oldSchool.OpenKind == CategoryKind.Deals : _state.Filter == TileFilter.All);
         _view.DealsPanel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
 
-        // Who the row's deals are from, beside its heading.
-        var free = _deals.Any(d => d.Deal.Note is not null);
-        var sales = _deals.Any(d => d.Deal.Note is null);
-        _view.DealsSource.Text = free && sales ? "Epic free games, prices from IsThereAnyDeal"
-            : free ? "Free games from the Epic Games Store"
-            : "Prices from IsThereAnyDeal";
         if (!show)
         {
             _focusInDeals = false;
             return;
         }
 
-        // Below the grid every deal is in one row. Below the row of games there is a card for each place
-        // they are from, and the deals of the one that was pressed in a grid under those. In the Old
+        // Below the games every deal is in one row, in the grid and the row of games alike. In the Old
         // School layout every deal is a card in its category's stack, which has no need of the heading.
-        var row = _layouts.IsRow;
         var cards = _layouts.IsOldSchool;
-        _view.DealsHeading.Visibility = cards ? Visibility.Collapsed : Visibility.Visible;
-        _view.DealsPanel.Margin = cards ? default : new Thickness(0, 18, 0, 0);
-        List<DealTile>? shown = _deals;
-        if (row)
-        {
-            if (!ReferenceEquals(_dealSourcesOf, _deals))
-            {
-                _dealSourcesOf = _deals;
-                _dealSources = DealSourceTile.From(_deals);
-            }
+        _view.DealsHeading.Visibility = cards || !LibrarySettings.SectionTitles ? Visibility.Collapsed : Visibility.Visible;
+        _view.DealsPanel.Margin = cards ? default : new Thickness(0, 4, 0, 0);
+        var shown = _deals;
+        _view.DealsScroller.HorizontalScrollBarVisibility = cards ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Hidden;
+        _view.DealsScroller.PanningMode = cards ? PanningMode.None : PanningMode.HorizontalOnly;
 
-            var open = _dealSources?.Find(s => s.Key == _openDealSource);
-            foreach (var source in _dealSources ?? [])
-            {
-                source.IsOpen = ReferenceEquals(source, open);
-            }
-
-            if (!ReferenceEquals(_view.DealSources.ItemsSource, _dealSources))
-            {
-                _view.DealSources.ItemsSource = _dealSources;
-            }
-
-            shown = open?.Deals;
-        }
-
-        _view.DealSources.Visibility = row ? Visibility.Visible : Visibility.Collapsed;
-        _view.DealsScroller.Visibility = shown is null ? Visibility.Collapsed : Visibility.Visible;
-        _view.DealsScroller.HorizontalScrollBarVisibility = row || cards ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Hidden;
-        _view.DealsScroller.PanningMode = row || cards ? PanningMode.None : PanningMode.HorizontalOnly;
-
-        var panel = (ItemsPanelTemplate)_window.FindResource(cards ? "OldSchoolPanel" : row ? "GridPanel" : "RowPanel");
+        var panel = (ItemsPanelTemplate)_window.FindResource(cards ? "OldSchoolPanel" : "RowPanel");
         if (!ReferenceEquals(_view.DealTiles.ItemsPanel, panel))
         {
             _view.DealTiles.ItemsPanel = panel;
             _view.DealTiles.ItemTemplate = (DataTemplate)_window.FindResource(cards ? "OldSchoolDeal" : "DealCard");
-            _view.DealTiles.Margin = cards ? new Thickness(10, 6, 10, 0) : default;
+            _view.DealTiles.Margin = cards ? new Thickness(10, 6, 10, 0) : ZoomRoom;
             _oldSchool.DealCards.Fresh = cards;
         }
 
@@ -264,15 +391,71 @@ internal sealed class DealsPresenter
 
         _oldSchool.QueueCardReset();
         LoadDealBanners();
+        Drift();
+    }
+
+    /// <summary>
+    /// Puts the deals at the bottom of the screen, above the button hints, for the grid and the row layouts,
+    /// or back in the page below the games, where the Old School layout's deal cards are.
+    /// </summary>
+    private void Dock(bool docked)
+    {
+        // At the bottom they are drawn smaller, which the user asked for on 2026-11-16, to leave the games more room.
+        _view.LayoutTransform = docked ? DockedSize : Transform.Identity;
+
+        var parent = VisualTreeHelper.GetParent(_view);
+        if (docked ? ReferenceEquals(parent, _dock) : ReferenceEquals(parent, _page))
+        {
+            return;
+        }
+
+        if (ReferenceEquals(parent, _dock))
+        {
+            _dock.Child = null;
+        }
+        else
+        {
+            _page.Children.Remove(_view);
+        }
+
+        if (docked)
+        {
+            _dock.Child = _view;
+        }
+        else
+        {
+            _page.Children.Insert(_page.Children.IndexOf(_tilesScroller) + 1, _view);
+        }
+
+        FitPage();
+    }
+
+    // The deals at the bottom are drawn at 65% (the user asked for 85%, then 35% off, on 2026-11-16), and the
+    // picked one grows to read (DealCardButton), into room kept above the cards.
+    private static readonly ScaleTransform DockedSize = new(0.65, 0.65);
+    // Room above the cards, under the heading, for the picked one to grow into.
+    private static readonly Thickness ZoomRoom = new(0, 64, 0, 0);
+
+    /// <summary>Ends the page where the deals at the bottom begin, so no game is hidden under them.</summary>
+    private void FitPage()
+    {
+        if (ReferenceEquals(VisualTreeHelper.GetParent(_view), _dock))
+        {
+            _scroller.Margin = new Thickness(0, 0, 0, _dock.ActualHeight);
+        }
+        else if (_scroller.Margin.Bottom > 0 && _scroller.Margin.Left == 0 && _scroller.Margin.Top == 0)
+        {
+            // Only what this put there: the Old School layout sets its own margin for its open card.
+            _scroller.Margin = default;
+        }
     }
 
     // How far the wheel has turned over the Old School deals since it last moved on one, as for the games.
     private int _dealWheel;
 
     /// <summary>
-    /// The mouse wheel over the deals: the row below the grid moves across with it, the Old School cards
-    /// move on by one, and the grid of deals below the row of games passes it on to the page, which a
-    /// scroll viewer does not do by itself.
+    /// The mouse wheel over the deals: the row below the games moves across with it, and the Old School
+    /// cards move on by one.
     /// </summary>
     private void OnDealsWheel(object sender, MouseWheelEventArgs e)
     {
@@ -289,73 +472,9 @@ internal sealed class DealsPresenter
                 buttons[Math.Clamp(Math.Max(0, _oldSchool.DealCards.Front) - steps, 0, buttons.Count - 1)].Focus();
             }
         }
-        else if (_layouts.IsRow)
-        {
-            _scroller.RaiseEvent(new MouseWheelEventArgs(e.MouseDevice, e.Timestamp, e.Delta) { RoutedEvent = UIElement.MouseWheelEvent });
-        }
         else
         {
             _view.DealsScroller.ScrollToHorizontalOffset(_view.DealsScroller.HorizontalOffset - e.Delta);
-        }
-    }
-
-    // ----- The cards for where the deals are from, below the row of games -----
-
-    private void OnDealSourceClick(object sender, RoutedEventArgs e)
-    {
-        if (sender is not Button { DataContext: DealSourceTile source })
-        {
-            return;
-        }
-
-        // Pressing the one that is open puts its deals away again.
-        _openDealSource = source.Key == _openDealSource ? null : source.Key;
-        UpdateDeals();
-        _acceptHint.Text = source.IsOpen ? "Close" : "Open";
-        if (source.IsOpen)
-        {
-            // Into view once they are laid out, with the cards still above them.
-            _window.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () => _view.DealsPanel.BringIntoView());
-        }
-    }
-
-    private void OnDealSourceFocused(object sender, KeyboardFocusChangedEventArgs e)
-    {
-        if (sender is not Button { DataContext: DealSourceTile source } button)
-        {
-            return;
-        }
-
-        _focusInDeals = true;
-        _focusedDealId = source.Key;
-        _acceptHint.Text = source.IsOpen ? "Close" : "Open";
-        button.BringIntoView(new Rect(-20, -60, button.ActualWidth + 40, button.ActualHeight + 100));
-    }
-
-    /// <summary>The cards for where the deals are from, left to right, while they are showing.</summary>
-    private List<Button> DealSourceButtons() =>
-        _view.DealsPanel.Visibility == Visibility.Visible && _view.DealSources.Visibility == Visibility.Visible ? Buttons(_view.DealSources) : [];
-
-    /// <summary>Left and right along the cards, up to the games, and down into the deals of the one that is open.</summary>
-    public void NavigateDealSources(Button from, FocusNavigationDirection direction)
-    {
-        var buttons = DealSourceButtons();
-        var index = buttons.IndexOf(from);
-        switch (direction)
-        {
-            case FocusNavigationDirection.Left when index > 0:
-                buttons[index - 1].Focus();
-                break;
-            case FocusNavigationDirection.Right when index >= 0 && index + 1 < buttons.Count:
-                buttons[index + 1].Focus();
-                break;
-            case FocusNavigationDirection.Up when _state.Tiles.Count > 0:
-                // Back on the game the row was left from.
-                _focusTile(Math.Max(0, _state.FocusedIndex));
-                break;
-            case FocusNavigationDirection.Down:
-                DealButtons().FirstOrDefault()?.Focus();
-                break;
         }
     }
 
@@ -467,8 +586,7 @@ internal sealed class DealsPresenter
         _view.DealsPanel.Visibility == Visibility.Visible && _view.DealsScroller.Visibility == Visibility.Visible ? Buttons(_view.DealTiles) : [];
 
     /// <summary>
-    /// Left and right along the deals. Below the grid they are one row, with the grid's last row above
-    /// it. Below the row of games they are a grid of their own, with the cards they came from above it.
+    /// Left and right along the deals, which are one row with the games' last row above it.
     /// </summary>
     public void NavigateDeals(Button from, FocusNavigationDirection direction)
     {
@@ -481,36 +599,6 @@ internal sealed class DealsPresenter
             return;
         }
 
-        if (_layouts.IsRow && index >= 0)
-        {
-            // As many across as sit level with the first. The focused card is drawn a little bigger, which
-            // moves its corner, so level is anywhere within half a card.
-            var top = buttons[0].TranslatePoint(default, _view.DealTiles).Y;
-            var columns = Math.Max(1, buttons.TakeWhile(b => Math.Abs(b.TranslatePoint(default, _view.DealTiles).Y - top) < b.ActualHeight / 2).Count());
-            var last = buttons.Count - 1;
-            switch (direction)
-            {
-                case FocusNavigationDirection.Left when index > 0:
-                    buttons[index - 1].Focus();
-                    break;
-                case FocusNavigationDirection.Right when index < last:
-                    buttons[index + 1].Focus();
-                    break;
-                case FocusNavigationDirection.Up when index >= columns:
-                    buttons[index - columns].Focus();
-                    break;
-                case FocusNavigationDirection.Up:
-                    var sources = DealSourceButtons();
-                    (sources.Find(b => b.DataContext is DealSourceTile { IsOpen: true }) ?? sources.FirstOrDefault())?.Focus();
-                    break;
-                case FocusNavigationDirection.Down when index / columns < last / columns:
-                    buttons[Math.Min(index + columns, last)].Focus();
-                    break;
-            }
-
-            return;
-        }
-
         switch (direction)
         {
             case FocusNavigationDirection.Left when index > 0:
@@ -520,7 +608,8 @@ internal sealed class DealsPresenter
                 buttons[index + 1].Focus();
                 break;
             case FocusNavigationDirection.Up when _state.Tiles.Count > 0:
-                var columns = _columnCount();
+                // The row of games is all one row, so any of its games may be the one above.
+                var columns = _layouts.IsRow ? _state.Tiles.Count : _columnCount();
                 var lastRow = Enumerable.Range((_state.Tiles.Count - 1) / columns * columns, _state.Tiles.Count - (_state.Tiles.Count - 1) / columns * columns)
                     .Select(i => _tileContainer(i) is { } c ? Visuals.Child<Button>(c) : null)
                     .OfType<Button>()
@@ -533,8 +622,7 @@ internal sealed class DealsPresenter
     /// <summary>Down from the grid's last row: the deal below it.</summary>
     public bool FocusDealBelow(Button from)
     {
-        // Below the row of games that is a card for where the deals are from.
-        if (Nearest(_layouts.IsRow ? DealSourceButtons() : DealButtons(), from) is not { } below)
+        if (Nearest(DealButtons(), from) is not { } below)
         {
             return false;
         }
@@ -547,8 +635,7 @@ internal sealed class DealsPresenter
     public bool RestoreDealFocus()
     {
         if (!_focusInDeals
-            || (DealButtons().Find(b => b.DataContext is DealTile d && d.Deal.Id == _focusedDealId)
-                ?? DealSourceButtons().Find(b => b.DataContext is DealSourceTile s && s.Key == _focusedDealId)) is not { } button)
+            || DealButtons().Find(b => b.DataContext is DealTile d && d.Deal.Id == _focusedDealId) is not { } button)
         {
             return false;
         }
@@ -625,7 +712,7 @@ internal sealed class DealsPresenter
 
     private void OnOpenDealsSettings(object sender, RoutedEventArgs e)
     {
-        _menu.Show(_menuView.DealsItems, "Deals & Free Games", SettingsMenu.GamesApps);
+        _menu.Show(_menuView.DealsItems, "Deals & Free Games", SettingsMenu.HomeScreen);
         RefreshDealsSettings();
         _notices.Show(_dealsError ?? string.Empty);
     }
@@ -660,7 +747,7 @@ internal sealed class DealsPresenter
         // What it needs to work was under the row's name, and is said once as it is switched on.
         if (LibrarySettings.WishlistDeals)
         {
-            _notices.Show(LibrarySettings.SteamKey is null ? "Wishlist deals need a Steam Web API key. Add it under Catalog & Content, Ready to Install."
+            _notices.Show(LibrarySettings.SteamKey is null ? "Wishlist deals need a Steam Web API key. Add it under Games & Stores, API Keys."
                 : "Your Steam wishlist must be public for this to work.");
         }
         _ = RefreshDealsAsync(force: true);
@@ -688,6 +775,9 @@ internal sealed class DealsPresenter
         }
     }
 
+    /// <summary>What each deals setting is set to, for the API Keys list, which shows the deals key.</summary>
+    public void RefreshSettings() => RefreshDealsSettings();
+
     private void RefreshDealsSettings()
     {
         var on = LibrarySettings.ShowDeals;
@@ -705,6 +795,10 @@ internal sealed class DealsPresenter
         var wishlist = LibrarySettings.WishlistDeals;
         _menuView.WishlistDealsSetting.IsEnabled = on;
         _menuView.WishlistDealsSetting.Tag = SettingSteps.OnOff(wishlist);
+
+        _menuView.DealsScrollSetting.IsEnabled = on;
+        _menuView.DealsScrollSetting.Visibility = LibrarySettings.ShownLayout == LibraryLayout.OldSchool ? Visibility.Collapsed : Visibility.Visible;
+        _menuView.DealsScrollSetting.Tag = SettingSteps.OnOff(LibrarySettings.ScrollDeals);
 
         _menuView.DealsRefreshItem.IsEnabled = on && (epic || key is not null);
         _menuView.DealsRefreshItem.Tag = null;

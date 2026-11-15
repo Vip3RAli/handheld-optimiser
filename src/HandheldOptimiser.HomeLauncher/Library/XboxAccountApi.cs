@@ -131,6 +131,84 @@ internal static class XboxAccountApi
         }
     }
 
+    // ----- The account's picture -----
+
+    /// <summary>Where the account's picture is kept, for the top bar.</summary>
+    public static string PicturePath(string xuid) => Path.Combine(OwnedFolder, $"xbox-{xuid}.picture");
+
+    /// <summary>
+    /// The signed-in account's picture as a file, fetched from Xbox Live when there is none yet or it is over
+    /// a week old. Null when not signed in or there is no picture to be had.
+    /// </summary>
+    public static async Task<string?> PictureFileAsync(CancellationToken cancel = default)
+    {
+        if (StoreSessions.Get(GameStore.Xbox) is not { NeedsSignIn: false } session)
+        {
+            return null;
+        }
+
+        var path = PicturePath(session.AccountId);
+        var have = File.Exists(path);
+        if (have && DateTime.UtcNow - File.GetLastWriteTimeUtc(path) < TimeSpan.FromDays(7))
+        {
+            return path;
+        }
+
+        if (await FreshAsync(cancel) is not { AccessToken: { } authorization } fresh)
+        {
+            return have ? path : null;
+        }
+
+        var json = await XboxAuth.GetAsync("https://profile.xboxlive.com/users/me/profile/settings?settings=GameDisplayPicRaw", authorization, "3", "profile", cancel);
+        if (json is null || ParsePicture(json) is not { } url)
+        {
+            return have ? path : null;
+        }
+
+        try
+        {
+            var bytes = await XboxAuth.Http.GetByteArrayAsync(url, cancel);
+            Directory.CreateDirectory(OwnedFolder);
+            await File.WriteAllBytesAsync(path, bytes, cancel);
+            if (fresh.Picture != url && StoreSessions.Get(GameStore.Xbox) is { } now)
+            {
+                StoreSessions.Save(now with { Picture = url });
+            }
+
+            return path;
+        }
+        catch (Exception ex) when (ex is System.Net.Http.HttpRequestException or TaskCanceledException or IOException or UnauthorizedAccessException)
+        {
+            Program.Log($"Could not fetch the Xbox account's picture: {ex.GetType().Name}");
+            return have ? path : null;
+        }
+    }
+
+    /// <summary>The picture's address in a profile settings answer, made secure.</summary>
+    internal static string? ParsePicture(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object || !doc.RootElement.TryGetProperty("profileUsers", out var users)
+                || users.ValueKind != JsonValueKind.Array || users.GetArrayLength() == 0
+                || !users[0].TryGetProperty("settings", out var settings) || settings.ValueKind != JsonValueKind.Array)
+            {
+                return null;
+            }
+
+            var url = settings.EnumerateArray().Where(s => Str(s, "id") == "GameDisplayPicRaw").Select(s => Str(s, "value")).FirstOrDefault(v => v is not null);
+            return url is null ? null
+                : url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ? "https://" + url[7..]
+                : url.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ? url
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>Lists the games the account has played again and keeps them on disk.</summary>
     /// <returns>Whether the list changed, and a message for the player when Xbox Live could not be asked.</returns>
     public static async Task<(bool Changed, string? Error)> RefreshPlayedAsync(bool force, CancellationToken cancel = default)

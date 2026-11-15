@@ -40,7 +40,29 @@ public partial class LibraryWindow
     {
         var scaleChanged = _layouts.Apply();
         var scale = _layouts.Scale;
+
+        // Each layout has its own Home Screen settings, so a new one reads them all again.
+        var layoutSettingsChanged = LibrarySettings.ShownLayout != _layouts.Layout;
+        if (layoutSettingsChanged)
+        {
+            LibrarySettings.ShownLayout = _layouts.Layout;
+            _options.Reload();
+            _options.ReloadShowFilter();
+            if (_options.ReloadContinue().InfoChanged)
+            {
+                _continue.ForgetInfo();
+            }
+
+            OptionsHint.Visibility = _options.QuickActions ? Visibility.Visible : Visibility.Collapsed;
+            _ = _topBar.UpdateStatusAsync();
+        }
         ScaledContent.LayoutTransform = scale == 1 ? Transform.Identity : new ScaleTransform(scale, scale);
+
+        // The top bar and the hints line up with the games: nearer the sides in the grid and the row, and
+        // where the Old School cards start in that layout.
+        var narrow = _layouts.Layout != LibraryLayout.OldSchool;
+        Resources["TopBarEdges"] = narrow ? new Thickness(24, 14, 24, 8) : new Thickness(48, 14, 48, 8);
+        Resources["HintBarEdges"] = narrow ? new Thickness(24, 2, 24, 12) : new Thickness(48, 2, 48, 12);
 
         // The cards' artwork is made at the size they are drawn, which has just changed.
         if (scaleChanged)
@@ -56,6 +78,13 @@ public partial class LibraryWindow
         _oldSchool.RefreshCategories();
         _continue.Update();
         UpdateDeals();
+        UpdateHeadings();
+        if (layoutSettingsChanged)
+        {
+            // Its own hidden games, order and store tabs.
+            ApplyFilter();
+        }
+
         RestoreFocus();
     }
 

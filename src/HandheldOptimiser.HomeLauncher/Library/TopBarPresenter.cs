@@ -34,6 +34,51 @@ internal sealed class TopBarPresenter
     private readonly Action<bool> _restoreFocus;
 
     private DateTime _lastUpdateCheck = DateTime.MinValue;
+
+    // The Xbox account whose picture is showing, so it is only read again when the account changes.
+    private string? _accountShown;
+
+    /// <summary>
+    /// Shows the Xbox account signed in inside the library in the capsule, with its gamertag and picture, or
+    /// takes it away when there is none. The user asked for this on 2026-11-15.
+    /// </summary>
+    public async Task ShowAccountAsync()
+    {
+        if (StoreSessions.Get(GameStore.Xbox) is not { NeedsSignIn: false, AccountName: { Length: > 0 } name } session)
+        {
+            _accountShown = null;
+            _view.AccountPanel.Visibility = Visibility.Collapsed;
+            _view.AccountPicture.Fill = null;
+            return;
+        }
+
+        _view.AccountName.Text = name;
+        _view.AccountInitial.Text = name[..1].ToUpperInvariant();
+        _view.AccountPanel.Visibility = Visibility.Visible;
+        if (_accountShown == session.AccountId && _view.AccountPicture.Fill is not null)
+        {
+            return;
+        }
+
+        _accountShown = session.AccountId;
+        var picture = await Task.Run(async () =>
+        {
+            try
+            {
+                return await XboxAccountApi.PictureFileAsync() is { } path ? GameTile.LoadCover(path, 96) : null;
+            }
+            catch (Exception ex) when (ex is System.IO.IOException or NotSupportedException or UnauthorizedAccessException)
+            {
+                return null;
+            }
+        });
+
+        // Signed out, or another account signed in, meanwhile.
+        if (picture is not null && _accountShown == session.AccountId)
+        {
+            _view.AccountPicture.Fill = new ImageBrush(picture) { Stretch = Stretch.UniformToFill };
+        }
+    }
     private Version? _dismissedUpdate;
 
     // The button the d-pad was last on, which Up goes back to.

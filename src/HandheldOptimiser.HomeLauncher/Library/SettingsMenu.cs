@@ -5,17 +5,35 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 
 /// <summary>
 /// The library's own settings, from the gear in the top bar or the controller's Menu button: a short list
-/// of three categories, each a short list of groups. This class has the settings list, Library display's
-/// groups (the background, what the library shows and docked mode), and where every group goes Back to.
-/// The other groups are each their own menu's, which wires the row that opens it.
+/// of five categories, each a short list of settings and of groups of them. The user had them regrouped on
+/// 2026-11-15: Look and Layout, Home Screen, Games and Stores, While Playing, and System. This class has the
+/// settings list, the rows of Look and Layout and Home Screen, the API Keys list (whose rows are still their
+/// own menus'), and where every group goes Back to. The other groups are each their own menu's, which
+/// wires the row that opens it.
 /// </summary>
 internal sealed class SettingsMenu
 {
     // The categories the settings list opens, each a short list of groups. A group's list names its
     // category under its title.
-    public const string LibraryDisplay = "Appearance & Layout";
-    public const string GamesApps = "Catalog & Content";
-    public const string SleepTweaks = "Performance & Power";
+    public const string LibraryDisplay = "Look & Layout";
+    public const string HomeScreen = "Home Screen";
+    public const string GamesApps = "Games & Stores";
+    public const string SleepTweaks = "While Playing";
+    public const string System = "System";
+
+    /// <summary>Told as the API Keys list opens, so the menus its rows belong to can say what each is set to.</summary>
+    public event Action? ApiKeysOpening;
+
+    /// <summary>A Home Screen setting that the deals below the games follow has changed.</summary>
+    public event Action? HomeScreenChanged;
+
+    /// <summary>A layout's name as the menu shows it.</summary>
+    private static string LayoutName(LibraryLayout layout) => layout switch
+    {
+        LibraryLayout.Row => "Row",
+        LibraryLayout.OldSchool => "NXE",
+        _ => "Grid"
+    };
 
     private readonly MenuView _view;
     private readonly MenuPresenter _menu;
@@ -55,9 +73,19 @@ internal sealed class SettingsMenu
         view.QuitSetting.Click += (_, _) => Quit();
         view.OpenMainAppSetting.Click += (_, _) => OpenMainApp();
 
-        // Appearance & Layout's groups.
-        view.BackgroundGroup.Click += (_, _) => _menu.Show(view.BackgroundItems, "Artwork & Theme", LibraryDisplay);
-        view.DisplayGroup.Click += (_, _) => _menu.Show(view.DisplayItems, "Library Elements", LibraryDisplay);
+        view.DisplayGroup.Click += (_, _) => OpenCategory(view.DisplayItems);
+        view.SystemGroup.Click += (_, _) => OpenCategory(view.SystemItems);
+
+        // Look & Layout's groups.
+        view.BackgroundGroup.Click += (_, _) => _menu.Show(view.BackgroundItems, "Background & Artwork", LibraryDisplay);
+
+        // Every API key, each row its own menu's.
+        view.ApiKeysGroup.Click += (_, _) =>
+        {
+            Refresh();
+            ApiKeysOpening?.Invoke();
+            _menu.Show(view.ApiKeysItems, "API Keys", GamesApps);
+        };
         view.TvGroup.Click += (_, _) => _menu.Show(view.TvItems, "Docked Display",
             _host.Docked ? "The library is on a TV or monitor now" : "The library is on the built-in screen now");
 
@@ -81,13 +109,18 @@ internal sealed class SettingsMenu
         {
             _options.ContinuePlaying = !_options.ContinuePlaying;
             Refresh();
-            _continue.Update();
+
+            // The games around it change too: the front card in NXE, a favourite back among the others.
+            _host.ShowTiles();
         };
         view.ContinueInfoSetting.Click += (_, _) =>
         {
             _options.ContinueInfo = !_options.ContinueInfo;
             Refresh();
             _continue.Update();
+
+            // The last game's play time and achievements on its picture in the grid.
+            _host.ShowTiles();
         };
         view.StoreDetailsSetting.Click += (_, _) =>
         {
@@ -97,6 +130,25 @@ internal sealed class SettingsMenu
             // Asked for again, or taken away, for the game on the card.
             _continue.ForgetInfo();
             _continue.Update();
+        };
+        view.CardDetailsSetting.Click += (_, _) =>
+        {
+            LibrarySettings.CardDetails = SettingSteps.Step(LibrarySettings.CardDetails, 1);
+            Refresh();
+            _host.RestoreFocus();
+        };
+        view.StoreBadgeSetting.Click += (_, _) =>
+        {
+            LibrarySettings.StoreBadge = !LibrarySettings.StoreBadge;
+            Refresh();
+            HomeScreenChanged?.Invoke();
+        };
+        view.TitlesSetting.Click += (_, _) =>
+        {
+            LibrarySettings.SectionTitles = !LibrarySettings.SectionTitles;
+            Refresh();
+            _continue.Update();
+            HomeScreenChanged?.Invoke();
         };
         view.StatusSetting.Click += (_, _) =>
         {
@@ -138,7 +190,8 @@ internal sealed class SettingsMenu
         foreach (var back in new[]
         {
             view.LibraryDisplaySettingsBackItem, view.GamesAppsSettingsBackItem, view.SleepTweaksSettingsBackItem,
-            view.BackgroundSettingsBackItem, view.DisplaySettingsBackItem, view.TvSettingsBackItem
+            view.BackgroundSettingsBackItem, view.DisplaySettingsBackItem, view.TvSettingsBackItem,
+            view.SystemBackItem, view.ApiKeysBackItem
         })
         {
             back.Click += (_, _) => menu.Back();
@@ -161,16 +214,20 @@ internal sealed class SettingsMenu
     private void OpenCategory(StackPanel category, Button? focus = null)
     {
         var title = ReferenceEquals(category, _view.LibraryDisplayItems) ? LibraryDisplay
+            : ReferenceEquals(category, _view.DisplayItems) ? HomeScreen
             : ReferenceEquals(category, _view.GamesAppsItems) ? GamesApps
+            : ReferenceEquals(category, _view.SystemItems) ? System
             : SleepTweaks;
 
         // A row hidden while its list was open, as Downloads is once the last download ends, cannot take the
         // focus, so the category's first row does.
-        _menu.Show(category, title, "Settings", focus is { Visibility: Visibility.Visible } ? focus : null);
+        // Each layout has its own Home Screen settings, so the menu says whose they are.
+        var subtitle = ReferenceEquals(category, _view.DisplayItems) ? $"{LayoutName(LibrarySettings.ShownLayout)} layout" : "Settings";
+        _menu.Show(category, title, subtitle, focus is { Visibility: Visibility.Visible } ? focus : null);
     }
 
     /// <summary>
-    /// One of the three categories, opened from its own Old School card. Back closes the menu, as there is
+    /// One of the categories, opened from its own Old School card. Back closes the menu, as there is
     /// no settings list behind it.
     /// </summary>
     public void OpenCategoryFromCard(StackPanel category)
@@ -197,7 +254,9 @@ internal sealed class SettingsMenu
         // A group goes back to its category, which is the list its row is in.
         foreach (var (group, row) in new[]
         {
-            (view.BackgroundItems, view.BackgroundGroup), (view.DisplayItems, view.DisplayGroup), (view.TvItems, view.TvGroup),
+            (view.BackgroundItems, view.BackgroundGroup), (view.TvItems, view.TvGroup), (view.ApiKeysItems, view.ApiKeysGroup),
+            (view.BackgroundAppsItems, view.BackgroundAppsGroup), (view.PowerCoolingItems, view.PowerCoolingGroup),
+            (view.StoreAppsItems, view.StoreAppsGroup),
             (view.AccountsItems, view.AccountsGroup), (view.OwnedItems, view.OwnedGroup), (view.DealsItems, view.DealsGroup),
             (view.AddItems, view.AddProgramGroup), (view.WhilePlayingItems, view.WhilePlayingGroup),
             (view.EmulatorItems, view.EmulatorsGroup), (view.MaintenanceItems, view.MaintenanceGroup),
@@ -221,8 +280,8 @@ internal sealed class SettingsMenu
         // settings list behind it: Back turns the card over again.
         foreach (var (category, row) in new[]
         {
-            (view.LibraryDisplayItems, view.LibraryDisplayGroup), (view.GamesAppsItems, view.GamesAppsGroup),
-            (view.SleepTweaksItems, view.SleepTweaksGroup)
+            (view.LibraryDisplayItems, view.LibraryDisplayGroup), (view.DisplayItems, view.DisplayGroup),
+            (view.GamesAppsItems, view.GamesAppsGroup), (view.SleepTweaksItems, view.SleepTweaksGroup), (view.SystemItems, view.SystemGroup)
         })
         {
             _menu.SetBack(category, () =>
@@ -263,19 +322,33 @@ internal sealed class SettingsMenu
         view.PositionSetting.Visibility = view.BlurSetting.Visibility;
         view.PositionSetting.Tag = _options.Position.ToString();
 
-        view.LayoutSetting.Tag = LibrarySettings.Layout switch
-        {
-            LibraryLayout.Row => "Row",
-            LibraryLayout.OldSchool => "Old School",
-            _ => "Grid"
-        };
+        view.LayoutSetting.Tag = LayoutName(LibrarySettings.Layout);
+
+        // Each layout shows its games' details its own way (2026-11-16): the grid on the last game's picture, the
+        // row below the picked game with what its store says, and the NXE layout on the picked card, as chosen.
+        var shown = LibrarySettings.ShownLayout;
+        static Visibility Shown(bool on) => on ? Visibility.Visible : Visibility.Collapsed;
+        view.ContinueInfoSetting.Visibility = Shown(shown != LibraryLayout.OldSchool);
+        view.StoreDetailsSetting.Visibility = Shown(shown == LibraryLayout.Row);
+        view.CardDetailsSetting.Visibility = Shown(shown == LibraryLayout.OldSchool);
+        view.TitlesSetting.Visibility = Shown(shown != LibraryLayout.OldSchool);
+        view.TitlesSetting.Tag = SettingSteps.OnOff(LibrarySettings.SectionTitles);
+        view.StoreBadgeSetting.Tag = SettingSteps.OnOff(LibrarySettings.StoreBadge);
         view.ContinueSetting.Tag = SettingSteps.OnOff(_options.ContinuePlaying);
 
-        view.ContinueInfoSetting.IsEnabled = _options.ContinuePlaying;
+        // In the grid the details are on the last game's picture, so they need it first.
+        view.ContinueInfoSetting.IsEnabled = shown == LibraryLayout.Row || _options.ContinuePlaying;
         view.ContinueInfoSetting.Tag = SettingSteps.OnOff(_options.ContinueInfo);
 
-        view.StoreDetailsSetting.IsEnabled = _options.ContinuePlaying && _options.ContinueInfo;
+        view.StoreDetailsSetting.IsEnabled = _options.ContinueInfo;
         view.StoreDetailsSetting.Tag = SettingSteps.OnOff(_options.StoreDetails);
+        view.CardDetailsSetting.Tag = LibrarySettings.CardDetails switch
+        {
+            CardDetails.Playtime => "Play time",
+            CardDetails.Achievements => "Achievements",
+            CardDetails.Both => "Both",
+            _ => "Off"
+        };
 
         var dockedMode = LibrarySettings.DockedMode;
         view.DockedSetting.Tag = SettingSteps.OnOff(dockedMode);
@@ -284,7 +357,7 @@ internal sealed class SettingsMenu
         view.DockedLayoutSetting.Tag = LibrarySettings.DockedLayout switch
         {
             DockedLayout.Grid => "Grid",
-            DockedLayout.OldSchool => "Old School",
+            DockedLayout.OldSchool => "NXE",
             _ => "Row"
         };
 
@@ -309,10 +382,21 @@ internal sealed class SettingsMenu
         view.ArtworkKeySetting.Tag = LibrarySettings.ArtworkKey is null ? "Not set" : "Set";
 
         // How the Old School layout is drawn, and whether the Console space look's background moves.
+        // Both belong to the NXE layout (Old School in the code), so they show only while it is the layout
+        // chosen, on the device's own screen or docked; the user asked for that on 2026-11-15.
+        var nxe = LibrarySettings.Layout == LibraryLayout.OldSchool
+            || (LibrarySettings.DockedMode && LibrarySettings.DockedLayout == DockedLayout.OldSchool);
         var console = LibrarySettings.OldSchoolLook == OldSchoolLook.ConsoleSpace;
+        view.OldSchoolLookSetting.Visibility = nxe ? Visibility.Visible : Visibility.Collapsed;
         view.OldSchoolLookSetting.Tag = console ? "Modern" : "Classic";
+        view.MovingBackgroundSetting.Visibility = view.OldSchoolLookSetting.Visibility;
         view.MovingBackgroundSetting.IsEnabled = console;
         view.MovingBackgroundSetting.Tag = SettingSteps.OnOff(LibrarySettings.MovingBackground);
+
+        // The NXE look's animated background covers the player's own, so its settings go while it is on; with it
+        // off the game's colours or artwork show behind the cards (2026-11-16).
+        view.BackgroundGroup.Visibility = LibrarySettings.ShownLayout == LibraryLayout.OldSchool && console
+            && LibrarySettings.MovingBackground ? Visibility.Collapsed : Visibility.Visible;
     }
 
     /// <summary>Between the Classic look and Console space. There are only the two, so either way is the other.</summary>

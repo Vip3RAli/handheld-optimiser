@@ -61,6 +61,15 @@ internal enum LibraryLayout
 /// How the Old School layout is drawn: Classic, its flat green wall and cards, or Console space, a lit
 /// green space with cards turned in perspective over a glass floor that reflects them.
 /// </summary>
+/// <summary>What the NXE layout's focused card shows of its game, besides its name.</summary>
+internal enum CardDetails
+{
+    Off,
+    Playtime,
+    Achievements,
+    Both
+}
+
 internal enum OldSchoolLook
 {
     ConsoleSpace,
@@ -180,37 +189,37 @@ internal static class LibrarySettings
     /// <summary>Battery and Wi-Fi beside the clock.</summary>
     public static bool ShowStatus
     {
-        get => ReadSwitch(StatusValue);
-        set => WriteSwitch(StatusValue, value);
+        get => ReadLayoutSwitch(StatusValue);
+        set => WriteLayoutSwitch(StatusValue, value);
     }
 
     /// <summary>The store tabs under the title, and the bumpers that move between them.</summary>
     public static bool ShowFilter
     {
-        get => ReadSwitch(FilterValue);
-        set => WriteSwitch(FilterValue, value);
+        get => ReadLayoutSwitch(FilterValue);
+        set => WriteLayoutSwitch(FilterValue, value);
     }
 
     /// <summary>The per-game menu on X, or press and hold.</summary>
     public static bool QuickActions
     {
-        get => ReadSwitch(QuickActionsValue);
-        set => WriteSwitch(QuickActionsValue, value);
+        get => ReadLayoutSwitch(QuickActionsValue);
+        set => WriteLayoutSwitch(QuickActionsValue, value);
     }
 
     /// <summary>Games the player hid, shown faded so they can be brought back. Off until switched on.</summary>
     public static bool ShowHidden
     {
-        get => ReadSwitch(ShowHiddenValue, on: false);
-        set => WriteSwitch(ShowHiddenValue, value);
+        get => ReadLayoutSwitch(ShowHiddenValue, on: false);
+        set => WriteLayoutSwitch(ShowHiddenValue, value);
     }
 
     public static SortOrder Sort
     {
-        get => Enum.TryParse<SortOrder>(Read(SortValue), ignoreCase: true, out var sort) && Enum.IsDefined(sort)
+        get => Enum.TryParse<SortOrder>(ReadForLayout(SortValue), ignoreCase: true, out var sort) && Enum.IsDefined(sort)
             ? sort
             : SortOrder.RecentlyPlayed;
-        set => Write(SortValue, value.ToString().ToLowerInvariant());
+        set => Write(ForLayout(SortValue, ShownLayout), value.ToString().ToLowerInvariant());
     }
 
     /// <summary>Close the chosen background programs whenever a game starts. Off until switched on.</summary>
@@ -259,22 +268,22 @@ internal static class LibrarySettings
     /// <summary>The last game played, above the grid.</summary>
     public static bool ContinuePlaying
     {
-        get => ReadSwitch(ContinueValue);
-        set => WriteSwitch(ContinueValue, value);
+        get => ReadLayoutSwitch(ContinueValue);
+        set => WriteLayoutSwitch(ContinueValue, value);
     }
 
     /// <summary>The last game's play time, size and profile, beside its Last played card.</summary>
     public static bool ContinueInfo
     {
-        get => ReadSwitch(ContinueInfoValue);
-        set => WriteSwitch(ContinueInfoValue, value);
+        get => ReadLayoutSwitch(ContinueInfoValue);
+        set => WriteLayoutSwitch(ContinueInfoValue, value);
     }
 
     /// <summary>The last game's description and the like from Steam's store or Wikipedia. Off until switched on.</summary>
     public static bool StoreDetails
     {
-        get => ReadSwitch(StoreDetailsValue, on: false);
-        set => WriteSwitch(StoreDetailsValue, value);
+        get => ReadLayoutSwitch(StoreDetailsValue, on: false);
+        set => WriteLayoutSwitch(StoreDetailsValue, value);
     }
 
     /// <summary>Back to the game that was running, rather than the library, when the device wakes.</summary>
@@ -373,8 +382,8 @@ internal static class LibrarySettings
     /// <summary>The Deals row below the library. Off until switched on.</summary>
     public static bool ShowDeals
     {
-        get => ReadSwitch(DealsValue, on: false);
-        set => WriteSwitch(DealsValue, value);
+        get => ReadLayoutSwitch(DealsValue, on: false);
+        set => WriteLayoutSwitch(DealsValue, value);
     }
 
     /// <summary>The Epic Games Store's free games of the week at the front of the Deals row, which need no key.</summary>
@@ -389,6 +398,44 @@ internal static class LibrarySettings
     {
         get => ReadSecret(Store, DealsKeyValue);
         set => WriteSecret(Store, DealsKeyValue, value);
+    }
+
+    /// <summary>When achievements were last synced for every game, by hand or by the daily sync. Null when never.</summary>
+    public static DateTimeOffset? AchievementsSyncedAt
+    {
+        get => DateTimeOffset.TryParse(Read("AchievementsSyncedAt"), System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.RoundtripKind, out var at) ? at : null;
+        set => Write("AchievementsSyncedAt", value?.ToString("o", System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>Whether the row of deals moves slowly across the screen by itself, in the grid and the row. On unless switched off.</summary>
+    public static bool ScrollDeals
+    {
+        get => ReadLayoutSwitch("ScrollDeals");
+        set => WriteLayoutSwitch("ScrollDeals", value);
+    }
+
+    /// <summary>Each game's store, as a logo on its picture. On unless switched off, in each layout.</summary>
+    public static bool StoreBadge
+    {
+        get => ReadLayoutSwitch("StoreBadge");
+        set => WriteLayoutSwitch("StoreBadge", value);
+    }
+
+    /// <summary>What the focused card shows of its game in the NXE layout. Off until chosen.</summary>
+    public static CardDetails CardDetails
+    {
+        get => Enum.TryParse<CardDetails>(ReadForLayout("CardDetails"), ignoreCase: true, out var details) && Enum.IsDefined(details)
+            ? details
+            : CardDetails.Off;
+        set => Write(ForLayout("CardDetails", ShownLayout), value.ToString().ToLowerInvariant());
+    }
+
+    /// <summary>The names above the sections of the home screen: Jump back in, Games, and Giveaways and On Sale. On unless switched off.</summary>
+    public static bool SectionTitles
+    {
+        get => ReadLayoutSwitch("SectionTitles");
+        set => WriteLayoutSwitch("SectionTitles", value);
     }
 
     /// <summary>Deals on the games on the player's Steam wishlist first, which needs the Steam key too.</summary>
@@ -445,6 +492,37 @@ internal static class LibrarySettings
     };
 
     private static void WriteSwitch(string name, bool on) => Write(name, on ? "on" : "off");
+
+    // ----- The Home Screen settings, one set for each layout -----
+
+    /// <summary>
+    /// The layout on screen, whose Home Screen settings are read and written. The window sets it as it draws a
+    /// layout; docked mode can make it differ from <see cref="Layout"/>. The grid until then, as the window starts.
+    /// </summary>
+    public static LibraryLayout ShownLayout { get; set; } = LibraryLayout.Grid;
+
+    /// <summary>
+    /// The name a Home Screen setting is kept under for one layout. Each layout has its own, which the user
+    /// asked for on 2026-11-16 (last played in the grid but not the row, say).
+    /// </summary>
+    public static string ForLayout(string name, LibraryLayout layout) => $"{name}.{layout.ToString().ToLowerInvariant()}";
+
+    /// <summary>
+    /// A layout's own value for a setting, or the one the layouts shared before each had its own, so nothing
+    /// changes for the player until they change it in a layout.
+    /// </summary>
+    public static string? PickForLayout(string? ownValue, string? sharedValue) => ownValue ?? sharedValue;
+
+    private static string? ReadForLayout(string name) => PickForLayout(Read(ForLayout(name, ShownLayout)), Read(name));
+
+    private static bool ReadLayoutSwitch(string name, bool on = true) => ReadForLayout(name)?.ToLowerInvariant() switch
+    {
+        "on" => true,
+        "off" => false,
+        _ => on
+    };
+
+    private static void WriteLayoutSwitch(string name, bool on) => Write(ForLayout(name, ShownLayout), on ? "on" : "off");
 
     /// <summary>The player's SteamGridDB API key, or null when none is set.</summary>
     public static string? ArtworkKey

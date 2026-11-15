@@ -185,7 +185,8 @@ internal sealed class MenuPresenter
             view.GamesAppsItems, view.SleepTweaksItems, view.BackgroundItems, view.DisplayItems, view.AddItems, view.PowerItems,
             view.QuickItems, view.WhilePlayingItems, view.AppsToCloseItems, view.RunningAppsItems, view.MaintenanceItems,
             view.StartupItems, view.EmulatorItems, view.TvItems, view.OwnedItems, view.DealsItems,
-            view.AccountsItems, view.AchievementsItems, view.SaveSnapshotsItems, view.TagsItems, view.DownloadsItems
+            view.AccountsItems, view.AchievementsItems, view.SaveSnapshotsItems, view.TagsItems, view.DownloadsItems,
+            view.SystemItems, view.ApiKeysItems, view.BackgroundAppsItems, view.PowerCoolingItems, view.StoreAppsItems
         })
         {
             list.Visibility = Visibility.Collapsed;

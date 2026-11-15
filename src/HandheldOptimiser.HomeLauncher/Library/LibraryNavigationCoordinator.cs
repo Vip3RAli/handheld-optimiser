@@ -141,12 +141,6 @@ internal sealed class LibraryNavigationCoordinator
             return;
         }
 
-        if (Keyboard.FocusedElement is Button { DataContext: DealSourceTile } source)
-        {
-            _deals.NavigateDealSources(source, direction);
-            return;
-        }
-
         if (Keyboard.FocusedElement is not Button { DataContext: GameTile tile } button)
         {
             // With nothing to show, such as an empty Apps tab, the top bar is all there is to reach.
@@ -303,9 +297,6 @@ internal sealed class LibraryNavigationCoordinator
                 break;
             case GamepadAction.Accept when Keyboard.FocusedElement is Button { DataContext: DealTile deal }:
                 _deals.OpenDeal(deal);
-                break;
-            case GamepadAction.Accept when Keyboard.FocusedElement is Button { DataContext: DealSourceTile } source:
-                source.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 break;
             case GamepadAction.Accept when Keyboard.FocusedElement is Button { DataContext: ActionCard card }:
                 card.Act();
@@ -533,6 +524,7 @@ internal sealed class LibraryNavigationCoordinator
             _acceptHint.Text = _state.Filter.Accept;
             _deals.FocusWasHere = false;
             _backdrop.Queue(tile);
+            _continue.Focused(tile);
 
             if (!tile.IsInstalled)
             {
@@ -548,10 +540,10 @@ internal sealed class LibraryNavigationCoordinator
                 return;
             }
 
-            // Leave room for the focus ring and the title underneath when scrolling a row into view.
-            // In the row the focused tile is drawn well beyond where it is laid out.
-            var (across, above) = _layouts.IsRow ? (95d, 170d) : (20d, 40d);
-            button.BringIntoView(new Rect(-across, -above, button.ActualWidth + (2 * across), button.ActualHeight + above + 40));
+            // Leave room for the focus ring and the title underneath when scrolling a row into view. In the row
+            // the focused tile is drawn well beyond where it is laid out, growing down from its top edge.
+            var (across, above, below) = _layouts.IsRow ? (95d, 20d, 170d) : (20d, 40d, 40d);
+            button.BringIntoView(new Rect(-across, -above, button.ActualWidth + (2 * across), button.ActualHeight + above + below));
         }
     }
 

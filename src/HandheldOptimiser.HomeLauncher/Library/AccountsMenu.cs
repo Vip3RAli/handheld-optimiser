@@ -1,3 +1,4 @@
+using System.Windows;
 using System.Windows.Controls;
 
 namespace HandheldOptimiser.HomeLauncher.Library;
@@ -23,6 +24,9 @@ internal sealed class AccountsMenu
 
     private bool _syncing;
 
+    /// <summary>Told when a store is signed out of, so what shows the account elsewhere can follow.</summary>
+    public event Action? SignedOut;
+
     // Each store's Sign out row, which a first press arms.
     private readonly Dictionary<GameStore, Button> _signOutRows = [];
 
@@ -47,7 +51,7 @@ internal sealed class AccountsMenu
     {
         _menu.Armed = null;
         RefreshRows();
-        _menu.Show(_view.AccountsItems, "Store Accounts & Achievements", SettingsMenu.GamesApps, focus);
+        _menu.Show(_view.AccountsItems, "Store Accounts", SettingsMenu.GamesApps, focus);
     }
 
     private void RefreshRows()
@@ -81,8 +85,9 @@ internal sealed class AccountsMenu
             _menu.AddRow(_view.AccountsItems, before, status.StoreName, status.Describe(), () => SignInWithApp(store));
         }
 
-        _view.AccountsSteamKeyItem.Tag = StoreSessions.SignedIn(GameStore.Steam) ? "Not needed"
-            : LibrarySettings.SteamKey is null ? "Not set" : "Set";
+        // The Steam key has one row now, under API Keys. This one stays in the list, unseen, as the place
+        // the stores' rows are added above.
+        _view.AccountsSteamKeyItem.Visibility = Visibility.Collapsed;
         _view.AccountsSyncAchievementsItem.Tag = _syncing ? "Syncing..." : null;
     }
 
@@ -154,6 +159,7 @@ internal sealed class AccountsMenu
             : $"Signed out of {name} in the library.");
         RefreshRows();
         _menu.ShowItems();
+        SignedOut?.Invoke();
     }
 
     private async Task SyncAsync(GameStore store)
@@ -215,7 +221,22 @@ internal sealed class AccountsMenu
                 _menu.ShowItems(_view.AccountsSteamKeyItem);
             });
 
-    private async void SyncAll()
+    private async void SyncAll() => await SyncEveryGameAsync(quiet: false);
+
+    /// <summary>
+    /// Syncs every game's achievements once a day by itself, as the library comes to the front after a scan.
+    /// Quietly: the player did not ask, so there is no notice, only the row saying it is under way.
+    /// </summary>
+    public Task SyncDailyAsync()
+    {
+        // Nothing to ask without a store signed in or the Steam key; the games' own files are read as they open.
+        var any = AccountsMenu.SignedInHere.Any(StoreSessions.SignedIn) || LibrarySettings.SteamKey is not null;
+        return any && Achievements.SyncAllDue(LibrarySettings.AchievementsSyncedAt, DateTimeOffset.Now)
+            ? SyncEveryGameAsync(quiet: true)
+            : Task.CompletedTask;
+    }
+
+    private async Task SyncEveryGameAsync(bool quiet)
     {
         if (_syncing)
         {
@@ -228,20 +249,29 @@ internal sealed class AccountsMenu
         {
             var games = _state.AllTiles.Select(t => t.Game).ToList();
             var (withAchievements, unlocked) = await Achievements.SyncAllAsync(games);
+            LibrarySettings.AchievementsSyncedAt = DateTimeOffset.Now;
             _continue.ForgetInfo();
             _continue.Update();
+            Program.Log($"Synced achievements for every game{(quiet ? " (daily)" : "")}: {unlocked} unlocked across {withAchievements}");
 
-            _notices.Show(withAchievements == 0
-                ? "No achievements found yet. Sign in to Steam or GOG above."
-                : $"Synced {unlocked} unlocked achievements across {withAchievements} {(withAchievements == 1 ? "game" : "games")}.");
+            if (!quiet)
+            {
+                _notices.Show(withAchievements == 0
+                    ? "No achievements found yet. Sign in to a store under Store Accounts."
+                    : $"Synced {unlocked} unlocked achievements across {withAchievements} {(withAchievements == 1 ? "game" : "games")}.");
+            }
+        }
+        catch (Exception ex) when (ex is System.Net.Http.HttpRequestException or System.IO.IOException or TaskCanceledException)
+        {
+            // Tried again on the next look after the scan, since the time is only kept when it worked.
+            Program.Log($"Could not sync every game's achievements: {ex.Message}");
         }
         finally
         {
             _syncing = false;
-            if (ReferenceEquals(_menu.List, _view.AccountsItems))
-            {
-                _view.AccountsSyncAchievementsItem.Tag = null;
-            }
+
+            // The row is in Games & Stores now, outside this menu's own list.
+            _view.AccountsSyncAchievementsItem.Tag = null;
         }
     }
 }

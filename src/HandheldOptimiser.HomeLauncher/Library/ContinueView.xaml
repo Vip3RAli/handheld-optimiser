@@ -1,6 +1,6 @@
 <!--
     Last played: the last game played as a wide card above the grid, with the panel of what is known
-    about it beside the card when there is room, and the Game library heading below. ContinuePresenter
+    about it beside the card when there is room, and the Games heading below. ContinuePresenter
     runs it. The card is a game's tile like any other, so the window wires its click and focus.
 -->
 <UserControl x:Class="HandheldOptimiser.HomeLauncher.Library.ContinueView"
@@ -12,17 +12,18 @@
         the middle and bigger above the grid, and at the left above the row.
     -->
     <StackPanel x:Name="ContinuePanel" Visibility="Collapsed">
-        <TextBlock Text="Last played" Margin="10,20,0,6" FontSize="22" FontWeight="SemiBold" Opacity="0.85" />
+        <!-- Named Last played until 2026-11-16. The section titles can be switched off (LibrarySettings.SectionTitles). -->
+        <TextBlock x:Name="ContinueHeading" Text="Jump back in" Margin="10,20,0,6" FontSize="22" FontWeight="SemiBold" Opacity="0.85" />
 
         <!--
-            Above the grid the card and the panel beside it are drawn one and a half times the size
+            Above the grid the card and the panel beside it are drawn at three quarters of the size
             they are laid out at below, as Scale in ContinuePresenter.cs, in the
             middle of the screen. When they fill it the margin keeps their edges in line with the
             tiles'. UpdateContinue sets both for the layout in use.
         -->
         <Grid x:Name="ContinueRow" Margin="-5,0,-5,0" HorizontalAlignment="Center">
             <Grid.LayoutTransform>
-                <ScaleTransform x:Name="ContinueZoom" ScaleX="1.5" ScaleY="1.5" />
+                <ScaleTransform x:Name="ContinueZoom" ScaleX="0.75" ScaleY="0.75" />
             </Grid.LayoutTransform>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
@@ -50,6 +51,13 @@
                                 <Image Source="{Binding Icon}" Width="72" Height="72"
                                        RenderOptions.BitmapScalingMode="HighQuality"
                                        Visibility="{Binding ShowsIcon, Converter={StaticResource BoolToVis}}" />
+                                <!-- A favourite wears its star here too, since it is not among the games below as well. -->
+                                <Border Width="26" Height="26" CornerRadius="13" Margin="6" Background="#B0101216"
+                                        HorizontalAlignment="Right" VerticalAlignment="Top"
+                                        Visibility="{Binding IsFavourite, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="&#xE735;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13"
+                                               Foreground="#F5C542" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
                                 <Border Width="26" Height="26" CornerRadius="13" Margin="6" Background="#D0101216"
                                         HorizontalAlignment="Right" VerticalAlignment="Bottom">
                                     <Border.Style>
@@ -106,6 +114,11 @@
                 </DockPanel>
             </Border>
         </Grid>
-        <TextBlock x:Name="AllGamesHeading" Text="Game library" Margin="10,36,0,6" FontSize="22" FontWeight="SemiBold" Opacity="0.85" />
+        <!--
+            The games' heading, Games since 2026-11-16 (Game library before). With the section titles off it is
+            kept with no height, so its top margin is still the space between the card and the games, which
+            ContinuePresenter grows on a TV or monitor.
+        -->
+        <TextBlock x:Name="AllGamesHeading" Text="Games" Margin="10,16,0,6" FontSize="22" FontWeight="SemiBold" Opacity="0.85" />
     </StackPanel>
 </UserControl>

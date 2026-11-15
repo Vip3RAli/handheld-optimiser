@@ -19,8 +19,8 @@ internal sealed class ContinuePresenter
     // The card's artwork is decoded at about the card's width at 200% scaling.
     private const int ArtWidth = 1680;
 
-    // The space above the Game library heading in DIPs, and the most it grows to on a TV or monitor.
-    private const double AllGamesGap = 36;
+    // The space between the card and the games in DIPs, and the most it grows to on a TV or monitor.
+    private const double AllGamesGap = 16;
     private const double AllGamesMaxGap = 240;
 
     // A row of tiles with its titles, until the tiles have been laid out.
@@ -81,53 +81,140 @@ internal sealed class ContinuePresenter
 
     private bool Showing => _view.ContinuePanel.Visibility == Visibility.Visible;
 
-    // How much bigger the card and the panel are drawn than ContinueView.xaml lays them out: half as big
-    // again above the grid, and as they are above the row. The widths above are before that.
-    private double Scale => _isRow() ? 1 : 1.5;
+    // How big the card and the panel are drawn against how ContinueView.xaml lays them out: three quarters
+    // above the grid, and as they are above the row. The widths above are before that. Above the grid they
+    // were half as big again until the user asked on 2026-11-16 for them halved, since with the deals at
+    // the bottom they left room for only part of a row of games.
+    private double Scale => _isRow() ? 1 : 0.75;
 
-    /// <summary>Fills the Last played row, or hides it when it is off or does not apply.</summary>
+    /// <summary>
+    /// The game for Jump back in, the last one played, when it is switched on in this layout and the Games tab
+    /// is open; null otherwise. In the NXE layout it is the first of the games' cards rather than a card of its own.
+    /// </summary>
+    public GameTile? LastPlayed() =>
+        _options.ContinuePlaying && _state.Filter == TileFilter.All
+            ? RecentGames.Pick(_state.Shown(_options.ShowHidden).Where(t => t.IsInstalled && !t.IsHidden && !t.IsApp),
+                t => _state.StatsOf(t).LastPlayed, 1).FirstOrDefault()
+            : null;
+
+    /// <summary>
+    /// Shows the details panel below the row for the game picked there, or hides it. The Jump back in card above
+    /// the games is gone since the user asked on 2026-11-16: the last game played is the first of the games
+    /// instead, with a badge, and in the row its details, or any game's, are shown below it when Game Details is on.
+    /// </summary>
     public void Update()
     {
-        // The Old School cards take the middle of the screen, and the first of them is the last game played.
-        var played = _options.ContinuePlaying && _state.Filter == TileFilter.All && !_isOldSchool()
-            ? RecentGames.Pick(_state.Shown(_options.ShowHidden).Where(t => t.IsInstalled && !t.IsHidden && !t.IsApp),
-                t => _state.StatsOf(t).LastPlayed, 1)
-            : [];
-
         var view = _view;
-        if (played.Count == 0)
+        view.ContinueCard.Visibility = Visibility.Collapsed;
+        view.ContinueHeading.Visibility = Visibility.Collapsed;
+        view.AllGamesHeading.Visibility = Visibility.Collapsed;
+        FocusWasHere = false;
+
+        var tile = _isRow() && _options.ContinueInfo && _state.Filter == TileFilter.All ? _detailsFor : null;
+        if (tile is null || !_state.Tiles.Contains(tile))
         {
             view.ContinuePanel.Visibility = Visibility.Collapsed;
-            FocusWasHere = false;
             return;
         }
 
-        // Above the grid the card is bigger and in the middle; above the row it is at the left, at the
-        // tiles' own size, and the row needs no heading of its own.
-        var row = _isRow();
         view.ContinueZoom.ScaleX = view.ContinueZoom.ScaleY = Scale;
-        view.ContinueRow.HorizontalAlignment = row ? HorizontalAlignment.Left : HorizontalAlignment.Center;
-        view.AllGamesHeading.Visibility = row ? Visibility.Collapsed : Visibility.Visible;
-
-        var card = played[0];
+        view.ContinueRow.HorizontalAlignment = HorizontalAlignment.Left;
         view.ContinuePanel.Visibility = Visibility.Visible;
-        view.ContinueCard.DataContext = card;
-        UpdateInfo(card);
+        UpdateInfo(tile);
+        if (view.ContinueInfo.Visibility != Visibility.Visible)
+        {
+            view.ContinuePanel.Visibility = Visibility.Collapsed;
+        }
+    }
 
-        // The play time is in the panel beside the card when that is showing.
-        view.ContinueDetail.Text = _isPaused(card) ? "Paused. Press A to carry on where you left off"
-            : view.ContinueInfo.Visibility == Visibility.Visible ? null
-            : _state.StatsOf(card).Describe(DateTimeOffset.UtcNow);
-        view.ContinueDetail.Visibility = string.IsNullOrEmpty(view.ContinueDetail.Text) ? Visibility.Collapsed : Visibility.Visible;
+    // The game the details below the row are for, and the wait for the focus to settle before they change, so
+    // holding a direction along the row does not look every game up on the way.
+    private GameTile? _detailsFor;
+    private DispatcherTimer? _settle;
 
-        ShowArt();
+    // The NXE card showing its play time or achievements, which only the focused one does.
+    private GameTile? _cardDetailTile;
 
-        // Once the row and the tiles have their sizes.
-        view.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, PlaceAllGames);
+    // Each game's size on disk, measured once a session: walking a big game's folder takes a while.
+    private readonly Dictionary<string, long> _sizes = [];
+
+    /// <summary>A game's tile has the focus: its details below the row, or its play time on its NXE card.</summary>
+    public void Focused(GameTile tile)
+    {
+        if (_isOldSchool())
+        {
+            ShowCardDetail(tile);
+            return;
+        }
+
+        if (!_isRow() || !_options.ContinueInfo)
+        {
+            return;
+        }
+
+        _detailsFor = tile;
+        if (_settle is null)
+        {
+            _settle = new DispatcherTimer { Interval = BackdropPresenter.SettleDelay };
+            _settle.Tick += (_, _) =>
+            {
+                _settle.Stop();
+                Update();
+            };
+        }
+
+        _settle.Stop();
+        _settle.Start();
+    }
+
+    /// <summary>The NXE layout's focused card shows its play time or achievements, as its Card details setting asks.</summary>
+    private void ShowCardDetail(GameTile tile)
+    {
+        if (_cardDetailTile is { } before && !ReferenceEquals(before, tile))
+        {
+            before.CoverDetail = null;
+        }
+
+        var details = LibrarySettings.CardDetails;
+        tile.CoverDetail = details == CardDetails.Off ? null
+            : CoverDetailOf(tile, details is CardDetails.Playtime or CardDetails.Both, details is CardDetails.Achievements or CardDetails.Both);
+        _cardDetailTile = tile;
     }
 
     /// <summary>
-    /// On a TV or monitor, moves the grid down so its first row sits at the bottom of the screen, when the
+    /// What the games show on their pictures: in the grid the last game played its play time and achievements,
+    /// with Game Details on; in the NXE layout only the focused card, which <see cref="Focused"/> looks after.
+    /// </summary>
+    public void UpdateCoverDetails(IEnumerable<GameTile> tiles, GameTile? lastPlayed)
+    {
+        var grid = !_isRow() && !_isOldSchool() && _options.ContinueInfo;
+        foreach (var tile in tiles)
+        {
+            tile.CoverDetail = _isOldSchool() ? (ReferenceEquals(tile, _cardDetailTile) ? tile.CoverDetail : null)
+                : grid && ReferenceEquals(tile, lastPlayed) ? CoverDetailOf(tile, playtime: true, achievements: true)
+                : null;
+        }
+    }
+
+    /// <summary>A game's play time and achievements as lines on its picture, or null when it has neither.</summary>
+    private string? CoverDetailOf(GameTile tile, bool playtime, bool achievements)
+    {
+        var lines = new List<string>();
+        if (playtime && _state.StatsOf(tile).Played is var played && played >= TimeSpan.FromMinutes(1))
+        {
+            lines.Add($"{PlayStats.Duration(played)} played");
+        }
+
+        if (achievements && Achievements.For(tile.Game) is { Total: > 0 } unlocked)
+        {
+            lines.Add($"Achievements {unlocked.Describe()}");
+        }
+
+        return lines.Count == 0 ? null : string.Join(Environment.NewLine, lines);
+    }
+
+    /// <summary>
+    /// On a TV or monitor, moves the grid down so its last whole row on show sits at the bottom of the screen, when the
     /// screen has room to spare below it. On the built-in screen the gap stays as it is.
     /// </summary>
     private void PlaceAllGames()
@@ -139,11 +226,20 @@ internal sealed class ContinuePresenter
 
         var view = _view;
         var gap = AllGamesGap;
-        if (_docked() && _scroller.ViewportHeight > 0)
+        // Not with the deals at the bottom of the screen (the page then ends above them, DealsPresenter.FitPage):
+        // the gap pushed the games down out of sight there, which the user saw on 2026-11-16.
+        var dealsBelow = _scroller.Margin.Bottom > 0;
+        if (_docked() && !dealsBelow && _scroller.ViewportHeight > 0)
         {
             var row = _firstTile() is { ActualHeight: > 0 } tile ? tile.ActualHeight : TileRowHeight;
             var above = view.ContinuePanel.ActualHeight - view.AllGamesHeading.Margin.Top;
-            gap = Math.Clamp(_scroller.ViewportHeight - above - row, AllGamesGap, AllGamesMaxGap);
+
+            // As many whole rows as fit below the card, and the room left over above the heading, so the
+            // last of them ends at the bottom. It used to be one row whatever the room, which pushed the
+            // second row out of sight once the card was made smaller (2026-11-16).
+            var room = _scroller.ViewportHeight - above;
+            var rows = Math.Max(1, Math.Floor((room - AllGamesGap) / row));
+            gap = Math.Clamp(room - rows * row, AllGamesGap, AllGamesMaxGap);
         }
 
         var margin = view.AllGamesHeading.Margin;
@@ -204,16 +300,7 @@ internal sealed class ContinuePresenter
 
     /// <summary>Gives the card the focus, when the row is showing.</summary>
     /// <returns>False when there is no row to go to.</returns>
-    public bool Focus()
-    {
-        if (!Showing)
-        {
-            return false;
-        }
-
-        _view.ContinueCard.Focus();
-        return true;
-    }
+    public bool Focus() => false;
 
     /// <summary>
     /// Back on the card, when the focus was last on it and the game it shows is still the focused one.
@@ -221,7 +308,9 @@ internal sealed class ContinuePresenter
     /// <returns>The game on the card when the focus went back to it, otherwise null.</returns>
     public GameTile? RestoreFocus()
     {
-        if (!FocusWasHere || !Showing || _view.ContinueCard.DataContext is not GameTile card || card.Game.Key != _state.FocusedKey)
+        // The card is gone (see Update), so there is never a card to go back to.
+        if (!FocusWasHere || !Showing || _view.ContinueCard.Visibility != Visibility.Visible
+            || _view.ContinueCard.DataContext is not GameTile card || card.Game.Key != _state.FocusedKey)
         {
             return null;
         }
@@ -235,8 +324,9 @@ internal sealed class ContinuePresenter
     /// <summary>Whether the panel has room beside the card on this screen.</summary>
     private bool InfoFits() => _options.ContinueInfo && InfoRoom() >= InfoMinWidth;
 
+    // The panel has the width of the page to itself now there is no card beside it.
     private double InfoRoom() =>
-        (_scroller.ActualWidth - _scroller.Padding.Left - _scroller.Padding.Right) / Scale - CardWidth;
+        (_scroller.ActualWidth - _scroller.Padding.Left - _scroller.Padding.Right) / Scale - 20;
 
     /// <summary>Fills the panel for the game on the card, or hides it when it is off or does not fit.</summary>
     private void UpdateInfo(GameTile card)
@@ -269,7 +359,11 @@ internal sealed class ContinuePresenter
         // A program the player added may sit in a folder full of other things.
         if (game.Store is not (GameStore.Other or GameStore.Emulator) && game.InstallDirectory is { } folder)
         {
-            var size = await Task.Run(() => Directory.Exists(folder) ? Cleanup.SizeOf([folder]) : 0);
+            if (!_sizes.TryGetValue(game.Key, out var size))
+            {
+                size = await Task.Run(() => Directory.Exists(folder) ? Cleanup.SizeOf([folder]) : 0);
+                _sizes[game.Key] = size;
+            }
 
             // The card may have moved on to another game meanwhile.
             if (_infoKey != game.Key)
@@ -333,9 +427,10 @@ internal sealed class ContinuePresenter
         }
 
         var about = InfoRoom() >= AboutMinWidth ? _infoDetails?.Description : null;
-        if (rows.Count == 0 && about is null)
+        if (about is null && rows.Count == 0)
         {
             view.ContinueInfo.Visibility = Visibility.Collapsed;
+            ShowDetail(card);
             return;
         }
 
@@ -350,8 +445,48 @@ internal sealed class ContinuePresenter
         // With no description the rows would be lost in a panel as wide as the screen.
         view.ContinueRows.Width = about is null ? double.NaN : RowsWidth;
         view.ContinueInfo.Width = about is null ? Math.Min(InfoWidthAlone, InfoRoom() - 20) : double.NaN;
+
+        // Only as tall as its lines without a description, which the panel was otherwise mostly empty around.
+        view.ContinueInfo.Height = about is null ? double.NaN : 270;
         view.ContinueInfo.HorizontalAlignment = about is null ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;
         view.ContinueInfo.Visibility = Visibility.Visible;
+        ShowDetail(card);
+    }
+
+    /// <summary>
+    /// The lines on the card under the game's name: that it is paused, or when it was played and its
+    /// achievements, which are in the panel beside the card instead when that is showing.
+    /// </summary>
+    private void ShowDetail(GameTile card)
+    {
+        var view = _view;
+        string? text;
+        if (_isPaused(card))
+        {
+            text = "Paused. Press A to carry on where you left off";
+        }
+        else if (view.ContinueInfo.Visibility == Visibility.Visible)
+        {
+            text = null;
+        }
+        else
+        {
+            var lines = new List<string>();
+            if (_state.StatsOf(card).Describe(DateTimeOffset.UtcNow) is { Length: > 0 } played)
+            {
+                lines.Add(played);
+            }
+
+            if (_options.ContinueInfo && Achievements.For(card.Game) is { Total: > 0 } achievements)
+            {
+                lines.Add($"Achievements {achievements.Describe()}");
+            }
+
+            text = lines.Count == 0 ? null : string.Join(Environment.NewLine, lines);
+        }
+
+        view.ContinueDetail.Text = text;
+        view.ContinueDetail.Visibility = string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private static string Capitalised(string text) =>
@@ -359,6 +494,30 @@ internal sealed class ContinuePresenter
 }
 
 /// <summary>The games for the Last played row.</summary>
+/// <summary>Where the game on Jump back in goes among the games, which the user set out on 2026-11-16.</summary>
+internal static class HomeOrder
+{
+    /// <summary>
+    /// The games in order with the last one played placed: first of all in the NXE layout, whose Jump back in
+    /// is the front card; and in the grid and the row, left out when it is a favourite, since its card above
+    /// already shows it with its star. Otherwise as they are.
+    /// </summary>
+    public static List<T> Arrange<T>(List<T> games, T? lastPlayed, bool cards, Func<T, bool> isFavourite) where T : class
+    {
+        if (lastPlayed is null || !games.Contains(lastPlayed))
+        {
+            return games;
+        }
+
+        if (cards)
+        {
+            return [lastPlayed, .. games.Where(g => !ReferenceEquals(g, lastPlayed))];
+        }
+
+        return isFavourite(lastPlayed) ? games.Where(g => !ReferenceEquals(g, lastPlayed)).ToList() : games;
+    }
+}
+
 internal static class RecentGames
 {
     /// <summary>The games played, most recent first, up to <paramref name="count"/> of them.</summary>

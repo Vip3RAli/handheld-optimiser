@@ -52,6 +52,15 @@
         </Style.Triggers>
     </Style>
 
+    <!-- Shown only while a game's tile has something to say on its picture (GameTile.CoverDetail). -->
+    <Style x:Key="CoverDetailStrip" TargetType="FrameworkElement">
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding CoverDetail}" Value="{x:Null}">
+                <Setter Property="Visibility" Value="Collapsed" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
     <!-- A game tile in the grid: portrait art, or the store colour with the game's icon and name. -->
     <Style x:Key="TileButton" TargetType="Button">
         <Setter Property="Margin" Value="10" />
@@ -68,8 +77,8 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <StackPanel Width="180">
-                        <Grid Height="270">
+                    <StackPanel Width="{DynamicResource GridTileWidth}">
+                        <Grid Height="{DynamicResource GridTileHeight}">
                             <Border x:Name="Art" CornerRadius="8" Background="{Binding Background}" ClipToBounds="True">
                                 <Grid>
                                     <Image Source="{Binding Cover}" Stretch="UniformToFill"
@@ -90,12 +99,32 @@
                                 <TextBlock Text="&#xE896;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16"
                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
-                            <!-- The store the game is from, as its logo. -->
-                            <Border x:Name="StoreMark" Width="30" Height="30" CornerRadius="15" Margin="8" Background="#D0101216"
-                                    HorizontalAlignment="Right" VerticalAlignment="Bottom">
-                                <Path Data="{Binding StoreLogo}" Fill="#F2F3F5" Stretch="Uniform" Width="16" Height="16"
-                                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <!--
+                                The last game played, first of the games when Last played first is on, and what it
+                                has to show of its play time and achievements across the bottom of its picture.
+                            -->
+                            <Border Style="{StaticResource CoverDetailStrip}" CornerRadius="0,0,8,8" Padding="10,22,44,8"
+                                    VerticalAlignment="Bottom">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Color="#00000000" Offset="0" />
+                                        <GradientStop Color="#E0000000" Offset="0.6" />
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                                <TextBlock Text="{Binding CoverDetail}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
                             </Border>
+                            <Border Margin="8" Padding="7,3" CornerRadius="6" Background="#D0101216"
+                                    HorizontalAlignment="Left" VerticalAlignment="Top"
+                                    Visibility="{Binding IsLastPlayed, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="Last played" FontSize="12" FontWeight="SemiBold" />
+                            </Border>
+                            <!-- The store the game is from, as its logo, unless the store badges are switched off. -->
+                            <Grid Visibility="{DynamicResource StoreBadgeVisibility}" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                                <Border x:Name="StoreMark" Width="30" Height="30" CornerRadius="15" Margin="8" Background="#D0101216">
+                                    <Path Data="{Binding StoreLogo}" Fill="#F2F3F5" Stretch="Uniform" Width="16" Height="16"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                            </Grid>
                             <!-- Favourites wear a star in the corner. -->
                             <Border Width="34" Height="34" CornerRadius="17" Margin="8" Background="#B0101216"
                                     HorizontalAlignment="Right" VerticalAlignment="Top"
@@ -169,7 +198,7 @@
 
     <!--
         A game tile in the row: a square icon, as on a console's home screen. The focused one is drawn
-        at twice the size from its bottom edge, with margins that move its neighbours aside by as much
+        at twice the size from its top edge, with margins that move its neighbours aside by as much
         (RowTileSize and RowFocusScale in LibraryLayoutManager.cs), and only it shows its name. The
         square picture is SteamGridDB's; until one arrives the cover is shown, cut to fit.
     -->
@@ -178,7 +207,7 @@
         <Setter Property="Foreground" Value="#F2F3F5" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-        <Setter Property="RenderTransformOrigin" Value="0.5,1" />
+        <Setter Property="RenderTransformOrigin" Value="0.5,0" />
         <Setter Property="RenderTransform">
             <Setter.Value>
                 <ScaleTransform />
@@ -199,11 +228,18 @@
                                        RenderOptions.BitmapScalingMode="HighQuality" />
                             </Grid>
                         </Border>
-                        <!-- The store the game is from, as its logo. -->
-                        <Border x:Name="StoreMark" Width="18" Height="18" CornerRadius="9" Margin="5" Background="#D0101216"
-                                HorizontalAlignment="Left" VerticalAlignment="Top">
-                            <Path Data="{Binding StoreLogo}" Fill="#F2F3F5" Stretch="Uniform" Width="10" Height="10"
-                                  HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <!-- The store the game is from, as its logo, unless the store badges are switched off. -->
+                        <Grid Visibility="{DynamicResource StoreBadgeVisibility}" HorizontalAlignment="Left" VerticalAlignment="Top">
+                            <Border x:Name="StoreMark" Width="18" Height="18" CornerRadius="9" Margin="5" Background="#D0101216">
+                                <Path Data="{Binding StoreLogo}" Fill="#F2F3F5" Stretch="Uniform" Width="10" Height="10"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                        </Grid>
+                        <!-- The last game played, first in the row when Last played first is on. -->
+                        <Border Margin="5,28,0,0" Padding="5,1" CornerRadius="4" Background="#D0101216"
+                                HorizontalAlignment="Left" VerticalAlignment="Top"
+                                Visibility="{Binding IsLastPlayed, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="Last played" FontSize="9" FontWeight="SemiBold" />
                         </Border>
                         <!-- Favourites wear a star in the corner. -->
                         <Border Width="18" Height="18" CornerRadius="9" Margin="5" Background="#B0101216"
@@ -270,6 +306,20 @@
     <SolidColorBrush x:Key="HudBorder" Color="Transparent" />
     <Thickness x:Key="HudPadding">0</Thickness>
     <Thickness x:Key="HudEnd">0</Thickness>
+
+    <!-- The top bar's and the button hints' edges, wider in the Old School layout (LibraryWindow.ApplyLayout). -->
+    <Thickness x:Key="TopBarEdges">24,14,24,8</Thickness>
+    <Thickness x:Key="HintBarEdges">24,2,24,12</Thickness>
+
+    <!--
+        A grid tile's picture: a fifth smaller on the Games tab than on Ready to install, which the user asked
+        for on 2026-11-16 (LibraryWindow.ApplyFilter sets them). Every store's logo on the games can be switched
+        off in a layout's Home Screen settings (Store badge).
+    -->
+    <sys:Double x:Key="GridTileWidth">180</sys:Double>
+    <sys:Double x:Key="GridTileHeight">270</sys:Double>
+    <Visibility x:Key="StoreBadgeVisibility">Visible</Visibility>
+
     <SolidColorBrush x:Key="PillBackground" Color="Transparent" />
     <SolidColorBrush x:Key="PillBorder" Color="Transparent" />
     <Thickness x:Key="PillPadding">0</Thickness>
@@ -416,12 +466,29 @@
                                            Opacity="{Binding Path=(local:OldSchoolPanel.Front), RelativeSource={RelativeSource AncestorType=ContentPresenter}}" />
                             </Grid>
                         </Border>
-                        <!-- The store the game is from, as its logo. -->
-                        <Border x:Name="StoreMark" Width="30" Height="30" CornerRadius="15" Margin="14" Background="#D0101216"
-                                HorizontalAlignment="Right" VerticalAlignment="Bottom">
-                            <Path Data="{Binding StoreLogo}" Fill="#F2F3F5" Stretch="Uniform" Width="16" Height="16"
-                                  HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
+                        <!--
+                            The last game played, at the front when Last played first is on, which the user asked to be
+                            marked (2026-11-16); and under it the focused card's play time or achievements, as the
+                            layout's Card details setting asks.
+                        -->
+                        <StackPanel Margin="12" HorizontalAlignment="Left" VerticalAlignment="Top">
+                            <Border Padding="10,4" CornerRadius="8" Background="#D0101216" HorizontalAlignment="Left"
+                                    Visibility="{Binding IsLastPlayed, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="Last played" FontSize="15" FontWeight="SemiBold" Foreground="#F2F3F5" />
+                            </Border>
+                            <Border Style="{StaticResource CoverDetailStrip}" Margin="0,6,0,0" Padding="10,5" CornerRadius="8"
+                                    Background="#D0101216" HorizontalAlignment="Left"
+                                    Opacity="{Binding Path=(local:OldSchoolPanel.Front), RelativeSource={RelativeSource AncestorType=ContentPresenter}}">
+                                <TextBlock Text="{Binding CoverDetail}" FontSize="14" FontWeight="SemiBold" Foreground="#F2F3F5" />
+                            </Border>
+                        </StackPanel>
+                        <!-- The store the game is from, as its logo, unless the store badges are switched off. -->
+                        <Grid Visibility="{DynamicResource StoreBadgeVisibility}" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                            <Border x:Name="StoreMark" Width="30" Height="30" CornerRadius="15" Margin="14" Background="#D0101216">
+                                <Path Data="{Binding StoreLogo}" Fill="#F2F3F5" Stretch="Uniform" Width="16" Height="16"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                        </Grid>
                         <!-- Favourites wear a star in the corner. -->
                         <Border Width="34" Height="34" CornerRadius="17" Margin="12" Background="#B0101216"
                                 HorizontalAlignment="Right" VerticalAlignment="Top"
@@ -505,7 +572,7 @@
 
     <!-- The layouts: a grid that scrolls down, one row of games that scrolls across, and the Old School cards. -->
     <ItemsPanelTemplate x:Key="GridPanel">
-        <WrapPanel />
+        <local:FullWidthGridPanel />
     </ItemsPanelTemplate>
     <ItemsPanelTemplate x:Key="RowPanel">
         <StackPanel Orientation="Horizontal" />
@@ -515,8 +582,52 @@
     </ItemsPanelTemplate>
 
     <!-- A deal's card in the row below the grid, and in the grid of deals below the row of games. -->
+    <!--
+        A deal's card at the bottom of the screen, which is drawn small: the one picked grows to read, as the
+        row's games do, and moves its neighbours aside by as much. The user asked for it on 2026-11-16. It grows
+        upwards from its lower edge, into the room DealsView keeps above the cards.
+    -->
+    <Style x:Key="DealCardButton" TargetType="Button">
+        <Setter Property="Margin" Value="10" />
+        <Setter Property="Foreground" Value="#F2F3F5" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="RenderTransformOrigin" Value="0.5,1" />
+        <Setter Property="RenderTransform">
+            <Setter.Value>
+                <ScaleTransform />
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid>
+                        <ContentPresenter />
+                        <Border x:Name="Ring" CornerRadius="10" Margin="-4" BorderThickness="3"
+                                BorderBrush="#F2F3F5" Opacity="0" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Ring" Property="Opacity" Value="0.45" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Ring" Property="Opacity" Value="1" />
+                            <Setter Property="RenderTransform">
+                                <Setter.Value>
+                                    <ScaleTransform ScaleX="1.35" ScaleY="1.35" />
+                                </Setter.Value>
+                            </Setter>
+                            <Setter Property="Margin" Value="62,10,62,10" />
+                            <Setter Property="Panel.ZIndex" Value="1" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <DataTemplate x:Key="DealCard">
-        <Button Style="{StaticResource CardButton}">
+        <Button Style="{StaticResource DealCardButton}">
             <StackPanel Width="300">
                 <Grid Height="140">
                     <Border CornerRadius="8" ClipToBounds="True" Background="#262B36">
@@ -579,10 +690,23 @@
                                 </LinearGradientBrush>
                             </Border.Background>
                         </Border>
-                        <!-- A brush, not an image, so the picture keeps the card's round corners. -->
-                        <Border Height="198" VerticalAlignment="Top" CornerRadius="12,12,0,0" RenderOptions.BitmapScalingMode="Linear">
+                        <!--
+                            A brush, not an image, so the picture keeps the card's round corners. It fills the
+                            whole card, which the user asked for on 2026-11-15; it was the top two thirds.
+                        -->
+                        <Border CornerRadius="12" RenderOptions.BitmapScalingMode="Linear">
                             <Border.Background>
                                 <ImageBrush ImageSource="{Binding Banner}" Stretch="UniformToFill" />
+                            </Border.Background>
+                        </Border>
+                        <!-- Dark behind the name and the price, which are written over the picture now. -->
+                        <Border CornerRadius="12">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                    <GradientStop Color="#00000000" Offset="0.42" />
+                                    <GradientStop Color="#B8000000" Offset="0.72" />
+                                    <GradientStop Color="#F0000000" Offset="1" />
+                                </LinearGradientBrush>
                             </Border.Background>
                         </Border>
                         <!-- The sheen across the top of the card. -->
