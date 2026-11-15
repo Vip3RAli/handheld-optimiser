@@ -150,6 +150,12 @@ public class EpicSignInTests
         Assert.True(EpicLauncherLog.Refused(stuck));
         Assert.False(EpicLauncherLog.Refused(fine));
         Assert.False(EpicLauncherLog.Refused(string.Empty));
+
+        // Taken only when it was dispatched and not refused straight after.
+        Assert.True(EpicLauncherLog.Accepted(fine));
+        Assert.False(EpicLauncherLog.Accepted(refused));
+        Assert.False(EpicLauncherLog.Accepted(stuck));
+        Assert.False(EpicLauncherLog.Accepted(string.Empty));
     }
 
     [Fact]

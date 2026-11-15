@@ -94,7 +94,10 @@ public partial class LibraryWindow : Window, ILibraryHost
         _steamInstalls = new SteamInstallWatcher(_state, _notices, () => ScanAsync(), Dispatcher);
 
         // Games the library installs itself (GOG), one at a time, paused while a game is played in front of it.
-        _installs = new InstallQueue(_state, _notices, () => ScanAsync(), () => _play.Session is { IsPaused: false } && !IsActive, Dispatcher);
+        _installs = new InstallQueue(_state, _notices, () => ScanAsync(), () => _play.Session is { IsPaused: false } && !IsActive, Dispatcher)
+        {
+            GameRunning = () => _play.Session is not null,
+        };
         _play.Installs = _installs;
 
         // The downloads in the status pill and their list, so Ready to install need not be opened to see them.

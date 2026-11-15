@@ -71,6 +71,9 @@ internal sealed class InstallQueue
 
     private static string QueuePath => Path.Combine(NativeInstalls.Folder, "queue.json");
 
+    /// <summary>Whether a game is running, paused or not, when the Epic launcher is not closed under it.</summary>
+    public Func<bool>? GameRunning { get; init; }
+
     /// <summary>Told after each look at the queue, with each install's progress. Empty once there are none.</summary>
     public event Action<IReadOnlyList<DownloadRow>>? Changed;
 
@@ -203,13 +206,8 @@ internal sealed class InstallQueue
         {
             yield return ("Install with the Epic launcher", null, () => Done(() =>
             {
-                var log = EpicLauncherLog.Length();
-                var problem = GameCatalog.Launch(tile.Game);
-                _notices.Show(problem ?? $"Opening Epic Games to install {tile.Title}...");
-                if (problem is null)
-                {
-                    _ = EpicLauncherLog.TellIfRefusedAsync(log, tile.Title, _notices);
-                }
+                _notices.Show($"Opening Epic Games to install {tile.Title}...");
+                _ = EpicLauncherLog.InstallAsync(tile.Game, _notices, restart: GameRunning?.Invoke() != true);
             }));
         }
     }

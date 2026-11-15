@@ -186,15 +186,17 @@ internal sealed class GameSessionController
         // A game that is not installed opens its store's install page, with nothing else to set up.
         if (!tile.IsInstalled)
         {
-            var epicLog = tile.Game.Store == GameStore.Epic ? EpicLauncherLog.Length() : (long?)null;
+            // The Epic launcher refuses the link for a game it has never looked up unless it starts afresh,
+            // so it is closed first, unless a game is running that it may have started.
+            if (tile.Game.Store == GameStore.Epic)
+            {
+                _notices.Show($"Opening Epic Games to install {tile.Title}...", tile);
+                _ = EpicLauncherLog.InstallAsync(tile.Game, _notices, restart: _session is null);
+                return;
+            }
+
             var problem = GameCatalog.Launch(tile.Game);
             _notices.Show(problem ?? $"Opening {Game.NameOf(tile.Game.Store)} to install {tile.Title}...", tile);
-
-            // The Epic launcher refuses the link for a game it has never looked up, and shows nothing.
-            if (problem is null && epicLog is { } from)
-            {
-                _ = EpicLauncherLog.TellIfRefusedAsync(from, tile.Title, _notices);
-            }
             if (problem is not null)
             {
                 _launchBlockedUntil = DateTime.MinValue;
