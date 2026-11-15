@@ -23,10 +23,19 @@ public partial class LibraryWindow
             // The background is made at the screen's size, which a new resolution changes.
             SizeChanged += (_, _) => _backdrop.Reload();
 
-            // Whether the game's info fits beside the Last played card depends on the width, and how
-            // far down the grid sits on a TV or monitor on the height.
+            // Whether the game's details below the row have room for its description depends on the width.
             Scroller.SizeChanged += (_, _) => _continue.Update();
             Scroller.SizeChanged += (_, _) => _oldSchool.FitCategories();
+
+            // The row stays in the middle as the deals come and go below it, or the screen changes.
+            Scroller.SizeChanged += (_, _) => CentreRow();
+            Page.SizeChanged += (_, e) =>
+            {
+                if (e.HeightChanged)
+                {
+                    CentreRow();
+                }
+            };
 
             // The pictures of the games that are not installed follow what is on screen.
             Scroller.ScrollChanged += _input.OnGridScrolled;

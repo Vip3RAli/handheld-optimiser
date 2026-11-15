@@ -272,7 +272,7 @@ internal static class LibrarySettings
         set => WriteLayoutSwitch(ContinueValue, value);
     }
 
-    /// <summary>The last game's play time, size and profile, beside its Last played card.</summary>
+    /// <summary>Game Details: a game's play time, achievements, size and profile, as each layout shows them.</summary>
     public static bool ContinueInfo
     {
         get => ReadLayoutSwitch(ContinueInfoValue);

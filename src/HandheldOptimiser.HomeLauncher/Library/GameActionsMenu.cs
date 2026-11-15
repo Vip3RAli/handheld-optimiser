@@ -296,7 +296,6 @@ internal sealed class GameActionsMenu
         _state.Replace(tile, replacement);
 
         _state.FocusedKey = moved.Key;
-        _continue.FocusWasHere = false;
         _state.Filter = app ? TileFilter.AppsTab : TileFilter.All;
         _host.ShowTiles();
         _host.RestoreFocus();
