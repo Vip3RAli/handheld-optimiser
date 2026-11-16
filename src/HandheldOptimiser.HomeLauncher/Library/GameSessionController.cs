@@ -128,22 +128,73 @@ internal sealed class GameSessionController
         StartGame(tile);
     }
 
+    // The Epic launcher's arguments for the game about to start, asked for a moment ago. Null arguments
+    // mean Epic could not be asked, and the game starts without them.
+    private (string Key, string? Arguments)? _epicLaunch;
+
+    private async Task StartEpicGameAsync(GameTile tile)
+    {
+        string? arguments = null;
+        try
+        {
+            using var wait = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+            arguments = await EpicLaunch.ArgumentsAsync(tile.Game, wait.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Epic took too long: the game starts without its sign-in, as it would offline.
+        }
+
+        if (arguments is null)
+        {
+            Program.Log($"Starting {tile.Game.Key} without Epic's sign-in: Epic could not be asked");
+        }
+
+        _epicLaunch = (tile.Game.Key, arguments);
+        StartGame(tile);
+    }
+
     private void StartGame(GameTile tile)
     {
         _launchBlockedUntil = DateTime.UtcNow + LaunchCooldown;
         _state.FocusedKey = tile.Game.Key;
         _closeArmed = null;
 
-        // A GOG game, signed in to GOG here, is downloaded by the library itself.
+        // A GOG or Epic game, signed in to its store here, is downloaded by the library itself.
         if (!tile.IsInstalled && Installs is { } installs && InstallQueue.InstallsHere(tile.Game))
         {
             installs.Add(tile.Game);
             return;
         }
 
+        // An Epic game the library installed is started as the Epic launcher would start it, with a code
+        // for the account that Epic has to be asked for first. The game starts once that is back.
+        string? storeArguments = null;
+        if (tile.IsInstalled && EpicLaunch.Needs(tile.Game))
+        {
+            if (_epicLaunch is not { } ready || ready.Key != tile.Game.Key)
+            {
+                _notices.Show($"Launching {tile.Title}...", tile, NoticePresenter.LaunchShownFor);
+                _ = StartEpicGameAsync(tile);
+                return;
+            }
+
+            storeArguments = ready.Arguments;
+            _epicLaunch = null;
+        }
+
         // A game that is not installed opens its store's install page, with nothing else to set up.
         if (!tile.IsInstalled)
         {
+            // The Epic launcher refuses the link for a game it has never looked up unless it starts afresh,
+            // so it is closed first, unless a game is running that it may have started.
+            if (tile.Game.Store == GameStore.Epic)
+            {
+                _notices.Show($"Opening Epic Games to install {tile.Title}...", tile);
+                _ = EpicLauncherLog.InstallAsync(tile.Game, _notices, restart: _session is null);
+                return;
+            }
+
             var problem = GameCatalog.Launch(tile.Game);
             _notices.Show(problem ?? $"Opening {Game.NameOf(tile.Game.Store)} to install {tile.Title}...", tile);
             if (problem is not null)
@@ -172,7 +223,7 @@ internal sealed class GameSessionController
         var profile = GameProfiles.For(tile.Game);
         var storeWasOpen = StoreClients.IsRunning(tile.Game.Store);
 
-        var error = GameCatalog.Launch(tile.Game);
+        var error = GameCatalog.Launch(tile.Game, storeArguments);
         _notices.Show(error ?? $"Launching {tile.Title}...", tile, error is null ? NoticePresenter.LaunchShownFor : null);
         if (error is not null)
         {

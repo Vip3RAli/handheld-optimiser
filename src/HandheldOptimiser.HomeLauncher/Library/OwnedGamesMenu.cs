@@ -85,7 +85,8 @@ internal sealed class OwnedGamesMenu
     {
         var steam = LibrarySettings.SteamKey is not null || StoreSessions.SignedIn(GameStore.Steam);
         var gog = StoreSessions.Get(GameStore.Gog) is not null;
-        if (_refreshing || !LibrarySettings.ShowNotInstalled || (!steam && !gog))
+        var epic = StoreSessions.Get(GameStore.Epic) is not null;
+        if (_refreshing || !LibrarySettings.ShowNotInstalled || (!steam && !gog && !epic))
         {
             return;
         }
@@ -100,6 +101,13 @@ internal sealed class OwnedGamesMenu
                 var (gogChanged, gogError) = await OwnedGames.RefreshGogAsync(force);
                 changed |= gogChanged;
                 error ??= gogError;
+            }
+
+            if (epic)
+            {
+                var (epicChanged, epicError) = await OwnedGames.RefreshEpicAsync(force);
+                changed |= epicChanged;
+                error ??= epicError;
             }
 
             _error = error;

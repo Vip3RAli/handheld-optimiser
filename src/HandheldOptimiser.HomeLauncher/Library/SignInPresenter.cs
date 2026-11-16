@@ -10,7 +10,8 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 /// <summary>
 /// Signs in to a store inside the library, over everything else, and keeps what the store hands back in
 /// <see cref="StoreSessions"/>. Steam (stage 1 of the store sign-in work) is a QR code approved in the Steam
-/// app on a phone, with Steam's own sign-in page as the fallback. GOG (stage 2) is GOG's own page.
+/// app on a phone, with Steam's own sign-in page as the fallback. GOG (stage 2) and Epic (stage 3) are
+/// the store's own page.
 ///
 /// The page is a WebView2 inside the library's own window, made when the page is asked for and disposed as
 /// the sign-in closes. A second window would take the library out of the front, which stops the controller
@@ -90,6 +91,25 @@ internal sealed class SignInPresenter
         _view.Heading.Text = "Sign in to GOG";
         _view.Visibility = Visibility.Visible;
         Program.Log("GOG sign-in opened");
+        ShowWebPage();
+    }
+
+    /// <summary>
+    /// Opens Epic's own sign-in page. Once signed in it goes to a page that is a line of JSON with a code in
+    /// it, which is swapped for the account's tokens.
+    /// </summary>
+    public void OpenEpic()
+    {
+        if (!_navigation.BeginSignIn())
+        {
+            return;
+        }
+
+        _store = GameStore.Epic;
+        _view.SwitchButton.Visibility = Visibility.Collapsed;
+        _view.Heading.Text = "Sign in to Epic Games";
+        _view.Visibility = Visibility.Visible;
+        Program.Log("Epic sign-in opened");
         ShowWebPage();
     }
 
@@ -362,6 +382,65 @@ internal sealed class SignInPresenter
         }
     }
 
+    private async Task RunEpicPageAsync(CancellationToken cancel)
+    {
+        if (await OpenPageAsync(cancel) is not { } core)
+        {
+            return;
+        }
+
+        // Epic's page goes to a page of JSON with the code in it once signed in. An account its cookies
+        // already know is sometimes sent to the store or its account page instead, and the page with the
+        // code is asked for from there.
+        var code = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var askedAgain = 0;
+        core.NavigationCompleted += async (_, _) =>
+        {
+            try
+            {
+                if (code.Task.IsCompleted || !Uri.TryCreate(core.Source, UriKind.Absolute, out var uri))
+                {
+                    return;
+                }
+
+                if (EpicAuth.IsRedirectPage(uri))
+                {
+                    // The script's answer is the page's text as a JSON string.
+                    var text = System.Text.Json.JsonSerializer.Deserialize<string>(await core.ExecuteScriptAsync("document.body.innerText"));
+                    if (EpicAuth.ParseCode(text) is { } found)
+                    {
+                        // The code is on show in the page; it is put away before anything else.
+                        core.Navigate("about:blank");
+                        code.TrySetResult(found);
+                    }
+                    else if (askedAgain++ < 2)
+                    {
+                        // Not signed in after all: back to the sign-in page.
+                        core.Navigate(EpicAuth.SignInUrl);
+                    }
+                }
+                else if (EpicAuth.IsPastSignIn(uri) && askedAgain++ < 2)
+                {
+                    core.Navigate(EpicAuth.RedirectUrl);
+                }
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException or System.Text.Json.JsonException or ObjectDisposedException)
+            {
+                // The page was closed as it was being read.
+            }
+        };
+
+        core.Navigate(EpicAuth.SignInUrl);
+        _view.Status.Text = "Sign in as you would on Epic's site.";
+
+        using (cancel.Register(() => code.TrySetCanceled()))
+        {
+            var got = await code.Task;
+            _view.Status.Text = "Signed in. Finishing...";
+            await FinishEpicAsync(got, cancel);
+        }
+    }
+
     private async Task RunWebPageAsync(CancellationToken cancel)
     {
         try
@@ -369,6 +448,12 @@ internal sealed class SignInPresenter
             if (_store == GameStore.Gog)
             {
                 await RunGogPageAsync(cancel);
+                return;
+            }
+
+            if (_store == GameStore.Epic)
+            {
+                await RunEpicPageAsync(cancel);
                 return;
             }
 
@@ -446,6 +531,11 @@ internal sealed class SignInPresenter
         [GameStore.Gog] =
         [
             "https://auth.gog.com", "https://login.gog.com", "https://www.gog.com", "https://embed.gog.com", "https://gog.com",
+        ],
+        [GameStore.Epic] =
+        [
+            "https://www.epicgames.com", "https://epicgames.com", "https://store.epicgames.com", "https://accounts.epicgames.com",
+            "https://launcher.store.epicgames.com",
         ],
     };
 
@@ -574,6 +664,46 @@ internal sealed class SignInPresenter
         _notices.Show(name is { Length: > 0 }
             ? $"Signed in to GOG as {name}. Finding your games..."
             : "Signed in to GOG. Finding your games...");
+        _signedIn(session);
+    }
+
+    private async Task FinishEpicAsync(string code, CancellationToken cancel)
+    {
+        var (tokens, _) = await EpicAuth.ExchangeAsync(code, cancel);
+        if (cancel.IsCancellationRequested)
+        {
+            return;
+        }
+
+        if (tokens is null)
+        {
+            _view.Status.Text = "Epic did not finish the sign-in. Press B and try again.";
+            return;
+        }
+
+        var session = new StoreSession
+        {
+            Store = GameStore.Epic,
+            AccountId = tokens.AccountId,
+            AccountName = tokens.DisplayName,
+            RefreshToken = tokens.RefreshToken,
+            AccessToken = tokens.AccessToken,
+            AccessExpires = tokens.Expires,
+        };
+
+        if (!StoreSessions.Save(session))
+        {
+            _view.Status.Text = "Signed in, but Windows would not keep the sign-in safely, so it was not saved.";
+            return;
+        }
+
+        Program.Log("Signed in to Epic inside the library");
+        Close();
+
+        // An account with hundreds of games is asked about one game at a time the first time, which takes a while.
+        _notices.Show(tokens.DisplayName is { Length: > 0 } name
+            ? $"Signed in to Epic as {name}. Finding your games, which takes a minute the first time..."
+            : "Signed in to Epic. Finding your games, which takes a minute the first time...");
         _signedIn(session);
     }
 

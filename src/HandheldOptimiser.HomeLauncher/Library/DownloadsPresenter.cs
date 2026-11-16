@@ -27,7 +27,8 @@ internal sealed class DownloadsPresenter
     /// <summary>The library's own installs, which a GOG row pauses and carries on.</summary>
     public InstallQueue? Queue { get; init; }
 
-    private static bool IsLibraryDownload(DownloadRow row) => row.AppId.StartsWith("gog:", StringComparison.Ordinal);
+    private static bool IsLibraryDownload(DownloadRow row) =>
+        row.AppId.StartsWith("gog:", StringComparison.Ordinal) || row.AppId.StartsWith("epic:", StringComparison.Ordinal);
 
     // The list's rows, by app id, so a new reading changes their text in place and the focus stays put.
     private readonly Dictionary<string, Button> _shown = [];

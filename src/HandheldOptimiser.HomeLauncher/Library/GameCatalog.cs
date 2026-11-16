@@ -120,13 +120,14 @@ internal static class GameCatalog
     }
 
     /// <summary>Starts an installed game, or opens the store's install page for one that is not installed.</summary>
+    /// <param name="storeArguments">What the game's store app would start it with, for a game the library installed itself. Never logged.</param>
     /// <returns>An error message, or null when the game was started.</returns>
-    public static string? Launch(Game game)
+    public static string? Launch(Game game, string? storeArguments = null)
     {
         try
         {
             var arguments = game.Installed
-                ? new[] { game.LaunchArguments, CustomArguments(game) }.Where(a => !string.IsNullOrWhiteSpace(a))
+                ? new[] { game.LaunchArguments, storeArguments, CustomArguments(game) }.Where(a => !string.IsNullOrWhiteSpace(a))
                 : [];
 
             Process.Start(new ProcessStartInfo(game.LaunchTarget)
