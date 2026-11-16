@@ -98,9 +98,12 @@ internal sealed partial class MusicPlayerWindow : Window
     {
         // Music has to start from a request with no click on the page, as the page is never clicked. The page
         // is never seen, so it is drawn without the graphics card, which is the game's, and in one renderer:
-        // measured on the Ally (2026-11-14), the browser took 555 MB private without these.
+        // measured on the Ally (2026-11-14), the browser took 555 MB private without these. A smaller script
+        // heap and the audio service inside the browser process saved about 50 MB more (2026-11-16); the
+        // graphics process inside it, tried the same day, cost 67 MB, so it stays apart.
         var options = new CoreWebView2EnvironmentOptions(
-            "--autoplay-policy=no-user-gesture-required --disable-gpu --renderer-process-limit=1 --disable-background-networking");
+            "--autoplay-policy=no-user-gesture-required --disable-gpu --renderer-process-limit=1 --disable-background-networking " +
+            "--js-flags=--optimize-for-size --disable-features=AudioServiceOutOfProcess");
         var environment = await CoreWebView2Environment.CreateAsync(null, DataFolder, options);
         await _browser.EnsureCoreWebView2Async(environment);
 
@@ -108,6 +111,18 @@ internal sealed partial class MusicPlayerWindow : Window
         core.Settings.AreDevToolsEnabled = false;
         core.Settings.IsStatusBarEnabled = false;
         core.Settings.AreDefaultContextMenusEnabled = false;
+
+        // Off screen nobody sees the page, so its pictures and fonts are refused unless it is signing in.
+        // The widget fetches the album art itself, from the address the page gives it, so it still has art.
+        core.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.Image);
+        core.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.Font);
+        core.WebResourceRequested += (_, e) =>
+        {
+            if (!_signingIn)
+            {
+                e.Response = core.Environment.CreateWebResourceResponse(null, 403, "Not shown", "");
+            }
+        };
 
         // The page's own prompts are answered here and never shown. YouTube Music asks "Leave site?" when
         // anything new is played while a song is on, and that prompt, unlike the window, lands on the
