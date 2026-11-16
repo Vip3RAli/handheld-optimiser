@@ -171,6 +171,7 @@ namespace HandheldOptimiser.GameBar
                 _loaded = false;
                 PowerManager.PowerSupplyStatusChanged -= OnPowerSupply;
                 _timer.Stop();
+                _musicTimer.Stop();
                 if (_sliding)
                 {
                     _sliderPause.Stop();
@@ -237,6 +238,8 @@ namespace HandheldOptimiser.GameBar
             {
                 _timer.Stop();
             }
+
+            UpdateMusicPolling();
         }
 
         private async void Refresh()
@@ -912,6 +915,11 @@ namespace HandheldOptimiser.GameBar
                     {
                         chevron.Text = open ? "\uE70E" : "\uE70D";
                     }
+                }
+
+                if (ReferenceEquals(body, MusicBody))
+                {
+                    UpdateMusicPolling();
                 }
             }
         }
