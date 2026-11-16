@@ -37,6 +37,7 @@ internal static class GameCatalog
             ("Epic", EpicLibrary.Scan),
             ("Battle.net", BattleNetLibrary.Scan),
             ("GOG", GogLibrary.Scan),
+            ("Library installs", NativeInstalls.Scan),
             ("EA App", EaLibrary.Scan),
             ("Ubisoft Connect", UbisoftLibrary.Scan),
             ("Amazon Games", AmazonLibrary.Scan),

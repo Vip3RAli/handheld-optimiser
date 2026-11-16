@@ -103,6 +103,38 @@ internal sealed class GameTile : INotifyPropertyChanged, INoticeHost
         }
     }
 
+    /// <summary>
+    /// Where the store's install of this game has got to, such as "Downloading 34%", shown across the
+    /// bottom of its picture with a line for how far along it is. Null when it is not being installed.
+    /// </summary>
+    public string? InstallStatus { get; private set; }
+
+    /// <summary>How far along the install is, from 0 to 1, for the line under <see cref="InstallStatus"/>.</summary>
+    public double InstallFraction { get; private set; }
+
+    /// <summary>Whether the store is installing it now, which takes the download mark off its tile.</summary>
+    public bool IsInstalling => InstallStatus is not null;
+
+    /// <summary>Shows how far its install has got, or with null that it is not being installed. UI thread only.</summary>
+    public void ShowInstall(string? status, double fraction)
+    {
+        var was = IsInstalling;
+        if (InstallStatus != status)
+        {
+            InstallStatus = status;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(InstallStatus)));
+        }
+        if (InstallFraction != fraction)
+        {
+            InstallFraction = fraction;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(InstallFraction)));
+        }
+        if (was != IsInstalling)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsInstalling)));
+        }
+    }
+
     private bool _isFavourite;
     private bool _isHidden;
     private string? _notice;

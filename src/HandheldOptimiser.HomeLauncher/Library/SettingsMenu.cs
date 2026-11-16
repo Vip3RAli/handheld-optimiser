@@ -164,7 +164,9 @@ internal sealed class SettingsMenu
             : ReferenceEquals(category, _view.GamesAppsItems) ? GamesApps
             : SleepTweaks;
 
-        _menu.Show(category, title, "Settings", focus);
+        // A row hidden while its list was open, as Downloads is once the last download ends, cannot take the
+        // focus, so the category's first row does.
+        _menu.Show(category, title, "Settings", focus is { Visibility: Visibility.Visible } ? focus : null);
     }
 
     /// <summary>
@@ -198,7 +200,8 @@ internal sealed class SettingsMenu
             (view.BackgroundItems, view.BackgroundGroup), (view.DisplayItems, view.DisplayGroup), (view.TvItems, view.TvGroup),
             (view.AccountsItems, view.AccountsGroup), (view.OwnedItems, view.OwnedGroup), (view.DealsItems, view.DealsGroup),
             (view.AddItems, view.AddProgramGroup), (view.WhilePlayingItems, view.WhilePlayingGroup),
-            (view.EmulatorItems, view.EmulatorsGroup), (view.MaintenanceItems, view.MaintenanceGroup)
+            (view.EmulatorItems, view.EmulatorsGroup), (view.MaintenanceItems, view.MaintenanceGroup),
+            (view.DownloadsItems, view.DownloadsGroup)
         })
         {
             _menu.SetBack(group, () =>

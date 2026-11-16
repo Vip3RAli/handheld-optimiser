@@ -47,12 +47,16 @@ internal sealed class LibraryNavigationCoordinator
     private readonly BackdropPresenter _backdrop;
     private readonly ILibraryHost _host;
 
+    // A store's sign-in, which has the input while it is open.
+    private readonly SignInPresenter _signIn;
+
     public LibraryNavigationCoordinator(TileGrid grid, InputParts parts, LibraryNavigation navigation, LibraryState state,
         LibraryOptions options, LibraryLayoutManager layouts, MenuPresenter menu, SearchPresenter search, TopBarPresenter topBar,
         ContinuePresenter continuePresenter, DealsPresenter deals, OldSchoolPresenter oldSchool, GameActionsMenu gameActions,
         SettingsMenu settings, PowerMenu power, GameSessionController play, TileArtwork artwork, BackdropPresenter backdrop,
-        ILibraryHost host)
+        SignInPresenter signIn, ILibraryHost host)
     {
+        _signIn = signIn;
         _grid = grid;
         _tiles = parts.Tiles;
         _tilesScroller = parts.TilesScroller;
@@ -96,6 +100,10 @@ internal sealed class LibraryNavigationCoordinator
         {
             case InputTarget.Menu:
                 _menu.MoveFocus(direction);
+                return;
+
+            case InputTarget.SignIn:
+                _signIn.Navigate(direction);
                 return;
 
             case InputTarget.Page:
@@ -224,6 +232,12 @@ internal sealed class LibraryNavigationCoordinator
             return;
         }
 
+        if (target == InputTarget.SignIn)
+        {
+            _signIn.Press(action);
+            return;
+        }
+
         if (target == InputTarget.TextBox)
         {
             // The Windows touch keyboard takes A, B, X and Y for typing, so those must not act here too.
@@ -342,6 +356,13 @@ internal sealed class LibraryNavigationCoordinator
         if (target == InputTarget.Nowhere)
         {
             e.Handled = true;
+            return;
+        }
+
+        // Every key but Escape belongs to the sign-in page.
+        if (target == InputTarget.SignIn)
+        {
+            _signIn.KeyDown(e);
             return;
         }
 

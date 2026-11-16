@@ -123,6 +123,31 @@ internal static partial class Native
         }
     }
 
+    private const ushort VkShift = 0x10;
+
+    /// <summary>
+    /// Presses and lets go of one key, with Shift held when asked, for whatever window has the keyboard.
+    /// The store sign-in page uses it: the controller's presses become Tab, Shift+Tab, Enter and the arrows.
+    /// </summary>
+    public static unsafe bool PressKey(ushort virtualKey, bool shift = false)
+    {
+        var inputs = stackalloc KeyInput[4];
+        var count = 0u;
+        if (shift)
+        {
+            inputs[count++] = new KeyInput { Type = InputKeyboard, VirtualKey = VkShift };
+        }
+
+        inputs[count++] = new KeyInput { Type = InputKeyboard, VirtualKey = virtualKey };
+        inputs[count++] = new KeyInput { Type = InputKeyboard, VirtualKey = virtualKey, Flags = KeyEventFKeyUp };
+        if (shift)
+        {
+            inputs[count++] = new KeyInput { Type = InputKeyboard, VirtualKey = VkShift, Flags = KeyEventFKeyUp };
+        }
+
+        return SendInput(count, inputs, sizeof(KeyInput)) == count;
+    }
+
     private const ushort VkLeftWindows = 0x5B;
     private const ushort VkG = 0x47;
 
@@ -205,6 +230,44 @@ internal static partial class Native
             var name = stackalloc char[Capacity];
             uint length = Capacity;
             return QueryFullProcessImageName(process, 0, name, ref length) ? new string(name, 0, (int)length) : null;
+        }
+        finally
+        {
+            CloseHandle(process);
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct IoCounters
+    {
+        public ulong ReadOperationCount;
+        public ulong WriteOperationCount;
+        public ulong OtherOperationCount;
+        public ulong ReadTransferCount;
+        public ulong WriteTransferCount;
+        public ulong OtherTransferCount;
+    }
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool GetProcessIoCounters(nint process, out IoCounters counters);
+
+    /// <summary>
+    /// How many bytes a process has written since it started, or null when it cannot be asked. Windows keeps
+    /// the count as the writes happen, which is how a Steam download's progress is followed: Steam does not
+    /// write its byte counts to the game's manifest until the download stops.
+    /// </summary>
+    public static long? BytesWritten(int processId)
+    {
+        var process = OpenProcess(ProcessQueryLimitedInformation, false, processId);
+        if (process == 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            return GetProcessIoCounters(process, out var counters) ? (long)counters.WriteTransferCount : null;
         }
         finally
         {

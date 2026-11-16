@@ -103,6 +103,24 @@
                                 <TextBlock Text="&#xE735;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16"
                                            Foreground="#F5C542" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
+                            <!--
+                                A store installing the game: how far it has got, across the bottom of the picture,
+                                over a line in the menu's green. A notice is drawn over it while there is one.
+                            -->
+                            <Border x:Name="InstallStrip" CornerRadius="0,0,8,8" Background="#E6101216" VerticalAlignment="Bottom"
+                                    Visibility="{Binding IsInstalling, Converter={StaticResource BoolToVis}}">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding InstallStatus}" Margin="10,8,10,7" FontSize="13" FontWeight="SemiBold" />
+                                    <Grid Height="4" Margin="10,0,10,9">
+                                        <Border CornerRadius="2" Background="#33FFFFFF" />
+                                        <Border CornerRadius="2" Background="{StaticResource MenuPanelRing}" RenderTransformOrigin="0,0.5">
+                                            <Border.RenderTransform>
+                                                <ScaleTransform ScaleX="{Binding InstallFraction}" />
+                                            </Border.RenderTransform>
+                                        </Border>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
                             <!-- A notice, across the bottom of the picture: the name under it is one short line. -->
                             <Border Style="{StaticResource ShownByNotice}" CornerRadius="0,0,8,8" Padding="10,8"
                                     Background="#E6101216" VerticalAlignment="Bottom">
@@ -125,6 +143,11 @@
                         <DataTrigger Binding="{Binding IsInstalled}" Value="False">
                             <Setter TargetName="Art" Property="Opacity" Value="{DynamicResource NotInstalledArtOpacity}" />
                             <Setter TargetName="InstallMark" Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                        <!-- While it downloads the strip says so, and the download mark would sit under it. -->
+                        <DataTrigger Binding="{Binding IsInstalling}" Value="True">
+                            <Setter TargetName="InstallMark" Property="Visibility" Value="Collapsed" />
+                            <Setter TargetName="StoreMark" Property="Visibility" Value="Collapsed" />
                         </DataTrigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Ring" Property="Opacity" Value="0.45" />

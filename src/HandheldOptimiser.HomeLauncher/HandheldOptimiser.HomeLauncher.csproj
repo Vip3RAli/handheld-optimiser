@@ -71,8 +71,11 @@
   <ItemGroup>
     <!-- The screen brightness control in quick settings, which Windows only offers through WMI. -->
     <PackageReference Include="System.Management" Version="10.0.12" />
-    <!-- The YouTube Music player (MusicPlayerWindow), in the Edge browser Windows 11 already has. -->
+    <!-- A store's own sign-in page (SignInPresenter) and the YouTube Music player (MusicPlayerWindow), in the
+         Edge browser Windows 11 already has. -->
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
+    <!-- The QR code a store's app on a phone scans to sign in to the library (SignInPresenter). MIT licence. -->
+    <PackageReference Include="QRCoder" Version="1.6.0" />
   </ItemGroup>
 
 </Project>

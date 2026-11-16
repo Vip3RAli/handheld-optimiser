@@ -109,6 +109,8 @@ internal static class LibrarySettings
     private const string StoreDetailsValue = "StoreDetails";
     private const string ResumeValue = "ResumeAfterSleep";
     private const string QuickResumeValue = "QuickResume";
+    private const string InstallFolderValue = "InstallFolder";
+    private const string DownloadWhilePlayingValue = "DownloadWhilePlaying";
     private const string PausedValue = "PausedProcesses";
     private const string DockedValue = "DockedMode";
     private const string DockedLayoutValue = "DockedLayout";
@@ -287,6 +289,26 @@ internal static class LibrarySettings
     {
         get => ReadSwitch(QuickResumeValue);
         set => WriteSwitch(QuickResumeValue, value);
+    }
+
+    /// <summary>
+    /// Where the games the library installs itself go, each store in a folder of its own. <c>C:\Games</c> unless
+    /// the player picked another; the user chose that on 2026-11-14.
+    /// </summary>
+    public static string InstallFolder
+    {
+        get => Read(InstallFolderValue) is { Length: > 0 } folder ? folder : @"C:\Games";
+        set => Write(InstallFolderValue, string.IsNullOrWhiteSpace(value) ? null : value.Trim());
+    }
+
+    /// <summary>
+    /// Keep the library's own downloads going while a game is played. Off until switched on: the game gets
+    /// the connection and the disk, which the user chose on 2026-11-14.
+    /// </summary>
+    public static bool DownloadWhilePlaying
+    {
+        get => ReadSwitch(DownloadWhilePlayingValue, on: false);
+        set => WriteSwitch(DownloadWhilePlayingValue, value);
     }
 
     /// <summary>The processes paused right now, for the next library to resume if this one ends without doing so.</summary>

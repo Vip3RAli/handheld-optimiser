@@ -156,4 +156,40 @@ public sealed class LibraryNavigationTests
         _navigation.BeginTyping();
         Assert.Equal("Navigation: did not type in the search box, as in front, on the page, menu", Assert.Single(_log));
     }
+
+    [Fact]
+    public void A_sign_in_takes_every_press_and_keeps_background_jobs_off_the_focus()
+    {
+        Assert.True(_navigation.BeginSignIn());
+        Assert.Equal(InputTarget.SignIn, _navigation.Input);
+        Assert.True(_navigation.SigningIn);
+        Assert.False(_navigation.MayRestoreFocus(leavingSearch: false));
+
+        // Not twice, and nothing else opens over it.
+        Assert.False(_navigation.BeginSignIn());
+        Assert.False(_navigation.BeginTyping());
+
+        _navigation.EndSignIn();
+        Assert.Equal(InputTarget.Page, _navigation.Input);
+    }
+
+    [Fact]
+    public void A_sign_in_opens_from_the_menu_but_not_from_a_text_box()
+    {
+        _navigation.OpenMenu();
+        _navigation.BeginEdit();
+        Assert.False(_navigation.BeginSignIn());
+
+        _navigation.EndEdit();
+        Assert.True(_navigation.BeginSignIn());
+        Assert.False(_navigation.MenuOpen);
+    }
+
+    [Fact]
+    public void Ending_a_sign_in_that_is_not_open_changes_nothing()
+    {
+        _navigation.OpenMenu();
+        _navigation.EndSignIn();
+        Assert.Equal(InputTarget.Menu, _navigation.Input);
+    }
 }
