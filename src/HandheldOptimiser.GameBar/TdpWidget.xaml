@@ -164,6 +164,21 @@
             </Setter>
         </Style>
 
+        <!-- The Music card's previous, play or pause, and next: small round buttons with a glyph. -->
+        <Style x:Key="RoundControl" TargetType="ToggleButton" BasedOn="{StaticResource Tile}">
+            <Setter Property="Background" Value="{StaticResource ControlFill}" />
+            <Setter Property="Foreground" Value="{StaticResource Text}" />
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="Width" Value="36" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="CornerRadius" Value="18" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="8,0" />
+        </Style>
+
         <!-- One quarter of the screen picker: a small grey block that turns the accent when it is the overlay's corner. -->
         <Style x:Key="Quadrant" TargetType="ToggleButton" BasedOn="{StaticResource Tile}">
             <Setter Property="Background" Value="{StaticResource QuadrantFill}" />
@@ -402,6 +417,85 @@
                             <Run x:Name="StateName" Foreground="{StaticResource Text}" FontWeight="SemiBold" /><Run x:Name="StateDetail" />
                         </TextBlock>
                     </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- ===== Music: YouTube Music, played by the launcher's off screen player (see TdpWidget.Music.cs).
+                 Folded like the others; it asks the player for news only while open. ===== -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <Button Style="{StaticResource Fold}" Click="OnFold" Tag="MusicBody">
+                        <Grid Margin="0,0,0,4">
+                            <TextBlock Style="{StaticResource CardTitle}" Margin="0" Text="MUSIC" />
+                            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center"
+                                       FontFamily="Segoe MDL2 Assets" FontSize="11" Foreground="{StaticResource Muted}" Text="&#xE70E;" />
+                        </Grid>
+                    </Button>
+
+                    <StackPanel x:Name="MusicBody" Visibility="Visible">
+                        <TextBlock x:Name="MusicNote" Style="{StaticResource Note}" TextWrapping="Wrap" Margin="0,2,0,8" />
+
+                        <Border x:Name="MusicStart" Style="{StaticResource Bar}">
+                            <ToggleButton Style="{StaticResource Tile}" Click="OnMusicStart" Content="Start YouTube Music" />
+                        </Border>
+                        <Border x:Name="MusicSignIn" Style="{StaticResource Bar}" Visibility="Collapsed">
+                            <ToggleButton Style="{StaticResource Tile}" Click="OnMusicSignIn" Content="Sign in" />
+                        </Border>
+
+                        <StackPanel x:Name="MusicPlayer" Visibility="Collapsed">
+                            <Grid Margin="0,2,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Width="96" Height="96" CornerRadius="8" Background="#1AFFFFFF">
+                                    <Image x:Name="MusicArt" Stretch="UniformToFill" />
+                                </Border>
+                                <!-- Beside the art, centred: the song, the buttons that act on it, and how far in it is. -->
+                                <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock x:Name="MusicTitle" Style="{StaticResource Label}" TextWrapping="Wrap" MaxLines="2"
+                                               TextTrimming="CharacterEllipsis" TextAlignment="Center" HorizontalAlignment="Center" />
+                                    <TextBlock x:Name="MusicArtist" Style="{StaticResource Note}" TextTrimming="CharacterEllipsis"
+                                               TextAlignment="Center" HorizontalAlignment="Center" />
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,0">
+                                        <ToggleButton Style="{StaticResource RoundControl}" Click="OnMusicPrevious"
+                                                      Content="&#xE892;" AutomationProperties.Name="Previous" />
+                                        <ToggleButton x:Name="MusicToggle" Style="{StaticResource RoundControl}" Click="OnMusicToggle"
+                                                      Content="&#xE768;" AutomationProperties.Name="Play or pause" />
+                                        <ToggleButton Style="{StaticResource RoundControl}" Click="OnMusicNext"
+                                                      Content="&#xE893;" AutomationProperties.Name="Next" />
+                                    </StackPanel>
+                                    <ProgressBar x:Name="MusicProgress" Height="3" Margin="0,10,0,0" Minimum="0" Maximum="1" />
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid Margin="0,10,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="MusicQuery" PlaceholderText="Search YouTube Music" KeyDown="OnMusicQueryKey" VerticalAlignment="Center" />
+                                <Border Grid.Column="1" Style="{StaticResource Bar}" Margin="8,0,0,0" VerticalAlignment="Center">
+                                    <ToggleButton Style="{StaticResource Tile}" Click="OnMusicSearch" Content="Search" />
+                                </Border>
+                            </Grid>
+
+                            <Border Style="{StaticResource Bar}" Margin="0,8,0,0">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <!-- Lit while the playlists are open; pressed again, it folds them away. -->
+                                    <ToggleButton x:Name="MusicPlaylistsTile" Style="{StaticResource Tile}" Click="OnMusicPlaylists" Content="My Playlists" />
+                                    <ToggleButton Grid.Column="1" Style="{StaticResource Tile}" Click="OnMusicQuit" Content="Close Player" />
+                                </Grid>
+                            </Border>
+
+                            <!-- The songs or playlists last asked for, made in the code. -->
+                            <StackPanel x:Name="MusicItems" Margin="0,6,0,0" />
+                        </StackPanel>
+                    </StackPanel>
                 </StackPanel>
             </Border>
 

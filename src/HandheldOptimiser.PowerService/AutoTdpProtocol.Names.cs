@@ -32,6 +32,53 @@ namespace HandheldOptimiser.PowerService
         /// ScreenStats, and draw it on the lime or on black, named by ScreenStatsLime. Either may come alone.</summary>
         public const string SetScreenStats = "set-screen-stats";
 
+        /// <summary>From the widget: start the YouTube Music player in the player's session, unless it is running.</summary>
+        public const string StartMusic = "start-music";
+
+        /// <summary>
+        /// The YouTube Music player: the launcher started with Argument, holding MutexName in the player's
+        /// session. The widget talks to it straight over PipeName, one line of JSON each way, as to the service.
+        /// </summary>
+        public static class Music
+        {
+            public const string PipeName = "HandheldOptimiser.Music";
+            public const string MutexName = "HandheldOptimiser.Music";
+            public const string Argument = "--music";
+
+            // What the widget asks. Each answer is the player's state; Search and Playlists add Items.
+            public const string State = "state";
+            public const string Toggle = "toggle";
+            public const string Next = "next";
+            public const string Previous = "previous";
+            public const string Play = "play";
+            public const string Search = "search";
+            public const string Playlists = "playlists";
+            public const string SignIn = "sign-in";
+            public const string Quit = "quit";
+
+            // The kinds of item: a song (a video id) or a playlist (a playlist id).
+            public const string Song = "song";
+            public const string Playlist = "playlist";
+
+            public static class Fields
+            {
+                public const string Command = "Command";
+                public const string Kind = "Kind";
+                public const string Id = "Id";
+                public const string Query = "Query";
+                public const string SignedIn = "SignedIn";
+                public const string Playing = "Playing";
+                public const string Title = "Title";
+                public const string Artist = "Artist";
+                public const string Art = "Art";
+                public const string Position = "Position";
+                public const string Duration = "Duration";
+                public const string Items = "Items";
+                public const string Subtitle = "Subtitle";
+                public const string Error = "Error";
+            }
+        }
+
         /// <summary>From the widget or the app: the GPU memory Windows has now, any size waiting for a restart, and the sizes on offer.</summary>
         public const string GpuMemoryRequest = "gpu-memory";
 
