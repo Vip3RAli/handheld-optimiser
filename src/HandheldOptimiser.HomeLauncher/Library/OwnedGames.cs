@@ -90,6 +90,7 @@ internal static class OwnedGames
         {
             ("Steam", SteamGames),
             ("Epic", EpicOwned),
+            ("Xbox", XboxPlayed),
             ("GOG", GogOwned)
         })
         {
@@ -359,6 +360,19 @@ internal static class OwnedGames
 
         return games;
     }
+
+    /// <summary>
+    /// The Xbox games for PC the account signed in inside the library has played before. Xbox Live does not
+    /// say which games an account owns, so these stand in for them; nothing is listed without the sign-in.
+    /// </summary>
+    private static List<Game> XboxPlayed() =>
+        StoreSessions.Get(GameStore.Xbox) is { } session
+            ? Cached(XboxAccountApi.PlayedPath(session.AccountId), p => XboxAccountApi.AsGames(XboxAccountApi.ReadPlayed(p)))
+            : [];
+
+    /// <summary>Lists the Xbox account's played games again, when signed in inside the library.</summary>
+    public static Task<(bool Changed, string? Error)> RefreshXboxAsync(bool force) =>
+        StoreSessions.Get(GameStore.Xbox) is null ? Task.FromResult<(bool, string?)>((false, null)) : XboxAccountApi.RefreshPlayedAsync(force);
 
     /// <summary>
     /// The Epic games: the account's own list once signed in inside the library and listed, or else what the

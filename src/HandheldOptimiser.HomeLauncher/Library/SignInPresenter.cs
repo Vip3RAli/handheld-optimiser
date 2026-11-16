@@ -11,7 +11,8 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 /// Signs in to a store inside the library, over everything else, and keeps what the store hands back in
 /// <see cref="StoreSessions"/>. Steam (stage 1 of the store sign-in work) is a QR code approved in the Steam
 /// app on a phone, with Steam's own sign-in page as the fallback. GOG (stage 2) and Epic (stage 3) are
-/// the store's own page.
+/// the store's own page. Xbox (stage 4) is Microsoft's page, which the account Windows is signed in with
+/// goes straight through without showing.
 ///
 /// The page is a WebView2 inside the library's own window, made when the page is asked for and disposed as
 /// the sign-in closes. A second window would take the library out of the front, which stops the controller
@@ -110,6 +111,25 @@ internal sealed class SignInPresenter
         _view.Heading.Text = "Sign in to Epic Games";
         _view.Visibility = Visibility.Visible;
         Program.Log("Epic sign-in opened");
+        ShowWebPage();
+    }
+
+    /// <summary>
+    /// Signs in to Xbox on Microsoft's own page. With the account Windows is signed in with, the page comes
+    /// straight back with a code and is never seen; otherwise it asks as usual.
+    /// </summary>
+    public void OpenXbox()
+    {
+        if (!_navigation.BeginSignIn())
+        {
+            return;
+        }
+
+        _store = GameStore.Xbox;
+        _view.SwitchButton.Visibility = Visibility.Collapsed;
+        _view.Heading.Text = "Sign in to Xbox";
+        _view.Visibility = Visibility.Visible;
+        Program.Log("Xbox sign-in opened");
         ShowWebPage();
     }
 
@@ -329,7 +349,7 @@ internal sealed class SignInPresenter
         var web = new WebView2();
         _web = web;
         _view.WebPart.Child = web;
-        var environment = await CoreWebView2Environment.CreateAsync(null, WebDataFolder);
+        var environment = await EnvironmentAsync();
         await web.EnsureCoreWebView2Async(environment);
         if (cancel.IsCancellationRequested || !ReferenceEquals(_web, web))
         {
@@ -350,6 +370,80 @@ internal sealed class SignInPresenter
 
         web.Focus();
         return core;
+    }
+
+    /// <summary>
+    /// The browser the sign-in pages run in. It may use the account Windows itself is signed in with, which is
+    /// what lets Microsoft's page sign in to Xbox without asking; no other store's page looks at it.
+    /// </summary>
+    private static Task<CoreWebView2Environment> EnvironmentAsync() =>
+        CoreWebView2Environment.CreateAsync(null, WebDataFolder, new CoreWebView2EnvironmentOptions { AllowSingleSignOnUsingOSPrimaryAccount = true });
+
+    private async Task RunXboxPageAsync(CancellationToken cancel)
+    {
+        if (await OpenPageAsync(cancel) is not { } core)
+        {
+            return;
+        }
+
+        // Microsoft's page goes to a blank page of its own with the code once signed in, or with why not.
+        // That page is never loaded.
+        var code = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        core.NavigationStarting += (_, e) =>
+        {
+            if (Uri.TryCreate(e.Uri, UriKind.Absolute, out var uri) && XboxAuth.IsRedirect(uri))
+            {
+                e.Cancel = true;
+                code.TrySetResult(XboxAuth.CodeFrom(uri));
+            }
+        };
+
+        core.Navigate(XboxAuth.SignInUrl);
+        _view.Status.Text = "Signing in with your Microsoft account...";
+
+        using (cancel.Register(() => code.TrySetCanceled()))
+        {
+            var got = await code.Task;
+            if (got is null)
+            {
+                Program.Log("Xbox sign-in: Microsoft's page came back without a code");
+                _view.Status.Text = "Microsoft did not finish the sign-in. Press B and try again.";
+                return;
+            }
+
+            _view.Status.Text = "Signed in. Finishing...";
+            await FinishXboxAsync(got, cancel);
+        }
+    }
+
+    private async Task FinishXboxAsync(string code, CancellationToken cancel)
+    {
+        var (session, refused) = await XboxAccountApi.SignInAsync(code, cancel);
+        if (cancel.IsCancellationRequested)
+        {
+            return;
+        }
+
+        if (session is null)
+        {
+            _view.Status.Text = refused
+                ? "Xbox would not take this Microsoft account. It may have no Xbox profile yet: open the Xbox app once, then try again."
+                : "Xbox could not be reached. Press B and try again.";
+            return;
+        }
+
+        if (!StoreSessions.Save(session))
+        {
+            _view.Status.Text = "Signed in, but Windows would not keep the sign-in safely, so it was not saved.";
+            return;
+        }
+
+        Program.Log("Signed in to Xbox inside the library");
+        Close();
+        _notices.Show(session.AccountName is { Length: > 0 } name
+            ? $"Signed in to Xbox as {name}. Finding your games..."
+            : "Signed in to Xbox. Finding your games...");
+        _signedIn(session);
     }
 
     private async Task RunGogPageAsync(CancellationToken cancel)
@@ -457,6 +551,12 @@ internal sealed class SignInPresenter
                 return;
             }
 
+            if (_store == GameStore.Xbox)
+            {
+                await RunXboxPageAsync(cancel);
+                return;
+            }
+
             if (await OpenPageAsync(cancel) is not { } core)
             {
                 return;
@@ -532,6 +632,10 @@ internal sealed class SignInPresenter
         [
             "https://auth.gog.com", "https://login.gog.com", "https://www.gog.com", "https://embed.gog.com", "https://gog.com",
         ],
+        [GameStore.Xbox] =
+        [
+            "https://login.live.com", "https://account.live.com", "https://login.microsoftonline.com", "https://www.xbox.com",
+        ],
         [GameStore.Epic] =
         [
             "https://www.epicgames.com", "https://epicgames.com", "https://store.epicgames.com", "https://accounts.epicgames.com",
@@ -553,7 +657,7 @@ internal sealed class SignInPresenter
         CoreWebView2Controller? controller = null;
         try
         {
-            var environment = await CoreWebView2Environment.CreateAsync(null, WebDataFolder);
+            var environment = await EnvironmentAsync();
             controller = await environment.CreateCoreWebView2ControllerAsync(_windowHandle());
             controller.IsVisible = false;
             var cookies = controller.CoreWebView2.CookieManager;

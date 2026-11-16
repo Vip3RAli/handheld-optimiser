@@ -91,6 +91,17 @@ internal static class Achievements
             return fromGog;
         }
 
+        // Xbox signed in inside the library: Xbox Live's achievements, with unlock times, for a game the
+        // account has played. The game's id for Xbox Live comes from the played list.
+        if (game.Store == GameStore.Xbox && game.Key.StartsWith("xbox:", StringComparison.Ordinal)
+            && XboxAccountApi.Find(game.Key[5..]) is { } played
+            && await XboxAccountApi.FreshAsync() is { } xbox
+            && await XboxAccountApi.AchievementsAsync(xbox, game.Key, played.TitleId) is { Total: > 0 } fromXbox)
+        {
+            WriteCache(fromXbox);
+            return fromXbox;
+        }
+
         var local = await Task.Run(() => ReadLocal(game));
         if (local is { Total: > 0 })
         {
