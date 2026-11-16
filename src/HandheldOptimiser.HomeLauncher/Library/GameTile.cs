@@ -73,6 +73,33 @@ internal sealed class GameTile : INotifyPropertyChanged, INoticeHost
         set => Set(ref _isFavourite, value);
     }
 
+    /// <summary>The NXE layout's Jump back in: the last game played, at the front of the games' cards with a badge.</summary>
+    public bool IsLastPlayed
+    {
+        get => _isLastPlayed;
+        set => Set(ref _isLastPlayed, value);
+    }
+
+    /// <summary>The same game on other stores, shown as this one tile and played from its Options menu.</summary>
+    public IReadOnlyList<GameTile> OtherCopies { get; set; } = [];
+
+    /// <summary>
+    /// Its play time or achievements, drawn on its picture: on the last game played in the grid, and on the
+    /// focused card in the NXE layout. Null when there is nothing to show.
+    /// </summary>
+    public string? CoverDetail
+    {
+        get => _coverDetail;
+        set
+        {
+            if (_coverDetail != value)
+            {
+                _coverDetail = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CoverDetail)));
+            }
+        }
+    }
+
     /// <summary>Hidden by the player, so only shown, faded, while hidden games are shown.</summary>
     public bool IsHidden
     {
@@ -136,6 +163,8 @@ internal sealed class GameTile : INotifyPropertyChanged, INoticeHost
     }
 
     private bool _isFavourite;
+    private bool _isLastPlayed;
+    private string? _coverDetail;
     private bool _isHidden;
     private string? _notice;
     public bool HasCover => Cover is not null;

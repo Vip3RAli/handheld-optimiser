@@ -44,6 +44,7 @@ public partial class LibraryWindow : Window, ILibraryHost
     // The menu's lists, each run by the menu it belongs to.
     private readonly PowerMenu _power;
     private readonly OwnedGamesMenu _owned;
+    private readonly AccountsMenu _accounts;
     private readonly GameActionsMenu _gameActions;
     private readonly SettingsMenu _settings;
 
@@ -79,7 +80,7 @@ public partial class LibraryWindow : Window, ILibraryHost
         _layouts.ScreenChanged += ApplyLayout;
         _grid = new TileGrid(Tiles, _state, _layouts);
 
-        _notices = new NoticePresenter(Menu.MenuNotice, _navigation, NoticeHost) { Panel = (NoticePanel, NoticePanelText), InFront = () => IsActive };
+        _notices = new NoticePresenter { Panel = (NoticePanel, NoticePanelText), InFront = () => IsActive };
         _backdrop = new BackdropPresenter(BackdropFront, BackdropBack, _state, _options, _navigation, () => _layouts.IsBrowsing);
         _menu = new MenuPresenter(Menu, _navigation, _notices, () => _layouts.IsOldSchool, () => RestoreFocus());
         _search = new SearchPresenter(TopBar, _navigation, _state, _options, () => new WindowInteropHelper(this).Handle,
@@ -87,8 +88,7 @@ public partial class LibraryWindow : Window, ILibraryHost
         _topBar = new TopBarPresenter(TopBar, UpdateBanner, UpdateText, UpdateNowButton, DismissUpdateButton, AcceptHint,
             _options, _notices, () => _layouts.IsBrowsing, () => _search.IsOpen, _menu.Close, leaving => RestoreFocus(leaving));
         _artwork = new TileArtwork(_state, _navigation, _backdrop, () => _layouts.IsRow, () => _layouts.IsOldSchool, CardPixels);
-        _continue = new ContinuePresenter(Continue, Scroller, _state, _options, _navigation, () => _layouts.IsRow, () => _layouts.IsOldSchool,
-            () => _layouts.Docked, IsPausedGame, () => _grid.Container(0));
+        _continue = new ContinuePresenter(Continue, Scroller, _state, _options, () => _layouts.IsRow, () => _layouts.IsOldSchool);
 
         _play = new GameSessionController(this, _state, _navigation, _notices, _continue, this, ScreenOff, ScreenOn, ShowLibrary);
         _steamInstalls = new SteamInstallWatcher(_state, _notices, () => ScanAsync(), Dispatcher);
@@ -111,8 +111,13 @@ public partial class LibraryWindow : Window, ILibraryHost
 
         // Once signed in to a store, its games are asked for at once, and the library looks again.
         _signIn = new SignInPresenter(SignIn, _navigation, _notices, () => new WindowInteropHelper(this).Handle,
-            () => RestoreFocus(), session => _ = _owned.RefreshAsync(force: true));
-        _ = new AccountsMenu(Menu, _menu, _notices, _state, _continue, _signIn, _owned);
+            () => RestoreFocus(), session =>
+            {
+                _ = _owned.RefreshAsync(force: true);
+                _ = _topBar.ShowAccountAsync();
+            });
+        var accounts = _accounts = new AccountsMenu(Menu, _menu, _notices, _state, _continue, _signIn, _owned);
+        accounts.SignedOut += () => _ = _topBar.ShowAccountAsync();
         _gameActions = new GameActionsMenu(Menu, _menu, _notices, _state, _options, _artwork, _backdrop, _continue, this) { Installs = _installs };
         _settings = new SettingsMenu(Menu, _menu, _notices, _state, _options, _backdrop, _artwork, _topBar, _continue, OptionsHint, this);
         _ = new AddProgramMenu(Menu, _menu, _notices, _state, this);
@@ -128,13 +133,25 @@ public partial class LibraryWindow : Window, ILibraryHost
                 TopBar, Menu, ConsoleSpace),
             _state, _options, _navigation, _layouts, _notices, _backdrop, _artwork, _topBar, _settings, _power, this,
             DealsShown, FocusedDealId, UpdateDeals, UpdateEmptyText);
-        _deals = new DealsPresenter(DealRow, this, Scroller, AcceptHint, Menu, _menu, _notices, _state, _navigation, _layouts,
+        _deals = new DealsPresenter(DealRow, DealsDock, Page, TilesScroller, this, Scroller, AcceptHint, Menu, _menu, _notices, _state, _navigation, _layouts,
             _oldSchool, _backdrop, _play, _grid.ColumnCount, _grid.Container, _grid.Focus);
         _input = new LibraryNavigationCoordinator(_grid,
-            new InputParts(Tiles, TilesScroller, Scroller, AcceptHint, Continue.ContinueCard, TopBar, Menu),
+            new InputParts(Tiles, TilesScroller, Scroller, AcceptHint, TopBar, Menu),
             _navigation, _state, _options, _layouts, _menu, _search, _topBar, _continue, _deals, _oldSchool, _gameActions, _settings,
             _power, _play, _artwork, _backdrop, _signIn, this);
         _topBar.SettingsPressed += _settings.Open;
+
+        // The API Keys list shows rows that belong to other menus, which say what each is set to as it opens.
+        _settings.HomeScreenChanged += () =>
+        {
+            UpdateDeals();
+            UpdateHeadings();
+        };
+        _settings.ApiKeysOpening += () =>
+        {
+            _owned.RefreshKey();
+            _deals.RefreshSettings();
+        };
         _topBar.PowerPressed += _power.Open;
 
         _gamepad = new GamepadInput(Dispatcher);
@@ -159,6 +176,7 @@ public partial class LibraryWindow : Window, ILibraryHost
         // Scan on load, not only on activation: Windows can start the home app without giving it focus.
         Loaded += (_, _) => _ = ScanAsync();
         Loaded += (_, _) => _ = _topBar.CheckForUpdateAsync();
+        Loaded += (_, _) => _ = _topBar.ShowAccountAsync();
         Loaded += (_, _) => _ = RefreshGameSettingsAsync();
         Loaded += (_, _) => WatchScreens();
         Loaded += (_, _) => _steamInstalls.Start();
@@ -218,7 +236,6 @@ public partial class LibraryWindow : Window, ILibraryHost
             ApplyLayout();
         }
 
-        _continue.ShowArt();
         _artwork.LoadSquares();
         _oldSchool.UpdateRenderMode();
         _artwork.LoadCardArt();
@@ -274,7 +291,6 @@ public partial class LibraryWindow : Window, ILibraryHost
         }
 
         _backdrop.Clear();
-        _continue.ClearArt();
         _artwork.UnloadSquares();
         _artwork.UnloadCardArt();
         _artwork.UnloadNotInstalled();
@@ -342,6 +358,12 @@ public partial class LibraryWindow : Window, ILibraryHost
         RestoreFocus();
         _ = _artwork.FetchCoversAsync();
         _ = _owned.RefreshAsync(force: false);
+
+        // Every game's achievements once a day, never while one is being played.
+        if (_play.Session is null)
+        {
+            _ = _accounts.SyncDailyAsync();
+        }
     }
 
     // The games downloading when the order of Ready to install was last made, to know when it has to change.
@@ -406,6 +428,44 @@ public partial class LibraryWindow : Window, ILibraryHost
         _state.Tiles = _state.Sorted(ShownTiles().Where(_state.Filter.Shows).Where(_search.Found), _options.Sort)
             .OrderByDescending(t => t.IsFavourite)
             .OrderByDescending(t => !t.IsInstalled && t.IsInstalling).ToList();
+
+        // The game on Jump back in: the front card in the NXE layout, and not twice when it is a favourite in the
+        // others. Left alone while searching, which shows every match.
+        // The last game played first, with a badge, in every layout since the user asked on 2026-11-16, and
+        // shown once whether or not it is a favourite.
+        var lastPlayed = _search.IsOpen ? null : _continue.LastPlayed();
+        if (lastPlayed is not null)
+        {
+            _state.Tiles = HomeOrder.Arrange(_state.Tiles, lastPlayed);
+        }
+
+        // A game owned on two stores is one tile, the copy first in the order, with the other in its Options menu.
+        // Not on Ready to install, whose games are each a store's to install, nor while searching, which shows all.
+        foreach (var tile in _state.AllTiles)
+        {
+            tile.IsLastPlayed = ReferenceEquals(tile, lastPlayed);
+            tile.OtherCopies = [];
+        }
+
+        if (!_search.IsOpen && !_state.Filter.NotInstalled)
+        {
+            var (merged, others) = SameGame.Merge(_state.Tiles, t => t.Title, t => t.StoreName, t => t.IsInstalled && !t.IsApp);
+            foreach (var (tile, copies) in others)
+            {
+                tile.OtherCopies = copies;
+            }
+
+            _state.Tiles = merged;
+        }
+
+        _continue.UpdateCoverDetails(_state.AllTiles, lastPlayed);
+
+        // The grid's pictures are a fifth smaller on the Games tab, which the user asked for on 2026-11-16, and as
+        // they were on Ready to install, whose hundreds of games are a grid in every layout.
+        var small = !_state.Filter.NotInstalled;
+        Resources["GridTileWidth"] = small ? 144d : 180d;
+        Resources["GridTileHeight"] = small ? 216d : 270d;
+        UpdateHeadings();
         Tiles.ItemsSource = _state.Tiles;
         AcceptHint.Text = _state.Filter.Accept;
         _oldSchool.UpdateOpenCardCount();
@@ -444,11 +504,11 @@ public partial class LibraryWindow : Window, ILibraryHost
                 : string.Empty
             : _state.Filter.Apps
             ? _state.Tiles.Count == 0
-                ? "No apps yet. Press Menu, then Catalog & Content, then Add Custom App."
+                ? "No apps yet. Press Menu, then Games & Stores, then Add Custom App."
                 : string.Empty
             : _state.AllTiles.All(t => !t.IsInstalled || t.IsApp) && !_state.Filter.NotInstalled
-            ? "No installed games were found in Steam, Xbox, Epic Games, Battle.net, GOG, the EA App or Ubisoft Connect.\nInstall a game, or press Menu, then Catalog & Content, then Add Custom App."
-            : _state.Tiles.Count == 0 ? "Every game is hidden. Turn on Show hidden games to bring them back. Press Menu, then Appearance & Layout, then Library Elements."
+            ? "No installed games were found in Steam, Xbox, Epic Games, Battle.net, GOG, the EA App or Ubisoft Connect.\nInstall a game, or press Menu, then Games & Stores, then Add Custom App."
+            : _state.Tiles.Count == 0 ? "Every game is hidden. Turn on Show hidden games to bring them back. Press Menu, then Home Screen."
             : string.Empty;
     }
 
@@ -556,13 +616,6 @@ public partial class LibraryWindow : Window, ILibraryHost
                 return;
             }
 
-            // Back on the Last played card it was on, when that game is still there.
-            if (_continue.RestoreFocus() is { } card)
-            {
-                _backdrop.Queue(card);
-                return;
-            }
-
             var index = Math.Max(0, _state.FocusedIndex);
             _grid.Focus(index);
 
@@ -624,6 +677,40 @@ public partial class LibraryWindow : Window, ILibraryHost
     /// <summary>Shows the deals for the category or tab that is open.</summary>
     private void UpdateDeals() => _deals.UpdateDeals();
 
+    /// <summary>
+    /// The Games heading above the games, in the grid and the row on the Games tab with the section titles on, and
+    /// every game's store badge, as this layout's Home Screen settings say.
+    /// </summary>
+    private void UpdateHeadings()
+    {
+        GamesHeading.Visibility = !_layouts.IsOldSchool && !_layouts.IsBrowsing && _state.Filter == TileFilter.All
+            && _state.Tiles.Count > 0 && LibrarySettings.SectionTitles ? Visibility.Visible : Visibility.Collapsed;
+        Resources["StoreBadgeVisibility"] = LibrarySettings.StoreBadge ? Visibility.Visible : Visibility.Collapsed;
+
+        CentreRow();
+    }
+
+    /// <summary>
+    /// Puts the row in the middle of the room above the deals when nothing is shown below it, which left the screen
+    /// looking empty under a row at the top (2026-11-16). With Game Details on the details fill that room, and the
+    /// other layouts are as they were. A margin, since the page in its scroll viewer always starts at the top.
+    /// </summary>
+    private void CentreRow()
+    {
+        var top = 0d;
+        if (_layouts.IsRow && !_options.ContinueInfo && Scroller.ViewportHeight > 0)
+        {
+            // What the page needs, not the height it is stretched to.
+            var content = Page.DesiredSize.Height - Page.Margin.Top - Page.Margin.Bottom;
+            top = Math.Max(0, Math.Floor((Scroller.ViewportHeight - content) / 2));
+        }
+
+        if (Math.Abs(Page.Margin.Top - top) >= 1)
+        {
+            Page.Margin = new Thickness(Page.Margin.Left, top, Page.Margin.Right, Page.Margin.Bottom);
+        }
+    }
+
     /// <summary>Whether an element is one of the top bar's buttons the d-pad goes along.</summary>
     private bool IsTopBarButton(object? element) => _topBar.IsButton(element);
 
@@ -651,9 +738,6 @@ public partial class LibraryWindow : Window, ILibraryHost
     /// closing, and again from LibraryApp.Run's finally in case the library failed before it could close.
     /// </summary>
     internal void EndSession() => _play.EndSession();
-
-    /// <summary>Whether this is the game paused right now.</summary>
-    private bool IsPausedGame(GameTile tile) => _play.IsPaused(tile);
 
     /// <summary>
     /// Nobody can see the library with the screen off, and on a Modern Standby device it stays running

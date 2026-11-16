@@ -28,6 +28,7 @@ internal sealed class ConsoleSpaceLayer : Grid
 
     // The circles keep out of the list of categories at the top left and the clock at the top right, where
     // they made the words hard to read on the lime.
+    private readonly List<UIElement> _lime = [];
     private readonly CircleField _circles = new() { KeepClear = [new Rect(0, 0, 0.32, 0.36), new Rect(0.8, 0, 0.2, 0.08)] };
     private readonly Canvas _motes = new() { ClipToBounds = false };
     private readonly Rectangle _floor = new() { VerticalAlignment = VerticalAlignment.Top };
@@ -42,6 +43,7 @@ internal sealed class ConsoleSpaceLayer : Grid
         Visibility = Visibility.Collapsed;
 
         LimeBackdrop.AddTo(this);
+        _lime.AddRange(Children.OfType<UIElement>());
 
         Children.Add(_circles);
         Children.Add(_motes);
@@ -58,6 +60,16 @@ internal sealed class ConsoleSpaceLayer : Grid
     public void Show(bool shown, bool moving)
     {
         Visibility = shown && moving ? Visibility.Visible : Visibility.Collapsed;
+
+        // With the animated background off the lime and its circles go, and the player's own background, the
+        // game's colours or artwork, shows through behind the floor; the user asked for that on 2026-11-16.
+        var lime = LibrarySettings.MovingBackground ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var layer in _lime)
+        {
+            layer.Visibility = lime;
+        }
+
+        _circles.Visibility = lime;
         // The circles stay, still, with the moving background off; the motes only show while they drift.
         _motes.Visibility = shown && LibrarySettings.MovingBackground ? Visibility.Visible : Visibility.Collapsed;
         Move(shown && moving && LibrarySettings.MovingBackground);

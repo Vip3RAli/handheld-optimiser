@@ -30,6 +30,9 @@ internal sealed record StoreSession
     /// <summary>A store's own web cookie, for pages that only answer a signed-in browser.</summary>
     public string? Cookie { get; init; }
 
+    /// <summary>Where the account's picture is, for a store that has one (Xbox).</summary>
+    public string? Picture { get; init; }
+
     /// <summary>The store no longer accepts the tokens: the player has to sign in again.</summary>
     public bool NeedsSignIn { get; init; }
 

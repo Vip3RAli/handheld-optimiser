@@ -164,6 +164,9 @@ internal sealed class OldSchoolPanel : Panel
     /// </summary>
     public static bool ConsoleSpace { get; set; }
 
+    /// <summary>How big the cards are drawn against the fit to the screen: 15% smaller since the user asked on 2026-11-16.</summary>
+    public const double CardShrink = 0.85;
+
     public static readonly DependencyProperty PositionProperty = DependencyProperty.Register(
         nameof(Position), typeof(double), typeof(OldSchoolPanel),
         new FrameworkPropertyMetadata(0d, (panel, _) => ((OldSchoolPanel)panel).PlaceCards()));
@@ -213,7 +216,7 @@ internal sealed class OldSchoolPanel : Panel
         }
 
         // As wide as there is room for, and tall enough for the card sliding out, which grows as it goes.
-        Fit = OldSchoolStack.Fit(availableSize.Width, ConsoleSpace);
+        Fit = OldSchoolStack.Fit(availableSize.Width, ConsoleSpace) * CardShrink;
         var width = double.IsInfinity(availableSize.Width) ? card.Width : availableSize.Width;
         var reflections = ConsoleSpace ? card.Height * Fit * OldSchoolStack.ReflectionRoom : 0;
         return new Size(width, (card.Height * Fit * OldSchoolStack.Tallest) + reflections);
@@ -221,7 +224,7 @@ internal sealed class OldSchoolPanel : Panel
 
     protected override Size ArrangeOverride(Size finalSize)
     {
-        Fit = OldSchoolStack.Fit(finalSize.Width, ConsoleSpace);
+        Fit = OldSchoolStack.Fit(finalSize.Width, ConsoleSpace) * CardShrink;
         Spread = ConsoleSpace ? OldSchoolStack.Spread(finalSize.Width) : 0;
         var card = new Rect(0, 0, OldSchoolStack.CardWidth, CardHeight);
         var children = InternalChildren;

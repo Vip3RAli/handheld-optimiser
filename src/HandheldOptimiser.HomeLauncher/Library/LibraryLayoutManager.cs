@@ -184,9 +184,9 @@ internal sealed class LibraryLayoutManager(Window window, LibraryState state)
 
         tiles.ItemTemplate = (DataTemplate)window.FindResource(cards ? "OldSchoolTile" : row ? "RowTile" : "GridTile");
 
-        // The focused icon grows upwards from its bottom edge, so the row needs that much room above it.
-        // The cards need room for the focus ring.
-        tiles.Margin = row ? new Thickness(0, (RowTileSize * (RowFocusScale - 1)) + 10, 0, 6)
+        // The focused icon grows downwards from its top edge, which the user asked for on 2026-11-16, so the
+        // row needs that much room below it. The cards need room for the focus ring.
+        tiles.Margin = row ? new Thickness(0, 10, 0, (RowTileSize * (RowFocusScale - 1)) + 6)
             : cards ? new Thickness(10, 6, 10, 0)
             : default;
         return true;

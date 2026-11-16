@@ -10,14 +10,13 @@ internal sealed record InputParts(
     ScrollViewer TilesScroller,
     ScrollViewer Scroller,
     TextBlock AcceptHint,
-    Button ContinueCard,
     TopBarView TopBar,
     MenuView Menu);
 
 /// <summary>
 /// Where each press of the controller, each key, and each click, tap or wheel turn on the games goes. Which
 /// of those has the input is <see cref="LibraryNavigation"/>'s answer; this moves the focus about the page
-/// when the page has it: through the grid by row and column, to the top bar and the Last played card above,
+/// when the page has it: through the grid by row and column, to the top bar above,
 /// to the deals below, and along the Old School cards.
 /// </summary>
 internal sealed class LibraryNavigationCoordinator
@@ -82,11 +81,8 @@ internal sealed class LibraryNavigationCoordinator
         _backdrop = backdrop;
         _host = host;
 
-        // Every game's tile, the Last played card among them.
+        // Every game's tile.
         Visuals.OnItemButtons(parts.Tiles, OnTileClick, OnTileFocused, OnTileRightClick);
-        parts.ContinueCard.Click += OnTileClick;
-        parts.ContinueCard.GotKeyboardFocus += OnTileFocused;
-        parts.ContinueCard.MouseRightButtonUp += OnTileRightClick;
         parts.TilesScroller.PreviewMouseWheel += OnTilesWheel;
     }
 
@@ -141,12 +137,6 @@ internal sealed class LibraryNavigationCoordinator
             return;
         }
 
-        if (Keyboard.FocusedElement is Button { DataContext: DealSourceTile } source)
-        {
-            _deals.NavigateDealSources(source, direction);
-            return;
-        }
-
         if (Keyboard.FocusedElement is not Button { DataContext: GameTile tile } button)
         {
             // With nothing to show, such as an empty Apps tab, the top bar is all there is to reach.
@@ -162,24 +152,14 @@ internal sealed class LibraryNavigationCoordinator
             return;
         }
 
-        if (_continue.Contains(button))
-        {
-            NavigateContinue(direction);
-            return;
-        }
-
         var index = _state.Tiles.IndexOf(tile);
         var columns = _grid.ColumnCount();
         var last = _state.Tiles.Count - 1;
 
-        // Up from the grid's first row goes to the Last played card above it, or to the top bar.
+        // Up from the grid's first row goes to the top bar.
         if (direction == FocusNavigationDirection.Up && index >= 0 && index < columns)
         {
-            if (!_continue.Focus())
-            {
-                _topBar.Focus();
-            }
-
+            _topBar.Focus();
             return;
         }
 
@@ -202,20 +182,6 @@ internal sealed class LibraryNavigationCoordinator
         if (target >= 0 && target <= last)
         {
             _grid.Focus(target);
-        }
-    }
-
-    /// <summary>Up from the Last played card to the top bar, and down into the grid.</summary>
-    private void NavigateContinue(FocusNavigationDirection direction)
-    {
-        switch (direction)
-        {
-            case FocusNavigationDirection.Up:
-                _topBar.Focus();
-                break;
-            case FocusNavigationDirection.Down when _state.Tiles.Count > 0:
-                _grid.Focus(0);
-                break;
         }
     }
 
@@ -303,9 +269,6 @@ internal sealed class LibraryNavigationCoordinator
                 break;
             case GamepadAction.Accept when Keyboard.FocusedElement is Button { DataContext: DealTile deal }:
                 _deals.OpenDeal(deal);
-                break;
-            case GamepadAction.Accept when Keyboard.FocusedElement is Button { DataContext: DealSourceTile } source:
-                source.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 break;
             case GamepadAction.Accept when Keyboard.FocusedElement is Button { DataContext: ActionCard card }:
                 card.Act();
@@ -499,7 +462,8 @@ internal sealed class LibraryNavigationCoordinator
     /// </summary>
     private void OpenSettingsOrItsCards()
     {
-        if (_layouts.Layout == LibraryLayout.OldSchool)
+        // Pressed again on the Settings cards, the whole settings list opens, as it does in the other layouts.
+        if (_layouts.Layout == LibraryLayout.OldSchool && _oldSchool.OpenKind != CategoryKind.Settings)
         {
             _oldSchool.LeaveNotInstalled();
             _oldSchool.OpenCategoryOf(CategoryKind.Settings);
@@ -529,10 +493,10 @@ internal sealed class LibraryNavigationCoordinator
         if (sender is Button { DataContext: GameTile tile } button)
         {
             _state.FocusedKey = tile.Game.Key;
-            _continue.FocusWasHere = _continue.Contains(button);
             _acceptHint.Text = _state.Filter.Accept;
             _deals.FocusWasHere = false;
             _backdrop.Queue(tile);
+            _continue.Focused(tile);
 
             if (!tile.IsInstalled)
             {
@@ -540,7 +504,7 @@ internal sealed class LibraryNavigationCoordinator
             }
 
             // The Old School cards all sit in one place and come to the focus, so only the page moves.
-            if (_layouts.IsOldSchool && !_continue.FocusWasHere)
+            if (_layouts.IsOldSchool)
             {
                 _oldSchool.CardFocused(_oldSchool.GameCards, tile, _state.Tiles.IndexOf(tile));
                 _artwork.LoadCardArt();
@@ -548,10 +512,10 @@ internal sealed class LibraryNavigationCoordinator
                 return;
             }
 
-            // Leave room for the focus ring and the title underneath when scrolling a row into view.
-            // In the row the focused tile is drawn well beyond where it is laid out.
-            var (across, above) = _layouts.IsRow ? (95d, 170d) : (20d, 40d);
-            button.BringIntoView(new Rect(-across, -above, button.ActualWidth + (2 * across), button.ActualHeight + above + 40));
+            // Leave room for the focus ring and the title underneath when scrolling a row into view. In the row
+            // the focused tile is drawn well beyond where it is laid out, growing down from its top edge.
+            var (across, above, below) = _layouts.IsRow ? (95d, 20d, 170d) : (20d, 40d, 40d);
+            button.BringIntoView(new Rect(-across, -above, button.ActualWidth + (2 * across), button.ActualHeight + above + below));
         }
     }
 

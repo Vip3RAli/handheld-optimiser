@@ -144,9 +144,13 @@ internal sealed class GameActionsMenu
                 ? $"App   Last opened {PlayStats.Ago(DateTimeOffset.UtcNow - opened)}"
                 : "App"
         : _state.StatsOf(tile).Describe(DateTimeOffset.UtcNow) is { } played
-            ? $"{tile.StoreName}   {played}"
+            ? $"{tile.StoreName}{AlsoOn(tile)}   {played}"
             : tile.IsInstalled ? $"{tile.StoreName}   Not played yet"
             : $"{tile.StoreName}   Not installed";
+
+    /// <summary>The other stores the game is on, when it shares its tile with them: " and Steam".</summary>
+    private static string AlsoOn(GameTile tile) =>
+        tile.OtherCopies.Count == 0 ? "" : " and " + string.Join(" and ", tile.OtherCopies.Select(c => c.StoreName));
 
     /// <summary>What each quick action will do for this game, on the rows' detail lines.</summary>
     private void Refresh(GameTile tile)
@@ -178,6 +182,16 @@ internal sealed class GameActionsMenu
         if (downloading)
         {
             view.InstallItem.Visibility = Visibility.Collapsed;
+        }
+
+        // The same game from another store, which shares this tile (SameGame).
+        foreach (var copy in tile.OtherCopies)
+        {
+            _menu.AddRow(view.GameItems, view.FavouriteItem, $"Play from {copy.StoreName}", null, () =>
+            {
+                _menu.Close();
+                _host.Launch(copy);
+            });
         }
         foreach (var row in new[] { view.FavouriteItem, view.ProfileItem, view.ArgumentsItem, view.FolderItem, view.PropertiesItem })
         {
@@ -296,7 +310,6 @@ internal sealed class GameActionsMenu
         _state.Replace(tile, replacement);
 
         _state.FocusedKey = moved.Key;
-        _continue.FocusWasHere = false;
         _state.Filter = app ? TileFilter.AppsTab : TileFilter.All;
         _host.ShowTiles();
         _host.RestoreFocus();
@@ -348,7 +361,7 @@ internal sealed class GameActionsMenu
         _host.RestoreFocus();
         _notices.Show(!hidden ? $"{tile.Title} is back in the library."
             : _options.ShowHidden ? $"{tile.Title} is hidden. It shows faded while Show hidden games is on."
-            : $"{tile.Title} is hidden. Turn on Show hidden games to bring it back. It is under Appearance & Layout, Library Elements.");
+            : $"{tile.Title} is hidden. Turn on Show hidden games to bring it back. It is under Home Screen, in Settings.");
     }
 
     // ----- Typed settings: launch arguments and the artwork title -----

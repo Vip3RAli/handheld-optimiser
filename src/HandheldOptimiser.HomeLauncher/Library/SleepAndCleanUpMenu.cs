@@ -33,6 +33,13 @@ internal sealed class SleepAndCleanUpMenu
 
         // Play and sleep.
         view.WhilePlayingGroup.Click += (_, _) => OpenWhilePlaying();
+        view.BackgroundAppsGroup.Click += (_, _) => OpenPlayGroup(view.BackgroundAppsItems);
+        view.PowerCoolingGroup.Click += (_, _) => OpenPlayGroup(view.PowerCoolingItems);
+        view.StoreAppsGroup.Click += (_, _) => OpenPlayGroup(view.StoreAppsItems);
+        foreach (var back in new[] { view.BackgroundAppsBackItem, view.PowerCoolingBackItem, view.StoreAppsBackItem })
+        {
+            back.Click += (_, _) => menu.Back();
+        }
         view.GameModeSetting.Click += (_, _) => Toggle(() => LibrarySettings.GameMode = !LibrarySettings.GameMode);
         view.WindowsGameModeSetting.Click += (_, _) => Toggle(() => LibrarySettings.WindowsGameMode = SettingSteps.Step(LibrarySettings.WindowsGameMode, 1));
         view.AppsToCloseGroup.Click += (_, _) => OpenAppsToClose();
@@ -78,7 +85,7 @@ internal sealed class SleepAndCleanUpMenu
         // Lists inside a group go back to that group.
         menu.SetBack(view.AppsToCloseItems, () =>
         {
-            OpenWhilePlaying(view.AppsToCloseGroup);
+            OpenPlayGroup(view.BackgroundAppsItems, view.AppsToCloseGroup);
             return true;
         });
         menu.SetBack(view.RunningAppsItems, () =>
@@ -90,7 +97,7 @@ internal sealed class SleepAndCleanUpMenu
         {
             if (ReferenceEquals(_startupFrom, view.StoreStartupItem))
             {
-                OpenWhilePlaying(view.StoreStartupItem);
+                OpenPlayGroup(view.StoreAppsItems, view.StoreStartupItem);
             }
             else
             {
@@ -105,10 +112,20 @@ internal sealed class SleepAndCleanUpMenu
 
     // ----- Play and sleep -----
 
-    private void OpenWhilePlaying(Button? focus = null)
+    private void OpenWhilePlaying(Button? focus = null) => OpenPlayGroup(_view.WhilePlayingItems, focus);
+
+    /// <summary>
+    /// One of While Playing's lists. What was one list of thirteen rows is four short ones since 2026-11-15;
+    /// the rows are refreshed together, as they were.
+    /// </summary>
+    private void OpenPlayGroup(StackPanel list, Button? focus = null)
     {
         RefreshWhilePlaying();
-        _menu.Show(_view.WhilePlayingItems, "Game Mode & Optimisation", SettingsMenu.SleepTweaks, focus);
+        var title = ReferenceEquals(list, _view.BackgroundAppsItems) ? "Background Programs"
+            : ReferenceEquals(list, _view.PowerCoolingItems) ? "Power & Cooling"
+            : ReferenceEquals(list, _view.StoreAppsItems) ? "Store Apps"
+            : "Resume & Saves";
+        _menu.Show(list, title, SettingsMenu.SleepTweaks, focus);
     }
 
     private void Toggle(Action change)

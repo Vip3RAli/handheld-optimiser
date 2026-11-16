@@ -69,6 +69,21 @@ public class XboxSignInTests
         Assert.Null(XboxAuth.ParseUserToken("not json"));
     }
 
+    [Fact]
+    public void The_accounts_picture_is_read_from_its_profile_and_made_secure()
+    {
+        const string answer = """
+            {"profileUsers":[{"id":"2533270000000001","hostId":"2533270000000001","settings":[
+              {"id":"Gamertag","value":"Player One"},
+              {"id":"GameDisplayPicRaw","value":"http://images-eds.xboxlive.com/image?url=abc&format=png"}],"isSponsoredUser":false}]}
+            """;
+
+        Assert.Equal("https://images-eds.xboxlive.com/image?url=abc&format=png", XboxAccountApi.ParsePicture(answer));
+        Assert.Null(XboxAccountApi.ParsePicture("""{"profileUsers":[{"settings":[{"id":"Gamertag","value":"Player One"}]}]}"""));
+        Assert.Null(XboxAccountApi.ParsePicture("""{"profileUsers":[{"settings":[{"id":"GameDisplayPicRaw","value":"file:///c:/x.png"}]}]}"""));
+        Assert.Null(XboxAccountApi.ParsePicture("not json"));
+    }
+
     private const string TitleHistory = """
         {"xuid":"2533270000000001","titles":[
           {"titleId":"1000000001","pfn":"Studio.OldDungeon_8wekyb3d8bbwe","name":"Old Dungeon","type":"Game","devices":["PC","XboxOne","XboxSeries"],

@@ -118,21 +118,21 @@ internal sealed class LibraryOptions
         set => LibrarySettings.Sort = _sort = value;
     }
 
-    /// <summary>The Last played card above the grid.</summary>
+    /// <summary>The last game played first among the games, with a badge.</summary>
     public bool ContinuePlaying
     {
         get => _continuePlaying;
         set => LibrarySettings.ContinuePlaying = _continuePlaying = value;
     }
 
-    /// <summary>The panel beside the Last played card.</summary>
+    /// <summary>Game Details: the picked game's details below the row, and the last game's on its picture in the grid.</summary>
     public bool ContinueInfo
     {
         get => _continueInfo;
         set => LibrarySettings.ContinueInfo = _continueInfo = value;
     }
 
-    /// <summary>What the game's store says about it, in the panel beside the Last played card.</summary>
+    /// <summary>Store Description: what the game's store says about it, in the details below the row.</summary>
     public bool StoreDetails
     {
         get => _storeDetails;

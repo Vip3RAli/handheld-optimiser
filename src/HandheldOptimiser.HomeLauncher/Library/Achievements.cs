@@ -112,6 +112,16 @@ internal static class Achievements
         return ReadCache(game.Key);
     }
 
+    /// <summary>How long after a sync of every game the library syncs them all again by itself, which the user asked for on 2026-11-16.</summary>
+    public static readonly TimeSpan SyncAllAfter = TimeSpan.FromDays(1);
+
+    /// <summary>
+    /// Whether the daily sync of every game is due: never synced, a day or more ago, or a time in the future,
+    /// which a clock put right since would leave waiting.
+    /// </summary>
+    public static bool SyncAllDue(DateTimeOffset? last, DateTimeOffset now) =>
+        last is not { } at || at > now || now - at >= SyncAllAfter;
+
     /// <summary>Syncs achievements for all installed games in the library.</summary>
     /// <returns>How many games had achievements, and the total unlocked across them.</returns>
     public static async Task<(int Games, int Unlocked)> SyncAllAsync(IEnumerable<Game> games)

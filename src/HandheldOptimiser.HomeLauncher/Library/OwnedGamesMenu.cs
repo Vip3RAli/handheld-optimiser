@@ -1,4 +1,5 @@
 using System.IO;
+using System.Windows;
 
 namespace HandheldOptimiser.HomeLauncher.Library;
 
@@ -180,15 +181,18 @@ internal sealed class OwnedGamesMenu
         _notices.Show(_error ?? (count == 1 ? "1 game ready to install." : $"{count} games ready to install."));
     }
 
+    /// <summary>What the Steam key row is set to, for the API Keys list, which is where it is shown.</summary>
+    public void RefreshKey() => Refresh();
+
     private void Refresh()
     {
         var on = LibrarySettings.ShowNotInstalled;
         _view.NotInstalledSetting.Tag = SettingSteps.OnOff(on);
 
+        // Signed in to Steam inside the library, the key is not used for the list, so its row is not shown.
+        _view.SteamKeySetting.Visibility = StoreSessions.SignedIn(GameStore.Steam) ? Visibility.Collapsed : Visibility.Visible;
         _view.SteamKeySetting.IsEnabled = on;
-        // Signed in to Steam inside the library, the key is not used for the list.
-        _view.SteamKeySetting.Tag = StoreSessions.SignedIn(GameStore.Steam) ? "Not needed"
-            : LibrarySettings.SteamKey is null ? "Not set" : _error is null ? "Set" : "Not working";
+        _view.SteamKeySetting.Tag = LibrarySettings.SteamKey is null ? "Not set" : _error is null ? "Set" : "Not working";
 
         _view.OwnedRefreshItem.IsEnabled = on;
 

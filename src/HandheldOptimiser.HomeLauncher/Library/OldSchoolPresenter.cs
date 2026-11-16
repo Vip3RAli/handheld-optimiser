@@ -865,10 +865,14 @@ internal sealed class OldSchoolPresenter
 
                 cards.Add(new ActionCard("", SettingsMenu.LibraryDisplay, null,
                     () => _settings.OpenCategoryFromCard(_parts.Menu.LibraryDisplayItems)));
-                cards.Add(new ActionCard("", SettingsMenu.GamesApps, null,
+                cards.Add(new ActionCard("", SettingsMenu.HomeScreen, null,
+                    () => _settings.OpenCategoryFromCard(_parts.Menu.DisplayItems)));
+                cards.Add(new ActionCard("", SettingsMenu.GamesApps, null,
                     () => _settings.OpenCategoryFromCard(_parts.Menu.GamesAppsItems)));
-                cards.Add(new ActionCard("", SettingsMenu.SleepTweaks, null,
+                cards.Add(new ActionCard("", SettingsMenu.SleepTweaks, null,
                     () => _settings.OpenCategoryFromCard(_parts.Menu.SleepTweaksItems)));
+                cards.Add(new ActionCard("", SettingsMenu.System, null,
+                    () => _settings.OpenCategoryFromCard(_parts.Menu.SystemItems)));
                 cards.Add(new ActionCard("", "Refresh library", null,
                     _settings.Rescan));
                 cards.Add(new ActionCard("", "Close library", null, _settings.Quit));
@@ -1015,7 +1019,9 @@ internal sealed class OldSchoolPresenter
     // The page's own edges, as LibraryWindow.xaml has them, and its place inside the open card: below
     // the card's heading and within its sides. Both leave the games the same width, so the grid has
     // as many columns in the card as it has on its tab in the other layouts.
-    private static readonly Thickness PageEdges = new(38, 4, 38, 24);
+    // The grid and the row reach nearer the screen's sides than the Old School cards, which the user asked
+    // for on 2026-11-16: with the tiles' own margin the games start 24 from the edge.
+    private static readonly Thickness PageEdges = new(14, 4, 14, 4);
 
     // Under the Old School cards there is only the button hints, so the page runs nearly down to them,
     // which is the room the list of categories needs above the cards on the handheld's own screen.
