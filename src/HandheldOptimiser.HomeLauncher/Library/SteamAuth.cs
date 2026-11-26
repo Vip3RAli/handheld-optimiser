@@ -154,7 +154,7 @@ internal static class SteamAuth
             }
 
             var transfer = ParseTransfers(await answer.Content.ReadAsStringAsync(cancel))
-                .FirstOrDefault(t => t.Url.Contains("steamcommunity.com", StringComparison.OrdinalIgnoreCase));
+                .FirstOrDefault(t => IsSteamCommunityUrl(t.Url));
             if (transfer.Url is null)
             {
                 return (null, true);
@@ -184,6 +184,12 @@ internal static class SteamAuth
             return (null, false);
         }
     }
+
+    internal static bool IsSteamCommunityUrl(string? url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var uri)
+        && uri.Scheme == Uri.UriSchemeHttps
+        && (uri.Host.Equals("steamcommunity.com", StringComparison.OrdinalIgnoreCase)
+            || uri.Host.EndsWith(".steamcommunity.com", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>The sites finalizelogin hands the sign-in on to, each with its one-use nonce and auth.</summary>
     internal static List<(string Url, string Nonce, string Auth)> ParseTransfers(string json)

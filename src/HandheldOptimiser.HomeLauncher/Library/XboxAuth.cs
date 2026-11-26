@@ -40,7 +40,8 @@ internal static class XboxAuth
 
     /// <summary>Whether a page is the one Microsoft goes to when the sign-in is over, with a code or with why not.</summary>
     public static bool IsRedirect(Uri uri) =>
-        uri.Host.Equals("login.live.com", StringComparison.OrdinalIgnoreCase)
+        uri.Scheme == Uri.UriSchemeHttps
+        && uri.Host.Equals("login.live.com", StringComparison.OrdinalIgnoreCase)
         && uri.AbsolutePath.StartsWith("/oauth20_desktop.srf", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>The code on the page Microsoft goes to once signed in, or null for any other page or a refusal.</summary>
