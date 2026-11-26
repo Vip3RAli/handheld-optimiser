@@ -43,24 +43,34 @@ internal sealed class OwnedGamesMenu
         };
     }
 
-    private void EditInstallFolder() =>
-        _menu.BeginEdit("Install folder",
-            @"A folder for the games the library installs itself, such as C:\Games or D:\Games. Games already installed stay where they are.",
-            LibrarySettings.InstallFolder, text =>
-            {
-                var folder = text.Trim().TrimEnd('\\');
-                if (folder.Length > 0 && !IsUsableFolder(folder))
-                {
-                    _notices.Show("That is not a folder the library can use. Give a full path, such as D:\\Games.");
-                }
-                else
-                {
-                    LibrarySettings.InstallFolder = folder;
-                }
+    private void EditInstallFolder()
+    {
+        var dialog = new Microsoft.Win32.OpenFolderDialog
+        {
+            Title = "Choose install folder",
+            InitialDirectory = Directory.Exists(LibrarySettings.InstallFolder)
+                ? LibrarySettings.InstallFolder
+                : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
+        };
 
-                Refresh();
-                _menu.ShowItems(_view.InstallFolderSetting);
-            });
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        var folder = dialog.FolderName.Trim().TrimEnd('\\');
+        if (folder.Length > 0 && !IsUsableFolder(folder))
+        {
+            _notices.Show("That is not a folder the library can use. Choose a subfolder on a drive, such as D:\\Games.");
+        }
+        else
+        {
+            LibrarySettings.InstallFolder = folder;
+        }
+
+        Refresh();
+        _menu.ShowItems(_view.InstallFolderSetting);
+    }
 
     /// <summary>A full path on a drive that is there, and not a drive's top folder alone.</summary>
     internal static bool IsUsableFolder(string folder)

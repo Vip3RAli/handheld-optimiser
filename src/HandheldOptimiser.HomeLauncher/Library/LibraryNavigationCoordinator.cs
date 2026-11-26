@@ -277,6 +277,12 @@ internal sealed class LibraryNavigationCoordinator
                 case GamepadAction.QuickSettings when ReferenceEquals(_menu.List, _menuView.QuickItems):
                     _menu.Close();
                     break;
+                case GamepadAction.PageUp:
+                    _menu.PageMove(-1);
+                    break;
+                case GamepadAction.PageDown:
+                    _menu.PageMove(1);
+                    break;
             }
 
             return;
@@ -312,6 +318,24 @@ internal sealed class LibraryNavigationCoordinator
                 break;
             case GamepadAction.Options when Keyboard.FocusedElement is Button { DataContext: GameTile tile }:
                 _gameActions.Open(tile);
+                break;
+
+            // Y toggles Search across the library.
+            case GamepadAction.QuickSettings when !(_layouts.IsOldSchool && _oldSchool.OpenKind is { } kind && kind != CategoryKind.Games):
+                if (_search.IsOpen && _search.Text.Length == 0)
+                {
+                    _search.Clear();
+                }
+                else
+                {
+                    _search.OpenFromController();
+                }
+
+                break;
+
+            case GamepadAction.PageUp:
+            case GamepadAction.PageDown:
+                PageTiles(action == GamepadAction.PageUp ? -1 : 1);
                 break;
 
             // B among the games a search found closes it and shows them all again.
@@ -400,15 +424,43 @@ internal sealed class LibraryNavigationCoordinator
         }
         else if (target == InputTarget.Menu)
         {
-            if (e.Key == Key.Escape)
+            if (e.Key is Key.Escape or Key.Back)
             {
                 _menu.Back();
+                e.Handled = true;
+            }
+            else if (e.Key is Key.F1 or Key.F2)
+            {
+                _menu.Close();
+                e.Handled = true;
+            }
+            else if (e.Key is Key.Home or Key.End)
+            {
+                _menu.FocusEdge(e.Key == Key.End);
+                e.Handled = true;
+            }
+            else if (e.Key is Key.PageUp or Key.PageDown)
+            {
+                _menu.PageMove(e.Key == Key.PageUp ? -1 : 1);
                 e.Handled = true;
             }
         }
         else if (e.Key == Key.Escape && _search.IsOpen)
         {
             _search.Clear();
+            e.Handled = true;
+        }
+        else if ((e.Key == Key.F && Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) || e.Key == Key.OemQuestion)
+        {
+            if (!(_layouts.IsOldSchool && _oldSchool.OpenKind is { } kind && kind != CategoryKind.Games))
+            {
+                _search.OpenFromKeyboard();
+                e.Handled = true;
+            }
+        }
+        else if (e.Key is Key.Home or Key.End && _state.Tiles.Count > 0)
+        {
+            _grid.Focus(e.Key == Key.Home ? 0 : _state.Tiles.Count - 1);
             e.Handled = true;
         }
         else if (e.Key == Key.Escape && _oldSchool.LeaveNotInstalled())
@@ -597,10 +649,20 @@ internal sealed class LibraryNavigationCoordinator
         }
     }
 
+    private void PageTiles(int direction)
+    {
+        if (_state.Tiles.Count == 0 || (_layouts.IsOldSchool && _oldSchool.OpenKind is { } kind && kind != CategoryKind.Games))
+        {
+            return;
+        }
+
+        var step = _layouts.IsOneLine ? 5 : Math.Max(1, _grid.ColumnCount()) * 3;
+        var current = Math.Max(0, _state.FocusedIndex);
+        _grid.Focus(Math.Clamp(current + (direction * step), 0, _state.Tiles.Count - 1));
+    }
+
     /// <summary>
-    /// LB and RB: one place left or right along the whole top bar, wrapping around. A tab is opened as it
-    /// is reached, with the focus back among its games. The buttons after the tabs (search on the Not
-    /// installed tab, settings and power) are picked out for A to press.
+    /// LB and RB: switch between filter tabs along the top bar, wrapping around cleanly.
     /// </summary>
     private void CycleFilter(int step)
     {
@@ -614,28 +676,13 @@ internal sealed class LibraryNavigationCoordinator
         }
 
         var tabs = TileFilter.Options(_state.Shown(_options.ShowHidden), _options.ShowFilter);
-        var buttons = new List<Button>();
-        if (_topBarView.SearchButton.Visibility == Visibility.Visible)
+        if (tabs.Count == 0)
         {
-            buttons.Add(_topBarView.SearchButton);
-        }
-
-        buttons.Add(_topBarView.SettingsButton);
-        buttons.Add(_topBarView.PowerButton);
-
-        // From a button, or from the open tab. The search bar and its store button count as the search button.
-        var focused = Keyboard.FocusedElement as Button;
-        var button = ReferenceEquals(focused, _topBarView.SearchBar) || ReferenceEquals(focused, _topBarView.StoreButton) ? _topBarView.SearchButton : focused;
-        var at = button is not null && buttons.IndexOf(button) is >= 0 and var index ? tabs.Count + index : tabs.IndexOf(_state.Filter);
-
-        var count = tabs.Count + buttons.Count;
-        var next = (((at + step) % count) + count) % count;
-        if (next >= tabs.Count)
-        {
-            buttons[next - tabs.Count].Focus();
             return;
         }
 
+        var at = Math.Max(0, tabs.IndexOf(_state.Filter));
+        var next = (((at + step) % tabs.Count) + tabs.Count) % tabs.Count;
         _host.ShowTab(tabs[next]);
         _host.RestoreFocus(leavingTopBar: true);
     }

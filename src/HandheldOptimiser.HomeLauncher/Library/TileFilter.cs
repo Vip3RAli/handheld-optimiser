@@ -22,43 +22,42 @@ internal readonly record struct TileFilter(GameStore? Store, bool Favourites, bo
 
     public bool Shows(GameTile tile) => Apps ? tile.IsApp
         : NotInstalled ? !tile.IsInstalled
-        : tile.IsInstalled && !tile.IsApp && (Favourites ? tile.IsFavourite
-            : Tag is { Length: > 0 } tag ? tile.HasTag(tag)
-            : Store is not { } store || tile.Game.Store == store);
+        : Favourites ? !tile.IsApp && tile.IsFavourite
+        : Tag is { Length: > 0 } tag ? !tile.IsApp && tile.HasTag(tag)
+        : tile.IsInstalled && !tile.IsApp && (Store is not { } store || tile.Game.Store == store);
 
     /// <summary>
-    /// The tabs of the filter strip, in order: Games; Apps, always, so there is somewhere to add them; then
-    /// Favourites once a game is starred, a tab per store when games come from more than one, and a tab per
-    /// tag collection while the store filter is on; and last Not installed, whenever there are owned games
-    /// that are not installed.
+    /// The tabs of the filter strip, in order: Games; Apps; Favourites once a game is starred; a tab per
+    /// store when store tabs are enabled and installed games come from multiple stores; a tab per tag
+    /// collection; and Ready to Install when owned uninstalled games exist.
     /// </summary>
     /// <param name="shown">The games the library shows, the hidden ones left out unless they are shown too.</param>
-    /// <param name="storeTabs">Whether the player switched the store filter on.</param>
+    /// <param name="storeTabs">Whether the player switched per-store tabs on.</param>
     public static List<TileFilter> Options(IEnumerable<GameTile> shown, bool storeTabs)
     {
         var games = shown.Where(t => !t.IsApp).ToList();
         var installed = games.Where(t => t.IsInstalled).ToList();
         var options = new List<TileFilter> { All, AppsTab };
 
+        if (games.Any(t => t.IsFavourite))
+        {
+            options.Add(Starred);
+        }
+
         if (storeTabs)
         {
-            if (installed.Any(t => t.IsFavourite))
-            {
-                options.Add(Starred);
-            }
-
             var stores = installed.Select(t => t.Game.Store).Distinct().Order().ToList();
             if (stores.Count > 1)
             {
                 options.AddRange(stores.Select(store => new TileFilter(store, false)));
             }
-
-            var tags = installed.SelectMany(t => t.Tags)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(t => t, StringComparer.CurrentCultureIgnoreCase)
-                .ToList();
-            options.AddRange(tags.Select(ForTag));
         }
+
+        var tags = games.SelectMany(t => t.Tags)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(t => t, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+        options.AddRange(tags.Select(ForTag));
 
         if (installed.Count < games.Count)
         {

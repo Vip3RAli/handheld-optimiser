@@ -88,6 +88,14 @@ internal sealed class GameActionsMenu
             }
         };
         view.HideItem.Click += (_, _) => ToggleHidden();
+        view.HideItem.LostKeyboardFocus += (_, _) =>
+        {
+            if (ReferenceEquals(_menu.Armed, view.HideItem))
+            {
+                _menu.Armed = null;
+                view.HideItem.Tag = null;
+            }
+        };
 
         view.ProfilePowerSetting.Click += (_, _) => StepProfile(view.ProfilePowerSetting, 1);
         view.ProfileResolutionSetting.Click += (_, _) => StepProfile(view.ProfileResolutionSetting, 1);
@@ -193,14 +201,15 @@ internal sealed class GameActionsMenu
                 _host.Launch(copy);
             });
         }
-        foreach (var row in new[] { view.FavouriteItem, view.ProfileItem, view.ArgumentsItem, view.FolderItem, view.PropertiesItem })
+        foreach (var row in new[] { view.ProfileItem, view.ArgumentsItem, view.FolderItem, view.PropertiesItem })
         {
             row.Visibility = installed ? Visibility.Visible : Visibility.Collapsed;
         }
 
+        view.FavouriteItem.Visibility = tile.IsApp ? Visibility.Collapsed : Visibility.Visible;
         view.FavouriteItem.Content = tile.IsFavourite ? "Remove from favourites" : "Add to favourites";
 
-        view.TagsItem.Visibility = installed && !tile.IsApp ? Visibility.Visible : Visibility.Collapsed;
+        view.TagsItem.Visibility = !tile.IsApp ? Visibility.Visible : Visibility.Collapsed;
         view.TagsItem.Tag = tile.Tags.Count > 0 ? string.Join(", ", tile.Tags) : "None";
 
         // Profiles only change things for games.
@@ -224,6 +233,7 @@ internal sealed class GameActionsMenu
         view.MoveItem.Visibility = added ? Visibility.Visible : Visibility.Collapsed;
         view.MoveItem.Content = tile.IsApp ? "Move to Games" : "Move to Apps";
         view.HideItem.Content = added ? "Remove from library" : tile.IsHidden ? "Show in library" : "Hide from library";
+        view.HideItem.Tag = null;
 
         var takesArguments = GameCatalog.SupportsCustomArguments(game);
         view.ArgumentsItem.IsEnabled = takesArguments;
@@ -309,8 +319,8 @@ internal sealed class GameActionsMenu
         replacement.IsHidden = tile.IsHidden;
         _state.Replace(tile, replacement);
 
+        _state.SwitchFilter(app ? TileFilter.AppsTab : TileFilter.All);
         _state.FocusedKey = moved.Key;
-        _state.Filter = app ? TileFilter.AppsTab : TileFilter.All;
         _host.ShowTiles();
         _host.RestoreFocus();
         _notices.Show(app ? $"{tile.Title} moved to Apps." : $"{tile.Title} moved to Games.");
@@ -324,8 +334,18 @@ internal sealed class GameActionsMenu
             return;
         }
 
+        var isAdded = AddedPrograms.IsAdded(tile.Game);
+        if (isAdded && !ReferenceEquals(_menu.Armed, _view.HideItem))
+        {
+            _menu.Armed = _view.HideItem;
+            _view.HideItem.Tag = "Press again to remove";
+            return;
+        }
+
+        _menu.Armed = null;
+
         // The focus moves on to the next game rather than jumping back to the first.
-        var leaving = AddedPrograms.IsAdded(tile.Game) || (!tile.IsHidden && !_options.ShowHidden);
+        var leaving = isAdded || (!tile.IsHidden && !_options.ShowHidden);
         if (leaving && _state.Tiles.IndexOf(tile) is var index and >= 0)
         {
             var next = index + 1 < _state.Tiles.Count ? index + 1 : index - 1;
@@ -334,7 +354,7 @@ internal sealed class GameActionsMenu
 
         _menu.Close();
 
-        if (AddedPrograms.IsAdded(tile.Game))
+        if (isAdded)
         {
             if (!AddedPrograms.Remove(tile.Game))
             {

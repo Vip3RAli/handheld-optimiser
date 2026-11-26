@@ -31,6 +31,10 @@ internal sealed class SignInPresenter
     private CancellationTokenSource? _run;
     private WebView2? _web;
     private bool _onWebPage;
+    private bool _qrFailed;
+
+    /// <summary>Optional callback invoked instead of returning to tiles after closing sign-in from Store Accounts.</summary>
+    public Action? ReturnToMenu { get; set; }
 
     // The store being signed in to. Only Steam has a QR code to switch to.
     private GameStore _store = GameStore.Steam;
@@ -191,6 +195,9 @@ internal sealed class SignInPresenter
                 FocusPage();
                 Native.PressKey(0x0D);
                 break;
+            case GamepadAction.Accept when !_onWebPage && _qrFailed:
+                ShowQr();
+                break;
         }
     }
 
@@ -243,6 +250,7 @@ internal sealed class SignInPresenter
     private void ShowQr()
     {
         var run = Restart();
+        _qrFailed = false;
         CloseWebPage();
         _view.Panel.Width = double.NaN;
         _view.Panel.MaxWidth = 940;
@@ -272,8 +280,9 @@ internal sealed class SignInPresenter
 
             if (challenge is null)
             {
+                _qrFailed = true;
                 _view.QrWaiting.Text = "No code";
-                _view.Status.Text = "Steam could not be reached. Check the connection, or press X to use the web page.";
+                _view.Status.Text = "Steam could not be reached. Press A to try again, X to use the web page, or B to cancel.";
                 return;
             }
 
@@ -319,7 +328,8 @@ internal sealed class SignInPresenter
 
         if (!cancel.IsCancellationRequested)
         {
-            _view.Status.Text = "The code ran out. Press X to use the web page, or B and try again.";
+            _qrFailed = true;
+            _view.Status.Text = "The code ran out. Press A to try again, X to use the web page, or B to cancel.";
         }
     }
 
@@ -849,6 +859,14 @@ internal sealed class SignInPresenter
         _view.QrImage.Source = null;
         _view.Visibility = Visibility.Collapsed;
         _navigation.EndSignIn();
-        _restoreFocus();
+        if (ReturnToMenu is { } returnToMenu)
+        {
+            ReturnToMenu = null;
+            returnToMenu();
+        }
+        else
+        {
+            _restoreFocus();
+        }
     }
 }

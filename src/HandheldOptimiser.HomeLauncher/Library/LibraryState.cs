@@ -13,10 +13,36 @@ internal sealed class LibraryState
     /// <summary>The tiles on screen: the open tab's, in the chosen order.</summary>
     public List<GameTile> Tiles { get; set; } = [];
 
+    private readonly Dictionary<TileFilter, string> _focusedByTab = [];
+    private string? _focusedKey;
+
     public TileFilter Filter { get; set; } = TileFilter.All;
 
-    /// <summary>The game the focus is on, or was last on, by its key. Kept across a rescan, which makes new tiles.</summary>
-    public string? FocusedKey { get; set; }
+    /// <summary>The game the focus is on, or was last on, by its key. Kept per tab and across rescans.</summary>
+    public string? FocusedKey
+    {
+        get => _focusedKey;
+        set
+        {
+            _focusedKey = value;
+            if (value is not null)
+            {
+                _focusedByTab[Filter] = value;
+            }
+        }
+    }
+
+    /// <summary>Switches the active filter tab while remembering each tab's last focused game.</summary>
+    public void SwitchFilter(TileFilter next)
+    {
+        if (_focusedKey is { } current)
+        {
+            _focusedByTab[Filter] = current;
+        }
+
+        Filter = next;
+        _focusedKey = _focusedByTab.GetValueOrDefault(next);
+    }
 
     /// <summary>Each game's play time and last play, for sorting and the quick actions menu.</summary>
     public Dictionary<string, PlayStats> Stats { get; set; } = [];

@@ -230,6 +230,30 @@ internal sealed class SleepAndCleanUpMenu
         {
             StepFanCurve(step);
         }
+        else if (ReferenceEquals(row, view.GameModeSetting))
+        {
+            Toggle(() => LibrarySettings.GameMode = !LibrarySettings.GameMode);
+        }
+        else if (ReferenceEquals(row, view.StopAmdRecordingSetting))
+        {
+            Toggle(() => LibrarySettings.StopAmdRecording = !LibrarySettings.StopAmdRecording);
+        }
+        else if (ReferenceEquals(row, view.ReopenSetting))
+        {
+            Toggle(() => LibrarySettings.ReopenApps = !LibrarySettings.ReopenApps);
+        }
+        else if (ReferenceEquals(row, view.QuickResumeSetting))
+        {
+            ToggleQuickResume();
+        }
+        else if (ReferenceEquals(row, view.ResumeSetting))
+        {
+            Toggle(() => LibrarySettings.ResumeAfterSleep = !LibrarySettings.ResumeAfterSleep);
+        }
+        else if (ReferenceEquals(row, view.SaveGuardSetting))
+        {
+            Toggle(() => LibrarySettings.SaveGuard = !LibrarySettings.SaveGuard);
+        }
         else
         {
             return false;

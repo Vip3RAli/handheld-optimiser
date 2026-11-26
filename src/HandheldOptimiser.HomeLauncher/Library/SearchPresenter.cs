@@ -49,11 +49,27 @@ internal sealed class SearchPresenter
 
         view.SearchButton.Click += (_, _) => Open();
         view.SearchBar.Click += (_, _) => BeginTyping();
+        view.SearchClearButton.Click += (_, _) => Clear();
         view.StoreButton.Click += (_, _) => StepStore();
         view.SearchBox.TextChanged += OnTextChanged;
         view.SearchBox.GotKeyboardFocus += OnFocusChanged;
         view.SearchBox.LostKeyboardFocus += OnFocusChanged;
     }
+
+    public void OpenFromController()
+    {
+        PressedByController = true;
+        try
+        {
+            Open();
+        }
+        finally
+        {
+            PressedByController = false;
+        }
+    }
+
+    public void OpenFromKeyboard() => BeginTyping();
 
     /// <summary>What the games are narrowed down to now. Empty shows them all.</summary>
     public string Text { get; private set; } = string.Empty;
@@ -101,8 +117,10 @@ internal sealed class SearchPresenter
 
     private void Show(bool show)
     {
+        var stores = show ? StoresInTab() : [];
         _view.SearchPanel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-        _view.StoreButton.Visibility = _view.SearchPanel.Visibility;
+        _view.SearchClearButton.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        _view.StoreButton.Visibility = show && stores.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
         _view.StoreButton.Content = Store is { } store ? Game.NameOf(store) : "All stores";
         ShowSearchText();
     }
@@ -219,7 +237,7 @@ internal sealed class SearchPresenter
     private void Apply()
     {
         var text = _view.SearchBox.Text.Trim();
-        if (text == Text || !_state.Filter.NotInstalled)
+        if (text == Text)
         {
             return;
         }
@@ -228,11 +246,13 @@ internal sealed class SearchPresenter
         _showFound();
     }
 
+    private List<GameStore> StoresInTab() =>
+        _state.Shown(_options.ShowHidden).Where(_state.Filter.Shows).Select(t => t.Game.Store).Distinct().Order().ToList();
+
     /// <summary>The store button: on to the next store's games, and after the last to every store's again.</summary>
     private void StepStore()
     {
-        // The stores that have games which are not installed, in the order the button goes through them.
-        var stores = _state.Shown(_options.ShowHidden).Where(t => !t.IsInstalled).Select(t => t.Game.Store).Distinct().Order().ToList();
+        var stores = StoresInTab();
         var index = Store is { } store ? stores.IndexOf(store) : -1;
         Store = index + 1 < stores.Count ? stores[index + 1] : null;
         Show(true);

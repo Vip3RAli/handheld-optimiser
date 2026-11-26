@@ -26,13 +26,25 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
             <!-- The Old School panel's sheen, out to the box's edges over its padding. -->
-            <Rectangle x:Name="MenuSheen" Grid.ColumnSpan="2" Visibility="Collapsed" IsHitTestVisible="False"
+            <Rectangle x:Name="MenuSheen" Grid.ColumnSpan="2" Grid.RowSpan="2" Visibility="Collapsed" IsHitTestVisible="False"
                        Fill="{StaticResource MenuPanelSheen}" RadiusX="5" RadiusY="5" />
             <!-- Scrolls when the list is taller than the screen, as on a small or heavily scaled display. -->
-            <ScrollViewer x:Name="MenuScroller" VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly" Focusable="False">
+            <ScrollViewer x:Name="MenuScroller" Grid.Row="0" VerticalScrollBarVisibility="Auto" PanningMode="VerticalOnly" Focusable="False">
             <StackPanel>
-                <TextBlock x:Name="MenuTitle" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="MenuTitle" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                    <Button x:Name="MenuCloseButton" Grid.Column="1" Style="{StaticResource IconButton}" Width="36" Height="36"
+                            FontSize="14" Content="&#xE711;" ToolTip="Close" Margin="8,0,0,0" />
+                </Grid>
                 <TextBlock x:Name="MenuStore" Margin="0,2,0,18" FontSize="13" Opacity="0.55" />
                 <!-- A notice raised while the menu is open, such as that a setting could not be saved. -->
                 <TextBlock x:Name="MenuNotice" Margin="0,-6,0,12" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap"
@@ -257,6 +269,9 @@
                             local:MenuRow.About="Show or hide the controller button hints." />
                     <Button x:Name="HiddenSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE7B3;" Content="Show hidden games"
                             local:MenuRow.About="Show hidden games, so you can restore them." />
+                    <Button x:Name="HiddenGamesGroup" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xED1A;" Content="Manage hidden games"
+                            local:MenuRow.About="Restore individual hidden games without showing all hidden tiles."
+                            Visibility="Collapsed" />
                     <Button x:Name="SortSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE8CB;" Content="Sort games"
                             local:MenuRow.About="The order games are shown in." />
                     <!-- For touch, which has no B button. -->
@@ -864,6 +879,22 @@
                     </StackPanel>
                 </StackPanel>
 
+                <!-- Hidden games manager: restore hidden tiles directly. -->
+                <StackPanel x:Name="HiddenGamesItems" Visibility="Collapsed">
+                    <Button x:Name="HiddenGamesBackItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE72B;" Content="Back"
+                            local:MenuRow.About="Back to Home Screen." />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Style="{StaticResource HintGlyph}" Background="#3FA34D">
+                            <TextBlock Text="A" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Restore" FontSize="15" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
+                            <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
                 <!-- Tags and collections for one game. -->
                 <StackPanel x:Name="TagsItems" Visibility="Collapsed">
                     <Button x:Name="AddCustomTagItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE710;" Content="Add custom tag"
@@ -897,7 +928,9 @@
                 </StackPanel>
             </StackPanel>
             </ScrollViewer>
-            <StackPanel x:Name="MenuDetail" Grid.Column="1" Visibility="Collapsed">
+            <TextBlock x:Name="MenuBoxAbout" Grid.Row="1" Grid.Column="0" Margin="2,10,2,0" FontSize="13.5" Opacity="0.72"
+                       TextWrapping="Wrap" Visibility="Collapsed" />
+            <StackPanel x:Name="MenuDetail" Grid.Column="1" Grid.RowSpan="2" Visibility="Collapsed">
                 <TextBlock x:Name="MenuDetailText" FontSize="17" LineHeight="25" TextWrapping="Wrap" Foreground="#E6EAED" />
             </StackPanel>
             </Grid>
