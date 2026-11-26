@@ -462,6 +462,11 @@ namespace HandheldOptimiser.GameBar
 
             try
             {
+                if (pipePath == PipePath && !IsServicePipe(pipe))
+                {
+                    return null;
+                }
+
                 var bytes = Encoding.UTF8.GetBytes(request + "\n");
                 if (!WriteFile(pipe, bytes, (uint)bytes.Length, out _, IntPtr.Zero))
                 {
@@ -492,10 +497,16 @@ namespace HandheldOptimiser.GameBar
 
         private static IntPtr Open(string pipePath)
         {
+            var extended = new CreateFile2ExtendedParameters
+            {
+                Size = (uint)Marshal.SizeOf(typeof(CreateFile2ExtendedParameters)),
+                SecurityQosFlags = SecuritySqosPresent | SecurityIdentification
+            };
+
             // The service takes one request at a time, so a busy pipe is tried again shortly.
             for (var tries = 0; tries < 20; tries++)
             {
-                var pipe = CreateFile2(pipePath, GenericRead | GenericWrite, 0, OpenExisting, IntPtr.Zero);
+                var pipe = CreateFile2(pipePath, GenericRead | GenericWrite, 0, OpenExisting, ref extended);
                 if (pipe != InvalidHandle)
                 {
                     return pipe;
@@ -510,6 +521,62 @@ namespace HandheldOptimiser.GameBar
             }
 
             return InvalidHandle;
+        }
+
+        private static bool IsServicePipe(IntPtr pipe)
+        {
+            uint serverPid;
+            if (!GetNamedPipeServerProcessId(pipe, out serverPid) || serverPid == 0)
+            {
+                return false;
+            }
+
+            var expectedPid = ServicePid();
+            if (expectedPid > 0)
+            {
+                return serverPid == expectedPid;
+            }
+
+            uint sessionId;
+            return ProcessIdToSessionId(serverPid, out sessionId) && sessionId == 0;
+        }
+
+        private static uint ServicePid()
+        {
+            var manager = OpenSCManager(null, null, ScManagerConnect);
+            if (manager == IntPtr.Zero)
+            {
+                return 0;
+            }
+
+            try
+            {
+                var service = OpenService(manager, AutoTdpProtocol.ServiceName, ServiceQueryStatus);
+                if (service == IntPtr.Zero)
+                {
+                    return 0;
+                }
+
+                try
+                {
+                    var status = new int[9];
+                    int needed;
+                    if (!QueryServiceStatusEx(service, ScStatusProcessInfo, status, status.Length * sizeof(int), out needed))
+                    {
+                        return 0;
+                    }
+
+                    return status[1] == ServiceRunningState && status[7] > 0 ? (uint)status[7] : 0;
+                }
+                finally
+                {
+                    CloseServiceHandle(service);
+                }
+            }
+            finally
+            {
+                CloseServiceHandle(manager);
+            }
         }
 
         /// <returns>Why it could not be started, or null.</returns>
@@ -557,14 +624,39 @@ namespace HandheldOptimiser.GameBar
         private const uint GenericRead = 0x80000000;
         private const uint GenericWrite = 0x40000000;
         private const uint OpenExisting = 3;
+        private const uint SecuritySqosPresent = 0x00100000;
+        private const uint SecurityIdentification = 0x00010000;
         private const int ErrorPipeBusy = 231;
         private const uint ScManagerConnect = 0x0001;
+        private const uint ServiceQueryStatus = 0x0004;
         private const uint ServiceStart = 0x0010;
+        private const int ScStatusProcessInfo = 0;
+        private const int ServiceRunningState = 4;
         private const int ErrorAlreadyRunning = 1056;
         private const int ErrorServiceDoesNotExist = 1060;
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct CreateFile2ExtendedParameters
+        {
+            public uint Size;
+            public uint FileAttributes;
+            public uint FileFlags;
+            public uint SecurityQosFlags;
+            public IntPtr SecurityAttributes;
+            public IntPtr TemplateFile;
+        }
+
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-        private static extern IntPtr CreateFile2(string fileName, uint access, uint share, uint creation, IntPtr parameters);
+        private static extern IntPtr CreateFile2(string fileName, uint access, uint share, uint creation, ref CreateFile2ExtendedParameters parameters);
+
+        [DllImport("kernel32.dll", SetLastError = true, ExactSpelling = true)]
+        private static extern bool GetNamedPipeServerProcessId(IntPtr pipe, out uint processId);
+
+        [DllImport("kernel32.dll", SetLastError = true, ExactSpelling = true)]
+        private static extern bool ProcessIdToSessionId(uint processId, out uint sessionId);
+
+        [DllImport("advapi32.dll", SetLastError = true, ExactSpelling = true)]
+        private static extern bool QueryServiceStatusEx(IntPtr service, int infoLevel, int[] buffer, int size, out int needed);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool WriteFile(IntPtr file, byte[] buffer, uint count, out uint written, IntPtr overlapped);

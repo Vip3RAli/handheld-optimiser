@@ -166,7 +166,7 @@ end;
 // a folder gets Program Files' kind of access: only Administrators and SYSTEM may change it.
 procedure SecureAppFolderOutsideProgramFiles();
 var
-  App, ProgramFiles: String;
+  App, ProgramFiles, Icacls: String;
   Code: Integer;
 begin
   App := AddBackslash(ExpandConstant('{app}'));
@@ -174,7 +174,10 @@ begin
   if Pos(Lowercase(ProgramFiles), Lowercase(App)) = 1 then
     exit;
 
-  Exec(ExpandConstant('{sys}\icacls.exe'),
+  Icacls := ExpandConstant('{sys}\icacls.exe');
+  Exec(Icacls, '"' + RemoveBackslash(App) + '" /setowner *S-1-5-32-544 /T /L /C', '', SW_HIDE, ewWaitUntilTerminated, Code);
+  Exec(Icacls, '"' + RemoveBackslash(App) + '" /reset /T /L /C', '', SW_HIDE, ewWaitUntilTerminated, Code);
+  Exec(Icacls,
     '"' + RemoveBackslash(App) + '" /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F *S-1-5-32-545:(OI)(CI)RX /T /L /C',
     '', SW_HIDE, ewWaitUntilTerminated, Code);
 end;
@@ -230,7 +233,7 @@ begin
 
   Exec(Sc, 'description {#ServiceName} "Holds a game at the frame rate chosen in the Handheld Optimiser game library, using the lowest power it can. When it replaces Armoury Crate, it also runs the ROG Ally''s buttons and controller mode."',
     '', SW_HIDE, ewWaitUntilTerminated, Code);
-  Exec(Sc, 'sdset {#ServiceName} D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWRPLOCRRC;;;IU)(A;;RP;;;AC)',
+  Exec(Sc, 'sdset {#ServiceName} D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWRPLOCRRC;;;IU)(A;;LCRP;;;AC)',
     '', SW_HIDE, ewWaitUntilTerminated, Code);
 
   // If it crashes mid-game, Windows starts it again after 5 seconds, and on starting it puts back the

@@ -59,6 +59,7 @@ internal sealed class GogInstaller(HttpClient http)
 
     /// <summary>Where a game's support files go inside its folder, as GOG Galaxy keeps them.</summary>
     internal const string SupportFolder = "__support";
+    internal const long MaxChunkBytes = 64 * 1024 * 1024;
     private static readonly TimeSpan LinkLifetime = TimeSpan.FromMinutes(45);
 
     /// <summary>A file of the game with where it goes.</summary>
@@ -72,6 +73,11 @@ internal sealed class GogInstaller(HttpClient http)
     /// </summary>
     public static byte[] Unpack(byte[] packed, GogChunk chunk)
     {
+        if (chunk.Size is < 0 or > MaxChunkBytes)
+        {
+            throw new InvalidDataException("A piece was larger than allowed.");
+        }
+
         if (!Md5Matches(packed, chunk.CompressedMd5))
         {
             throw new InvalidDataException("A piece did not match its packed checksum.");
@@ -404,7 +410,10 @@ internal sealed class GogInstaller(HttpClient http)
         {
             foreach (var gone in Removed(files.Values.ToList(), oldFiles))
             {
-                TryDelete(Path.Combine(folder, gone));
+                if (GogDepots.SafeFullPath(folder, gone) is { } target)
+                {
+                    TryDelete(target);
+                }
             }
         }
 
