@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IO;
 using System.Text.Json;
 
 namespace HandheldOptimiser.HomeLauncher.Library;
@@ -140,12 +141,25 @@ internal static class GogDepots
     internal static string? SafePath(string path)
     {
         var parts = path.Replace('/', '\\').Split('\\', StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length == 0 || parts.Any(p => p is "." or ".." || p.Contains(':')))
+        if (parts.Length == 0 || parts.Any(p => p.TrimEnd(' ', '.').Length == 0 || p.Contains(':')))
         {
             return null;
         }
 
         return string.Join('\\', parts);
+    }
+
+    /// <summary>Resolves <paramref name="relative"/> under <paramref name="root"/>, or null if it escapes it.</summary>
+    internal static string? SafeFullPath(string root, string relative)
+    {
+        if (SafePath(relative) is not { } safe)
+        {
+            return null;
+        }
+
+        var rootFull = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var full = Path.GetFullPath(Path.Combine(rootFull, safe));
+        return full.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase) ? full : null;
     }
 
     /// <summary>The CDN addresses in a <c>secure_link</c> answer, the preferred first, fallbacks last.</summary>

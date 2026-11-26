@@ -63,9 +63,8 @@ internal static partial class Log
                 state,
                 shown.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)));
 
-    /// <summary>The last folder of a game's path, without commas or quotes, so the line stays plain CSV.</summary>
-    private static string CsvName(string? folder) =>
-        folder is null ? string.Empty : Path.GetFileName(folder.TrimEnd('\\', '/')).Replace(',', ' ').Replace('"', ' ');
+    /// <summary>The last folder of a game's path, stripped of control characters, commas and quotes for plain CSV.</summary>
+    private static string CsvName(string? folder) => AutoTdpRules.CsvSafeName(folder);
 
     /// <summary>
     /// Adds a line to one of the files in the locked folder. A file over its cap is emptied, through the
@@ -171,10 +170,28 @@ internal static partial class Log
             {
                 File.Delete(path);
             }
+
+            return true;
         }
 
+        // A pre-existing plain file created before the folder was locked can carry a user owner or protected DACL.
+        // Delete untrusted-owner files and reset DACL inheritance so only Administrators and SYSTEM can write.
+        var fileInfo = new FileInfo(path);
+        var owner = fileInfo.GetAccessControl(AccessControlSections.Owner).GetOwner(typeof(SecurityIdentifier)) as SecurityIdentifier;
+        if (owner is null || !IsAdminOrSystem(owner))
+        {
+            File.Delete(path);
+            return true;
+        }
+
+        var fileSecurity = new FileSecurity();
+        fileSecurity.SetAccessRuleProtection(isProtected: false, preserveInheritance: false);
+        fileInfo.SetAccessControl(fileSecurity);
         return true;
     }
+
+    private static bool IsAdminOrSystem(SecurityIdentifier sid) =>
+        sid.IsWellKnown(WellKnownSidType.BuiltinAdministratorsSid) || sid.IsWellKnown(WellKnownSidType.LocalSystemSid);
 
     /// <summary>
     /// Creates the folder with access only Administrators and SYSTEM can write. One already there must be a

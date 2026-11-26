@@ -1,7 +1,10 @@
+using System.ComponentModel;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.Win32;
+using Microsoft.Win32.SafeHandles;
 using HandheldOptimiser.Models;
 
 namespace HandheldOptimiser.Services;
@@ -165,12 +168,30 @@ public static class DiagnosticsReport
                 return $"(not read: {link} is a junction or symbolic link)";
             }
 
-            if (!File.Exists(path))
+            using var handle = CreateFileW(
+                path, GenericRead, ShareAll, IntPtr.Zero, OpenExisting, FileFlagOpenReparsePoint, IntPtr.Zero);
+
+            if (handle.IsInvalid)
             {
-                return "(no such log on this device)";
+                var error = Marshal.GetLastWin32Error();
+                return error is ErrorFileNotFound or ErrorPathNotFound
+                    ? "(no such log on this device)"
+                    : $"(not read: {new Win32Exception(error).Message})";
             }
 
-            using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            if (!GetFileInformationByHandle(handle, out var info)
+                || (info.FileAttributes & (FileAttributeReparsePoint | FileAttributeDirectory)) != 0)
+            {
+                return $"(not read: {path} is a junction or symbolic link)";
+            }
+
+            var actual = FinalPath(handle);
+            if (!string.Equals(actual, Path.GetFullPath(path), StringComparison.OrdinalIgnoreCase))
+            {
+                return $"(not read: {path} resolved through a junction or symbolic link)";
+            }
+
+            using var file = new FileStream(handle, FileAccess.Read);
             var length = (int)Math.Min(file.Length, MaxLogBytes);
             file.Seek(-length, SeekOrigin.End);
             var bytes = new byte[length];
@@ -189,6 +210,56 @@ public static class DiagnosticsReport
         {
             return $"(not read: {ex.Message})";
         }
+    }
+
+    private const uint GenericRead = 0x80000000;
+    private const uint ShareAll = 0x1 | 0x2 | 0x4;
+    private const uint OpenExisting = 3;
+    private const uint FileFlagOpenReparsePoint = 0x00200000;
+    private const int ErrorFileNotFound = 2;
+    private const int ErrorPathNotFound = 3;
+    private const uint FileAttributeDirectory = 0x10;
+    private const uint FileAttributeReparsePoint = 0x400;
+
+    [StructLayout(LayoutKind.Sequential, Pack = 4)]
+    private struct ByHandleFileInformation
+    {
+        public uint FileAttributes;
+        public long CreationTime;
+        public long LastAccessTime;
+        public long LastWriteTime;
+        public uint VolumeSerialNumber;
+        public uint FileSizeHigh;
+        public uint FileSizeLow;
+        public uint NumberOfLinks;
+        public uint FileIndexHigh;
+        public uint FileIndexLow;
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern SafeFileHandle CreateFileW(
+        string fileName, uint access, uint share, IntPtr security, uint creation, uint flags, IntPtr template);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetFileInformationByHandle(SafeFileHandle file, out ByHandleFileInformation information);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern uint GetFinalPathNameByHandleW(SafeFileHandle file, char[] path, uint length, uint flags);
+
+    private static string? FinalPath(SafeFileHandle handle)
+    {
+        var buffer = new char[1024];
+        var length = GetFinalPathNameByHandleW(handle, buffer, (uint)buffer.Length, 0);
+
+        if (length == 0 || length >= buffer.Length)
+        {
+            return null;
+        }
+
+        var result = new string(buffer, 0, (int)length);
+        return result.StartsWith(@"\\?\UNC\", StringComparison.Ordinal) ? @"\\" + result[8..]
+            : result.StartsWith(@"\\?\", StringComparison.Ordinal) ? result[4..]
+            : result;
     }
 
     /// <summary>Windows' name, version and build, as Settings shows them.</summary>

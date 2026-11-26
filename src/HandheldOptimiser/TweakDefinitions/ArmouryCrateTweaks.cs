@@ -130,10 +130,18 @@ public static class ArmouryCrateTweaks
     /// <summary>The TDP Engine widget's package family, the same as <c>AutoTdpProtocol.WidgetPackage</c>.</summary>
     public const string WidgetFamily = "HandheldOptimiser.GameBar_pgc7cpy78bqbw";
 
-    /// <summary>What the apply script prints once the widget is removed, and the journal key that remembers it.</summary>
+    /// <summary>What the apply script prints once the widget is removed, and the journal keys that remember it.</summary>
     private const string WidgetRemoved = "WIDGET=REMOVED";
     private const string WidgetJournalKey = "widget.commandcenter";
-    private const string OemWidgetJournalKey = "widget.oem";
+    public const string OemWidgetJournalKey = "widget.oem";
+    public const string ScreenManagerJournalKey = "run.screenmanager";
+
+    private static readonly System.Text.RegularExpressions.Regex FamilyNameRegex = new(
+        @"^[A-Za-z0-9._-]+_[A-Za-z0-9]+$",
+        System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    internal static bool IsValidPackageFamilyName(string? value) =>
+        !string.IsNullOrEmpty(value) && !PsQuote.HasControlCharacters(value) && FamilyNameRegex.IsMatch(value);
 
     public static IReadOnlyList<Tweak> All => [ReplaceArmouryCrate];
 
@@ -238,11 +246,11 @@ public static class ArmouryCrateTweaks
             switch (ctx.Registry.ReadValue(RegistryRoot.LocalMachine, ApprovedKey32, ScreenManagerEntry))
             {
                 case null:
-                    journal.CapturedState.TryAdd("run.screenmanager", Absent);
+                    journal.CapturedState.TryAdd(ScreenManagerJournalKey, Absent);
                     turnOffRunEntry = true;
                     break;
                 case byte[] bytes:
-                    journal.CapturedState.TryAdd("run.screenmanager", Convert.ToHexString(bytes));
+                    journal.CapturedState.TryAdd(ScreenManagerJournalKey, Convert.ToHexString(bytes));
                     turnOffRunEntry = true;
                     break;
                 default:
@@ -483,7 +491,10 @@ public static class ArmouryCrateTweaks
             : "Write-Output \"No widget to put back\"";
 
         // With nothing journalled, as for a tweak applied before this was added, ASUS's widget is what the Ally shipped with.
-        var oem = captured.TryGetValue(OemWidgetJournalKey, out var saved) ? saved : CommandCenterFamily;
+        var oem = captured.TryGetValue(OemWidgetJournalKey, out var saved)
+            && (saved == Absent || IsValidPackageFamilyName(saved))
+            ? saved
+            : CommandCenterFamily;
         var putOem = oem == Absent
             ? $"$k.DeleteValue({Quote(OemWidgetValue)}, $false)"
             : $"$k.SetValue({Quote(OemWidgetValue)}, {Quote(oem)}, [Microsoft.Win32.RegistryValueKind]::String)";
@@ -498,20 +509,35 @@ public static class ArmouryCrateTweaks
             """;
 
         var run = "Write-Output \"No startup entry to put back\"";
-        if (captured.TryGetValue("run.screenmanager", out var flag))
+        if (captured.TryGetValue(ScreenManagerJournalKey, out var flag))
         {
-            var put = flag == Absent
-                ? $"$k.DeleteValue({Quote(ScreenManagerEntry)}, $false)"
-                : $"$k.SetValue({Quote(ScreenManagerEntry)}, {ByteLiteral(Convert.FromHexString(flag))}, [Microsoft.Win32.RegistryValueKind]::Binary)";
+            byte[]? bytes = null;
+            if (flag != Absent && flag.Length > 0 && flag.Length % 2 == 0)
+            {
+                try
+                {
+                    bytes = Convert.FromHexString(flag);
+                }
+                catch (FormatException)
+                {
+                }
+            }
 
-            run = $$"""
-                Write-Output "Putting back the startup entry: {{ScreenManagerEntry}}"
-                try {
-                    $k = [Microsoft.Win32.Registry]::LocalMachine.CreateSubKey({{Quote(ApprovedKey32)}})
-                    {{put}}
-                    $k.Close()
-                } catch { Write-Output "  failed: $($_.Exception.Message)"; $script:failed = $true }
-                """;
+            if (flag == Absent || bytes is not null)
+            {
+                var put = flag == Absent
+                    ? $"$k.DeleteValue({Quote(ScreenManagerEntry)}, $false)"
+                    : $"$k.SetValue({Quote(ScreenManagerEntry)}, {ByteLiteral(bytes!)}, [Microsoft.Win32.RegistryValueKind]::Binary)";
+
+                run = $$"""
+                    Write-Output "Putting back the startup entry: {{ScreenManagerEntry}}"
+                    try {
+                        $k = [Microsoft.Win32.Registry]::LocalMachine.CreateSubKey({{Quote(ApprovedKey32)}})
+                        {{put}}
+                        $k.Close()
+                    } catch { Write-Output "  failed: $($_.Exception.Message)"; $script:failed = $true }
+                    """;
+            }
         }
 
         return $$"""
@@ -558,8 +584,8 @@ public static class ArmouryCrateTweaks
 
     private static string TaskLeaf => FrameworkTask[(FrameworkTask.LastIndexOf('\\') + 1)..];
 
-    /// <summary>A PowerShell single quoted string, which takes spaces and needs only its own quote doubled.</summary>
-    private static string Quote(string value) => $"'{value.Replace("'", "''")}'";
+    /// <summary>A PowerShell single-quoted literal, escaping every quote form PowerShell recognises.</summary>
+    private static string Quote(string value) => PsQuote.Literal(value);
 
     private static string List(IEnumerable<string> values) => string.Join(", ", values.Select(Quote));
 

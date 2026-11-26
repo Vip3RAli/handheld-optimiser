@@ -751,7 +751,9 @@ public static class DebloatTweaks
                 return TweakResult.NoChange("debloat.amd_telemetry", none);
             }
 
-            var toChange = found.Where(f => !f.Off).ToList();
+            var toChange = found
+                .Where(f => !f.Off && (f.Kind == "svc" ? IsAllowedAmdService(f.Name) : IsAllowedAmdTask(f.Name)))
+                .ToList();
             if (toChange.Count == 0)
             {
                 return TweakResult.NoChange("debloat.amd_telemetry");
@@ -759,7 +761,8 @@ public static class DebloatTweaks
 
             foreach (var item in toChange)
             {
-                journal.CapturedState[$"amd.{item.Kind}.{item.Name}"] = item.State;
+                var prefix = item.Kind == "svc" ? AmdServicePrefix : AmdTaskPrefix;
+                journal.CapturedState[$"{prefix}{item.Name}"] = item.State;
             }
 
             var lines = toChange.Select(f => f.Kind == "svc"
@@ -777,18 +780,7 @@ public static class DebloatTweaks
         },
         ScriptRevert = async (ctx, journal, ct) =>
         {
-            var lines = new List<string>();
-            foreach (var (key, state) in journal.CapturedState)
-            {
-                if (key.StartsWith("amd.svc.", StringComparison.Ordinal))
-                {
-                    lines.Add($"Set-Service -Name {PsQuote.Literal(key[8..])} -StartupType {PsQuote.Literal(state)}");
-                }
-                else if (key.StartsWith("amd.task.", StringComparison.Ordinal))
-                {
-                    lines.Add($"Get-ScheduledTask | Where-Object {{ ($_.TaskPath + $_.TaskName) -eq {PsQuote.Literal(key[9..])} }} | Enable-ScheduledTask | Out-Null");
-                }
-            }
+            var lines = BuildAmdTelemetryRevertLines(journal.CapturedState);
 
             if (lines.Count == 0)
             {
@@ -805,6 +797,54 @@ public static class DebloatTweaks
                 : TweakResult.Fail("debloat.amd_telemetry", "Could not restore AMD telemetry. The console has the detail.");
         }
     };
+
+    public const string AmdServicePrefix = "amd.svc.";
+    public const string AmdTaskPrefix = "amd.task.";
+
+    private static bool IsAllowedAmdService(string name) =>
+        !string.IsNullOrWhiteSpace(name)
+        && !PsQuote.HasControlCharacters(name)
+        && name.Contains("AUEP", StringComparison.OrdinalIgnoreCase)
+        && !SafetyGuard.IsServiceProtected(name, out _);
+
+    private static bool IsAllowedAmdTask(string name) =>
+        !string.IsNullOrWhiteSpace(name)
+        && !PsQuote.HasControlCharacters(name)
+        && name.Contains("AUEP", StringComparison.OrdinalIgnoreCase);
+
+    public static List<string> BuildAmdTelemetryRevertLines(IReadOnlyDictionary<string, string> captured)
+    {
+        var lines = new List<string>();
+        foreach (var (key, state) in captured)
+        {
+            if (key.StartsWith(AmdServicePrefix, StringComparison.Ordinal))
+            {
+                var serviceName = key[AmdServicePrefix.Length..];
+                var startupType = state.ToLowerInvariant() switch
+                {
+                    "automatic" => "Automatic",
+                    "manual" => "Manual",
+                    "automaticdelayedstart" => "AutomaticDelayedStart",
+                    _ => null
+                };
+
+                if (startupType is not null && IsAllowedAmdService(serviceName))
+                {
+                    lines.Add($"Set-Service -Name {PsQuote.Literal(serviceName)} -StartupType {PsQuote.Literal(startupType)}");
+                }
+            }
+            else if (key.StartsWith(AmdTaskPrefix, StringComparison.Ordinal))
+            {
+                var taskName = key[AmdTaskPrefix.Length..];
+                if (IsAllowedAmdTask(taskName))
+                {
+                    lines.Add($"Get-ScheduledTask | Where-Object {{ ($_.TaskPath + $_.TaskName) -eq {PsQuote.Literal(taskName)} }} | Enable-ScheduledTask | Out-Null");
+                }
+            }
+        }
+
+        return lines;
+    }
 
     /// <summary>One AMD User Experience Program service or scheduled task, and how it is set now.</summary>
     private sealed record AmdTelemetryItem(string Kind, string Name, string State, bool Off);
@@ -919,11 +959,17 @@ public static class DebloatTweaks
                 return TweakResult.NoChange("debloat.edge_uninstall");
             }
 
-            var outcome = await ctx.Runner.RunScriptAsync(
-                """
-                Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\EdgeUpdate' -Name 'DoNotUpdateToEdgeWithChromium' -ErrorAction SilentlyContinue
-                winget install Microsoft.Edge --source winget --accept-source-agreements --accept-package-agreements
-                """,
+            await ctx.Runner.RunScriptAsync(
+                "Remove-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\EdgeUpdate' -Name 'DoNotUpdateToEdgeWithChromium' -ErrorAction SilentlyContinue",
+                "Clear Microsoft Edge update block policy",
+                ct);
+
+            var outcome = await ctx.Runner.RunProcessAsync(
+                "winget.exe",
+                [
+                    "install", "--id", "Microsoft.Edge", "--exact", "--source", "winget",
+                    "--silent", "--accept-source-agreements", "--accept-package-agreements", "--disable-interactivity"
+                ],
                 "Reinstall Microsoft Edge browser",
                 ct);
 

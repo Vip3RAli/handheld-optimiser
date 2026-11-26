@@ -72,28 +72,28 @@ internal static partial class MusicApp
 
     private static async Task ServeAsync(MusicPlayerWindow window, Application app, CancellationToken cancel)
     {
-        var first = true;
-        while (!cancel.IsCancellationRequested)
+        NamedPipeServerStream pipe;
+        try
         {
-            NamedPipeServerStream pipe;
-            try
-            {
-                pipe = CreatePipe(first);
-                first = false;
-            }
-            catch (IOException ex)
-            {
-                Program.Log($"Music player could not open its pipe: {ex.Message}");
-                app.Shutdown();
-                return;
-            }
+            pipe = CreatePipe();
+        }
+        catch (IOException ex)
+        {
+            Program.Log($"Music player could not open its pipe: {ex.Message}");
+            app.Shutdown();
+            return;
+        }
 
-            await using (pipe)
+        await using (pipe)
+        {
+            while (!cancel.IsCancellationRequested)
             {
                 var quit = false;
+                var connected = false;
                 try
                 {
                     await pipe.WaitForConnectionAsync(cancel);
+                    connected = true;
                     var line = await ReadLineAsync(pipe, cancel);
 
                     // Answered on the window's thread, which the browser belongs to. A page that stalls (as one
@@ -115,6 +115,19 @@ internal static partial class MusicApp
                 catch (IOException)
                 {
                     // The widget went away before its answer. The next one is waited for.
+                }
+                finally
+                {
+                    if (connected)
+                    {
+                        try
+                        {
+                            pipe.Disconnect();
+                        }
+                        catch (Exception ex) when (ex is IOException or InvalidOperationException)
+                        {
+                        }
+                    }
                 }
 
                 if (quit)
@@ -267,9 +280,10 @@ internal static partial class MusicApp
     /// the TDP Engine service's pipe is. Only the first instance may create it, so no other program can sit
     /// on its name while the player runs.
     /// </summary>
-    private static NamedPipeServerStream CreatePipe(bool first)
+    private static NamedPipeServerStream CreatePipe()
     {
-        var user = WindowsIdentity.GetCurrent().User?.Value ?? throw new IOException("Who is signed in could not be read");
+        using var identity = WindowsIdentity.GetCurrent();
+        var user = identity.User?.Value ?? throw new IOException("Who is signed in could not be read");
         var sddl = $"D:(A;;GA;;;SY)(A;;GA;;;{user})";
         if (WidgetSid() is { } widget)
         {
@@ -285,7 +299,7 @@ internal static partial class MusicApp
         {
             var attributes = new SecurityAttributes { Length = Marshal.SizeOf<SecurityAttributes>(), Descriptor = descriptor };
             var handle = CreateNamedPipe(@"\\.\pipe\" + Music.PipeName,
-                PipeAccessDuplex | FileFlagOverlapped | (first ? FileFlagFirstPipeInstance : 0),
+                PipeAccessDuplex | FileFlagOverlapped | FileFlagFirstPipeInstance,
                 PipeTypeByte | PipeRejectRemoteClients, 1, 0, 0, 0, ref attributes);
             if (handle.IsInvalid)
             {

@@ -42,7 +42,8 @@ internal static class EpicAuth
 
     /// <summary>Whether a page is the one with the code on it.</summary>
     public static bool IsRedirectPage(Uri uri) =>
-        uri.Host.Equals("www.epicgames.com", StringComparison.OrdinalIgnoreCase)
+        uri.Scheme == Uri.UriSchemeHttps
+        && uri.Host.Equals("www.epicgames.com", StringComparison.OrdinalIgnoreCase)
         && uri.AbsolutePath.StartsWith("/id/api/redirect", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
@@ -50,7 +51,8 @@ internal static class EpicAuth
     /// to its account page or the store, and the page with the code has to be asked for from there.
     /// </summary>
     public static bool IsPastSignIn(Uri uri) =>
-        (uri.Host.Equals("www.epicgames.com", StringComparison.OrdinalIgnoreCase) || uri.Host.Equals("store.epicgames.com", StringComparison.OrdinalIgnoreCase))
+        uri.Scheme == Uri.UriSchemeHttps
+        && (uri.Host.Equals("www.epicgames.com", StringComparison.OrdinalIgnoreCase) || uri.Host.Equals("store.epicgames.com", StringComparison.OrdinalIgnoreCase))
         && !uri.AbsolutePath.StartsWith("/id/", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>The code in the redirect page's text, or null when the page has none, as when not signed in.</summary>

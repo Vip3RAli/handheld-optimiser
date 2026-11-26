@@ -72,7 +72,15 @@ public sealed class TweakJournalService(LogService log) : ITweakJournal
     private static readonly string[] UntrustedLegacyStateKeys =
     [
         SleepTweaks.WakeDevices,
-        SleepTweaks.CardReaders
+        SleepTweaks.CardReaders,
+        ArmouryCrateTweaks.OemWidgetJournalKey,
+        ArmouryCrateTweaks.ScreenManagerJournalKey
+    ];
+
+    private static readonly string[] UntrustedLegacyStatePrefixes =
+    [
+        DebloatTweaks.AmdServicePrefix,
+        DebloatTweaks.AmdTaskPrefix
     ];
 
     public TweakJournal Load()
@@ -234,6 +242,15 @@ public sealed class TweakJournalService(LogService log) : ITweakJournal
         foreach (var key in UntrustedLegacyStateKeys)
         {
             if (entry.CapturedState.Remove(key))
+            {
+                dropped.Add(key);
+            }
+        }
+
+        foreach (var key in entry.CapturedState.Keys.ToList())
+        {
+            if (UntrustedLegacyStatePrefixes.Any(prefix => key.StartsWith(prefix, StringComparison.Ordinal))
+                && entry.CapturedState.Remove(key))
             {
                 dropped.Add(key);
             }
