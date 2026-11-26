@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using HandheldOptimiser.PowerService;
 using Microsoft.Win32;
 
 namespace HandheldOptimiser.HomeLauncher.Library;
@@ -15,13 +16,23 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 /// 0 for off. Null follows that setting.</param>
 /// <param name="FanCurve">The fan curve for this game, one of <see cref="AutoTdp.FanChoices"/>, whatever the
 /// library's own setting. Null follows that setting.</param>
+/// <param name="CpuBoostMode">The CPU boost mode for this game, one of <see cref="AutoTdp.CpuBoostModes"/>.</param>
+/// <param name="AcBoostBursts">Whether short AC boost bursts (sPPT/fPPT) are allowed while playing on AC.</param>
+/// <param name="FreeSync">Whether AMD FreeSync VRR is enabled for this game.</param>
+/// <param name="MaxWatts">Optional maximum TDP ceiling (7 to 30 W) for TDP Engine during this game.</param>
+/// <param name="ControllerMode">Optional Ally controller mode (<see cref="AutoTdp.ControllerModes"/>) held during this game.</param>
 internal sealed record GameProfile(PowerMode? PowerMode, int? RefreshRate, int? Brightness, bool? CloseApps = null,
-    Resolution? Resolution = null, int? AutoTdpFps = null, string? FanCurve = null)
+    Resolution? Resolution = null, int? AutoTdpFps = null, string? FanCurve = null, string? CpuBoostMode = null,
+    bool? AcBoostBursts = null, bool? FreeSync = null, int? MaxWatts = null, string? ControllerMode = null)
 {
     public static readonly GameProfile None = new(null, null, null);
 
-    /// <summary>Whether it changes any of the device's settings, which are put back after the game.</summary>
-    public bool IsEmpty => PowerMode is null && RefreshRate is null && Brightness is null && Resolution is null;
+    /// <summary>Whether it changes any of the device or service settings applied and restored around the game.</summary>
+    public bool IsEmpty => PowerMode is null && RefreshRate is null && Brightness is null && Resolution is null
+        && CpuBoostMode is null && AcBoostBursts is null && FreeSync is null && ControllerMode is null;
+
+    /// <summary>Whether this profile configures any per-game override, including TDP Engine or close-apps behaviour.</summary>
+    public bool HasAny => !IsEmpty || CloseApps is not null || AutoTdpFps is not null || FanCurve is not null || MaxWatts is not null;
 
     /// <summary>A one-line summary for the quick actions menu.</summary>
     public string Describe()
@@ -57,9 +68,34 @@ internal sealed record GameProfile(PowerMode? PowerMode, int? RefreshRate, int? 
             parts.Add(fps > 0 ? $"TDP Engine at {fps} fps" : "TDP Engine off");
         }
 
+        if (MaxWatts is { } watts)
+        {
+            parts.Add($"{watts} W max");
+        }
+
         if (FanCurve is { } fans)
         {
             parts.Add($"{AutoTdp.FanName(fans)} fans");
+        }
+
+        if (CpuBoostMode is { } boost)
+        {
+            parts.Add($"CPU boost {AutoTdp.CpuBoostName(boost).ToLowerInvariant()}");
+        }
+
+        if (AcBoostBursts is { } acBoost)
+        {
+            parts.Add(acBoost ? "AC boost bursts on" : "AC boost bursts off");
+        }
+
+        if (FreeSync is { } freeSync)
+        {
+            parts.Add(freeSync ? "FreeSync on" : "FreeSync off");
+        }
+
+        if (ControllerMode is { } controls)
+        {
+            parts.Add($"{AutoTdp.ControllerModeName(controls).ToLowerInvariant()} controls");
         }
 
         return parts.Count == 0 ? "Not set. Plays with your current settings" : string.Join(", ", parts);
@@ -97,6 +133,11 @@ internal static class GameProfiles
         bool? closeApps = null;
         int? autoTdp = null;
         string? fans = null;
+        string? boost = null;
+        bool? acBoost = null;
+        bool? freeSync = null;
+        int? maxWatts = null;
+        string? controls = null;
 
         foreach (var part in text.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
@@ -127,10 +168,39 @@ internal static class GameProfiles
                 case "fan" when AutoTdp.FanChoices.Contains(value):
                     fans = value;
                     break;
+                case "boost":
+                {
+                    var normalized = value.ToLowerInvariant();
+                    if (AutoTdp.CpuBoostModes.Contains(normalized))
+                    {
+                        boost = normalized;
+                    }
+                    break;
+                }
+                case "acboost" when value is "on" or "off":
+                    acBoost = value == "on";
+                    break;
+                case "freesync" when value is "on" or "off":
+                    freeSync = value == "on";
+                    break;
+                case "watts" when int.TryParse(value, out var parsed)
+                    && parsed is >= AutoTdpProtocol.LowestWatts and <= AutoTdpProtocol.HighestWatts:
+                    maxWatts = parsed;
+                    break;
+                case "controls":
+                {
+                    var normalized = value.ToLowerInvariant();
+                    if (AutoTdp.ControllerModes.Contains(normalized))
+                    {
+                        controls = normalized;
+                    }
+                    break;
+                }
             }
         }
 
-        return new GameProfile(mode, hertz, brightness, closeApps, resolution, autoTdp, fans);
+        return new GameProfile(mode, hertz, brightness, closeApps, resolution, autoTdp, fans,
+            boost, acBoost, freeSync, maxWatts, controls);
     }
 
     /// <summary>A profile as stored text, empty when it changes nothing.</summary>
@@ -170,6 +240,31 @@ internal static class GameProfiles
         if (profile.FanCurve is { } fans)
         {
             parts.Add($"fan={fans}");
+        }
+
+        if (profile.CpuBoostMode is { } boost)
+        {
+            parts.Add($"boost={boost}");
+        }
+
+        if (profile.AcBoostBursts is { } acBoost)
+        {
+            parts.Add($"acboost={(acBoost ? "on" : "off")}");
+        }
+
+        if (profile.FreeSync is { } freeSync)
+        {
+            parts.Add($"freesync={(freeSync ? "on" : "off")}");
+        }
+
+        if (profile.MaxWatts is { } watts)
+        {
+            parts.Add($"watts={watts}");
+        }
+
+        if (profile.ControllerMode is { } controls)
+        {
+            parts.Add($"controls={controls}");
         }
 
         return string.Join(';', parts);

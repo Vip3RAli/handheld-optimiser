@@ -36,7 +36,7 @@ internal static class RefreshRates
     }
 
     /// <returns>An error message, or null when the screen switched.</returns>
-    public static string? Set(int hertz)
+    public static string? Set(int hertz, bool persist = true)
     {
         if (!Native.CurrentDisplayMode(out var mode))
         {
@@ -51,7 +51,7 @@ internal static class RefreshRates
         mode.DisplayFrequency = (uint)hertz;
         mode.Fields = Native.DmDisplayFrequency;
 
-        return Native.ChangeDisplayMode(ref mode) switch
+        return Native.ChangeDisplayMode(ref mode, persist) switch
         {
             Native.DispChangeSuccessful => null,
             Native.DispChangeRestart => "Windows needs a restart to change the refresh rate.",

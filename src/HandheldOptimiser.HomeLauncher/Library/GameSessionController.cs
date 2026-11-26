@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
+using HandheldOptimiser.PowerService;
 
 namespace HandheldOptimiser.HomeLauncher.Library;
 
@@ -310,7 +311,8 @@ internal sealed class GameSessionController
         }
 
         StartSession(tile.Game, storeWasOpen, profile.CloseApps ?? LibrarySettings.GameMode,
-            profile.AutoTdpFps ?? LibrarySettings.AutoTdpFps, profile.FanCurve ?? LibrarySettings.FanCurve, backedUp);
+            profile.AutoTdpFps ?? LibrarySettings.AutoTdpFps, profile.FanCurve ?? LibrarySettings.FanCurve,
+            backedUp, profile.MaxWatts, profile.AutoTdpFps == 0);
     }
 
 
@@ -334,7 +336,10 @@ internal sealed class GameSessionController
 
     /// <param name="autoTdpFps">The frame rate TDP Engine holds the game at, or 0 for off.</param>
     /// <param name="fanCurve">The fan curve to play with, one of <see cref="AutoTdp.FanChoices"/>.</param>
-    private void StartSession(Game game, bool storeWasOpen, bool closeApps, int autoTdpFps, string fanCurve, bool backedUp = false)
+    /// <param name="maxWatts">Optional per-game TDP ceiling in watts, or null to use the library default.</param>
+    /// <param name="explicitAutoTdpOff">True when the game profile explicitly turns TDP Engine off.</param>
+    private void StartSession(Game game, bool storeWasOpen, bool closeApps, int autoTdpFps, string fanCurve,
+        bool backedUp = false, int? maxWatts = null, bool explicitAutoTdpOff = false)
     {
         var session = new GameSession(game);
         _session = session;
@@ -369,7 +374,11 @@ internal sealed class GameSessionController
         if ((autoTdpFps > 0 || fanCurve != AutoTdp.AllyFans) && session.CanFollow)
         {
             _autoTdpGame = game;
-            _ = StartAutoTdpAsync(game, autoTdpFps, fanCurve);
+            _ = StartAutoTdpAsync(game, autoTdpFps, fanCurve, maxWatts);
+        }
+        else if (explicitAutoTdpOff && autoTdpFps == 0 && fanCurve == AutoTdp.AllyFans)
+        {
+            _ = AutoTdp.StopIfRunningAsync();
         }
 
         if (session.CanFollow)
@@ -378,9 +387,9 @@ internal sealed class GameSessionController
         }
     }
 
-    private async Task StartAutoTdpAsync(Game game, int fps, string fanCurve)
+    private async Task StartAutoTdpAsync(Game game, int fps, string fanCurve, int? maxWatts)
     {
-        if (await AutoTdp.StartAsync(game, fps, fanCurve) is { } problem)
+        if (await AutoTdp.StartAsync(game, fps, fanCurve, maxWatts) is { } problem)
         {
             _notices.Show(problem);
             if (ReferenceEquals(_autoTdpGame, game))
@@ -391,12 +400,12 @@ internal sealed class GameSessionController
     }
 
     /// <summary>Hands the power limit and fans back to Armoury Crate's operating mode, for the game closing.</summary>
-    private void StopAutoTdp(bool wait = false)
+    private void StopAutoTdp(bool wait = false, TimeSpan? played = null)
     {
         if (_autoTdpGame is { } game)
         {
             _autoTdpGame = null;
-            var stopping = AutoTdp.StopAsync(game);
+            var stopping = AutoTdp.StopAsync(game, played);
             if (wait)
             {
                 try
@@ -466,7 +475,7 @@ internal sealed class GameSessionController
         ResumeGame(session);
         session.Stop();
         RecordPlaytime(session);
-        StopAutoTdp(wait);
+        StopAutoTdp(wait, session.Played);
         SyncTileStates();
     }
 
@@ -499,7 +508,7 @@ internal sealed class GameSessionController
         // Ended while paused, from Task Manager say: lets go of its processes.
         ResumeGame(session);
         RecordPlaytime(session);
-        StopAutoTdp();
+        StopAutoTdp(played: session.Played);
         RestoreProfileSettings();
         ReopenClosedApps();
         SyncTileStates();
@@ -606,7 +615,8 @@ internal sealed class GameSessionController
 
     /// <summary>The settings from before a profiled game started. Only what its profile changed is set.</summary>
     private sealed record SavedSettings(Game Game, DateTime StartedAt, PowerMode? PowerMode, int? RefreshRate, int? Brightness,
-        Resolution? Resolution = null);
+        Resolution? Resolution = null, string? CpuBoostMode = null, bool? AcBoostBursts = null, bool? FreeSync = null,
+        bool ControllerModeHeld = false);
 
     private SavedSettings? _saved;
 
@@ -632,10 +642,13 @@ internal sealed class GameSessionController
         // A new size can come with a different refresh rate, so the rate is kept to put back as well.
         var currentRefresh = profile.RefreshRate is not null || currentResolution is not null ? RefreshRates.Read()?.Current : null;
 
-        // The size first: the refresh rate is then set for the new size.
+        // Change size and refresh rate in one temporary mode switch whenever both change so there is one flicker,
+        // and never write temporary per-game modes to the registry in case the game or device loses power.
+        var refreshApplied = false;
         if (profile.Resolution is { } size && currentResolution is not null && currentResolution != size)
         {
-            if (Resolutions.Set(size) is { } sizeError)
+            int? requestedRefresh = profile.RefreshRate is { } hz && currentRefresh != hz ? hz : null;
+            if (Resolutions.Set(size, requestedRefresh, persist: false) is { } sizeError)
             {
                 Program.Log($"Could not switch to the resolution in {game.Key}'s profile: {sizeError}");
             }
@@ -643,12 +656,13 @@ internal sealed class GameSessionController
             {
                 savedResolution = currentResolution;
                 savedRefresh = currentRefresh;
+                refreshApplied = requestedRefresh is not null;
             }
         }
 
-        if (profile.RefreshRate is { } hertz && currentRefresh is not null && currentRefresh != hertz)
+        if (!refreshApplied && profile.RefreshRate is { } hertz && currentRefresh is not null && currentRefresh != hertz)
         {
-            if (RefreshRates.Set(hertz) is { } error)
+            if (RefreshRates.Set(hertz, persist: false) is { } error)
             {
                 Program.Log($"Could not switch to the refresh rate in {game.Key}'s profile: {error}");
             }
@@ -663,6 +677,12 @@ internal sealed class GameSessionController
         if (profile.Brightness is { } level)
         {
             _ = ApplyProfileBrightnessAsync(game, level);
+        }
+
+        if (profile.CpuBoostMode is not null || profile.AcBoostBursts is not null
+            || profile.FreeSync is not null || profile.ControllerMode is not null)
+        {
+            _ = ApplyProfilePowerServiceAsync(game, profile);
         }
 
         Program.Log($"Switched to {game.Key}'s profile");
@@ -688,6 +708,72 @@ internal sealed class GameSessionController
         }
     }
 
+    private async Task ApplyProfilePowerServiceAsync(Game game, GameProfile profile)
+    {
+        if (await AutoTdp.StatusAsync() is not { } before)
+        {
+            return;
+        }
+
+        string? savedBoost = null;
+        if (profile.CpuBoostMode is { } boost && !string.Equals(before.CpuBoostMode, boost, StringComparison.OrdinalIgnoreCase))
+        {
+            if (await AutoTdp.SetCpuBoostModeAsync(boost) is { Error: null })
+            {
+                savedBoost = before.CpuBoostMode ?? AutoTdpProtocol.BoostOff;
+            }
+        }
+
+        bool? savedAcBoost = null;
+        if (profile.AcBoostBursts is { } acBoost && before.AcBoostBursts != acBoost)
+        {
+            if (await AutoTdp.SetAcBoostBurstsAsync(acBoost) is { Error: null })
+            {
+                savedAcBoost = before.AcBoostBursts;
+            }
+        }
+
+        bool? savedFreeSync = null;
+        if (profile.FreeSync is { } freeSync && before.FreeSync is { } currentFreeSync && currentFreeSync != freeSync)
+        {
+            if (await AutoTdp.SetFreeSyncAsync(freeSync) is { Error: null })
+            {
+                savedFreeSync = currentFreeSync;
+            }
+        }
+
+        var heldControls = false;
+        if (profile.ControllerMode is { } controls && before.Replacing && before.ControllerConnected
+            && !string.Equals(before.ControllerMode, controls, StringComparison.OrdinalIgnoreCase))
+        {
+            if (await AutoTdp.SetControllerModeAsync(controls, temporary: true) is { Error: null })
+            {
+                heldControls = true;
+            }
+        }
+
+        if (savedBoost is null && savedAcBoost is null && savedFreeSync is null && !heldControls)
+        {
+            return;
+        }
+
+        if (_saved is { } saved && saved.Game == game)
+        {
+            _saved = saved with
+            {
+                CpuBoostMode = savedBoost,
+                AcBoostBursts = savedAcBoost,
+                FreeSync = savedFreeSync,
+                ControllerModeHeld = heldControls
+            };
+        }
+        else
+        {
+            await RestorePowerServiceAsync(new SavedSettings(game, DateTime.UtcNow, null, null, null, null,
+                savedBoost, savedAcBoost, savedFreeSync, heldControls));
+        }
+    }
+
     /// <summary>Puts back the settings a profiled game replaced, if any.</summary>
     private void RestoreProfileSettings(bool wait = false)
     {
@@ -703,32 +789,76 @@ internal sealed class GameSessionController
             PowerModes.Set(mode);
         }
 
-        if (saved.Resolution is { } size && Resolutions.Set(size, saved.RefreshRate) is { } sizeError)
+        var refreshRestored = false;
+        if (saved.Resolution is { } size)
         {
-            Program.Log($"Could not put the resolution back: {sizeError}");
+            if (Resolutions.Set(size, saved.RefreshRate, persist: false) is { } sizeError)
+            {
+                Program.Log($"Could not put the resolution back: {sizeError}");
+            }
+            else
+            {
+                refreshRestored = saved.RefreshRate is not null;
+            }
         }
 
-        if (saved.RefreshRate is { } hertz && RefreshRates.Set(hertz) is { } error)
+        if (!refreshRestored && saved.RefreshRate is { } hertz && RefreshRates.Set(hertz, persist: false) is { } error)
         {
             Program.Log($"Could not put the refresh rate back: {error}");
         }
 
+        Task? brightnessRestore = null;
         if (saved.Brightness is { } level)
         {
-            var restore = Task.Run(() => Brightness.Set(level));
-            if (wait)
+            brightnessRestore = Task.Run(() => Brightness.Set(level));
+        }
+
+        Task? serviceRestore = null;
+        if (saved.CpuBoostMode is not null || saved.AcBoostBursts is not null
+            || saved.FreeSync is not null || saved.ControllerModeHeld)
+        {
+            serviceRestore = RestorePowerServiceAsync(saved);
+        }
+
+        if (wait)
+        {
+            try
             {
-                try
+                var pending = new[] { brightnessRestore, serviceRestore }.Where(t => t is not null).Cast<Task>().ToArray();
+                if (pending.Length > 0)
                 {
-                    restore.Wait(TimeSpan.FromSeconds(3));
+                    Task.WaitAll(pending, TimeSpan.FromSeconds(3));
                 }
-                catch (Exception ex) when (!LibraryApp.IsFatal(ex))
-                {
-                }
+            }
+            catch (Exception ex) when (!LibraryApp.IsFatal(ex))
+            {
             }
         }
 
         Program.Log($"Put back the settings {saved.Game.Key}'s profile replaced");
+    }
+
+    private static async Task RestorePowerServiceAsync(SavedSettings saved)
+    {
+        if (saved.CpuBoostMode is { } boost)
+        {
+            _ = await AutoTdp.SetCpuBoostModeAsync(boost);
+        }
+
+        if (saved.AcBoostBursts is { } acBoost)
+        {
+            _ = await AutoTdp.SetAcBoostBurstsAsync(acBoost);
+        }
+
+        if (saved.FreeSync is { } freeSync)
+        {
+            _ = await AutoTdp.SetFreeSyncAsync(freeSync);
+        }
+
+        if (saved.ControllerModeHeld)
+        {
+            _ = await AutoTdp.ReleaseControllerModeAsync();
+        }
     }
 
     // ===== Quick Resume =====

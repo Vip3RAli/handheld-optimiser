@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows.Controls;
+using HandheldOptimiser.PowerService;
 
 namespace HandheldOptimiser.HomeLauncher.Library;
 
@@ -24,6 +25,9 @@ internal sealed class SleepAndCleanUpMenu
 
     private (long Temp, long Shaders, long? Recycle)? _measured;
     private readonly HashSet<Button> _cleaning = [];
+    private AutoTdpStatus? _powerStatus;
+    private bool _powerChecking;
+    private int _powerRequestId;
 
     public SleepAndCleanUpMenu(MenuView view, MenuPresenter menu, NoticePresenter notices, ILibraryHost host)
     {
@@ -50,6 +54,9 @@ internal sealed class SleepAndCleanUpMenu
         view.AutoTdpTemperatureSetting.Click += (_, _) => StepAutoTdpTemperature(1);
         view.AutoTdpWattsSetting.Click += (_, _) => StepAutoTdpWatts(1);
         view.FanCurveSetting.Click += (_, _) => StepFanCurve(1);
+        view.CpuBoostSetting.Click += (_, _) => StepCpuBoost(1);
+        view.AcBoostSetting.Click += (_, _) => StepAcBoost();
+        view.FreeSyncSetting.Click += (_, _) => StepFreeSync();
         view.StoreClosingSetting.Click += (_, _) => StepStoreClosing(1);
         view.StoreStartupItem.Click += (_, _) => OpenStartup(view.StoreStartupItem);
         view.QuickResumeSetting.Click += (_, _) => ToggleQuickResume();
@@ -122,12 +129,23 @@ internal sealed class SleepAndCleanUpMenu
     /// </summary>
     private void OpenPlayGroup(StackPanel list, Button? focus = null)
     {
+        var isPowerCooling = ReferenceEquals(list, _view.PowerCoolingItems);
+        if (isPowerCooling && _powerStatus is null)
+        {
+            _powerChecking = true;
+        }
+
         RefreshWhilePlaying();
         var title = ReferenceEquals(list, _view.BackgroundAppsItems) ? "Background Programs"
-            : ReferenceEquals(list, _view.PowerCoolingItems) ? "Power & Cooling"
+            : isPowerCooling ? "Power & Cooling"
             : ReferenceEquals(list, _view.StoreAppsItems) ? "Store Apps"
             : "Resume & Saves";
         _menu.Show(list, title, SettingsMenu.SleepTweaks, focus);
+
+        if (isPowerCooling)
+        {
+            _ = RefreshPowerServiceAsync();
+        }
     }
 
     private void Toggle(Action change)
@@ -166,6 +184,105 @@ internal sealed class SleepAndCleanUpMenu
         view.AutoTdpTemperatureSetting.Tag = $"{LibrarySettings.AutoTdpTemperature} °C";
         view.AutoTdpWattsSetting.Tag = $"{LibrarySettings.AutoTdpMaxWatts} W";
         view.FanCurveSetting.Tag = AutoTdp.FanName(LibrarySettings.FanCurve);
+        RefreshPowerServiceRows();
+    }
+
+    private void RefreshPowerServiceRows()
+    {
+        var view = _view;
+        if (_powerStatus is not { } status)
+        {
+            var fallback = _powerChecking ? "Checking..." : "Service off";
+            view.CpuBoostSetting.IsEnabled = false;
+            view.AcBoostSetting.IsEnabled = false;
+            view.FreeSyncSetting.IsEnabled = false;
+            view.CpuBoostSetting.Tag = fallback;
+            view.AcBoostSetting.Tag = fallback;
+            view.FreeSyncSetting.Tag = fallback;
+            return;
+        }
+
+        view.CpuBoostSetting.IsEnabled = true;
+        view.CpuBoostSetting.Tag = AutoTdp.CpuBoostName(status.CpuBoostMode);
+
+        view.AcBoostSetting.IsEnabled = true;
+        view.AcBoostSetting.Tag = SettingSteps.OnOff(status.AcBoostBursts);
+
+        view.FreeSyncSetting.IsEnabled = status.FreeSync is not null;
+        view.FreeSyncSetting.Tag = status.FreeSync is { } freeSync ? SettingSteps.OnOff(freeSync) : "Not available";
+    }
+
+    private async Task RefreshPowerServiceAsync()
+    {
+        var requestId = ++_powerRequestId;
+        var status = await AutoTdp.StatusAsync();
+        if (requestId != _powerRequestId)
+        {
+            return;
+        }
+
+        _powerChecking = false;
+        _powerStatus = status;
+        if (ReferenceEquals(_menu.List, _view.PowerCoolingItems))
+        {
+            RefreshPowerServiceRows();
+        }
+    }
+
+    private void StepCpuBoost(int step)
+    {
+        if (_powerStatus is not { } status)
+        {
+            return;
+        }
+
+        var modes = AutoTdp.CpuBoostModes;
+        var current = Array.FindIndex(modes, m => string.Equals(m, status.CpuBoostMode, StringComparison.OrdinalIgnoreCase));
+        var index = current < 0 ? 0 : current;
+        var next = modes[(index + step + modes.Length) % modes.Length];
+        _ = ApplyPowerServiceAsync(() => AutoTdp.SetCpuBoostModeAsync(next));
+    }
+
+    private void StepAcBoost()
+    {
+        if (_powerStatus is not { } status)
+        {
+            return;
+        }
+
+        _ = ApplyPowerServiceAsync(() => AutoTdp.SetAcBoostBurstsAsync(!status.AcBoostBursts));
+    }
+
+    private void StepFreeSync()
+    {
+        if (_powerStatus is not { FreeSync: { } current })
+        {
+            return;
+        }
+
+        _ = ApplyPowerServiceAsync(() => AutoTdp.SetFreeSyncAsync(!current));
+    }
+
+    private async Task ApplyPowerServiceAsync(Func<Task<AutoTdpStatus?>> apply)
+    {
+        var requestId = ++_powerRequestId;
+        var result = await apply();
+        if (requestId != _powerRequestId)
+        {
+            return;
+        }
+
+        _powerChecking = false;
+        _powerStatus = result ?? await AutoTdp.StatusAsync();
+        if (ReferenceEquals(_menu.List, _view.PowerCoolingItems))
+        {
+            RefreshPowerServiceRows();
+        }
+
+        if (result?.Error is { } error)
+        {
+            _notices.Show(error);
+        }
     }
 
     private void ToggleQuickResume()
@@ -229,6 +346,18 @@ internal sealed class SleepAndCleanUpMenu
         else if (ReferenceEquals(row, view.FanCurveSetting))
         {
             StepFanCurve(step);
+        }
+        else if (ReferenceEquals(row, view.CpuBoostSetting))
+        {
+            StepCpuBoost(step);
+        }
+        else if (ReferenceEquals(row, view.AcBoostSetting))
+        {
+            StepAcBoost();
+        }
+        else if (ReferenceEquals(row, view.FreeSyncSetting))
+        {
+            StepFreeSync();
         }
         else if (ReferenceEquals(row, view.GameModeSetting))
         {

@@ -103,7 +103,12 @@ internal sealed class GameActionsMenu
         view.ProfileBrightnessSetting.Click += (_, _) => StepProfile(view.ProfileBrightnessSetting, 1);
         view.ProfileAppsSetting.Click += (_, _) => StepProfile(view.ProfileAppsSetting, 1);
         view.ProfileAutoTdpSetting.Click += (_, _) => StepProfile(view.ProfileAutoTdpSetting, 1);
+        view.ProfileWattsSetting.Click += (_, _) => StepProfile(view.ProfileWattsSetting, 1);
         view.ProfileFanSetting.Click += (_, _) => StepProfile(view.ProfileFanSetting, 1);
+        view.ProfileBoostSetting.Click += (_, _) => StepProfile(view.ProfileBoostSetting, 1);
+        view.ProfileAcBoostSetting.Click += (_, _) => StepProfile(view.ProfileAcBoostSetting, 1);
+        view.ProfileFreeSyncSetting.Click += (_, _) => StepProfile(view.ProfileFreeSyncSetting, 1);
+        view.ProfileControlsSetting.Click += (_, _) => StepProfile(view.ProfileControlsSetting, 1);
         view.ProfileExportItem.Click += (_, _) => ExportPreset();
         view.ProfileImportItem.Click += (_, _) => ImportPreset();
         view.ProfileSettingsBackItem.Click += (_, _) => menu.Back();
@@ -214,7 +219,7 @@ internal sealed class GameActionsMenu
 
         // Profiles only change things for games.
         view.ProfileItem.Visibility = installed && !tile.IsApp ? Visibility.Visible : Visibility.Collapsed;
-        view.ProfileItem.Tag = GameProfiles.For(game) is { IsEmpty: true, CloseApps: null, AutoTdpFps: null, FanCurve: null } ? "Not set" : "Set";
+        view.ProfileItem.Tag = GameProfiles.For(game).HasAny ? "Set" : "Not set";
 
         var recommendation = installed && !tile.IsApp ? GameSettingsDb.Current.For(game) : null;
         view.RecommendedItem.Visibility = recommendation is null ? Visibility.Collapsed : Visibility.Visible;
@@ -553,7 +558,24 @@ internal sealed class GameActionsMenu
             var fps => $"{fps} fps"
         };
 
+        view.ProfileWattsSetting.Tag = _profile.MaxWatts is { } watts ? $"{watts} W" : UseDefault;
         view.ProfileFanSetting.Tag = _profile.FanCurve is { } fans ? AutoTdp.FanName(fans) : UseDefault;
+        view.ProfileBoostSetting.Tag = _profile.CpuBoostMode is { } boost ? AutoTdp.CpuBoostName(boost) : Unchanged;
+        view.ProfileAcBoostSetting.Tag = _profile.AcBoostBursts switch
+        {
+            true => "On",
+            false => "Off",
+            null => Unchanged
+        };
+        view.ProfileFreeSyncSetting.Tag = _profile.FreeSync switch
+        {
+            true => "On",
+            false => "Off",
+            null => Unchanged
+        };
+        view.ProfileControlsSetting.Tag = _profile.ControllerMode is { } controls
+            ? AutoTdp.ControllerModeName(controls)
+            : Unchanged;
     }
 
     /// <summary>Left and right on a profile row. Each row's choices start with Don't change.</summary>
@@ -600,11 +622,35 @@ internal sealed class GameActionsMenu
         {
             profile = _profile with { AutoTdpFps = SettingSteps.StepChoice(_profile.AutoTdpFps, [0, .. AutoTdp.FrameRates], step) };
         }
+        else if (ReferenceEquals(row, view.ProfileWattsSetting))
+        {
+            profile = _profile with { MaxWatts = SettingSteps.StepChoice(_profile.MaxWatts, AutoTdp.MostWatts, step) };
+        }
         else if (ReferenceEquals(row, view.ProfileFanSetting))
         {
             string?[] options = [null, .. AutoTdp.FanChoices];
             var index = Math.Max(0, Array.IndexOf(options, _profile.FanCurve));
             profile = _profile with { FanCurve = options[(index + step + options.Length) % options.Length] };
+        }
+        else if (ReferenceEquals(row, view.ProfileBoostSetting))
+        {
+            string?[] options = [null, .. AutoTdp.CpuBoostModes];
+            var index = Math.Max(0, Array.IndexOf(options, _profile.CpuBoostMode));
+            profile = _profile with { CpuBoostMode = options[(index + step + options.Length) % options.Length] };
+        }
+        else if (ReferenceEquals(row, view.ProfileAcBoostSetting))
+        {
+            profile = _profile with { AcBoostBursts = SettingSteps.StepChoice(_profile.AcBoostBursts, [true, false], step) };
+        }
+        else if (ReferenceEquals(row, view.ProfileFreeSyncSetting))
+        {
+            profile = _profile with { FreeSync = SettingSteps.StepChoice(_profile.FreeSync, [true, false], step) };
+        }
+        else if (ReferenceEquals(row, view.ProfileControlsSetting))
+        {
+            string?[] options = [null, .. AutoTdp.ControllerModes];
+            var index = Math.Max(0, Array.IndexOf(options, _profile.ControllerMode));
+            profile = _profile with { ControllerMode = options[(index + step + options.Length) % options.Length] };
         }
         else
         {

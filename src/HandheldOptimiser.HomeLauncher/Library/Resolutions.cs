@@ -63,7 +63,8 @@ internal static class Resolutions
 
     /// <returns>An error message, or null when the screen switched.</returns>
     /// <param name="hertz">The refresh rate to keep, when the new size offers it; otherwise its fastest.</param>
-    public static string? Set(Resolution size, int? hertz = null)
+    /// <param name="persist">Whether to store the mode in the registry so it persists across restarts.</param>
+    public static string? Set(Resolution size, int? hertz = null, bool persist = true)
     {
         if (!Native.CurrentDisplayMode(out var mode))
         {
@@ -96,7 +97,7 @@ internal static class Resolutions
         mode.DisplayFrequency = (uint)(rates.Contains(wanted) ? wanted : rates.Max);
         mode.Fields = Native.DmPelsWidth | Native.DmPelsHeight | Native.DmDisplayFrequency;
 
-        return Native.ChangeDisplayMode(ref mode) switch
+        return Native.ChangeDisplayMode(ref mode, persist) switch
         {
             Native.DispChangeSuccessful => null,
             Native.DispChangeRestart => "Windows needs a restart to change the resolution.",

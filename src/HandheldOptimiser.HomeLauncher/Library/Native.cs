@@ -605,12 +605,12 @@ internal static partial class Native
         return EnumDisplaySettings(null, index, ref mode);
     }
 
-    /// <summary>Switches the main screen to a mode, for this user, kept after a restart.</summary>
+    /// <summary>Switches the main screen to a mode, for this user, kept after a restart when <paramref name="persist"/> is true.</summary>
     /// <returns>A DISP_CHANGE code; 0 is success.</returns>
-    public static unsafe int ChangeDisplayMode(ref DevMode mode)
+    public static unsafe int ChangeDisplayMode(ref DevMode mode, bool persist = true)
     {
         mode.Size = (ushort)sizeof(DevMode);
-        return ChangeDisplaySettingsEx(null, ref mode, 0, CdsUpdateRegistry, 0);
+        return ChangeDisplaySettingsEx(null, ref mode, 0, persist ? CdsUpdateRegistry : 0u, 0);
     }
 
     [LibraryImport("user32.dll")]
