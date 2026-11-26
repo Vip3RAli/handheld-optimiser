@@ -291,14 +291,15 @@ internal sealed class AutoTdpController
 
         if (middle < target * Below)
         {
+            var ceiling = Ceiling(now);
+
             // A held limit is not let go on a timer, which would hand it back to raises judged on three
             // noisy seconds. One step up, judged like the steps down, decides.
             if (_heldNoGain && now >= _noGainUntil)
             {
-                return StepUp(now);
+                return StepUp(now, ceiling);
             }
 
-            var ceiling = Ceiling(now);
             if (Watts >= ceiling)
             {
                 State = now < _noGainUntil ? AutoTdpState.NoGain : AutoTdpState.AtMaximum;
@@ -563,9 +564,9 @@ internal sealed class AutoTdpController
     }
 
     /// <summary>When a limit stepped down to from the top runs out: one step up, to see whether the power helps again.</summary>
-    private int? StepUp(DateTime now)
+    private int? StepUp(DateTime now, int ceiling)
     {
-        if (Watts >= _settings.MaxWatts)
+        if (Watts >= ceiling)
         {
             _heldNoGain = false;
             return null;
@@ -575,7 +576,8 @@ internal sealed class AutoTdpController
         var full = _longReadings.Count >= StepDownWindow;
         _judging = (Step.Up, Watts, full ? LongMiddle() : DecidedFps ?? 0);
         _stepUpBeforeHigh = full ? HighQuarter() : 0;
-        return Change(now, Watts + Math.Max(SmallestStepDown, Watts / StepDownShare), SettleAfterLower);
+        var target = Math.Min(Watts + Math.Max(SmallestStepDown, Watts / StepDownShare), ceiling);
+        return Change(now, target, SettleAfterLower);
     }
 
     /// <summary>The longer window's reading a quarter of the way up: three quarters of its seconds are at or above it.</summary>

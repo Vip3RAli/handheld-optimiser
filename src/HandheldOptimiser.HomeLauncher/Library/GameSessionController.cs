@@ -131,6 +131,7 @@ internal sealed class GameSessionController
     // The Epic launcher's arguments for the game about to start, asked for a moment ago. Null arguments
     // mean Epic could not be asked, and the game starts without them.
     private (string Key, string? Arguments)? _epicLaunch;
+    private string? _saveBackedUpFor;
 
     private async Task StartEpicGameAsync(GameTile tile)
     {
@@ -151,6 +152,26 @@ internal sealed class GameSessionController
         }
 
         _epicLaunch = (tile.Game.Key, arguments);
+        StartGame(tile);
+    }
+
+    private async Task StartWithSaveGuardAsync(GameTile tile, string? storeArguments)
+    {
+        try
+        {
+            await Task.Run(() => SaveGuard.CreateSnapshot(tile.Game));
+        }
+        catch (Exception ex) when (!LibraryApp.IsFatal(ex))
+        {
+            Program.Log($"Save Guard could not back up {tile.Game.Key}: {ex.Message}");
+        }
+
+        _saveBackedUpFor = tile.Game.Key;
+        if (storeArguments is not null)
+        {
+            _epicLaunch = (tile.Game.Key, storeArguments);
+        }
+
         StartGame(tile);
     }
 
@@ -220,6 +241,21 @@ internal sealed class GameSessionController
             return;
         }
 
+        // Back up saves before launching the game so it cannot race and lock save files during snapshot.
+        var backedUp = false;
+        if (LibrarySettings.SaveGuard)
+        {
+            if (_saveBackedUpFor != tile.Game.Key)
+            {
+                _notices.Show($"Launching {tile.Title}...", tile, NoticePresenter.LaunchShownFor);
+                _ = StartWithSaveGuardAsync(tile, storeArguments);
+                return;
+            }
+
+            _saveBackedUpFor = null;
+            backedUp = true;
+        }
+
         // The last game's profile never carries over to the next game.
         RestoreProfileSettings();
         var profile = GameProfiles.For(tile.Game);
@@ -242,7 +278,7 @@ internal sealed class GameSessionController
         }
 
         StartSession(tile.Game, storeWasOpen, profile.CloseApps ?? LibrarySettings.GameMode,
-            profile.AutoTdpFps ?? LibrarySettings.AutoTdpFps, profile.FanCurve ?? LibrarySettings.FanCurve);
+            profile.AutoTdpFps ?? LibrarySettings.AutoTdpFps, profile.FanCurve ?? LibrarySettings.FanCurve, backedUp);
     }
 
 
@@ -266,13 +302,13 @@ internal sealed class GameSessionController
 
     /// <param name="autoTdpFps">The frame rate TDP Engine holds the game at, or 0 for off.</param>
     /// <param name="fanCurve">The fan curve to play with, one of <see cref="AutoTdp.FanChoices"/>.</param>
-    private void StartSession(Game game, bool storeWasOpen, bool closeApps, int autoTdpFps, string fanCurve)
+    private void StartSession(Game game, bool storeWasOpen, bool closeApps, int autoTdpFps, string fanCurve, bool backedUp = false)
     {
         var session = new GameSession(game);
         _session = session;
         _sessionStoreWasOpen = storeWasOpen;
 
-        if (LibrarySettings.SaveGuard)
+        if (LibrarySettings.SaveGuard && !backedUp)
         {
             _ = Task.Run(() => SaveGuard.CreateSnapshot(game));
         }
@@ -321,12 +357,22 @@ internal sealed class GameSessionController
     }
 
     /// <summary>Hands the power limit and fans back to Armoury Crate's operating mode, for the game closing.</summary>
-    private void StopAutoTdp()
+    private void StopAutoTdp(bool wait = false)
     {
         if (_autoTdpGame is { } game)
         {
             _autoTdpGame = null;
-            _ = AutoTdp.StopAsync(game);
+            var stopping = AutoTdp.StopAsync(game);
+            if (wait)
+            {
+                try
+                {
+                    stopping.Wait(TimeSpan.FromSeconds(3));
+                }
+                catch (Exception ex) when (!LibraryApp.IsFatal(ex))
+                {
+                }
+            }
         }
     }
 
@@ -375,7 +421,7 @@ internal sealed class GameSessionController
     }
 
     /// <summary>Stops following the current game, counting its time so far, for a new game starting.</summary>
-    private void StopFollowing()
+    private void StopFollowing(bool wait = false)
     {
         if (_session is not { } session)
         {
@@ -386,7 +432,7 @@ internal sealed class GameSessionController
         ResumeGame(session);
         session.Stop();
         RecordPlaytime(session);
-        StopAutoTdp();
+        StopAutoTdp(wait);
     }
 
     // Set once EndSession has run, so the window closing and LibraryApp's finally do not both do it.
@@ -404,8 +450,8 @@ internal sealed class GameSessionController
         }
 
         _sessionEnded = true;
-        StopFollowing();
-        RestoreProfileSettings();
+        StopFollowing(wait: true);
+        RestoreProfileSettings(wait: true);
 
         // Started before returning: the library's process ends right after this.
         ReopenClosedApps(wait: true);
@@ -531,29 +577,52 @@ internal sealed class GameSessionController
     /// <summary>Switches to a game's profile as it starts, keeping what it replaces.</summary>
     private void ApplyProfile(Game game, GameProfile profile)
     {
-        var powerMode = profile.PowerMode is not null ? PowerModes.Read() : null;
-        var resolution = profile.Resolution is not null ? Resolutions.Read()?.Current : null;
-
-        // A new size can come with a different refresh rate, so the rate is kept to put back as well.
-        var refreshRate = profile.RefreshRate is not null || resolution is not null ? RefreshRates.Read()?.Current : null;
-        _saved = new SavedSettings(game, DateTime.UtcNow, powerMode, refreshRate, null, resolution);
-
-        if (profile.PowerMode is { } mode && powerMode is not null && powerMode != mode && !PowerModes.Set(mode))
+        PowerMode? savedMode = null;
+        if (profile.PowerMode is { } mode && PowerModes.Read() is { } currentMode && currentMode != mode)
         {
-            Program.Log($"Could not switch to the power mode in {game.Key}'s profile");
+            if (PowerModes.Set(mode))
+            {
+                savedMode = currentMode;
+            }
+            else
+            {
+                Program.Log($"Could not switch to the power mode in {game.Key}'s profile");
+            }
         }
+
+        Resolution? savedResolution = null;
+        int? savedRefresh = null;
+        var currentResolution = profile.Resolution is not null ? Resolutions.Read()?.Current : null;
+        // A new size can come with a different refresh rate, so the rate is kept to put back as well.
+        var currentRefresh = profile.RefreshRate is not null || currentResolution is not null ? RefreshRates.Read()?.Current : null;
 
         // The size first: the refresh rate is then set for the new size.
-        if (profile.Resolution is { } size && resolution is not null && resolution != size
-            && Resolutions.Set(size) is { } sizeError)
+        if (profile.Resolution is { } size && currentResolution is not null && currentResolution != size)
         {
-            Program.Log($"Could not switch to the resolution in {game.Key}'s profile: {sizeError}");
+            if (Resolutions.Set(size) is { } sizeError)
+            {
+                Program.Log($"Could not switch to the resolution in {game.Key}'s profile: {sizeError}");
+            }
+            else
+            {
+                savedResolution = currentResolution;
+                savedRefresh = currentRefresh;
+            }
         }
 
-        if (profile.RefreshRate is { } hertz && refreshRate is not null && refreshRate != hertz && RefreshRates.Set(hertz) is { } error)
+        if (profile.RefreshRate is { } hertz && currentRefresh is not null && currentRefresh != hertz)
         {
-            Program.Log($"Could not switch to the refresh rate in {game.Key}'s profile: {error}");
+            if (RefreshRates.Set(hertz) is { } error)
+            {
+                Program.Log($"Could not switch to the refresh rate in {game.Key}'s profile: {error}");
+            }
+            else
+            {
+                savedRefresh ??= currentRefresh;
+            }
         }
+
+        _saved = new SavedSettings(game, DateTime.UtcNow, savedMode, savedRefresh, null, savedResolution);
 
         if (profile.Brightness is { } level)
         {
@@ -566,15 +635,25 @@ internal sealed class GameSessionController
     private async Task ApplyProfileBrightnessAsync(Game game, int level)
     {
         // WMI is slow, so the reading and the change both happen off the UI thread.
-        var before = await Task.Run(() => Brightness.Read() is { } now && Brightness.Set(level) ? now : (int?)null);
-        if (before is not null && _saved is { } saved && saved.Game == game)
+        var before = await Task.Run(() => Brightness.Read() is { } now && now != level && Brightness.Set(level) ? now : (int?)null);
+        if (before is null)
+        {
+            return;
+        }
+
+        if (_saved is { } saved && saved.Game == game)
         {
             _saved = saved with { Brightness = before };
+        }
+        else
+        {
+            // The game closed or another started while WMI ran: put the brightness back right away.
+            _ = Task.Run(() => Brightness.Set(before.Value));
         }
     }
 
     /// <summary>Puts back the settings a profiled game replaced, if any.</summary>
-    private void RestoreProfileSettings()
+    private void RestoreProfileSettings(bool wait = false)
     {
         if (_saved is not { } saved)
         {
@@ -600,7 +679,17 @@ internal sealed class GameSessionController
 
         if (saved.Brightness is { } level)
         {
-            _ = Task.Run(() => Brightness.Set(level));
+            var restore = Task.Run(() => Brightness.Set(level));
+            if (wait)
+            {
+                try
+                {
+                    restore.Wait(TimeSpan.FromSeconds(3));
+                }
+                catch (Exception ex) when (!LibraryApp.IsFatal(ex))
+                {
+                }
+            }
         }
 
         Program.Log($"Put back the settings {saved.Game.Key}'s profile replaced");

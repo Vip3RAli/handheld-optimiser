@@ -120,6 +120,7 @@
                            MinHeight="36"
                            Appearance="Primary"
                            Command="{Binding InstallUpdateCommand}"
+                           IsEnabled="{Binding IsIdle}"
                            Visibility="{Binding CanInstallUpdate, Converter={StaticResource BoolToVis}}" />
                 <ui:Button Content="Open release page"
                            MinHeight="36"

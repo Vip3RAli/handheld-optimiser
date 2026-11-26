@@ -134,6 +134,10 @@ public sealed class PowerShellRunner(LogService log)
 
         var stdout = new StringBuilder();
         var stderr = new StringBuilder();
+        var stdoutLock = new object();
+        var stderrLock = new object();
+        var stdoutDone = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var stderrDone = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         using var process = new Process { StartInfo = psi };
 
@@ -141,10 +145,14 @@ public sealed class PowerShellRunner(LogService log)
         {
             if (e.Data is null)
             {
+                stdoutDone.TrySetResult();
                 return;
             }
 
-            stdout.AppendLine(e.Data);
+            lock (stdoutLock)
+            {
+                stdout.AppendLine(e.Data);
+            }
 
             var shown = LastRedraw(e.Data);
             if (logOutput && !string.IsNullOrWhiteSpace(shown))
@@ -160,10 +168,14 @@ public sealed class PowerShellRunner(LogService log)
         {
             if (e.Data is null)
             {
+                stderrDone.TrySetResult();
                 return;
             }
 
-            stderr.AppendLine(e.Data);
+            lock (stderrLock)
+            {
+                stderr.AppendLine(e.Data);
+            }
 
             var shown = LastRedraw(e.Data);
             if (logOutput && !string.IsNullOrWhiteSpace(shown))
@@ -212,13 +224,21 @@ public sealed class PowerShellRunner(LogService log)
             }
 
             await process.WaitForExitAsync(token);
+            await Task.WhenAny(Task.WhenAll(stdoutDone.Task, stderrDone.Task), Task.Delay(TimeSpan.FromSeconds(2), CancellationToken.None));
         }
         catch (OperationCanceledException) when (timeout is { } allowed && !ct.IsCancellationRequested)
         {
             Stop(process);
+            await Task.WhenAny(Task.WhenAll(stdoutDone.Task, stderrDone.Task), Task.Delay(TimeSpan.FromMilliseconds(250), CancellationToken.None));
             var message = $"{description} did not finish within {Describe(allowed)}, so it was stopped.";
             _log.Warning($"    {message}");
-            return new ProcessOutcome(-1, stdout.ToString(), message) { TimedOut = true };
+            string partialOut;
+            lock (stdoutLock)
+            {
+                partialOut = stdout.ToString();
+            }
+
+            return new ProcessOutcome(-1, partialOut, message) { TimedOut = true };
         }
         catch (OperationCanceledException)
         {
@@ -226,7 +246,18 @@ public sealed class PowerShellRunner(LogService log)
             throw;
         }
 
-        return new ProcessOutcome(process.ExitCode, stdout.ToString(), stderr.ToString());
+        string allOut, allErr;
+        lock (stdoutLock)
+        {
+            allOut = stdout.ToString();
+        }
+
+        lock (stderrLock)
+        {
+            allErr = stderr.ToString();
+        }
+
+        return new ProcessOutcome(process.ExitCode, allOut, allErr);
     }
 
     /// <summary>Stops a process and everything it started, if it is still running.</summary>
@@ -239,9 +270,9 @@ public sealed class PowerShellRunner(LogService log)
                 process.Kill(entireProcessTree: true);
             }
         }
-        catch (InvalidOperationException)
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or NotSupportedException or AggregateException)
         {
-            // Process already gone.
+            // Process already gone or terminating.
         }
     }
 

@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using HandheldOptimiser.PowerService;
 using Windows.UI.Xaml;
@@ -27,7 +28,9 @@ namespace HandheldOptimiser.GameBar
         private MusicStatus _music = MusicStatus.Off;
         private string _musicArt = "";
         private bool _musicBusy;
+        private bool _musicRefreshing;
         private bool _musicTimerHooked;
+        private CancellationTokenSource _musicStartCancel;
 
         // Whether the list under the card is the player's playlists, which the My Playlists button folds away.
         private bool _showingPlaylists;
@@ -57,17 +60,28 @@ namespace HandheldOptimiser.GameBar
 
         private async void RefreshMusic()
         {
-            if (_musicBusy)
+            if (_musicBusy || _musicRefreshing)
             {
                 return;
             }
 
-            var status = await Task.Run(() => MusicClient.Ask(AutoTdpProtocol.Music.State));
-            if (!_musicBusy)
+            _musicRefreshing = true;
+            try
             {
-                // A list asked for stays until another is.
-                status.Items = status.Items ?? _music.Items;
-                ShowMusic(status);
+                var status = await Task.Run(() => MusicClient.Ask(AutoTdpProtocol.Music.State));
+                if (_loaded && !_musicBusy)
+                {
+                    // A list asked for stays until another is.
+                    status.Items = status.Items ?? _music.Items;
+                    ShowMusic(status);
+                }
+            }
+            catch
+            {
+            }
+            finally
+            {
+                _musicRefreshing = false;
             }
         }
 
@@ -81,6 +95,15 @@ namespace HandheldOptimiser.GameBar
 
             _musicBusy = true;
             MusicNote.Text = "Starting YouTube Music…";
+            MusicNote.Visibility = Visibility.Visible;
+            if (_musicStartCancel != null)
+            {
+                _musicStartCancel.Cancel();
+                _musicStartCancel.Dispose();
+            }
+
+            _musicStartCancel = new CancellationTokenSource();
+            var token = _musicStartCancel.Token;
             try
             {
                 var status = await Task.Run(() =>
@@ -94,18 +117,33 @@ namespace HandheldOptimiser.GameBar
                     // The player opens its pipe once its browser is up.
                     for (var tries = 0; tries < StartTries; tries++)
                     {
+                        if (token.IsCancellationRequested)
+                        {
+                            return null;
+                        }
+
                         var answer = MusicClient.Ask(AutoTdpProtocol.Music.State);
                         if (answer.Running && answer.Error == null)
                         {
                             return answer;
                         }
 
-                        System.Threading.Thread.Sleep(500);
+                        if (token.WaitHandle.WaitOne(500))
+                        {
+                            return null;
+                        }
                     }
 
                     return new MusicStatus { Error = "YouTube Music did not start. Try again in a moment." };
                 });
-                ShowMusic(status);
+
+                if (_loaded && status != null)
+                {
+                    ShowMusic(status);
+                }
+            }
+            catch
+            {
             }
             finally
             {
@@ -116,7 +154,13 @@ namespace HandheldOptimiser.GameBar
         private void OnMusicSignIn(object sender, RoutedEventArgs e)
         {
             Unpress(sender);
+            if (_musicBusy)
+            {
+                return;
+            }
+
             MusicNote.Text = "Sign in in the YouTube Music window, then come back here. Close Game Bar to see it.";
+            MusicNote.Visibility = Visibility.Visible;
             SendMusic(AutoTdpProtocol.Music.SignIn);
         }
 
@@ -147,6 +191,11 @@ namespace HandheldOptimiser.GameBar
             if (_showingPlaylists)
             {
                 ClearMusicList();
+                return;
+            }
+
+            if (_musicBusy)
+            {
                 return;
             }
 
@@ -181,6 +230,11 @@ namespace HandheldOptimiser.GameBar
 
         private void Search()
         {
+            if (_musicBusy)
+            {
+                return;
+            }
+
             var query = MusicQuery.Text.Trim();
             if (query.Length == 0)
             {
@@ -188,19 +242,31 @@ namespace HandheldOptimiser.GameBar
             }
 
             MusicNote.Text = "Searching…";
+            MusicNote.Visibility = Visibility.Visible;
             SendMusic(AutoTdpProtocol.Music.Search, query: query);
         }
 
         private async void OnMusicQuit(object sender, RoutedEventArgs e)
         {
             Unpress(sender);
+            if (_musicBusy)
+            {
+                return;
+            }
+
             _musicBusy = true;
             try
             {
                 await Task.Run(() => MusicClient.Ask(AutoTdpProtocol.Music.Quit));
                 _showingPlaylists = false;
                 MusicPlaylistsTile.IsChecked = false;
-                ShowMusic(MusicStatus.Off);
+                if (_loaded)
+                {
+                    ShowMusic(MusicStatus.Off);
+                }
+            }
+            catch
+            {
             }
             finally
             {
@@ -238,7 +304,13 @@ namespace HandheldOptimiser.GameBar
 
                 MusicPlaylistsTile.IsChecked = _showingPlaylists;
                 status.Items = status.Items ?? _music.Items;
-                ShowMusic(status);
+                if (_loaded)
+                {
+                    ShowMusic(status);
+                }
+            }
+            catch
+            {
             }
             finally
             {
@@ -264,6 +336,11 @@ namespace HandheldOptimiser.GameBar
 
             if (!status.Running || !status.SignedIn)
             {
+                MusicItems.Children.Clear();
+                _musicArt = "";
+                MusicArt.Source = null;
+                _showingPlaylists = false;
+                MusicPlaylistsTile.IsChecked = false;
                 return;
             }
 

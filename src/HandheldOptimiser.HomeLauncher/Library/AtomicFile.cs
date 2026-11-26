@@ -12,21 +12,48 @@ internal static class AtomicFile
     public static async Task WriteAllBytesAsync(string path, byte[] bytes)
     {
         var temp = TempFor(path);
-        await File.WriteAllBytesAsync(temp, bytes);
-        File.Move(temp, path, overwrite: true);
+        try
+        {
+            await File.WriteAllBytesAsync(temp, bytes);
+            File.Move(temp, path, overwrite: true);
+        }
+        catch
+        {
+            TryDelete(temp);
+            throw;
+        }
     }
 
     public static async Task WriteAllTextAsync(string path, string text)
     {
         var temp = TempFor(path);
-        await File.WriteAllTextAsync(temp, text);
-        File.Move(temp, path, overwrite: true);
+        try
+        {
+            await File.WriteAllTextAsync(temp, text);
+            File.Move(temp, path, overwrite: true);
+        }
+        catch
+        {
+            TryDelete(temp);
+            throw;
+        }
     }
 
     // Beside the file, so the move stays on the same drive and is a rename rather than a copy.
     private static string TempFor(string path)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
-        return path + ".tmp";
+        return $"{path}.{Guid.NewGuid():N}.tmp";
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
     }
 }

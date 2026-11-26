@@ -131,12 +131,7 @@ internal sealed class SettingsMenu
             _continue.ForgetInfo();
             _continue.Update();
         };
-        view.CardDetailsSetting.Click += (_, _) =>
-        {
-            LibrarySettings.CardDetails = SettingSteps.Step(LibrarySettings.CardDetails, 1);
-            Refresh();
-            _host.RestoreFocus();
-        };
+        view.CardDetailsSetting.Click += (_, _) => StepCardDetails(1);
         view.StoreBadgeSetting.Click += (_, _) =>
         {
             LibrarySettings.StoreBadge = !LibrarySettings.StoreBadge;
@@ -482,10 +477,17 @@ internal sealed class SettingsMenu
         LayoutChanged();
     }
 
+    private void StepCardDetails(int step)
+    {
+        LibrarySettings.CardDetails = SettingSteps.Step(LibrarySettings.CardDetails, step);
+        Refresh();
+        _host.ShowTiles();
+    }
+
     private void LayoutChanged()
     {
-        Refresh();
         _host.LayoutSettingsChanged();
+        Refresh();
     }
 
     /// <summary>Left and right on the rows of Art and background, What it shows and Docked mode.</summary>
@@ -515,6 +517,10 @@ internal sealed class SettingsMenu
         else if (ReferenceEquals(row, view.OldSchoolLookSetting))
         {
             StepOldSchoolLook();
+        }
+        else if (ReferenceEquals(row, view.CardDetailsSetting))
+        {
+            StepCardDetails(step);
         }
         else if (ReferenceEquals(row, view.SortSetting))
         {

@@ -121,7 +121,7 @@ internal sealed partial class AsusAcpi : IPowerBackend
     {
         Span<byte> args = stackalloc byte[8];
         BitConverter.TryWriteBytes(args, GpuMemory.Device);
-        return GpuMemory.CodeFromStatus(Call(Dsts, args));
+        return Call(Dsts, args) is { } status ? GpuMemory.CodeFromStatus(status) : null;
     }
 
     /// <summary>Sets the GPU memory code, used from the next restart.</summary>
@@ -135,12 +135,12 @@ internal sealed partial class AsusAcpi : IPowerBackend
     /// <returns>False when the firmware refused it.</returns>
     public bool SetChargeLimit(int percent) => Set(BatteryCare.Device, percent) == 1;
 
-    /// <summary>A device's status, or below 0 when this model does not have it.</summary>
+    /// <summary>A device's status, or below 0 when this model does not have it or the call failed.</summary>
     private int Get(uint device)
     {
         Span<byte> args = stackalloc byte[8];
         BitConverter.TryWriteBytes(args, device);
-        return Call(Dsts, args) - 65536;
+        return Call(Dsts, args) is { } value ? value - 65536 : -1;
     }
 
     /// <returns>1 when the firmware accepted it.</returns>
@@ -149,7 +149,7 @@ internal sealed partial class AsusAcpi : IPowerBackend
         Span<byte> args = stackalloc byte[8];
         BitConverter.TryWriteBytes(args, device);
         BitConverter.TryWriteBytes(args[4..], value);
-        return Call(Devs, args);
+        return Call(Devs, args) ?? -1;
     }
 
     /// <returns>1 when the firmware accepted it.</returns>
@@ -158,10 +158,10 @@ internal sealed partial class AsusAcpi : IPowerBackend
         Span<byte> args = stackalloc byte[4 + values.Length];
         BitConverter.TryWriteBytes(args, device);
         values.CopyTo(args[4..]);
-        return Call(Devs, args);
+        return Call(Devs, args) ?? -1;
     }
 
-    private int Call(uint method, ReadOnlySpan<byte> args)
+    private int? Call(uint method, ReadOnlySpan<byte> args)
     {
         var input = new byte[8 + args.Length];
         BitConverter.TryWriteBytes(input, method);
@@ -173,7 +173,7 @@ internal sealed partial class AsusAcpi : IPowerBackend
         {
             if (!DeviceIoControl(_device, ControlCode, input, (uint)input.Length, output, (uint)output.Length, out _, 0))
             {
-                return int.MinValue;
+                return null;
             }
         }
 

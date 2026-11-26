@@ -22,8 +22,8 @@ internal sealed partial class AutoTdpService : ServiceBase
     // Armoury Crate can put its own limits back, on a charger being plugged in say, so they are set again this often.
     private static readonly TimeSpan Reassert = TimeSpan.FromSeconds(5);
 
-    // A request has this long to arrive and be answered. The library sends one line straight away.
-    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(2);
+    // A request has this long to arrive and be answered. Includes 5 s child runs such as RadeonHost / BatteryCareHost.
+    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(7);
 
     // Pipe instances, so one client that connects and says nothing does not keep the library out.
     private const int PipeInstances = 4;
@@ -68,6 +68,7 @@ internal sealed partial class AutoTdpService : ServiceBase
     // The game being controlled, or null between games.
     private Control? _control;
     private DateTime _idleSince = DateTime.UtcNow;
+    private DateTime _lastTick = DateTime.UtcNow;
     private AutoTdpStatus _last = new(false);
 
     // Set once it has decided to end, so a start that arrives meanwhile is turned away rather than lost.
@@ -101,23 +102,32 @@ internal sealed partial class AutoTdpService : ServiceBase
     protected override bool OnPowerEvent(PowerBroadcastStatus powerStatus)
     {
         // The firmware can come back from sleep with its own limits, so they are set again straight away.
-        if (powerStatus == PowerBroadcastStatus.ResumeSuspend)
+        // Modern Standby / automatic wakes can deliver ResumeAutomatic instead of ResumeSuspend.
+        if (powerStatus is PowerBroadcastStatus.ResumeSuspend or PowerBroadcastStatus.ResumeAutomatic)
         {
-            lock (_gate)
-            {
-                if (_control is { } control)
-                {
-                    control.LastSet = DateTime.MinValue;
-                    control.LastFans = DateTime.MinValue;
-                }
-            }
-
-            // Outside the gate, as it closes the controller's handle.
-            _controls?.Resume();
-            _batteryCare.RestoreIfEnabled();
+            OnSystemResumed();
         }
 
         return true;
+    }
+
+    private void OnSystemResumed()
+    {
+        var now = DateTime.UtcNow;
+        lock (_gate)
+        {
+            _idleSince = now;
+            if (_control is { } control)
+            {
+                control.LastSet = DateTime.MinValue;
+                control.LastFans = DateTime.MinValue;
+                control.LastFrames = now;
+            }
+        }
+
+        // Outside the gate, as it closes the controller's handle.
+        _controls?.Resume();
+        _batteryCare.RestoreIfEnabled();
     }
 
     /// <summary>How it ends itself: through the service manager, or from a console by cancelling.</summary>
@@ -202,8 +212,22 @@ internal sealed partial class AutoTdpService : ServiceBase
 
             serving = ServeAsync(cancel);
             using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+            _lastTick = DateTime.UtcNow;
             while (await timer.WaitForNextTickAsync(cancel))
             {
+                var woken = false;
+                var tickNow = DateTime.UtcNow;
+                if (tickNow - _lastTick > TimeSpan.FromSeconds(15))
+                {
+                    woken = true;
+                }
+                _lastTick = tickNow;
+
+                if (woken)
+                {
+                    OnSystemResumed();
+                }
+
                 lock (_gate)
                 {
                     try
@@ -674,11 +698,26 @@ internal sealed partial class AutoTdpService : ServiceBase
         control.LastFans = DateTime.UtcNow;
         if (_power!.SetFanCurve(control.Curve!))
         {
+            control.FansApplied = true;
+            control.FanFailures = 0;
             return;
         }
 
-        // Not asked again: a model without custom fan curves refuses every time.
+        control.FanFailures++;
+        if (control.FansApplied && control.FanFailures < 3)
+        {
+            Log.Write($"The firmware refused the {control.FanCurve} fan curve (attempt {control.FanFailures}); retrying");
+            return;
+        }
+
+        // Not asked again when unsupported or repeatedly failing; restore vendor mode if a custom curve was active.
         Log.Write($"The firmware refused the {control.FanCurve} fan curve, so the fans are left as they were");
+        if (control.FansApplied)
+        {
+            _power.SetVendorMode(control.RestoreMode ?? _power.DefaultVendorMode);
+            control.LastSet = DateTime.MinValue;
+        }
+
         control.Curve = null;
         control.Dynamic = null;
         control.Fine = null;
@@ -773,6 +812,8 @@ internal sealed partial class AutoTdpService : ServiceBase
         public DateTime LastSet { get; set; }
         public DateTime LastFans { get; set; }
         public DateTime LastFrames { get; set; }
+        public bool FansApplied { get; set; }
+        public int FanFailures { get; set; }
     }
 
     private const uint QueryLimitedInformation = 0x1000;

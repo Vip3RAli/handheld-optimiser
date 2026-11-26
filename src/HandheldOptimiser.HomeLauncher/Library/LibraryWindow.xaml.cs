@@ -748,6 +748,9 @@ public partial class LibraryWindow : Window, ILibraryHost
     {
         _gamepad.Stop();
         _clock.Stop();
+        _oldSchool.DisplayOff = true;
+        _oldSchool.UpdateRenderMode();
+        _deals.Drift();
     }
 
     /// <summary>Starts again what <see cref="ScreenOff"/> stopped.</summary>
@@ -755,6 +758,9 @@ public partial class LibraryWindow : Window, ILibraryHost
     {
         _gamepad.Start();
         _clock.Start();
+        _oldSchool.DisplayOff = false;
+        _oldSchool.UpdateRenderMode();
+        _deals.Drift();
         _topBar.Refresh();
     }
 

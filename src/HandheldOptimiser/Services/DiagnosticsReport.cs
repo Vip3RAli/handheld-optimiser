@@ -17,6 +17,7 @@ public sealed record DiagnosticsFacts
     public required string Device { get; init; }
     public string? ProfileFolder { get; init; }
     public string? UserName { get; init; }
+    public string? SessionUserName { get; init; }
     public string? MachineName { get; init; }
 
     /// <summary>Every tweak for this device and what it was last found to be.</summary>
@@ -126,13 +127,24 @@ public static class DiagnosticsReport
     /// folder goes first, so that a path keeps its meaning as %USERPROFILE%.
     /// </summary>
     public static string Scrub(string text, DiagnosticsFacts facts) =>
-        Scrub(text, facts.ProfileFolder, facts.UserName, facts.MachineName);
+        Scrub(text, facts.ProfileFolder, facts.UserName, facts.MachineName, facts.SessionUserName);
 
-    public static string Scrub(string text, string? profileFolder, string? userName, string? machineName)
+    public static string Scrub(string text, string? profileFolder, string? userName, string? machineName, string? sessionUserName = null)
     {
         if (!string.IsNullOrWhiteSpace(profileFolder))
         {
             text = text.Replace(profileFolder.TrimEnd('\\'), "%USERPROFILE%", StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (!string.IsNullOrWhiteSpace(sessionUserName))
+        {
+            var trimmed = sessionUserName.Trim();
+            text = ReplaceWord(text, trimmed, "<user>");
+            var slash = trimmed.IndexOf('\\');
+            if (slash >= 0 && slash + 1 < trimmed.Length)
+            {
+                text = ReplaceWord(text, trimmed[(slash + 1)..], "<user>");
+            }
         }
 
         text = ReplaceWord(text, userName, "<user>");

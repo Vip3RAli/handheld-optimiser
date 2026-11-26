@@ -199,7 +199,7 @@ internal static class GameDeals
                 batch.Select(id => $"app/{id}"));
             foreach (var (shopId, gameId) in ParseLookup(lookup))
             {
-                if (long.TryParse(shopId.AsSpan(4), out var appId))
+                if (shopId.StartsWith("app/", StringComparison.OrdinalIgnoreCase) && long.TryParse(shopId.AsSpan(4), out var appId))
                 {
                     ids.TryAdd(gameId, appId);
                 }

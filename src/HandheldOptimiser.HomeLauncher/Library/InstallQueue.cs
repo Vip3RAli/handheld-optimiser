@@ -20,6 +20,7 @@ internal sealed class InstallQueue
         Paused,
         PausedForGame,
         Stopped,
+        Cancelling,
     }
 
     /// <summary>One game in the queue.</summary>
@@ -275,21 +276,28 @@ internal sealed class InstallQueue
             return false;
         }
 
-        _entries.Remove(entry);
-        entry.Run?.Cancel();
         var job = entry.Job;
-        _ = Task.Run(async () =>
+        if (entry.Run is { } run)
         {
-            // Let the run see it was cancelled and let go of its files first.
-            await Task.Delay(1500);
-            if (job.Mode == InstallMode.Install)
+            // Keep the entry in the queue while RunAsync winds down and closes open file handles, then discard.
+            entry.Status = Status.Cancelling;
+            run.Cancel();
+        }
+        else
+        {
+            _entries.Remove(entry);
+            _ = Task.Run(() =>
             {
-                NativeInstalls.Discard(job.Store, job.ProductId, job.Folder);
-            }
-        });
+                if (job.Mode == InstallMode.Install)
+                {
+                    NativeInstalls.Discard(job.Store, job.ProductId, job.Folder);
+                }
+            });
+            Save();
+        }
+
         Program.Log($"Cancelled the download of {key}");
         _notices.Show($"{job.Title} was cancelled.");
-        Save();
         Tick();
         return true;
     }
@@ -440,6 +448,21 @@ internal sealed class InstallQueue
 
             Save();
         }
+        catch (Exception ex) when (!LibraryApp.IsFatal(ex))
+        {
+            // Never fall through to finally with Status.Running, which would reset to Waiting and loop every second.
+            entry.Status = Status.Stopped;
+            entry.RetryAt = DateTime.UtcNow + RetryAfter;
+            entry.Problem = "The download ran into an error.";
+            Program.Log($"The download of {entry.Key} failed unexpectedly: {ex}");
+            if (!entry.Told)
+            {
+                _notices.Show($"{job.Title} stopped downloading. {entry.Problem}");
+                entry.Told = true;
+            }
+
+            Save();
+        }
         finally
         {
             if (ReferenceEquals(entry.Run, run))
@@ -448,7 +471,16 @@ internal sealed class InstallQueue
             }
 
             run.Dispose();
-            if (entry.Status == Status.Running)
+            if (entry.Status == Status.Cancelling)
+            {
+                _entries.Remove(entry);
+                Save();
+                if (job.Mode == InstallMode.Install)
+                {
+                    _ = Task.Run(() => NativeInstalls.Discard(job.Store, job.ProductId, job.Folder));
+                }
+            }
+            else if (entry.Status == Status.Running)
             {
                 entry.Status = Status.Waiting;
             }
@@ -495,15 +527,21 @@ internal sealed class InstallQueue
 
     private void Save()
     {
+        var temp = $"{QueuePath}.{Guid.NewGuid():N}.tmp";
         try
         {
             Directory.CreateDirectory(NativeInstalls.Folder);
-            var saved = _entries.Select(e => new Saved(e.Job.ProductId, e.Job.Title, e.Job.Cover, e.Job.Mode, e.Job.Folder, e.Status == Status.Paused,
-                e.Job.Store, e.Job.Namespace, e.Job.CatalogItemId)).ToList();
-            File.WriteAllText(QueuePath, JsonSerializer.Serialize(saved));
+            var saved = _entries
+                .Where(e => e.Status != Status.Cancelling)
+                .Select(e => new Saved(e.Job.ProductId, e.Job.Title, e.Job.Cover, e.Job.Mode, e.Job.Folder, e.Status == Status.Paused,
+                    e.Job.Store, e.Job.Namespace, e.Job.CatalogItemId))
+                .ToList();
+            File.WriteAllText(temp, JsonSerializer.Serialize(saved));
+            File.Move(temp, QueuePath, overwrite: true);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            try { File.Delete(temp); } catch { }
             Program.Log($"Could not keep the install queue: {ex.Message}");
         }
     }
@@ -532,7 +570,7 @@ internal sealed class InstallQueue
                 var update = build.BuildId != install.BuildId ? build.BuildId : null;
                 if (update != install.UpdateBuildId)
                 {
-                    NativeInstalls.Save(install with { UpdateBuildId = update });
+                    NativeInstalls.SetUpdateBuildId(install.Key, install.BuildId, update);
                 }
 
                 found += update is null ? 0 : 1;
@@ -561,7 +599,7 @@ internal sealed class InstallQueue
                 var update = version != install.BuildId ? version : null;
                 if (update != install.UpdateBuildId)
                 {
-                    NativeInstalls.Save(install with { UpdateBuildId = update });
+                    NativeInstalls.SetUpdateBuildId(install.Key, install.BuildId, update);
                 }
 
                 found += update is null ? 0 : 1;

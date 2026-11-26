@@ -929,7 +929,7 @@ public static class DebloatTweaks
                 """
                 $ErrorActionPreference = 'Continue'
                 $paths = @(
-                    "$env:ProgramFiles (x86)\Microsoft\Edge\Application\*\Installer\setup.exe",
+                    "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\*\Installer\setup.exe",
                     "$env:ProgramFiles\Microsoft\Edge\Application\*\Installer\setup.exe"
                 )
                 $installer = Resolve-Path $paths -ErrorAction SilentlyContinue | Select-Object -Last 1 -ExpandProperty Path
@@ -937,20 +937,31 @@ public static class DebloatTweaks
                     $stubDir = "$env:SystemRoot\SystemApps\Microsoft.MicrosoftEdge_8wekyb3d8bbwe"
                     if (-not (Test-Path $stubDir)) { New-Item -Path $stubDir -ItemType Directory -Force | Out-Null }
                     New-Item -Path "$stubDir\MicrosoftEdge.exe" -ItemType File -Force | Out-Null
-                    Start-Process -FilePath $installer -ArgumentList '--uninstall', '--system-level', '--force-uninstall', '--delete-profile' -Wait
+                    $p = Start-Process -FilePath $installer -ArgumentList '--uninstall', '--system-level', '--force-uninstall' -Wait -PassThru
+                    if ($p.ExitCode -ne 0) {
+                        Write-Output "Edge uninstaller exited with $($p.ExitCode)"
+                        exit $p.ExitCode
+                    }
                     Write-Output 'RESULT=UNINSTALLED'
                 } else {
                     Write-Output 'RESULT=NOT_FOUND'
+                    exit 1
                 }
                 """,
                 "Uninstall Microsoft Edge browser",
                 ct);
 
-            ctx.Registry.WriteValue(EdgeUpdateBlockPolicy);
+            if (!outcome.Succeeded)
+            {
+                return TweakResult.Fail("debloat.edge_uninstall", "Edge uninstaller did not complete cleanly. The console has the detail.");
+            }
 
-            return outcome.Succeeded
-                ? TweakResult.Ok("debloat.edge_uninstall", "Microsoft Edge uninstalled. WebView2 was left intact.")
-                : TweakResult.Fail("debloat.edge_uninstall", "Edge uninstaller did not complete cleanly. The console has the detail.");
+            if (ctx.Registry.WriteValue(EdgeUpdateBlockPolicy) is { } snap)
+            {
+                journal.RegistrySnapshots.Add(snap);
+            }
+
+            return TweakResult.Ok("debloat.edge_uninstall", "Microsoft Edge uninstalled. WebView2 was left intact.");
         },
         ScriptRevert = async (ctx, journal, ct) =>
         {
@@ -960,7 +971,11 @@ public static class DebloatTweaks
             }
 
             await ctx.Runner.RunScriptAsync(
-                "Remove-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\EdgeUpdate' -Name 'DoNotUpdateToEdgeWithChromium' -ErrorAction SilentlyContinue",
+                """
+                Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\EdgeUpdate' -Name 'DoNotUpdateToEdgeWithChromium' -ErrorAction SilentlyContinue
+                $stub = "$env:SystemRoot\SystemApps\Microsoft.MicrosoftEdge_8wekyb3d8bbwe\MicrosoftEdge.exe"
+                if ((Test-Path $stub) -and ((Get-Item $stub).Length -eq 0)) { Remove-Item -Path $stub -Force -ErrorAction SilentlyContinue }
+                """,
                 "Clear Microsoft Edge update block policy",
                 ct);
 
