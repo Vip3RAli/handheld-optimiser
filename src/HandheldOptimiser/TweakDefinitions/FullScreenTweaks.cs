@@ -60,6 +60,12 @@ public static class FullScreenTweaks
         },
         ScriptApply = async (ctx, journal, ct) =>
         {
+            if (SignedInUser.OtherSid is not null)
+            {
+                return TweakResult.Fail(HomeAppId,
+                    "Sign in to Windows with an administrator account to register the full screen home app for your account.");
+            }
+
             if (!HomeAppRegistration.IsFullScreenExperienceAvailable())
             {
                 return TweakResult.Fail(HomeAppId,

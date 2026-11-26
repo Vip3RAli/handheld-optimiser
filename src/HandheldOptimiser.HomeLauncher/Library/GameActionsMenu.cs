@@ -882,12 +882,19 @@ internal sealed class GameActionsMenu
         }
     }
 
+    private bool _saveBusy;
+
     /// <summary>A row that puts a snapshot back. It asks first: the save as it is now is replaced.</summary>
     private void AddRestoreRow(GameTile tile, SaveSnapshot snapshot, string label, string detail)
     {
         Button? row = null;
-        row = _menu.AddRow(_view.SaveSnapshotsItems, _view.BackupSaveNowItem, label, detail, () =>
+        row = _menu.AddRow(_view.SaveSnapshotsItems, _view.BackupSaveNowItem, label, detail, async () =>
         {
+            if (_saveBusy)
+            {
+                return;
+            }
+
             if (!ReferenceEquals(_menu.Armed, row))
             {
                 _menu.Armed = row;
@@ -897,12 +904,26 @@ internal sealed class GameActionsMenu
             }
 
             _menu.Armed = null;
-            var ok = SaveGuard.RestoreSnapshot(snapshot, SaveGuard.FindSaveFolder(tile.Game));
-            RefreshSaveSnapshotsRows(tile);
-            _menu.ShowItems(_view.BackupSaveNowItem);
-            _notices.Show(ok
-                ? $"{tile.Title}'s save from {snapshot.Describe(DateTimeOffset.UtcNow)} is back."
-                : $"{tile.Title}'s save could not be restored.");
+            _saveBusy = true;
+            _notices.Show($"Restoring {tile.Title}'s save...");
+            try
+            {
+                var ok = await Task.Run(() => SaveGuard.RestoreSnapshot(snapshot, SaveGuard.FindSaveFolder(tile.Game)));
+                RefreshSaveSnapshotsRows(tile);
+                _menu.ShowItems(_view.BackupSaveNowItem);
+                _notices.Show(ok
+                    ? $"{tile.Title}'s save from {snapshot.Describe(DateTimeOffset.UtcNow)} is back."
+                    : $"{tile.Title}'s save could not be restored.");
+            }
+            catch (Exception ex) when (!LibraryApp.IsFatal(ex))
+            {
+                Program.Log($"Could not restore save snapshot: {ex.Message}");
+                _notices.Show($"{tile.Title}'s save could not be restored.");
+            }
+            finally
+            {
+                _saveBusy = false;
+            }
         });
 
         // Moving off a row pressed once disarms it, and its own detail comes back.
@@ -916,19 +937,33 @@ internal sealed class GameActionsMenu
         };
     }
 
-    private void BackupSaveNow()
+    private async void BackupSaveNow()
     {
-        if (_menu.Tile is not { } tile)
+        if (_saveBusy || _menu.Tile is not { } tile)
         {
             return;
         }
 
-        var created = SaveGuard.CreateSnapshot(tile.Game);
-        RefreshSaveSnapshotsRows(tile);
-        _menu.ShowItems(_view.BackupSaveNowItem);
-        _notices.Show(created is not null
-            ? $"Saved backup for {tile.Title} ({CleanResult.Size(created.SizeBytes)})."
-            : $"Could not back up saves for {tile.Title}. Set its save folder if needed.");
+        _saveBusy = true;
+        _notices.Show($"Backing up saves for {tile.Title}...");
+        try
+        {
+            var created = await Task.Run(() => SaveGuard.CreateSnapshot(tile.Game));
+            RefreshSaveSnapshotsRows(tile);
+            _menu.ShowItems(_view.BackupSaveNowItem);
+            _notices.Show(created is not null
+                ? $"Saved backup for {tile.Title} ({CleanResult.Size(created.SizeBytes)})."
+                : $"Could not back up saves for {tile.Title}. Set its save folder if needed.");
+        }
+        catch (Exception ex) when (!LibraryApp.IsFatal(ex))
+        {
+            Program.Log($"Could not back up saves: {ex.Message}");
+            _notices.Show($"Could not back up saves for {tile.Title}.");
+        }
+        finally
+        {
+            _saveBusy = false;
+        }
     }
 
     private void EditSaveFolder()

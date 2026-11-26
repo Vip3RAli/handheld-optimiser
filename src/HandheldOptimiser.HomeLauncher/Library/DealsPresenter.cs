@@ -138,11 +138,11 @@ internal sealed class DealsPresenter
 
     /// <summary>
     /// Starts or stops the row of deals moving by itself: only when switched on, in the grid or the row, with
-    /// the library in front.
+    /// the library in front and the display on.
     /// </summary>
-    private void Drift()
+    public void Drift()
     {
-        _driftOn = LibrarySettings.ScrollDeals && _window.IsActive && !_layouts.IsOldSchool
+        _driftOn = LibrarySettings.ScrollDeals && _window.IsActive && !_play.DisplayOff && !_layouts.IsOldSchool
             && _view.DealsPanel.Visibility == Visibility.Visible && _view.DealsScroller.Visibility == Visibility.Visible;
         if (!_driftOn)
         {
@@ -332,7 +332,7 @@ internal sealed class DealsPresenter
     /// <summary>Fills the Deals row, or hides it when it is off or does not apply.</summary>
     public void UpdateDeals()
     {
-        Dock(!_layouts.IsOldSchool);
+        Dock(_layouts.Layout != LibraryLayout.OldSchool);
         if (!Wanted)
         {
             _view.DealsPanel.Visibility = Visibility.Collapsed;
@@ -340,6 +340,7 @@ internal sealed class DealsPresenter
             ForgetDeals();
             _focusInDeals = false;
             _oldSchool.RefreshCategories();
+            Drift();
             return;
         }
 
@@ -350,6 +351,7 @@ internal sealed class DealsPresenter
             _view.DealsPanel.Visibility = Visibility.Collapsed;
             _focusInDeals = false;
             _oldSchool.RefreshCategories();
+            Drift();
             return;
         }
 
@@ -363,6 +365,7 @@ internal sealed class DealsPresenter
         if (!show)
         {
             _focusInDeals = false;
+            Drift();
             return;
         }
 
@@ -439,6 +442,11 @@ internal sealed class DealsPresenter
     /// <summary>Ends the page where the deals at the bottom begin, so no game is hidden under them.</summary>
     private void FitPage()
     {
+        if (_layouts.IsBrowsing)
+        {
+            return;
+        }
+
         if (ReferenceEquals(VisualTreeHelper.GetParent(_view), _dock))
         {
             _scroller.Margin = new Thickness(0, 0, 0, _dock.ActualHeight);

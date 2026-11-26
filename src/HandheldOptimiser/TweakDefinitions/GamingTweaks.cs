@@ -177,37 +177,7 @@ public static class GamingTweaks
         },
         ScriptRevert = async (ctx, journal, ct) =>
         {
-            // The journal is a file on disk that ends up in an elevated script, so only names and values
-            // this tweak could have written are used from it.
-            var toEnable = VirtualisationFeatures
-                .Where(f => journal.CapturedState.TryGetValue($"feature.{f}", out var s) &&
-                            s.Equals("Enabled", StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
-            var launchType = journal.CapturedState.TryGetValue("bcd.hypervisorlaunchtype", out var lt) &&
-                             HypervisorLaunchTypes.FirstOrDefault(t => t.Equals(lt, StringComparison.OrdinalIgnoreCase)) is { } known
-                ? known
-                : "auto";
-
-            var featureList = string.Join(",", toEnable.Select(f => $"'{f}'"));
-
-            var script = $$"""
-                $ErrorActionPreference = 'Continue'
-                $failed = $false
-                $features = @({{featureList}})
-                if ($features.Count -eq 0) {
-                    Write-Output 'No optional features were enabled before; only restoring boot configuration.'
-                }
-                foreach ($f in $features) {
-                    Write-Output "Re-enabling optional feature: $f"
-                    try { Enable-WindowsOptionalFeature -Online -FeatureName $f -All -NoRestart -ErrorAction Stop | Out-Null }
-                    catch { Write-Output "  failed: $($_.Exception.Message)"; $failed = $true }
-                }
-                & bcdedit /set '{current}' hypervisorlaunchtype {{launchType}}
-                if ($LASTEXITCODE -ne 0) { Write-Output "bcdedit failed (exit $LASTEXITCODE)"; $failed = $true }
-                if ($failed) { exit 1 }
-                """;
-
+            var script = BuildVirtualisationRevertScript(journal.CapturedState);
             var outcome = await ctx.Runner.RunScriptAsync(script, "Restore virtualisation platform", ct);
 
             return outcome.Succeeded
@@ -215,6 +185,40 @@ public static class GamingTweaks
                 : TweakResult.Fail("gaming.vmp", "Could not fully restore virtualisation platform. The console has the detail.");
         }
     };
+
+    public static string BuildVirtualisationRevertScript(IReadOnlyDictionary<string, string> captured)
+    {
+        // The journal is a file on disk that ends up in an elevated script, so only names and values
+        // this tweak could have written are used from it.
+        var toEnable = VirtualisationFeatures
+            .Where(f => captured.TryGetValue($"feature.{f}", out var s) &&
+                        s.Equals("Enabled", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        var bcdCommand = captured.TryGetValue("bcd.hypervisorlaunchtype", out var lt) &&
+                         lt.Equals("absent", StringComparison.OrdinalIgnoreCase)
+            ? "& bcdedit /deletevalue '{current}' hypervisorlaunchtype"
+            : $"& bcdedit /set '{{current}}' hypervisorlaunchtype {(lt is not null && HypervisorLaunchTypes.FirstOrDefault(t => t.Equals(lt, StringComparison.OrdinalIgnoreCase)) is { } known ? known : "auto")}";
+
+        var featureList = string.Join(",", toEnable.Select(f => $"'{f}'"));
+
+        return $$"""
+            $ErrorActionPreference = 'Continue'
+            $failed = $false
+            $features = @({{featureList}})
+            if ($features.Count -eq 0) {
+                Write-Output 'No optional features were enabled before; only restoring boot configuration.'
+            }
+            foreach ($f in $features) {
+                Write-Output "Re-enabling optional feature: $f"
+                try { Enable-WindowsOptionalFeature -Online -FeatureName $f -All -NoRestart -ErrorAction Stop | Out-Null }
+                catch { Write-Output "  failed: $($_.Exception.Message)"; $failed = $true }
+            }
+            {{bcdCommand}}
+            if ($LASTEXITCODE -ne 0) { Write-Output "bcdedit failed (exit $LASTEXITCODE)"; $failed = $true }
+            if ($failed) { exit 1 }
+            """;
+    }
 
     /// <summary>
     /// Kills background capture only. The Xbox app, Game Pass and the overlay itself are untouched, which

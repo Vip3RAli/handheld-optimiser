@@ -249,57 +249,108 @@ public sealed class RuntimeService(LogService log, PowerShellRunner runner, Rest
     }
 
     /// <summary>
-    /// Parses winget's table by the header's column positions. Names can be truncated with an ellipsis,
-    /// but winget always keeps the columns aligned to the header, so positions are reliable where
-    /// splitting on whitespace is not (names contain spaces, and the Available column is often blank).
+    /// Parses winget's table by the header's column positions above the <c>---</c> separator, so localized
+    /// column titles on non-English Windows still line up with their values.
     /// </summary>
-    private static List<(string Version, string? Available)> ParseListRows(string stdout, string id)
+    public static List<(string Version, string? Available)> ParseListRows(string stdout, string id)
     {
-        var lines = stdout.Split('\n')
-            .Select(l => l.TrimEnd('\r').Split('\r')[^1])
+        var lines = stdout.Replace("\r\n", "\n").Split('\n')
+            .Select(l => l.Split('\r')[^1].TrimEnd())
             .ToList();
 
-        var headerIndex = lines.FindIndex(l => l.Contains(" Id ", StringComparison.Ordinal) &&
-                                               l.Contains("Version", StringComparison.Ordinal));
+        var separator = lines.FindIndex(l => l.Length >= 10 && l.All(c => c == '-'));
         var rows = new List<(string, string?)>();
-
-        if (headerIndex < 0)
+        if (separator < 1)
         {
             return rows;
         }
 
-        var header = lines[headerIndex];
-        var idCol = header.IndexOf(" Id ", StringComparison.Ordinal) + 1;
-        var versionCol = header.IndexOf("Version", StringComparison.Ordinal);
-        var availableCol = header.IndexOf("Available", StringComparison.Ordinal);
-        var sourceCol = header.IndexOf("Source", StringComparison.Ordinal);
-
-        string Cell(string line, int start, int end) =>
-            start < 0 || start >= line.Length ? string.Empty
-            : line[start..Math.Min(end < 0 ? line.Length : end, line.Length)].Trim();
-
-        foreach (var line in lines.Skip(headerIndex + 1))
+        var header = lines[separator - 1];
+        var starts = new List<int>();
+        var col = 0;
+        for (var i = 0; i < header.Length; i++)
         {
-            if (line.Length <= versionCol || line.StartsWith("---", StringComparison.Ordinal))
+            if (header[i] != ' ' && (i == 0 || header[i - 1] == ' '))
+            {
+                starts.Add(col);
+            }
+
+            col += DisplayWidth(header[i]);
+        }
+
+        // winget list prints Name, Id, Version, plus optional Available and Source (3 to 5 columns).
+        if (starts.Count is < 3 or > 5)
+        {
+            return rows;
+        }
+
+        string Cell(string line, int column)
+        {
+            var startCol = starts[column];
+            var endCol = column + 1 < starts.Count ? starts[column + 1] : int.MaxValue;
+            var startIdx = line.Length;
+            var endIdx = line.Length;
+            var lineCol = 0;
+            for (var i = 0; i < line.Length; i++)
+            {
+                if (startIdx == line.Length && lineCol >= startCol)
+                {
+                    startIdx = i;
+                }
+
+                if (lineCol >= endCol)
+                {
+                    endIdx = i;
+                    break;
+                }
+
+                lineCol += DisplayWidth(line[i]);
+            }
+
+            return startIdx >= endIdx ? string.Empty : line[startIdx..endIdx].Trim();
+        }
+
+        foreach (var line in lines.Skip(separator + 1))
+        {
+            var rowId = Cell(line, 1);
+            var version = Cell(line, 2).TrimStart('<', ' ');
+            if (!rowId.Equals(id, StringComparison.OrdinalIgnoreCase) || version.Length == 0)
             {
                 continue;
             }
 
-            var rowId = Cell(line, idCol, versionCol);
-            if (!rowId.Equals(id, StringComparison.OrdinalIgnoreCase))
+            string? available = null;
+            if (starts.Count == 5)
             {
-                continue;
+                available = Cell(line, 3);
             }
-
-            var versionEnd = availableCol >= 0 ? availableCol : sourceCol;
-            var version = Cell(line, versionCol, versionEnd).TrimStart('<', ' ');
-            var available = availableCol >= 0 ? Cell(line, availableCol, sourceCol) : null;
+            else if (starts.Count == 4)
+            {
+                var col3 = Cell(line, 3);
+                // When Source is omitted, column 4 is Available (version strings contain digits); otherwise it is Source.
+                if (col3.Any(char.IsDigit))
+                {
+                    available = col3;
+                }
+            }
 
             rows.Add((version, string.IsNullOrEmpty(available) ? null : available));
         }
 
         return rows;
     }
+
+    private static int DisplayWidth(char c) =>
+        c is (>= '\u1100' and <= '\u115F')
+            or (>= '\u2E80' and <= '\uA4CF')
+            or (>= '\uAC00' and <= '\uD7A3')
+            or (>= '\uF900' and <= '\uFAFF')
+            or (>= '\uFE10' and <= '\uFE19')
+            or (>= '\uFE30' and <= '\uFE6F')
+            or (>= '\uFF00' and <= '\uFF60')
+            or (>= '\uFFE0' and <= '\uFFE6')
+            ? 2
+            : 1;
 
     /// <summary>
     /// Installs or updates each package. One restore point is taken first, under the same rule as the

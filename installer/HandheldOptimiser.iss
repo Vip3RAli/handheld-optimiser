@@ -60,8 +60,10 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; Versions up to 1.1.0 named the library's shortcut "Game Library". An upgrade would keep it next to the new one.
+; Upgrading GameBar removes older framework .appx packages and an earlier widget build before copying the new one.
 [InstallDelete]
 Type: files; Name: "{group}\Game Library.lnk"
+Type: filesandordirs; Name: "{app}\GameBar"
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
@@ -82,15 +84,9 @@ Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#AppName}}"; F
 Filename: "{app}\{#AppExeName}"; Flags: nowait; Check: IsInAppUpdate
 
 [UninstallRun]
-; The TDP Engine service is stopped and deleted in [Code] (CurUninstallStepChanged) before this runs,
-; as stopping has to be waited for, which these entries cannot do.
-; Remove the full screen home app registration before its files go, and if it was the selected home
-; app, clear the setting so Windows falls back to the Xbox app instead of an entry that no longer exists.
-; Braces are doubled because Inno reads single braces as constants. The uninstaller runs elevated, so
-; PowerShell is started by full path and only loads modules from its own folder, never from anywhere
-; the user can write to.
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""$env:PSModulePath = $PSHOME + '\Modules'; Get-AppxPackage -Name 'HandheldOptimiser.GameBar' | Remove-AppxPackage"""; Flags: runhidden; RunOnceId: "RemoveGameBarWidget"
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""$env:PSModulePath = $PSHOME + '\Modules'; Get-AppxPackage -Name 'HandheldOptimiser.HomeApp' | Remove-AppxPackage; $k = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\GamingConfiguration'; if ((Get-ItemProperty $k -ErrorAction SilentlyContinue).GamingHomeApp -in 'HandheldOptimiser.HomeApp_pgc7cpy78bqbw!HomeApp','HandheldOptimiser.HomeApp_n7ggsqt1rt3jm!HomeApp') {{ Remove-ItemProperty $k -Name GamingHomeApp }"""; Flags: runhidden; RunOnceId: "RemoveHomeApp"
+; Per-user MSIX package removal, HKCU GamingConfiguration cleanup, and ASUS Command Center re-registration run
+; via ExecAsOriginalUser in CurUninstallStepChanged so over-the-shoulder UAC targets the signed-in player.
+; Elevated -AllUsers cleanup also runs there so packages are removed cleanly across users.
 
 [Code]
 // Stops the TDP Engine service and waits, up to about 15 seconds, until Windows reports it STOPPED.
@@ -112,9 +108,12 @@ begin
     Stopped := True;
     if Exec(ExpandConstant('{cmd}'), '/C ""' + Sc + '" query {#ServiceName} > "' + Output + '""', '', SW_HIDE,
       ewWaitUntilTerminated, Code) and (Code = 0) and LoadStringsFromFile(Output, Lines) then
+    begin
+      Stopped := False;
       for I := 0 to GetArrayLength(Lines) - 1 do
-        if (Pos('STATE', Lines[I]) > 0) and (Pos('STOPPED', Lines[I]) = 0) then
-          Stopped := False;
+        if Pos('STOPPED', Lines[I]) > 0 then
+          Stopped := True;
+    end;
 
     if Stopped then
       Exit;
@@ -398,6 +397,12 @@ begin
     Log('Set AllyControls Replacing to 0.')
   else
     Log('Could not set AllyControls Replacing to 0.');
+
+  // Restore ASUS Command Center Game Bar widget for the player if provisioned.
+  ExecAsOriginalUser(
+    ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+    '-NoProfile -ExecutionPolicy Bypass -Command "$env:PSModulePath = $PSHOME + ''\Modules''; if ((Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue | Where-Object DisplayName -eq ''B9ECED6F.ASUSCommandCenter'') -and -not (Get-AppxPackage -Name ''B9ECED6F.ASUSCommandCenter'' -ErrorAction SilentlyContinue)) { Add-AppxPackage -RegisterByFamilyName -MainPackage ''B9ECED6F.ASUSCommandCenter_qmba6cd70vzyy'' -ErrorAction SilentlyContinue }"',
+    '', SW_HIDE, ewWaitUntilTerminated, Code);
 end;
 
 // The TDP Engine service goes first, so its exe is free to delete. Stopping it puts Armoury Crate's
@@ -405,10 +410,19 @@ end;
 // are put back once it has stopped and let go of the controller, and before it is deleted.
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
+  PowerShell: String;
   Code: Integer;
 begin
   if CurUninstallStep = usUninstall then
   begin
+    PowerShell := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
+    ExecAsOriginalUser(PowerShell,
+      '-NoProfile -ExecutionPolicy Bypass -Command "$env:PSModulePath = $PSHOME + ''\Modules''; Get-AppxPackage -Name ''HandheldOptimiser.GameBar'' | Remove-AppxPackage -ErrorAction SilentlyContinue; Get-AppxPackage -Name ''HandheldOptimiser.HomeApp'' | Remove-AppxPackage -ErrorAction SilentlyContinue; $k = ''HKCU:\Software\Microsoft\Windows\CurrentVersion\GamingConfiguration''; if ((Get-ItemProperty $k -ErrorAction SilentlyContinue).GamingHomeApp -in ''HandheldOptimiser.HomeApp_pgc7cpy78bqbw!HomeApp'',''HandheldOptimiser.HomeApp_n7ggsqt1rt3jm!HomeApp'') { Remove-ItemProperty $k -Name GamingHomeApp }"',
+      '', SW_HIDE, ewWaitUntilTerminated, Code);
+    Exec(PowerShell,
+      '-NoProfile -ExecutionPolicy Bypass -Command "$env:PSModulePath = $PSHOME + ''\Modules''; Get-AppxPackage -AllUsers -Name ''HandheldOptimiser.GameBar'' | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue; Get-AppxPackage -AllUsers -Name ''HandheldOptimiser.HomeApp'' | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue"',
+      '', SW_HIDE, ewWaitUntilTerminated, Code);
+
     StopAutoTdp();
     PutBackArmouryCrate();
     Exec(ExpandConstant('{sys}\sc.exe'), 'delete {#ServiceName}', '', SW_HIDE, ewWaitUntilTerminated, Code);

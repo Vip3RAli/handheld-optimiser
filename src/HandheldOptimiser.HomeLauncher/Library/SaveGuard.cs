@@ -223,13 +223,19 @@ internal static class SaveGuard
     /// <summary>The copy of the save taken just before the last restore, or null when there is none.</summary>
     public static SaveSnapshot? BeforeRestoreFor(Game game, string? backupsRoot = null)
     {
-        var path = Path.Combine(GameBackupDir(game.Key, backupsRoot ?? DefaultBackupsRoot), BeforeRestoreName);
+        var dir = GameBackupDir(game.Key, backupsRoot ?? DefaultBackupsRoot);
+        var path = Path.Combine(dir, BeforeRestoreName);
         try
         {
             var info = new FileInfo(path);
-            return info.Exists
-                ? new SaveSnapshot(path, string.Empty, new DateTimeOffset(info.LastWriteTimeUtc, TimeSpan.Zero), info.Length)
-                : null;
+            if (!info.Exists)
+            {
+                return null;
+            }
+
+            var sourceFile = Path.Combine(dir, "source.txt");
+            var recordedSource = File.Exists(sourceFile) ? File.ReadAllText(sourceFile).Trim() : string.Empty;
+            return new SaveSnapshot(path, recordedSource, new DateTimeOffset(info.LastWriteTimeUtc, TimeSpan.Zero), info.Length);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -253,6 +259,8 @@ internal static class SaveGuard
         }
 
         var unpacked = Path.Combine(Path.GetTempPath(), $"HandheldOptimiser-restore-{Guid.NewGuid():N}");
+        var hadDestination = false;
+        var beforeRestorePath = Path.Combine(backupDir, BeforeRestoreName);
         try
         {
             ZipFile.ExtractToDirectory(snapshot.ZipPath, unpacked);
@@ -264,7 +272,8 @@ internal static class SaveGuard
                 var keeping = Path.Combine(backupDir, BeforeRestoreName + ".new");
                 File.Delete(keeping);
                 ZipFile.CreateFromDirectory(destination, keeping, CompressionLevel.Fastest, includeBaseDirectory: false);
-                File.Move(keeping, Path.Combine(backupDir, BeforeRestoreName), overwrite: true);
+                File.Move(keeping, beforeRestorePath, overwrite: true);
+                hadDestination = true;
 
                 foreach (var file in Directory.GetFiles(destination))
                 {
@@ -285,6 +294,18 @@ internal static class SaveGuard
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
         {
             Program.Log($"Could not restore save snapshot {snapshot.ZipPath}: {ex.Message}");
+            if (hadDestination && File.Exists(beforeRestorePath))
+            {
+                try
+                {
+                    ZipFile.ExtractToDirectory(beforeRestorePath, destination, overwriteFiles: true);
+                }
+                catch (Exception rollbackEx) when (rollbackEx is IOException or UnauthorizedAccessException or InvalidDataException)
+                {
+                    Program.Log($"Could not roll back partial save restore: {rollbackEx.Message}");
+                }
+            }
+
             return false;
         }
         finally

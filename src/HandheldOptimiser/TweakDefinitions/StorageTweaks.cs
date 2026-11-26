@@ -58,7 +58,8 @@ public static class StorageTweaks
 
             journal.CapturedState["bitlocker.state"] = state;
 
-            var outcome = await ctx.Runner.RunScriptAsync("manage-bde.exe -off $env:SystemDrive", "Turn off Device Encryption", ct);
+            var systemDrive = Environment.GetEnvironmentVariable("SystemDrive") ?? "C:";
+            var outcome = await ctx.Runner.RunProcessAsync("manage-bde.exe", ["-off", systemDrive], "Turn off Device Encryption", ct);
             return outcome.Succeeded
                 ? TweakResult.Ok("storage.deviceencryption", "Device encryption turned off. The drive is decrypting in the background.")
                 : TweakResult.Fail("storage.deviceencryption", "Could not turn off device encryption. The console has the detail.");

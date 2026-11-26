@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -374,7 +375,7 @@ namespace HandheldOptimiser.GameBar
             return new EngineStatus
             {
                 Reachable = true,
-                Running = json.GetNamedBoolean(AutoTdpProtocol.Fields.Running, false),
+                Running = Flag(json, AutoTdpProtocol.Fields.Running) ?? false,
                 Fps = Number(json, AutoTdpProtocol.Fields.Fps),
                 Watts = (int?)Number(json, AutoTdpProtocol.Fields.Watts),
                 Temperature = (int?)Number(json, AutoTdpProtocol.Fields.Temperature),
@@ -383,8 +384,8 @@ namespace HandheldOptimiser.GameBar
                 TargetFps = (int)(Number(json, AutoTdpProtocol.Fields.TargetFps) ?? 0),
                 FanCurve = Text(json, AutoTdpProtocol.Fields.FanCurve),
                 PowerLimit = (int)(Number(json, AutoTdpProtocol.Fields.PowerLimit) ?? 0),
-                Replacing = json.GetNamedBoolean(AutoTdpProtocol.Fields.Replacing, false),
-                ControllerConnected = json.GetNamedBoolean(AutoTdpProtocol.Fields.ControllerConnected, false),
+                Replacing = Flag(json, AutoTdpProtocol.Fields.Replacing) ?? false,
+                ControllerConnected = Flag(json, AutoTdpProtocol.Fields.ControllerConnected) ?? false,
                 ControllerMode = Text(json, AutoTdpProtocol.Fields.ControllerMode),
                 CpuBoost = Flag(json, AutoTdpProtocol.Fields.CpuBoost),
                 Rsr = Flag(json, AutoTdpProtocol.Fields.Rsr),
@@ -402,8 +403,8 @@ namespace HandheldOptimiser.GameBar
                 OverlayLevel = Text(json, AutoTdpProtocol.Fields.OverlayLevel),
                 OverlayCorner = Text(json, AutoTdpProtocol.Fields.OverlayCorner),
                 OverlayLayout = Text(json, AutoTdpProtocol.Fields.OverlayLayout),
-                ScreenStats = json.GetNamedBoolean(AutoTdpProtocol.Fields.ScreenStats, false),
-                ScreenStatsLime = json.GetNamedBoolean(AutoTdpProtocol.Fields.ScreenStatsLime, true),
+                ScreenStats = Flag(json, AutoTdpProtocol.Fields.ScreenStats) ?? false,
+                ScreenStatsLime = Flag(json, AutoTdpProtocol.Fields.ScreenStatsLime) ?? true,
                 GpuMemoryNow = (int?)Number(json, AutoTdpProtocol.Fields.GpuMemoryNow),
                 GpuMemoryNext = (int?)Number(json, AutoTdpProtocol.Fields.GpuMemoryNext),
                 GpuMemoryOffered = Numbers(json, AutoTdpProtocol.Fields.GpuMemoryOffered),
@@ -463,26 +464,41 @@ namespace HandheldOptimiser.GameBar
             try
             {
                 var bytes = Encoding.UTF8.GetBytes(request + "\n");
-                if (!WriteFile(pipe, bytes, (uint)bytes.Length, out _, IntPtr.Zero))
+                if (!WriteOverlapped(pipe, bytes))
                 {
                     return null;
                 }
 
-                // The answer is one line; the service closes its end after it.
-                var answer = new StringBuilder();
-                var buffer = new byte[4096];
-                while (ReadFile(pipe, buffer, (uint)buffer.Length, out var read, IntPtr.Zero) && read > 0)
+                // Buffer raw bytes up to MaxResponseBytes and decode UTF-8 once so multi-byte characters
+                // split across 4 KB reads are never corrupted.
+                using (var answer = new MemoryStream())
                 {
-                    answer.Append(Encoding.UTF8.GetString(buffer, 0, (int)read));
-                    var text = answer.ToString();
-                    var end = text.IndexOf('\n');
-                    if (end >= 0)
+                    var buffer = new byte[4096];
+                    uint read;
+                    while (ReadOverlapped(pipe, buffer, (uint)buffer.Length, out read) && read > 0)
                     {
-                        return text.Substring(0, end).TrimEnd('\r');
-                    }
-                }
+                        var take = (int)Math.Min(read, (uint)(MaxResponseBytes - answer.Length));
+                        if (take <= 0)
+                        {
+                            return null;
+                        }
 
-                return answer.Length > 0 ? answer.ToString() : null;
+                        var newline = Array.IndexOf(buffer, (byte)'\n', 0, take);
+                        if (newline >= 0)
+                        {
+                            answer.Write(buffer, 0, newline);
+                            return Encoding.UTF8.GetString(answer.GetBuffer(), 0, (int)answer.Length).TrimEnd('\r');
+                        }
+
+                        answer.Write(buffer, 0, take);
+                        if (answer.Length >= MaxResponseBytes)
+                        {
+                            return null;
+                        }
+                    }
+
+                    return answer.Length > 0 ? Encoding.UTF8.GetString(answer.GetBuffer(), 0, (int)answer.Length).TrimEnd('\r') : null;
+                }
             }
             finally
             {
@@ -490,12 +506,95 @@ namespace HandheldOptimiser.GameBar
             }
         }
 
+        private static bool WriteOverlapped(IntPtr pipe, byte[] buffer)
+        {
+            var offset = 0;
+            while (offset < buffer.Length)
+            {
+                var chunk = buffer.Length - offset;
+                var slice = offset == 0 ? buffer : new byte[chunk];
+                if (offset > 0)
+                {
+                    Buffer.BlockCopy(buffer, offset, slice, 0, chunk);
+                }
+
+                uint written;
+                if (!IoOverlapped(pipe, slice, (uint)chunk, isWrite: true, out written) || written == 0)
+                {
+                    return false;
+                }
+
+                offset += (int)written;
+            }
+
+            return true;
+        }
+
+        private static bool ReadOverlapped(IntPtr pipe, byte[] buffer, uint count, out uint read) =>
+            IoOverlapped(pipe, buffer, count, isWrite: false, out read);
+
+        private static bool IoOverlapped(IntPtr pipe, byte[] buffer, uint count, bool isWrite, out uint transferred)
+        {
+            transferred = 0;
+            var ev = CreateEventW(IntPtr.Zero, true, false, null);
+            if (ev == IntPtr.Zero)
+            {
+                return false;
+            }
+
+            var overlappedPtr = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(NativeOverlapped)));
+            var pin = GCHandle.Alloc(buffer, GCHandleType.Pinned);
+            try
+            {
+                Marshal.StructureToPtr(new NativeOverlapped { EventHandle = ev }, overlappedPtr, false);
+                uint immediate;
+                var ok = isWrite
+                    ? WriteFile(pipe, buffer, count, out immediate, overlappedPtr)
+                    : ReadFile(pipe, buffer, count, out immediate, overlappedPtr);
+
+                if (ok)
+                {
+                    transferred = immediate;
+                    return true;
+                }
+
+                var error = Marshal.GetLastWin32Error();
+                if (error != ErrorIoPending)
+                {
+                    return false;
+                }
+
+                var waited = WaitForSingleObject(ev, IoTimeoutMs);
+                if (waited != WaitObject0)
+                {
+                    CancelIoEx(pipe, overlappedPtr);
+                    uint dummy;
+                    GetOverlappedResult(pipe, overlappedPtr, out dummy, true);
+                    return false;
+                }
+
+                return GetOverlappedResult(pipe, overlappedPtr, out transferred, true);
+            }
+            finally
+            {
+                pin.Free();
+                Marshal.FreeHGlobal(overlappedPtr);
+                CloseHandle(ev);
+            }
+        }
+
         private static IntPtr Open(string pipePath)
         {
+            var extended = new CreateFile2ExtendedParameters
+            {
+                Size = (uint)Marshal.SizeOf(typeof(CreateFile2ExtendedParameters)),
+                FileFlags = FileFlagOverlapped
+            };
+
             // The service takes one request at a time, so a busy pipe is tried again shortly.
             for (var tries = 0; tries < 20; tries++)
             {
-                var pipe = CreateFile2(pipePath, GenericRead | GenericWrite, 0, OpenExisting, IntPtr.Zero);
+                var pipe = CreateFile2(pipePath, GenericRead | GenericWrite, 0, OpenExisting, ref extended);
                 if (pipe != InvalidHandle)
                 {
                     return pipe;
@@ -557,14 +656,42 @@ namespace HandheldOptimiser.GameBar
         private const uint GenericRead = 0x80000000;
         private const uint GenericWrite = 0x40000000;
         private const uint OpenExisting = 3;
+        private const uint FileFlagOverlapped = 0x40000000;
+        private const int ErrorIoPending = 997;
         private const int ErrorPipeBusy = 231;
+        private const uint WaitObject0 = 0;
+        private const uint IoTimeoutMs = 5000;
+        private const int MaxResponseBytes = 1024 * 1024;
         private const uint ScManagerConnect = 0x0001;
         private const uint ServiceStart = 0x0010;
         private const int ErrorAlreadyRunning = 1056;
         private const int ErrorServiceDoesNotExist = 1060;
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct CreateFile2ExtendedParameters
+        {
+            public uint Size;
+            public uint FileAttributes;
+            public uint FileFlags;
+            public uint SecurityQosFlags;
+            public IntPtr SecurityAttributes;
+            public IntPtr TemplateFile;
+        }
+
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-        private static extern IntPtr CreateFile2(string fileName, uint access, uint share, uint creation, IntPtr parameters);
+        private static extern IntPtr CreateFile2(string fileName, uint access, uint share, uint creation, ref CreateFile2ExtendedParameters parameters);
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode, ExactSpelling = true)]
+        private static extern IntPtr CreateEventW(IntPtr attributes, bool manualReset, bool initialState, string name);
+
+        [DllImport("kernel32.dll", SetLastError = true, ExactSpelling = true)]
+        private static extern uint WaitForSingleObject(IntPtr handle, uint milliseconds);
+
+        [DllImport("kernel32.dll", SetLastError = true, ExactSpelling = true)]
+        private static extern bool GetOverlappedResult(IntPtr file, IntPtr overlapped, out uint transferred, bool wait);
+
+        [DllImport("kernel32.dll", SetLastError = true, ExactSpelling = true)]
+        private static extern bool CancelIoEx(IntPtr file, IntPtr overlapped);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool WriteFile(IntPtr file, byte[] buffer, uint count, out uint written, IntPtr overlapped);

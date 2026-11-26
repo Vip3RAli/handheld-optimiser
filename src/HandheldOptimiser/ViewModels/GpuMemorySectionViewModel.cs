@@ -82,8 +82,15 @@ public sealed partial class GpuMemorySectionViewModel : SectionViewModel
 
         var size = picked.Size;
         AutoTdpStatus? answer = null;
-        await Shell.RunExclusiveAsync("Setting GPU memory", async (_, ct) =>
-            answer = await _engine.SendAsync(new AutoTdpRequest(AutoTdpProtocol.SetGpuMemory, GpuMemory: size), ct));
+        if (!await Shell.RunExclusiveAsync("Setting GPU memory", async (_, ct) =>
+            answer = await _engine.SendAsync(new AutoTdpRequest(AutoTdpProtocol.SetGpuMemory, GpuMemory: size), ct)))
+        {
+            _placing = true;
+            Selected = Choices.FirstOrDefault(o => o.Size == (_next ?? _now));
+            _placing = false;
+            return;
+        }
+
         Show(answer);
 
         if (answer?.Error is { } problem)

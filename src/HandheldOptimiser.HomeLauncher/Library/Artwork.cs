@@ -425,14 +425,18 @@ internal static class Artwork
     }
 
     // The stores' own image servers, the only places a cover named by a store's game list is fetched from.
-    private static readonly string[] StoreImageHosts = ["steamstatic.com", "epicgames.com", "unrealengine.com", "gog.com", "gog-statics.com"];
+    private static readonly string[] StoreImageHosts =
+        ["steamstatic.com", "epicgames.com", "unrealengine.com", "gog.com", "gog-statics.com", "s-microsoft.com", "xboxlive.com"];
+
+    internal static bool IsStoreImageHost(Uri url) =>
+        url.Scheme == Uri.UriSchemeHttps
+        && StoreImageHosts.Any(host => url.Host.Equals(host, StringComparison.OrdinalIgnoreCase)
+            || url.Host.EndsWith("." + host, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Downloads the cover a store's game list names, for a game that is not installed.</summary>
     private static async Task<string?> StoreCoverAsync(Game game)
     {
-        if (game.CoverUrl is not { } link || !Uri.TryCreate(link, UriKind.Absolute, out var url) || url.Scheme != Uri.UriSchemeHttps
-            || !StoreImageHosts.Any(host => url.Host.Equals(host, StringComparison.OrdinalIgnoreCase)
-                || url.Host.EndsWith("." + host, StringComparison.OrdinalIgnoreCase))
+        if (game.CoverUrl is not { } link || !Uri.TryCreate(link, UriKind.Absolute, out var url) || !IsStoreImageHost(url)
             || RecentlyNotFound(NoStoreCoverPath(game)))
         {
             return null;

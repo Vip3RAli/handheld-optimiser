@@ -45,8 +45,8 @@ public sealed class RestorePointService(LogService log, PowerShellRunner runner,
 
         try
         {
-            var before = await GetLatestSequenceNumberAsync(ct);
-            _log.Trace($"Latest restore point sequence before: {(before?.ToString() ?? "none")}");
+            var (beforeOk, before) = await GetLatestSequenceNumberAsync(ct);
+            _log.Trace($"Latest restore point sequence before: {(beforeOk ? before?.ToString() ?? "none" : "unknown")}");
 
             var driveLetter = systemDrive.TrimEnd('\\');
             var safeDescription = PsQuote.Escape(description);
@@ -95,11 +95,14 @@ public sealed class RestorePointService(LogService log, PowerShellRunner runner,
                 _log.Warning("System Protection could not be enabled automatically.");
             }
 
-            var after = await GetLatestSequenceNumberAsync(ct);
-            _log.Trace($"Latest restore point sequence after: {(after?.ToString() ?? "none")}");
+            var (afterOk, after) = await GetLatestSequenceNumberAsync(ct);
+            _log.Trace($"Latest restore point sequence after: {(afterOk ? after?.ToString() ?? "none" : "unknown")}");
 
-            // The only trustworthy signal is that a new, higher-numbered restore point now exists.
-            if (after is not null && (before is null || after > before))
+            var callOk = outcome.OutputLines.Any(l => l == "CHECKPOINT_CALL_OK")
+                && !outcome.StdOut.Contains("CHECKPOINT_ERROR", StringComparison.Ordinal);
+
+            // The only trustworthy signal is that Checkpoint-Computer succeeded and a new, higher-numbered restore point now exists.
+            if (callOk && beforeOk && afterOk && after is not null && (before is null || after > before))
             {
                 _log.Success($"Restore point created (sequence {after}).");
                 return RestorePointResult.Ok($"Restore point created (sequence {after}).");
@@ -171,24 +174,34 @@ public sealed class RestorePointService(LogService log, PowerShellRunner runner,
         return true;
     }
 
-    private async Task<long?> GetLatestSequenceNumberAsync(CancellationToken ct)
+    private async Task<(bool Ok, long? Sequence)> GetLatestSequenceNumberAsync(CancellationToken ct)
     {
         var outcome = await _runner.RunScriptAsync(
             """
-            $ErrorActionPreference = 'SilentlyContinue'
-            $p = Get-ComputerRestorePoint | Sort-Object -Property SequenceNumber | Select-Object -Last 1
-            if ($null -ne $p) { Write-Output "SEQ=$($p.SequenceNumber)" }
+            $ErrorActionPreference = 'Stop'
+            try {
+                $p = Get-ComputerRestorePoint | Sort-Object -Property SequenceNumber | Select-Object -Last 1
+                if ($null -ne $p) { Write-Output "SEQ=$($p.SequenceNumber)" }
+                else { Write-Output 'SEQ=NONE' }
+            } catch {
+                Write-Output 'SEQ=ERROR'
+            }
             """,
             "Read latest restore point sequence",
             ct,
             echoScript: false);
 
         var line = outcome.OutputLines.FirstOrDefault(l => l.StartsWith("SEQ=", StringComparison.Ordinal));
-        if (line is null)
+        if (line is null || line == "SEQ=ERROR" || !outcome.Succeeded)
         {
-            return null;
+            return (false, null);
         }
 
-        return long.TryParse(line.AsSpan(4), out var seq) ? seq : null;
+        if (line == "SEQ=NONE")
+        {
+            return (true, null);
+        }
+
+        return long.TryParse(line.AsSpan(4), out var seq) ? (true, seq) : (false, null);
     }
 }

@@ -97,42 +97,42 @@ internal static class StoreSessions
             return false;
         }
 
-        try
-        {
-            Directory.CreateDirectory(Folder);
-            var path = PathOf(session.Store);
-            var temp = path + ".tmp";
-            File.WriteAllBytes(temp, bytes);
-            File.Move(temp, path, overwrite: true);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            Program.Log($"Could not save the {Game.NameOf(session.Store)} sign-in: {ex.Message}");
-            return false;
-        }
-
         lock (Gate)
         {
-            Loaded[session.Store] = session;
-        }
+            var path = PathOf(session.Store);
+            var temp = $"{path}.{Guid.NewGuid():N}.tmp";
+            try
+            {
+                Directory.CreateDirectory(Folder);
+                File.WriteAllBytes(temp, bytes);
+                File.Move(temp, path, overwrite: true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                try { File.Delete(temp); } catch { }
+                Program.Log($"Could not save the {Game.NameOf(session.Store)} sign-in: {ex.Message}");
+                return false;
+            }
 
-        return true;
+            Loaded[session.Store] = session;
+            return true;
+        }
     }
 
     /// <summary>Forgets the store's sign-in.</summary>
     public static void Delete(GameStore store)
     {
-        try
-        {
-            File.Delete(PathOf(store));
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            Program.Log($"Could not delete the {Game.NameOf(store)} sign-in: {ex.Message}");
-        }
-
         lock (Gate)
         {
+            try
+            {
+                File.Delete(PathOf(store));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                Program.Log($"Could not delete the {Game.NameOf(store)} sign-in: {ex.Message}");
+            }
+
             Loaded[store] = null;
         }
     }

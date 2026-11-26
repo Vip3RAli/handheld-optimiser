@@ -11,7 +11,7 @@ public interface IShell
 {
     bool IsBusy { get; }
 
-    Task RunExclusiveAsync(string statusText, Func<IProgress<string>, CancellationToken, Task> work);
+    Task<bool> RunExclusiveAsync(string statusText, Func<IProgress<string>, CancellationToken, Task> work);
 
     /// <summary>
     /// Runs something that only reads, in the background. It does not take the busy gate, so the app

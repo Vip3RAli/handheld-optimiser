@@ -29,8 +29,16 @@ public sealed partial class StartupRowViewModel(StartupEntry entry, StartupServi
     [RelayCommand]
     private void Toggle()
     {
-        if (_suppress || _shell.IsBusy)
+        if (_suppress)
         {
+            return;
+        }
+
+        if (_shell.IsBusy)
+        {
+            _suppress = true;
+            IsEnabled = Entry.IsEnabled;
+            _suppress = false;
             return;
         }
 

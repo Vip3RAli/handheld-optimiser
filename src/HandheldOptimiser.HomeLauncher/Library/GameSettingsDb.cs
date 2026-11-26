@@ -93,7 +93,7 @@ internal sealed record GameSettingsList(string Updated, IReadOnlyList<GameRecomm
 
         var title = GameSettingsDb.Normalise(game.Title);
         return title.Length == 0 ? null
-            : Games.FirstOrDefault(g => g.Titles.Append(g.Title).Any(t => GameSettingsDb.Normalise(t) == title));
+            : Games.FirstOrDefault(g => g.Titles.Append(g.Title).Where(t => !string.IsNullOrWhiteSpace(t)).Any(t => GameSettingsDb.Normalise(t) == title));
     }
 }
 
@@ -127,6 +127,8 @@ internal static class GameSettingsDb
     /// <summary>The newest list there is: the downloaded one when it is newer than the built-in one.</summary>
     public static GameSettingsList Current => _current ??= Load();
 
+    private const int MaxRemoteBytes = 2 * 1024 * 1024;
+
     /// <summary>Fetches the list from the repository when the saved copy is a day old or missing.</summary>
     /// <returns>True when a newer list was saved, so open menus can show it.</returns>
     public static async Task<bool> RefreshAsync()
@@ -138,24 +140,31 @@ internal static class GameSettingsDb
                 return false;
             }
 
-            var text = await Http.GetStringAsync(RemoteUrl);
+            using var response = await Http.GetAsync(RemoteUrl, HttpCompletionOption.ResponseHeadersRead);
+            response.EnsureSuccessStatusCode();
+            if (await HttpClients.ReadCappedAsync(response.Content, MaxRemoteBytes) is not { } bytes)
+            {
+                Program.Log("The game settings list from GitHub was larger than allowed");
+                return false;
+            }
+
+            var text = Encoding.UTF8.GetString(bytes);
             if (Parse(text) is not { } list)
             {
                 Program.Log("The game settings list from GitHub could not be read");
                 return false;
             }
 
-            Directory.CreateDirectory(Path.GetDirectoryName(CachePath)!);
-            await File.WriteAllTextAsync(CachePath, text);
-
             // The same date counts as newer, so an edit made on the day the list was last changed still arrives.
             var newer = string.CompareOrdinal(list.Updated, Current.Updated) >= 0;
-            if (newer)
+            if (!newer)
             {
-                _current = list;
+                return false;
             }
 
-            return newer;
+            await AtomicFile.WriteAllTextAsync(CachePath, text);
+            _current = list;
+            return true;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException or UnauthorizedAccessException)
         {
@@ -218,22 +227,30 @@ internal static class GameSettingsDb
         }
 
         var list = games
-            .Where(g => !string.IsNullOrWhiteSpace(g.Title))
+            .Where(g => g is not null && !string.IsNullOrWhiteSpace(g.Title))
             .Select(g => new GameRecommendation(
-                g.Title!.Trim(),
-                g.Keys ?? [],
-                g.Titles ?? [],
+                g!.Title!.Trim(),
+                (g.Keys ?? []).Where(k => !string.IsNullOrWhiteSpace(k)).ToList(),
+                (g.Titles ?? []).Where(t => !string.IsNullOrWhiteSpace(t)).ToList(),
                 string.IsNullOrWhiteSpace(g.Target) ? "Recommended" : g.Target.Trim(),
                 g.Device,
-                (g.Settings ?? []).Where(s => !string.IsNullOrWhiteSpace(s.Name)).ToList(),
+                (g.Settings ?? [])
+                    .Where(s => s is not null && !string.IsNullOrWhiteSpace(s.Name))
+                    .Select(s => s with { Name = s.Name ?? string.Empty, Value = s.Value ?? string.Empty })
+                    .ToList(),
                 g.Note,
-                g.Source,
+                g.Source is null ? null : SanitiseSource(g.Source),
                 g.Checked,
                 g.Confidence))
             .ToList();
 
         return new GameSettingsList(file.Updated ?? "", list);
     }
+
+    private static SettingsSource? SanitiseSource(SettingsSource source) =>
+        string.IsNullOrWhiteSpace(source.Name) && string.IsNullOrWhiteSpace(source.Url)
+            ? null
+            : new SettingsSource(source.Name ?? string.Empty, source.Url ?? string.Empty);
 
     /// <summary>A name with only its letters and digits, lower case: "Baldur's Gate 3" is "baldursgate3".</summary>
     public static string Normalise(string title)

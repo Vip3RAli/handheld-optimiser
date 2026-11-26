@@ -84,22 +84,52 @@ internal static partial class SessionLauncher
 
         try
         {
+            var outputBytes = new MemoryStream();
+            var readTask = Task.Run(() =>
+            {
+                try
+                {
+                    using var stream = new FileStream(reader, FileAccess.Read, 1);
+                    var buffer = new byte[4096];
+                    int read;
+                    while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        var room = OutputPipeSize - (int)outputBytes.Length;
+                        if (room > 0)
+                        {
+                            outputBytes.Write(buffer, 0, Math.Min(read, room));
+                        }
+                    }
+                }
+                catch (IOException)
+                {
+                }
+            });
+
             if (WaitForSingleObject(handle, (uint)timeout.TotalMilliseconds) != WaitObject0)
             {
+                TerminateProcess(handle, 1);
+                CancelIoEx(reader, 0);
+                readTask.Wait(TimeSpan.FromMilliseconds(200));
                 return "It did not finish in time.";
             }
 
             if (!GetExitCodeProcess(handle, out var code))
             {
+                CancelIoEx(reader, 0);
+                readTask.Wait(TimeSpan.FromMilliseconds(200));
                 return $"Its result could not be read (error {Marshal.GetLastPInvokeError()}).";
             }
 
             exitCode = (int)code;
 
-            // It has ended, so the pipe holds all it printed, which is far less than the pipe's size.
-            using var stream = new FileStream(reader, FileAccess.Read, 1);
-            using var text = new StreamReader(stream);
-            output = text.ReadToEnd();
+            if (!readTask.Wait(TimeSpan.FromSeconds(1)))
+            {
+                CancelIoEx(reader, 0);
+                readTask.Wait(TimeSpan.FromMilliseconds(200));
+            }
+
+            output = System.Text.Encoding.UTF8.GetString(outputBytes.GetBuffer(), 0, (int)outputBytes.Length);
             return null;
         }
         finally
@@ -403,4 +433,12 @@ internal static partial class SessionLauncher
     [LibraryImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static partial bool GetExitCodeProcess(nint process, out uint exitCode);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool TerminateProcess(nint process, uint exitCode);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool CancelIoEx(SafeFileHandle handle, nint overlapped);
 }
