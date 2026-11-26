@@ -28,7 +28,7 @@ jobs:
         run: dotnet build HandheldOptimiser.sln --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test tests/HandheldOptimiser.Tests/HandheldOptimiser.Tests.csproj --configuration Release --no-build --logger "console;verbosity=normal"
+        run: dotnet test HandheldOptimiser.sln --configuration Release --no-build --logger "console;verbosity=normal"
 
       # Visual Studio's MSBuild is used by build-installer.ps1 to compile the .NET Native UWP Game Bar widget
       # once, with its UTC timestamp version bumped in Package.appxmanifest.
