@@ -19,8 +19,15 @@ namespace HandheldOptimiser.PowerService
         /// <summary>From the library: set the Ally controller's mode, named by the request's ControllerMode.</summary>
         public const string SetControls = "set-controls";
 
-        /// <summary>From the widget: turn the processor's boost on or off, named by the request's CpuBoost.</summary>
+        /// <summary>From the widget: set processor boost mode ("off", "efficient", "aggressive") or legacy CpuBoost bool.</summary>
         public const string SetBoost = "set-boost";
+
+        /// <summary>From the widget: allow short-term AC boost bursts (sPPT/fPPT) while plugged in.</summary>
+        public const string SetAcBoost = "set-ac-boost";
+
+        public const string BoostOff = "off";
+        public const string BoostEfficient = "efficient";
+        public const string BoostAggressive = "aggressive";
 
         /// <summary>From the widget: show the performance overlay at OverlayLevel, in OverlayCorner.</summary>
         public const string SetOverlay = "set-overlay";
@@ -207,6 +214,8 @@ namespace HandheldOptimiser.PowerService
             public const string Replacing = "Replacing";
             public const string ControllerConnected = "ControllerConnected";
             public const string CpuBoost = "CpuBoost";
+            public const string CpuBoostMode = "CpuBoostMode";
+            public const string AcBoostBursts = "AcBoostBursts";
             public const string OverlayLevel = "OverlayLevel";
             public const string OverlayCorner = "OverlayCorner";
             public const string OverlayLayout = "OverlayLayout";
@@ -234,6 +243,7 @@ namespace HandheldOptimiser.PowerService
             public const string Sharpening = "Sharpening";
             public const string SharpeningStrength = "SharpeningStrength";
             public const string SharpeningRange = "SharpeningRange";
+            public const string FreeSync = "FreeSync";
             public const string BatteryCare = "BatteryCare";
             public const string PaddleAction = "PaddleAction";
             public const string ControllerLighting = "ControllerLighting";

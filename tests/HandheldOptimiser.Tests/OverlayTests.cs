@@ -182,7 +182,10 @@ public class OverlayTests
         Assert.Contains("OverlaySwitch.IsOn ? _overlaySize : AutoTdpProtocol.OverlayOff", code);
         Assert.Equal(AutoTdpProtocol.OverlayCorners, Tags(xaml, "OnOverlayCorner"));
         Assert.Equal(AutoTdpProtocol.OverlayLayouts, Tags(xaml, "OnOverlayLayout"));
-        Assert.Matches("<ToggleSwitch\\b[^>]*Toggled=\"OnCpuBoost\"", xaml);
+        Assert.Matches("<ComboBox\\b[^>]*DropDownClosed=\"OnCpuBoostPicked\"", xaml);
+        foreach (var mode in AutoTdpProtocol.CpuBoostModes)
+            Assert.Matches($"<ComboBoxItem\\b[^>]*Tag=\"{mode}\"", xaml);
+        Assert.Matches("<ToggleSwitch\\b[^>]*Toggled=\"OnAcBoost\"", xaml);
     }
 
     [Fact]

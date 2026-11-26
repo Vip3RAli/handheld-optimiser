@@ -70,16 +70,19 @@ internal sealed partial class AsusAcpi : IPowerBackend
 
     /// <inheritdoc/>
     /// <remarks>The sustained, slow boost and fast boost limits are all set to it.</remarks>
-    public bool SetPowerLimit(int watts)
+    public bool SetPowerLimit(int watts) => SetPowerLimits(watts, watts, watts);
+
+    /// <inheritdoc/>
+    public bool SetPowerLimits(int sustained, int slow, int fast)
     {
-        var sustained = Set(SustainedLimit, watts);
-        var slow = Set(SlowLimit, watts);
+        var spl = Set(SustainedLimit, sustained);
+        var sppt = Set(SlowLimit, slow);
         if (_fastLimit)
         {
-            Set(FastLimit, watts);
+            Set(FastLimit, fast);
         }
 
-        return sustained == 1 && slow == 1;
+        return spl == 1 && sppt == 1;
     }
 
     /// <inheritdoc/>

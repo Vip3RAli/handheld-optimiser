@@ -38,6 +38,15 @@ namespace HandheldOptimiser.GameBar
         /// <summary>Whether the processor's boost is on for the power source in use, or null when not known.</summary>
         public bool? CpuBoost;
 
+        /// <summary>"off", "efficient", or "aggressive", or null when not known.</summary>
+        public string CpuBoostMode;
+
+        /// <summary>Whether short-term 43/53 W AC boost bursts are allowed while plugged in.</summary>
+        public bool AcBoostBursts;
+
+        /// <summary>Whether AMD FreeSync (VRR) is enabled on a connected display, or null when not offered.</summary>
+        public bool? FreeSync;
+
         /// <summary>Whether Radeon Super Resolution is on, or null where it is not offered or not read yet.</summary>
         public bool? Rsr;
 
@@ -193,6 +202,28 @@ namespace HandheldOptimiser.GameBar
             {
                 [AutoTdpProtocol.Fields.Command] = JsonValue.CreateStringValue(AutoTdpProtocol.SetBoost),
                 [AutoTdpProtocol.Fields.CpuBoost] = JsonValue.CreateBooleanValue(on)
+            }.Stringify();
+
+            return SendStarting(request);
+        }
+
+        public static EngineStatus SetCpuBoostMode(string mode)
+        {
+            var request = new JsonObject
+            {
+                [AutoTdpProtocol.Fields.Command] = JsonValue.CreateStringValue(AutoTdpProtocol.SetBoost),
+                [AutoTdpProtocol.Fields.CpuBoostMode] = JsonValue.CreateStringValue(mode)
+            }.Stringify();
+
+            return SendStarting(request);
+        }
+
+        public static EngineStatus SetAcBoostBursts(bool allow)
+        {
+            var request = new JsonObject
+            {
+                [AutoTdpProtocol.Fields.Command] = JsonValue.CreateStringValue(AutoTdpProtocol.SetAcBoost),
+                [AutoTdpProtocol.Fields.AcBoostBursts] = JsonValue.CreateBooleanValue(allow)
             }.Stringify();
 
             return SendStarting(request);
@@ -388,6 +419,8 @@ namespace HandheldOptimiser.GameBar
                 ControllerConnected = Flag(json, AutoTdpProtocol.Fields.ControllerConnected) ?? false,
                 ControllerMode = Text(json, AutoTdpProtocol.Fields.ControllerMode),
                 CpuBoost = Flag(json, AutoTdpProtocol.Fields.CpuBoost),
+                CpuBoostMode = Text(json, AutoTdpProtocol.Fields.CpuBoostMode),
+                AcBoostBursts = Flag(json, AutoTdpProtocol.Fields.AcBoostBursts) ?? false,
                 Rsr = Flag(json, AutoTdpProtocol.Fields.Rsr),
                 Afmf = Flag(json, AutoTdpProtocol.Fields.Afmf),
                 RsrSharpness = (int?)Number(json, AutoTdpProtocol.Fields.RsrSharpness),
@@ -400,6 +433,7 @@ namespace HandheldOptimiser.GameBar
                 Sharpening = Flag(json, AutoTdpProtocol.Fields.Sharpening),
                 SharpeningStrength = (int?)Number(json, AutoTdpProtocol.Fields.SharpeningStrength),
                 SharpeningRange = Range(json, AutoTdpProtocol.Fields.SharpeningRange),
+                FreeSync = Flag(json, AutoTdpProtocol.Fields.FreeSync),
                 OverlayLevel = Text(json, AutoTdpProtocol.Fields.OverlayLevel),
                 OverlayCorner = Text(json, AutoTdpProtocol.Fields.OverlayCorner),
                 OverlayLayout = Text(json, AutoTdpProtocol.Fields.OverlayLayout),

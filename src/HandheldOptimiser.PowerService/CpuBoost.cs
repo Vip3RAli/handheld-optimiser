@@ -24,22 +24,76 @@ internal static partial class CpuBoost
     /// <summary>Whether boost is on now for the power source in use, or null when Windows will not say.</summary>
     public static bool? Read() => ReadModes() is { } modes ? CpuBoostRules.IsOn(modes, OnBattery()) : null;
 
+    /// <summary>The active boost mode name ("off", "efficient", or "aggressive"), or null when unknown.</summary>
+    public static string? ReadMode() => ReadModes() is { } modes ? CpuBoostRules.ModeName(modes, OnBattery()) : null;
+
     /// <summary>
-    /// Turns the processor's boost on or off, from the widget. Answered with the last status, its Error
-    /// saying why when Windows would not change it.
+    /// Turns the processor's boost on or off, or sets an explicit mode, from the widget. Answered with the last
+    /// status, its Error saying why when Windows would not change it.
     /// </summary>
     public static AutoTdpStatus Answer(AutoTdpRequest request, AutoTdpStatus last)
     {
-        if (request.CpuBoost is not { } on)
+        string? problem;
+        if (request.CpuBoostMode is { } mode)
         {
-            return last with { Error = "The request did not say whether to turn boost on or off." };
+            problem = SetMode(mode);
+        }
+        else if (request.CpuBoost is { } on)
+        {
+            problem = Set(on);
+        }
+        else
+        {
+            problem = "The request did not say which CPU boost mode to set.";
         }
 
-        return Set(on) is { } problem ? last with { Error = problem } : last;
+        return problem is not null ? last with { Error = problem } : last;
     }
 
-    /// <summary>The status with whether boost is on for the power source in use.</summary>
-    public static AutoTdpStatus AddTo(AutoTdpStatus status) => status with { CpuBoost = Read() };
+    /// <summary>The status with whether boost is on and its mode name for the power source in use.</summary>
+    public static AutoTdpStatus AddTo(AutoTdpStatus status)
+    {
+        if (ReadModes() is not { } modes)
+        {
+            return status with { CpuBoost = null, CpuBoostMode = null };
+        }
+
+        var onBattery = OnBattery();
+        return status with
+        {
+            CpuBoost = CpuBoostRules.IsOn(modes, onBattery),
+            CpuBoostMode = CpuBoostRules.ModeName(modes, onBattery)
+        };
+    }
+
+    /// <summary>Sets an explicit boost mode ("off", "efficient", or "aggressive"). Returns why it could not, or null.</summary>
+    public static string? SetMode(string mode)
+    {
+        if (!AutoTdpProtocol.CpuBoostModes.Contains(mode))
+        {
+            return $"\"{mode}\" is not a CPU boost mode this knows.";
+        }
+
+        if (ReadModes() is not { } current)
+        {
+            return "Windows would not say what the power plan's boost setting is.";
+        }
+
+        var saved = LoadSaved();
+        if (mode == AutoTdpProtocol.BoostOff)
+        {
+            Save(CpuBoostRules.ToSave(current, saved));
+        }
+
+        var target = CpuBoostRules.TargetForMode(mode, saved);
+        if (!WriteModes(target))
+        {
+            return "Windows would not change the power plan's boost setting.";
+        }
+
+        Log.Write($"CPU boost mode {mode}: plugged in {target.PluggedIn}, on battery {target.OnBattery}");
+        return null;
+    }
 
     /// <summary>Turns boost on or off. Returns why it could not, or null.</summary>
     public static string? Set(bool on)

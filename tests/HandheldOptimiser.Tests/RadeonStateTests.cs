@@ -20,6 +20,7 @@ public class RadeonStateTests
         Sharpening = true,
         SharpeningStrength = 80,
         SharpeningRange = new RadeonRange(10, 100, 1),
+        FreeSync = true,
     };
 
     [Fact]

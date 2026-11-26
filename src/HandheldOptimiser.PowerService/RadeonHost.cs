@@ -80,6 +80,7 @@ internal sealed class RadeonHost
         Sharpening = state.Sharpening,
         SharpeningStrength = state.SharpeningStrength,
         SharpeningRange = state.SharpeningRange?.ToArray(),
+        FreeSync = state.FreeSync,
     };
 
     /// <summary>A Radeon setting changed from the widget. Answered with the last status, its Error saying why not.</summary>

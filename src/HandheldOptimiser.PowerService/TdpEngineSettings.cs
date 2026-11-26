@@ -15,6 +15,7 @@ internal sealed class TdpEngineSettings
     private const string ManualPowerLimitValue = "ManualPowerLimit";
     private const string ManualFansValue = "ManualFans";
     private const string AutoTargetFpsValue = "AutoTargetFps";
+    private const string AcBoostBurstsValue = "AcBoostBursts";
     private const string PlayerBoostPluggedInValue = "PlayerBoostPluggedIn";
     private const string PlayerBoostOnBatteryValue = "PlayerBoostOnBattery";
 
@@ -27,6 +28,7 @@ internal sealed class TdpEngineSettings
             ManualPowerLimit = key?.GetValue(ManualPowerLimitValue) is int watts ? watts : 0;
             ManualFans = key?.GetValue(ManualFansValue) is string { Length: > 0 } fans ? fans : null;
             AutoTargetFps = key?.GetValue(AutoTargetFpsValue) is int target ? target : 0;
+            AcBoostBursts = key?.GetValue(AcBoostBurstsValue) is 1;
         }
         catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
         {
@@ -49,6 +51,9 @@ internal sealed class TdpEngineSettings
     /// </summary>
     public int AutoTargetFps { get; private set; }
 
+    /// <summary>Whether to allow short-term sPPT/fPPT boost bursts on AC power instead of flat wattage.</summary>
+    public bool AcBoostBursts { get; private set; }
+
     /// <summary>Saves the frame rate an Auto session holds, when it changed.</summary>
     public void SaveAutoTarget(int targetFps)
     {
@@ -66,12 +71,23 @@ internal sealed class TdpEngineSettings
 
     /// <summary>The status with Auto or Manual, and the last manual choices.</summary>
     public AutoTdpStatus AddTo(AutoTdpStatus status) =>
-        status with { Mode = ModeName, ManualPowerLimit = ManualPowerLimit, ManualFans = ManualFans };
+        status with { Mode = ModeName, ManualPowerLimit = ManualPowerLimit, ManualFans = ManualFans, AcBoostBursts = AcBoostBursts };
 
     public void SetMode(bool auto)
     {
         Auto = auto;
         Write(key => key.SetValue(ModeValue, ModeName));
+    }
+
+    public void SetAcBoostBursts(bool allow)
+    {
+        if (allow == AcBoostBursts)
+        {
+            return;
+        }
+
+        AcBoostBursts = allow;
+        Write(key => key.SetValue(AcBoostBurstsValue, allow ? 1 : 0, RegistryValueKind.DWord));
     }
 
     /// <summary>Saves the power limit and fans chosen in Manual, when they changed.</summary>

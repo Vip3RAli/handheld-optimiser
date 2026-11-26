@@ -19,15 +19,22 @@ internal static unsafe class RadeonSettings
 
     // IADLXSystem has no Acquire or Release.
     private const int SystemGetGpus = 1;
+    private const int SystemGetDisplaysServices = 3;
     private const int SystemGet3DSettingsServices = 7;
 
     // Every other interface starts with Acquire, Release and QueryInterface.
     private const int ReleaseSlot = 1;
     private const int QueryInterfaceSlot = 2;
 
-    // IADLXGPUList: IADLXList's Size, Empty, Begin, End, At, Clear, Remove_Back and Add_Back, then its own At.
+    // IADLXGPUList / IADLXDisplayList: Size, Empty, Begin, End, At, Clear, Remove_Back, Add_Back, then typed At.
     private const int ListBegin = 5;
+    private const int ListEnd = 6;
     private const int GpuListAt = 11;
+    private const int DisplayListAt = 11;
+
+    // IADLXDisplayServices: GetDisplays, GetFreeSync.
+    private const int DisplayServicesGetDisplays = 4;
+    private const int DisplayServicesGetFreeSync = 9;
 
     // IADLX3DSettingsServices. Anti-Lag, Chill and Image Sharpening are asked for per graphics card.
     private const int ServicesGetAntiLag = 3;
@@ -72,9 +79,13 @@ internal static unsafe class RadeonSettings
     /// Makes <paramref name="change"/> when there is one, then reads every setting. Null when ADLX could not be
     /// started.
     /// </summary>
-    public static RadeonState? Apply(Change? change)
+    public static RadeonState? Apply(Change? change, bool includeFreeSync = true)
     {
         nint dll = 0;
+        // Calling ADLXTerminate + FreeLibrary after IADLXDisplayServices::GetDisplays triggers 0xC0000374 in ntdll
+        // under amdadlx64.dll 1.5 when this host has MSIX sparse-package identity; since --radeon is a one-shot
+        // helper that exits immediately afterwards, release COM interfaces and let process exit clean up instead.
+        var keepLoaded = false;
         try
         {
             if (!NativeLibrary.TryLoad(Library, out dll))
@@ -97,16 +108,16 @@ internal static unsafe class RadeonSettings
 
             try
             {
+                var state = RadeonState.Unknown;
                 nint services;
                 if (!Succeeded(((delegate* unmanaged<nint, nint*, int>)Table(system)[SystemGet3DSettingsServices])(system, &services)) || services == 0)
                 {
-                    return RadeonState.Unknown;
+                    return state;
                 }
 
                 var gpu = FirstGpu(system);
                 try
                 {
-                    var state = RadeonState.Unknown;
                     state = Rsr(state, Get(services, ServicesGetRadeonSuperResolution), change);
                     state = Afmf(state, AfmfOf(services), change);
                     if (gpu != 0)
@@ -115,8 +126,6 @@ internal static unsafe class RadeonSettings
                         state = Chill(state, Get(services, ServicesGetChill, gpu), change);
                         state = Sharpening(state, Get(services, ServicesGetImageSharpening, gpu), change);
                     }
-
-                    return state;
                 }
                 finally
                 {
@@ -127,10 +136,20 @@ internal static unsafe class RadeonSettings
 
                     Release(services);
                 }
+
+                if (includeFreeSync)
+                {
+                    state = FreeSync(state, system, change, out keepLoaded);
+                }
+
+                return state;
             }
             finally
             {
-                terminate();
+                if (!keepLoaded)
+                {
+                    terminate();
+                }
             }
         }
         catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException)
@@ -140,7 +159,7 @@ internal static unsafe class RadeonSettings
         }
         finally
         {
-            if (dll != 0)
+            if (dll != 0 && !keepLoaded)
             {
                 NativeLibrary.Free(dll);
             }
@@ -282,6 +301,80 @@ internal static unsafe class RadeonSettings
         finally
         {
             Release(sharpening);
+        }
+    }
+
+    private static RadeonState FreeSync(RadeonState state, nint system, Change? change, out bool touchedDisplays)
+    {
+        touchedDisplays = false;
+        var displayServices = Get(system, SystemGetDisplaysServices);
+        if (displayServices == 0)
+        {
+            return state;
+        }
+
+        try
+        {
+            var displays = Get(displayServices, DisplayServicesGetDisplays);
+            if (displays == 0)
+            {
+                return state;
+            }
+
+            touchedDisplays = true;
+            try
+            {
+                var begin = ((delegate* unmanaged<nint, uint>)Table(displays)[ListBegin])(displays);
+                var end = ((delegate* unmanaged<nint, uint>)Table(displays)[ListEnd])(displays);
+                var anySupported = false;
+                var anyEnabled = false;
+
+                for (var i = begin; i < end; i++)
+                {
+                    nint display;
+                    if (!Succeeded(((delegate* unmanaged<nint, uint, nint*, int>)Table(displays)[DisplayListAt])(displays, i, &display)) || display == 0)
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        var fs = Get(displayServices, DisplayServicesGetFreeSync, display);
+                        if (!Supported(fs))
+                        {
+                            continue;
+                        }
+
+                        try
+                        {
+                            anySupported = true;
+                            SetSwitch(fs, PlainSetEnabled, change, RadeonState.FreeSyncName);
+                            if (Enabled(fs) == true)
+                            {
+                                anyEnabled = true;
+                            }
+                        }
+                        finally
+                        {
+                            Release(fs);
+                        }
+                    }
+                    finally
+                    {
+                        Release(display);
+                    }
+                }
+
+                return anySupported ? state with { FreeSync = anyEnabled } : state;
+            }
+            finally
+            {
+                Release(displays);
+            }
+        }
+        finally
+        {
+            Release(displayServices);
         }
     }
 

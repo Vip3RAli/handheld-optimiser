@@ -40,6 +40,9 @@ internal static partial class AutoTdpProtocol
     /// <summary>Every fan choice a request may name: the fixed curves, then Dynamic.</summary>
     public static readonly string[] FanModes = [.. FanCurves, DynamicFans];
 
+    /// <summary>Supported CPU boost mode names for <see cref="AutoTdpRequest.CpuBoostMode"/>.</summary>
+    public static readonly string[] CpuBoostModes = [BoostOff, BoostEfficient, BoostAggressive];
+
     /// <summary>The overlay's levels, from Off to the most it shows.</summary>
     public static readonly string[] OverlayLevels = [OverlayOff, OverlaySmall, OverlayMedium, OverlayFull];
 
@@ -136,7 +139,8 @@ internal partial class AutoTdpJsonContext : JsonSerializerContext
 /// <param name="ScreenStatsLime">With set-screen-stats: true to draw the stats screen on the lime background, false for black.</param>
 internal sealed record AutoTdpRequest(string Command, int TargetFps = 0, int MinWatts = 0, int MaxWatts = 0,
     int TemperatureLimit = 0, int StartWatts = 0, string? GameFolder = null, string? FanCurve = null, int PowerLimit = 0,
-    string? ControllerMode = null, bool Temporary = false, bool? CpuBoost = null, string? OverlayLevel = null,
+    string? ControllerMode = null, bool Temporary = false, bool? CpuBoost = null, string? CpuBoostMode = null,
+    bool? AcBoostBursts = null, string? OverlayLevel = null,
     string? OverlayCorner = null, int ProcessId = 0, string? OverlayLayout = null, bool? ScreenStats = null,
     int? GpuMemory = null, string? Mode = null, string? RadeonFeature = null, bool? RadeonOn = null, int? RadeonValue = null,
     bool? BatteryCare = null, string? PaddleAction = null, string? ControllerLighting = null, string? LightingColour = null,
@@ -183,11 +187,12 @@ internal sealed record AutoTdpRequest(string Command, int TargetFps = 0, int Min
 internal sealed record AutoTdpStatus(bool Running, double? Fps = null, int? Watts = null, int? Temperature = null,
     string? State = null, string? Error = null, int TargetFps = 0, string? FanCurve = null, int PowerLimit = 0,
     bool Replacing = false, bool ControllerConnected = false, string? ControllerMode = null, bool? CpuBoost = null,
+    string? CpuBoostMode = null, bool AcBoostBursts = false,
     string? OverlayLevel = null, string? OverlayCorner = null, string? OverlayLayout = null, bool ScreenStats = false,
     int? GpuMemoryNow = null, int? GpuMemoryNext = null, int[]? GpuMemoryOffered = null, string? Mode = null,
     int ManualPowerLimit = 0, string? ManualFans = null, bool? Rsr = null, bool? Afmf = null,
     int? RsrSharpness = null, int[]? RsrSharpnessRange = null, bool? AntiLag = null, bool? Chill = null,
     int? ChillMin = null, int? ChillMax = null, int[]? ChillRange = null, bool? Sharpening = null,
-    int? SharpeningStrength = null, int[]? SharpeningRange = null, bool? BatteryCare = null,
+    int? SharpeningStrength = null, int[]? SharpeningRange = null, bool? FreeSync = null, bool? BatteryCare = null,
     string? PaddleAction = null, string? ControllerLighting = null, string? LightingColour = null,
     bool ScreenStatsLime = true);

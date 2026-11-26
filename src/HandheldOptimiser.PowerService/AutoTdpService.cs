@@ -672,6 +672,25 @@ internal sealed partial class AutoTdpService : ServiceBase
         return _error is not null && _control is null ? new AutoTdpStatus(false, Error: _error) : _last;
     }
 
+    private AutoTdpStatus SetAcBoostBursts(AutoTdpRequest request)
+    {
+        if (request.AcBoostBursts is not { } allow)
+        {
+            return _last with { Error = "The request did not say whether to allow AC boost bursts." };
+        }
+
+        _engine.SetAcBoostBursts(allow);
+        _idleSince = DateTime.UtcNow;
+        Log.Write($"AC boost bursts {(allow ? "enabled (up to 43/53 W on charger)" : "disabled")}");
+
+        if (_control is { } control && _power is not null && WattsNow(control) is { } watts)
+        {
+            Apply(control, watts);
+        }
+
+        return _error is not null && _control is null ? new AutoTdpStatus(false, Error: _error) : _last;
+    }
+
     // With fans only there are no settings, so Dynamic measures from the default limit.
     private static int TemperatureLimit(Control control) =>
         control.Settings?.TemperatureLimit ?? AutoTdpProtocol.DefaultTemperature;
@@ -685,7 +704,14 @@ internal sealed partial class AutoTdpService : ServiceBase
 
     private void Apply(Control control, int watts)
     {
-        if (!_power!.SetPowerLimit(watts))
+        var envelope = PowerLimits.Envelope(
+            watts,
+            _engine.AcBoostBursts,
+            CpuBoost.OnBattery(),
+            _power!.ReadTemperature(),
+            TemperatureLimit(control));
+
+        if (!_power.SetPowerLimits(envelope.Sustained, envelope.Slow, envelope.Fast))
         {
             Log.Write($"The firmware refused {watts} W");
         }

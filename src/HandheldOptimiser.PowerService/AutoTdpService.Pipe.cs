@@ -136,6 +136,7 @@ internal sealed partial class AutoTdpService
                     AutoTdpProtocol.SetOverlay => SetOverlay(request),
                     AutoTdpProtocol.SetScreenStats => SetScreenStats(request),
                     AutoTdpProtocol.SetMode => SetMode(request, client),
+                    AutoTdpProtocol.SetAcBoost => SetAcBoostBursts(request),
                     AutoTdpProtocol.Overlay => OverlayStatus(request),
                     _ => _error is not null ? new AutoTdpStatus(false, Error: _error) : _last
                 };
