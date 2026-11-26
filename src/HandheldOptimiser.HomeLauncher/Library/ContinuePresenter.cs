@@ -147,6 +147,9 @@ internal sealed class ContinuePresenter
     /// <summary>Forgets what the panel found, so it is looked for again, as after its settings changed.</summary>
     public void ForgetInfo() => _infoKey = null;
 
+    /// <summary>Stops the settle timer when the window loses focus or closes.</summary>
+    public void StopSettle() => _settle?.Stop();
+
     /// <summary>The NXE layout's focused card shows its play time or achievements, as its Card details setting asks.</summary>
     private void ShowCardDetail(GameTile tile)
     {
@@ -210,32 +213,39 @@ internal sealed class ContinuePresenter
     /// <summary>Measures the game's folder and asks for its store details, both of which take a while.</summary>
     private async void LoadInfo(GameTile tile)
     {
-        var game = tile.Game;
-        var details = _options.StoreDetails && _infoDetails is null ? Task.Run(() => StoreDetails.FindAsync(game)) : null;
-
-        // A program the player added may sit in a folder full of other things.
-        if (game.Store is not (GameStore.Other or GameStore.Emulator) && game.InstallDirectory is { } folder)
+        try
         {
-            if (!_sizes.TryGetValue(game.Key, out var size))
+            var game = tile.Game;
+            var details = _options.StoreDetails && _infoDetails is null ? Task.Run(() => StoreDetails.FindAsync(game)) : null;
+
+            // A program the player added may sit in a folder full of other things.
+            if (game.Store is not (GameStore.Other or GameStore.Emulator) && game.InstallDirectory is { } folder)
             {
-                size = await Task.Run(() => Directory.Exists(folder) ? Cleanup.SizeOf([folder]) : 0);
-                _sizes[game.Key] = size;
+                if (!_sizes.TryGetValue(game.Key, out var size))
+                {
+                    size = await Task.Run(() => Directory.Exists(folder) ? Cleanup.SizeOf([folder]) : 0);
+                    _sizes[game.Key] = size;
+                }
+
+                // The panel may have moved on to another game meanwhile.
+                if (_infoKey != game.Key)
+                {
+                    return;
+                }
+
+                _infoSize = size;
+                ShowInfo(tile);
             }
 
-            // The panel may have moved on to another game meanwhile.
-            if (_infoKey != game.Key)
+            if (details is not null && await details is { } found && _infoKey == game.Key && _options.StoreDetails)
             {
-                return;
+                _infoDetails = found;
+                ShowInfo(tile);
             }
-
-            _infoSize = size;
-            ShowInfo(tile);
         }
-
-        if (details is not null && await details is { } found && _infoKey == game.Key && _options.StoreDetails)
+        catch (Exception ex) when (!LibraryApp.IsFatal(ex))
         {
-            _infoDetails = found;
-            ShowInfo(tile);
+            Program.Log($"Could not load details for {tile.Game.Key}: {ex.Message}");
         }
     }
 

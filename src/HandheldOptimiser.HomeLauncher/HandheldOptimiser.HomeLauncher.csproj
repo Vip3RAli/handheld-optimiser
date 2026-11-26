@@ -23,7 +23,6 @@
     <AssemblyName>HandheldOptimiser.HomeLauncher</AssemblyName>
     <RootNamespace>HandheldOptimiser.HomeLauncher</RootNamespace>
     <Product>Handheld Optimiser</Product>
-    <Version>1.3.0</Version>
     <StartupHookSupport>false</StartupHookSupport>
 
     <!-- The library stays open behind games, so a small footprint matters more than GC throughput. -->

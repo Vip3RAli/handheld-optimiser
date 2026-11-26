@@ -623,6 +623,8 @@
                             local:MenuRow.About="Close programs running in the background as a game starts, to free memory." />
                     <Button x:Name="WindowsGameModeSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE770;" Content="Optimise Windows processes"
                             local:MenuRow.About="Turn down background processes while gaming." />
+                    <Button x:Name="StopAmdRecordingSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE714;" Content="Stop AMD Instant Replay"
+                            local:MenuRow.About="Close AMD's recording service while gaming to free memory. Instant Replay stops while active." />
                     <Button x:Name="AppsToCloseGroup" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE71D;" Content="Close programs"
                             local:MenuRow.About="Choose which programs to close when a game starts." />
                     <Button x:Name="ReopenSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE7A7;" Content="Restore on game exit"

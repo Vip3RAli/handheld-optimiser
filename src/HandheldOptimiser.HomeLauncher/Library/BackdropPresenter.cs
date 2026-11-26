@@ -55,9 +55,15 @@ internal sealed class BackdropPresenter(Rectangle front, Rectangle back, Library
         }
 
         _key = tile.Game.Key;
+        _ = LoadAsync(tile, ReplaceLoad());
+    }
+
+    private CancellationToken ReplaceLoad()
+    {
         _load?.Cancel();
+        _load?.Dispose();
         _load = new CancellationTokenSource();
-        _ = LoadAsync(tile, _load.Token);
+        return _load.Token;
     }
 
     /// <summary>Shows the focused game's background again, after a setting that affects it changed.</summary>
@@ -82,15 +88,21 @@ internal sealed class BackdropPresenter(Rectangle front, Rectangle back, Library
         }
 
         _key = GreenKey;
-        _load?.Cancel();
-        var load = _load = new CancellationTokenSource();
+        var token = ReplaceLoad();
 
-        var (width, height) = Pixels();
-        var shade = Shade(options.Strength);
-        var backdrop = await Task.Run(() => Backdrops.Gradient(Green, DeepGreen, width, height, shade));
-        if (!load.IsCancellationRequested)
+        try
         {
-            Show(backdrop);
+            var (width, height) = Pixels();
+            var shade = Shade(options.Strength);
+            var backdrop = await Task.Run(() => Backdrops.Gradient(Green, DeepGreen, width, height, shade));
+            if (!token.IsCancellationRequested)
+            {
+                Show(backdrop);
+            }
+        }
+        catch (Exception ex) when (!LibraryApp.IsFatal(ex))
+        {
+            Program.Log($"Green backdrop generation failed: {ex.Message}");
         }
     }
 
@@ -98,6 +110,8 @@ internal sealed class BackdropPresenter(Rectangle front, Rectangle back, Library
     public void Clear()
     {
         _load?.Cancel();
+        _load?.Dispose();
+        _load = null;
         _key = null;
 
         foreach (var layer in new[] { back, front })

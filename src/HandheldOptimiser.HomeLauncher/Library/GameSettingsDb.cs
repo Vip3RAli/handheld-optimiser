@@ -113,7 +113,9 @@ internal static class GameSettingsDb
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "HandheldOptimiser", "game-settings.json");
 
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(15) };
+    private const int MaxRemoteBytes = 2 * 1024 * 1024;
+
+    private static readonly HttpClient Http = HttpClients.Create(TimeSpan.FromSeconds(15), maxResponseBytes: MaxRemoteBytes);
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -126,8 +128,6 @@ internal static class GameSettingsDb
 
     /// <summary>The newest list there is: the downloaded one when it is newer than the built-in one.</summary>
     public static GameSettingsList Current => _current ??= Load();
-
-    private const int MaxRemoteBytes = 2 * 1024 * 1024;
 
     /// <summary>Fetches the list from the repository when the saved copy is a day old or missing.</summary>
     /// <returns>True when a newer list was saved, so open menus can show it.</returns>

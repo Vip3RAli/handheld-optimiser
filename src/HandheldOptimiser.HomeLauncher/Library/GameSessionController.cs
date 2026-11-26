@@ -323,7 +323,8 @@ internal sealed class GameSessionController
 
         if (shouldOptimiseWindows)
         {
-            _ = Task.Run(WindowsProcessOptimiser.Optimise);
+            var stopAmdRecording = LibrarySettings.StopAmdRecording;
+            _ = Task.Run(() => WindowsProcessOptimiser.Optimise(stopAmdRecording));
         }
 
         if (closeApps)
@@ -748,6 +749,10 @@ internal sealed class GameSessionController
 
             ReportPause(session, outcome);
         }
+        catch (Exception ex) when (!LibraryApp.IsFatal(ex))
+        {
+            Program.Log($"Pause on return failed for {session.Game.Key}: {ex.Message}");
+        }
         finally
         {
             _pausing = false;
@@ -1030,9 +1035,16 @@ internal sealed class GameSessionController
             return;
         }
 
-        _wokeAt = DateTime.UtcNow;
-        await Task.Delay(SettleAfterWake);
-        await ResumeGameAsync();
+        try
+        {
+            _wokeAt = DateTime.UtcNow;
+            await Task.Delay(SettleAfterWake);
+            await ResumeGameAsync();
+        }
+        catch (Exception ex) when (!LibraryApp.IsFatal(ex))
+        {
+            Program.Log($"Resume after sleep failed: {ex.Message}");
+        }
     }
 
     /// <summary>

@@ -131,13 +131,25 @@ internal sealed class GamepadInput
 
             var pad = state.Gamepad;
             buttons |= pad.Buttons;
-            if (pad.ThumbLY > StickThreshold) buttons |= DpadUp;
-            if (pad.ThumbLY < -StickThreshold) buttons |= DpadDown;
-            if (pad.ThumbLX < -StickThreshold) buttons |= DpadLeft;
-            if (pad.ThumbLX > StickThreshold) buttons |= DpadRight;
+            buttons |= StickToDpad(pad.ThumbLX, pad.ThumbLY);
         }
 
         return buttons;
+    }
+
+    /// <summary>Maps the left stick to at most one d-pad direction along its dominant axis.</summary>
+    internal static ushort StickToDpad(short lx, short ly)
+    {
+        var absX = Math.Abs((int)lx);
+        var absY = Math.Abs((int)ly);
+        if (absX <= StickThreshold && absY <= StickThreshold)
+        {
+            return 0;
+        }
+
+        return absX > absY
+            ? (lx < 0 ? DpadLeft : DpadRight)
+            : (ly > 0 ? DpadUp : DpadDown);
     }
 
     /// <summary>

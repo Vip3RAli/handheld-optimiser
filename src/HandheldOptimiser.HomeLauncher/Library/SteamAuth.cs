@@ -24,14 +24,7 @@ namespace HandheldOptimiser.HomeLauncher.Library;
 internal static class SteamAuth
 {
     /// <summary>Steam's sites send their own cookies, so none are kept between requests.</summary>
-    internal static readonly HttpClient Http = new(new SocketsHttpHandler
-    {
-        UseCookies = false,
-        AutomaticDecompression = DecompressionMethods.All,
-    })
-    {
-        Timeout = TimeSpan.FromSeconds(20),
-    };
+    internal static readonly HttpClient Http = HttpClients.Create(TimeSpan.FromSeconds(20), useCookies: false);
 
     private const string Service = "https://api.steampowered.com/IAuthenticationService/";
 

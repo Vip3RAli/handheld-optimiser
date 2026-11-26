@@ -21,7 +21,13 @@ internal static class GamePause
         ("EAAntiCheat", "EA Javelin"),
         ("GameGuard", "nProtect GameGuard"),
         ("XIGNCODE", "XIGNCODE3"),
-        ("AntiCheatExpert", "Anti-Cheat Expert")
+        ("XignCode3", "XIGNCODE3"),
+        ("AntiCheatExpert", "Anti-Cheat Expert"),
+        ("Riot Vanguard", "Riot Vanguard"),
+        ("Vanguard", "Riot Vanguard"),
+        ("PunkBuster", "PunkBuster"),
+        ("SGuard", "ACE SGuard"),
+        ("BlackCipher", "Nexon BlackCipher")
     ];
 
     private static readonly (string Prefix, string Shown)[] AntiCheatFiles =
@@ -33,12 +39,20 @@ internal static class GamePause
         ("EAAntiCheat", "EA Javelin"),
         ("npggNT", "nProtect GameGuard"),
         ("xhunter1", "XIGNCODE3"),
+        ("x3.xem", "XIGNCODE3"),
+        ("xxd-", "XIGNCODE3"),
         ("mhypbase", "HoYoverse's anti-cheat"),
-        ("ACE-Base", "Anti-Cheat Expert")
+        ("ACE-Base", "Anti-Cheat Expert"),
+        ("randgrid", "RICOCHET Anti-Cheat"),
+        ("vgc.", "Riot Vanguard"),
+        ("vgk.", "Riot Vanguard"),
+        ("PnkBstr", "PunkBuster"),
+        ("SGuard", "ACE SGuard"),
+        ("BlackCipher", "Nexon BlackCipher")
     ];
 
-    // Unreal games keep their anti-cheat beside the exe, three folders down (Game\Binaries\Win64).
-    private const int AntiCheatDepth = 3;
+    // Unreal and Xbox Game Pass Content\<Game>\Binaries\Win64 layouts can nest anti-cheat up to 5 folders deep.
+    private const int AntiCheatDepth = 5;
 
     /// <summary>The anti-cheat the game's folder holds, by name, or null when none was found.</summary>
     public static string? FindAntiCheat(string folder)

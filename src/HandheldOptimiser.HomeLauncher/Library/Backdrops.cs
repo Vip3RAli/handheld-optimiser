@@ -39,10 +39,28 @@ internal static class Backdrops
 
     private const int BytesPerPixel = 4;
 
+    internal const int MaxWidth = 1920;
+    internal const int MaxHeight = 1080;
+
+    /// <summary>Caps backdrop generation dimensions at 1920x1080 while preserving aspect ratio.</summary>
+    internal static (int Width, int Height) CapSize(int width, int height)
+    {
+        if (width <= MaxWidth && height <= MaxHeight)
+        {
+            return (Math.Max(1, width), Math.Max(1, height));
+        }
+
+        var scale = Math.Min((double)MaxWidth / width, (double)MaxHeight / height);
+        return (Math.Max(1, (int)Math.Round(width * scale)), Math.Max(1, (int)Math.Round(height * scale)));
+    }
+
     /// <summary>A diagonal gradient between two colours, under the shade.</summary>
     /// <param name="shade">How much of the shade to apply, from 0 to 1.</param>
-    public static BitmapSource Gradient(Color from, Color to, int width, int height, double shade) =>
-        Frozen(GradientPixels(from, to, width, height, shade), width, height);
+    public static BitmapSource Gradient(Color from, Color to, int width, int height, double shade)
+    {
+        (width, height) = CapSize(width, height);
+        return Frozen(GradientPixels(from, to, width, height, shade), width, height);
+    }
 
     private static byte[] GradientPixels(Color from, Color to, int width, int height, double shade)
     {
@@ -83,6 +101,7 @@ internal static class Backdrops
     public static BitmapSource? FromArtwork(string path, int width, int height, ArtworkBlur blur,
         ArtworkPosition position, Color from, Color to, double shade)
     {
+        (width, height) = CapSize(width, height);
         var (divisor, radius) = Plan(blur);
 
         // A pixel or two over the width it is laid out at, so the scale to fit is never an enlargement.

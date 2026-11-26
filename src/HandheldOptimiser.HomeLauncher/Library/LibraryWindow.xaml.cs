@@ -71,6 +71,7 @@ public partial class LibraryWindow : Window, ILibraryHost
     private readonly LibraryNavigationCoordinator _input;
 
     private bool _scanning;
+    private bool _tilesUnbound;
 
     public LibraryWindow()
     {
@@ -167,6 +168,9 @@ public partial class LibraryWindow : Window, ILibraryHost
 
         // Closing the library also ends what was changed for a game: its profile and closed programs.
         Closed += (_, _) => EndSession();
+        Closed += (_, _) => _gamepad.Stop();
+        Closed += (_, _) => _clock.Stop();
+        Closed += (_, _) => _continue.StopSettle();
         Closed += (_, _) => _layouts.StopWatching();
         Closed += (_, _) => _play.StopWatchingWake();
         Closed += (_, _) => _play.StopWatchingForeground();
@@ -204,6 +208,12 @@ public partial class LibraryWindow : Window, ILibraryHost
     private void OnActivated(object? sender, EventArgs e)
     {
         _navigation.Return();
+
+        if (_tilesUnbound && Tiles.ItemsSource is null)
+        {
+            Tiles.ItemsSource = _state.Tiles;
+            _tilesUnbound = false;
+        }
 
         // A notice that came while a store app was in front, once everything below has settled.
         Dispatcher.BeginInvoke(_notices.Back, System.Windows.Threading.DispatcherPriority.Background);
@@ -275,6 +285,7 @@ public partial class LibraryWindow : Window, ILibraryHost
         _navigation.Leave();
         _gamepad.Stop();
         _clock.Stop();
+        _continue.StopSettle();
         Notice = string.Empty;
         _menu.Close();
 
@@ -288,6 +299,12 @@ public partial class LibraryWindow : Window, ILibraryHost
             // library the active window again, in front of the game or store that just opened.
             Keyboard.ClearFocus();
             _oldSchool.LeaveNotInstalled();
+        }
+        else if (_state.Filter.NotInstalled && Tiles.ItemsSource is not null)
+        {
+            Keyboard.ClearFocus();
+            Tiles.ItemsSource = null;
+            _tilesUnbound = true;
         }
 
         _backdrop.Clear();
@@ -466,6 +483,7 @@ public partial class LibraryWindow : Window, ILibraryHost
         Resources["GridTileWidth"] = small ? 144d : 180d;
         Resources["GridTileHeight"] = small ? 216d : 270d;
         UpdateHeadings();
+        _tilesUnbound = false;
         Tiles.ItemsSource = _state.Tiles;
         AcceptHint.Text = _state.Filter.Accept;
         _oldSchool.UpdateOpenCardCount();

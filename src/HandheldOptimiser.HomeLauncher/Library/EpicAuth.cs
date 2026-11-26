@@ -25,14 +25,7 @@ internal static class EpicAuth
     private const string TokenUrl = "https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/token";
 
     /// <summary>A client of its own that sends no cookies, so nothing of a browser's rides along with a token.</summary>
-    internal static readonly HttpClient Http = new(new SocketsHttpHandler
-    {
-        UseCookies = false,
-        AutomaticDecompression = DecompressionMethods.All,
-    })
-    {
-        Timeout = TimeSpan.FromSeconds(30),
-    };
+    internal static readonly HttpClient Http = HttpClients.Create(TimeSpan.FromSeconds(30), useCookies: false, addUserAgent: false);
 
     /// <summary>The page Epic shows once signed in: a line of JSON with the code in it.</summary>
     public static string RedirectUrl => $"https://www.epicgames.com/id/api/redirect?clientId={ClientId}&responseType=code";
