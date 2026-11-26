@@ -13,7 +13,7 @@ namespace HandheldOptimiser.Services;
 /// The service ends itself when idle, so it is started when the pipe is not there; the app is elevated,
 /// which lets it.
 /// </summary>
-internal sealed class TdpEngineClient(LogService log)
+public sealed class TdpEngineClient(LogService log)
 {
     private const string ServiceExeName = "HandheldOptimiser.PowerService";
 
@@ -25,14 +25,14 @@ internal sealed class TdpEngineClient(LogService log)
 
     /// <summary>Sends one request, starting the service first if need be.</summary>
     /// <returns>The answer, or null when the service never answered.</returns>
-    public async Task<AutoTdpStatus?> SendAsync(AutoTdpRequest request, CancellationToken ct)
+    internal async Task<AutoTdpStatus?> SendAsync(AutoTdpRequest request, CancellationToken ct)
     {
         if (await TrySendAsync(request, ct) is { } answer)
         {
             return answer;
         }
 
-        if (!StartService())
+        if (!await StartServiceAsync(ct))
         {
             return null;
         }
@@ -104,8 +104,10 @@ internal sealed class TdpEngineClient(LogService log)
         }
     }
 
-    /// <returns>Whether sc.exe was started; the service itself answers, or not, on the pipe.</returns>
-    private bool StartService()
+    public static bool IsStartSuccess(int exitCode) => exitCode is 0 or 1056;
+
+    /// <returns>Whether the service started or is already running; non-installed/failing services skip polling.</returns>
+    private async Task<bool> StartServiceAsync(CancellationToken ct)
     {
         try
         {
@@ -115,8 +117,20 @@ internal sealed class TdpEngineClient(LogService log)
                 CreateNoWindow = true,
                 UseShellExecute = false
             });
-            sc?.WaitForExit(3000);
-            return sc is not null;
+            if (sc is null)
+            {
+                return false;
+            }
+
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeout.CancelAfter(3000);
+            await sc.WaitForExitAsync(timeout.Token);
+            return IsStartSuccess(sc.ExitCode);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            log.Warning("Timed out waiting for TDP Engine service start.");
+            return false;
         }
         catch (System.ComponentModel.Win32Exception ex)
         {

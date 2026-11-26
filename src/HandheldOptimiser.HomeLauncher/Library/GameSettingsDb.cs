@@ -113,7 +113,9 @@ internal static class GameSettingsDb
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "HandheldOptimiser", "game-settings.json");
 
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(15) };
+    private const int MaxRemoteBytes = 2 * 1024 * 1024;
+
+    private static readonly HttpClient Http = HttpClients.Create(TimeSpan.FromSeconds(15), maxResponseBytes: MaxRemoteBytes);
 
     private static readonly JsonSerializerOptions Options = new()
     {

@@ -146,11 +146,11 @@ public sealed class TweakStateStore
             .Select(spec => $@"{spec.Root}\{spec.SubKey.TrimEnd('\\')}");
 
     /// <summary>
-    /// Checks the tweaks that have never been asked about. A page calls this when it is opened, so it
-    /// still fills in if the scan at start-up did not run.
+    /// Checks the tweaks that still have no recorded state and no check in flight. A page calls this
+    /// when it is opened, so cancelled or skipped initial scans still fill in.
     /// </summary>
     public Task CheckMissingAsync(IEnumerable<Tweak> tweaks, CancellationToken ct = default) =>
-        CheckAsync(tweaks.Where(t => _entries.TryGetValue(t.Id, out var entry) && entry.Asked == 0).ToList(), ct);
+        CheckAsync(tweaks.Where(t => _entries.TryGetValue(t.Id, out var entry) && entry.State is null && entry.Asked == entry.Answered).ToList(), ct);
 
     private Task Ask(Tweak tweak, CancellationToken ct)
     {

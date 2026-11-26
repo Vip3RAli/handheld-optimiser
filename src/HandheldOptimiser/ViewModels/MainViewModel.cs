@@ -12,6 +12,7 @@ namespace HandheldOptimiser.ViewModels;
 public sealed partial class MainViewModel : ObservableObject, IShell
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private CancellationTokenSource? _operationCts;
 
     public LogService Log { get; }
 
@@ -197,6 +198,8 @@ public sealed partial class MainViewModel : ObservableObject, IShell
             return;
         }
 
+        using var cts = new CancellationTokenSource();
+        _operationCts = cts;
         IsBusy = true;
         StatusText = statusText;
         ProgressDetail = string.Empty;
@@ -205,7 +208,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
 
         try
         {
-            await work(progress, CancellationToken.None);
+            await work(progress, cts.Token);
         }
         catch (OperationCanceledException)
         {
@@ -217,10 +220,21 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         }
         finally
         {
+            _operationCts = null;
             IsBusy = false;
             StatusText = "Ready";
             ProgressDetail = string.Empty;
             _gate.Release();
+        }
+    }
+
+    [RelayCommand]
+    private void CancelOperation()
+    {
+        if (_operationCts is { IsCancellationRequested: false } cts)
+        {
+            StatusText = "Cancelling…";
+            cts.Cancel();
         }
     }
 

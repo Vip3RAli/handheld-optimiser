@@ -42,6 +42,7 @@ internal sealed class SleepAndCleanUpMenu
         }
         view.GameModeSetting.Click += (_, _) => Toggle(() => LibrarySettings.GameMode = !LibrarySettings.GameMode);
         view.WindowsGameModeSetting.Click += (_, _) => Toggle(() => LibrarySettings.WindowsGameMode = SettingSteps.Step(LibrarySettings.WindowsGameMode, 1));
+        view.StopAmdRecordingSetting.Click += (_, _) => Toggle(() => LibrarySettings.StopAmdRecording = !LibrarySettings.StopAmdRecording);
         view.AppsToCloseGroup.Click += (_, _) => OpenAppsToClose();
         view.ReopenSetting.Click += (_, _) => Toggle(() => LibrarySettings.ReopenApps = !LibrarySettings.ReopenApps);
         view.AutoTdpSetting.Click += (_, _) => StepAutoTdp(1);
@@ -148,6 +149,7 @@ internal sealed class SleepAndCleanUpMenu
             WindowsGameMode.XboxMode => "In Xbox mode",
             _ => "Off"
         };
+        view.StopAmdRecordingSetting.Tag = SettingSteps.OnOff(LibrarySettings.StopAmdRecording);
         view.AppsToCloseGroup.Tag = BackgroundApps.Choices().Count(c => c.Close) is var chosen and > 0 ? chosen.ToString() : "None";
 
         view.ReopenSetting.Tag = SettingSteps.OnOff(LibrarySettings.ReopenApps);

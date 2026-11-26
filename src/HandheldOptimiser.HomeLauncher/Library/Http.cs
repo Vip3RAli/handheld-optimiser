@@ -26,12 +26,17 @@ internal static class HttpClients
     /// <summary>The client for the library's ordinary requests.</summary>
     public static readonly HttpClient Shared = Create();
 
-    /// <summary>A client with the library's user agent, for one that needs another timeout or limit.</summary>
-    public static HttpClient Create(TimeSpan? timeout = null, long maxResponseBytes = DefaultMaxResponseBytes)
+    /// <summary>A client with the library's defaults, allowing overrides for timeout, buffer cap, cookies, or user agent.</summary>
+    public static HttpClient Create(
+        TimeSpan? timeout = null,
+        long maxResponseBytes = DefaultMaxResponseBytes,
+        bool useCookies = true,
+        bool addUserAgent = true)
     {
         var handler = new SocketsHttpHandler
         {
             AutomaticDecompression = DecompressionMethods.All,
+            UseCookies = useCookies,
 
             // The library runs for days: connections are made again now and then, so a changed address
             // is picked up, and idle ones are closed soon rather than held open behind a game.
@@ -44,7 +49,11 @@ internal static class HttpClients
             Timeout = timeout ?? DefaultTimeout,
             MaxResponseContentBufferSize = maxResponseBytes
         };
-        http.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
+        if (addUserAgent)
+        {
+            http.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
+        }
+
         return http;
     }
 

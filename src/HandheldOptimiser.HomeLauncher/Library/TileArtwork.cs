@@ -292,6 +292,10 @@ internal sealed class TileArtwork(LibraryState state, LibraryNavigation navigati
                 }
             }));
         }
+        catch (Exception ex) when (!LibraryApp.IsFatal(ex))
+        {
+            Program.Log($"Square icon load failed: {ex.Message}");
+        }
         finally
         {
             _loadingSquares = false;
@@ -408,80 +412,89 @@ internal sealed class TileArtwork(LibraryState state, LibraryNavigation navigati
         }
 
         _cardArtLoad?.Cancel();
+        _cardArtLoad?.Dispose();
         var load = _cardArtLoad = new CancellationTokenSource();
-        if (!atOnce)
+        var token = load.Token;
+        try
         {
-            try
+            if (!atOnce)
             {
-                await Task.Delay(BackdropPresenter.SettleDelay, load.Token);
+                try
+                {
+                    await Task.Delay(BackdropPresenter.SettleDelay, token);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
             }
-            catch (OperationCanceledException)
+
+            var tiles = state.Tiles;
+            var front = Math.Max(0, tiles.FindIndex(t => t.Game.Key == state.FocusedKey));
+            var (first, last) = OldSchoolStack.Window(front, tiles.Count);
+
+            // The cards on screen and the few either side are the ones wanted now. The rest keep their
+            // artwork until there is more of it held than a couple of screens of cards, the longest unseen
+            // going first, so going back to a category just left does not load it all again.
+            var wanted = tiles.Skip(first - CardArtKept).Take(last - first + 1 + (2 * CardArtKept)).ToList();
+            _cardArtHeld.RemoveAll(wanted.Contains);
+            _cardArtHeld.RemoveAll(t => t.Wide is null);
+            _cardArtHeld.AddRange(wanted);
+            while (_cardArtHeld.Count > CardArtHeld)
             {
-                return;
+                _cardArtHeld[0].ShowWide(null);
+                _cardArtHeld.RemoveAt(0);
+            }
+
+            var (width, height) = cardPixels();
+            var decoded = false;
+
+            // The front card first, then outwards from it.
+            foreach (var tile in tiles.Skip(first).Take(last - first + 1).OrderBy(t => Math.Abs(tiles.IndexOf(t) - front)))
+            {
+                if (tile.Wide is not null || !tile.IsInstalled || _noCardArt.Contains(tile.Game.Key))
+                {
+                    continue;
+                }
+
+                // An app has a landscape picture with its logo on it, shown whole. One with none keeps its
+                // cover on its own colours: the banner artwork kept for programs is a backdrop with no logo.
+                var art = await Task.Run(async () => tile.IsApp
+                    ? await Artwork.FindCapsuleAsync(tile.Game) is { } capsule ? Backdrops.AppCard(capsule, width, height) : null
+                    : await Artwork.FindAsync(tile.Game) is { } path ? Backdrops.Card(path, width, height) : null);
+
+                // The layout may have changed or a game come to the front meanwhile.
+                if (!isOldSchool() || !navigation.InFront)
+                {
+                    break;
+                }
+
+                if (art is null)
+                {
+                    _noCardArt.Add(tile.Game.Key);
+                }
+                else
+                {
+                    tile.ShowWide(art);
+                    decoded = true;
+                }
+
+                // The focus has moved on, and the load that followed it takes over from here.
+                if (token.IsCancellationRequested)
+                {
+                    break;
+                }
+            }
+
+            if (decoded)
+            {
+                // As for the background: decoding artwork leaves buffers behind that only a collection frees.
+                GC.Collect();
             }
         }
-
-        var tiles = state.Tiles;
-        var front = Math.Max(0, tiles.FindIndex(t => t.Game.Key == state.FocusedKey));
-        var (first, last) = OldSchoolStack.Window(front, tiles.Count);
-
-        // The cards on screen and the few either side are the ones wanted now. The rest keep their
-        // artwork until there is more of it held than a couple of screens of cards, the longest unseen
-        // going first, so going back to a category just left does not load it all again.
-        var wanted = tiles.Skip(first - CardArtKept).Take(last - first + 1 + (2 * CardArtKept)).ToList();
-        _cardArtHeld.RemoveAll(wanted.Contains);
-        _cardArtHeld.RemoveAll(t => t.Wide is null);
-        _cardArtHeld.AddRange(wanted);
-        while (_cardArtHeld.Count > CardArtHeld)
+        catch (Exception ex) when (!LibraryApp.IsFatal(ex))
         {
-            _cardArtHeld[0].ShowWide(null);
-            _cardArtHeld.RemoveAt(0);
-        }
-
-        var (width, height) = cardPixels();
-        var decoded = false;
-
-        // The front card first, then outwards from it.
-        foreach (var tile in tiles.Skip(first).Take(last - first + 1).OrderBy(t => Math.Abs(tiles.IndexOf(t) - front)))
-        {
-            if (tile.Wide is not null || !tile.IsInstalled || _noCardArt.Contains(tile.Game.Key))
-            {
-                continue;
-            }
-
-            // An app has a landscape picture with its logo on it, shown whole. One with none keeps its
-            // cover on its own colours: the banner artwork kept for programs is a backdrop with no logo.
-            var art = await Task.Run(async () => tile.IsApp
-                ? await Artwork.FindCapsuleAsync(tile.Game) is { } capsule ? Backdrops.AppCard(capsule, width, height) : null
-                : await Artwork.FindAsync(tile.Game) is { } path ? Backdrops.Card(path, width, height) : null);
-
-            // The layout may have changed or a game come to the front meanwhile.
-            if (!isOldSchool() || !navigation.InFront)
-            {
-                break;
-            }
-
-            if (art is null)
-            {
-                _noCardArt.Add(tile.Game.Key);
-            }
-            else
-            {
-                tile.ShowWide(art);
-                decoded = true;
-            }
-
-            // The focus has moved on, and the load that followed it takes over from here.
-            if (load.IsCancellationRequested)
-            {
-                break;
-            }
-        }
-
-        if (decoded)
-        {
-            // As for the background: decoding artwork leaves buffers behind that only a collection frees.
-            GC.Collect();
+            Program.Log($"Card artwork load failed: {ex.Message}");
         }
     }
 
@@ -489,6 +502,8 @@ internal sealed class TileArtwork(LibraryState state, LibraryNavigation navigati
     public void UnloadCardArt()
     {
         _cardArtLoad?.Cancel();
+        _cardArtLoad?.Dispose();
+        _cardArtLoad = null;
         _noCardArt.Clear();
         _cardArtHeld.Clear();
         foreach (var tile in state.AllTiles)

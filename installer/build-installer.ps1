@@ -25,9 +25,15 @@ $script = Join-Path $PSScriptRoot 'HandheldOptimiser.iss'
 # MakeAppx comes from Microsoft's SDK build tools package on NuGet, so no Windows SDK install is needed.
 $buildToolsVersion = '10.0.28000.2705'
 
-# The csproj is the single source of truth for the version.
-$version = ([xml](Get-Content $project)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
-if (-not $version) { throw "No <Version> found in $project" }
+# Directory.Build.props is the single source of truth for the version (falling back to the csproj).
+$propsFile = Join-Path $root 'Directory.Build.props'
+$version = if (Test-Path $propsFile) {
+    ([xml](Get-Content $propsFile)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+}
+if (-not $version) {
+    $version = ([xml](Get-Content $project)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+}
+if (-not $version) { throw "No <Version> found in $propsFile or $project" }
 
 $iscc = @(
     (Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source,

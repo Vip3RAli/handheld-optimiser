@@ -74,7 +74,7 @@ internal sealed partial class MusicPlayerWindow : Window
 
     private const string ReadContext = "JSON.stringify((window.ytcfg && ytcfg.get('INNERTUBE_CONTEXT')) || null)";
 
-    private static readonly HttpClient Http = new(new SocketsHttpHandler { UseCookies = false }) { Timeout = TimeSpan.FromSeconds(15) };
+    private static readonly HttpClient Http = HttpClients.Create(TimeSpan.FromSeconds(15), useCookies: false, addUserAgent: false);
 
     private readonly WebView2 _browser = new();
     private bool _quitting;
@@ -141,10 +141,17 @@ internal sealed partial class MusicPlayerWindow : Window
         // Back from signing in, the window goes away again.
         core.NavigationCompleted += async (_, _) =>
         {
-            if (_signingIn && core.Source.StartsWith(YouTubeMusic.Origin, StringComparison.OrdinalIgnoreCase) && await SignedInAsync())
+            try
             {
-                _signingIn = false;
-                PutAway();
+                if (_signingIn && core.Source.StartsWith(YouTubeMusic.Origin, StringComparison.OrdinalIgnoreCase) && await SignedInAsync())
+                {
+                    _signingIn = false;
+                    PutAway();
+                }
+            }
+            catch (Exception ex) when (!LibraryApp.IsFatal(ex))
+            {
+                Program.Log($"Music sign-in navigation check failed: {ex.Message}");
             }
         };
 

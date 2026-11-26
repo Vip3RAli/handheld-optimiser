@@ -24,14 +24,7 @@ internal static class XboxAuth
     private const string TokenUrl = "https://login.live.com/oauth20_token.srf";
 
     /// <summary>A client of its own that sends no cookies, so nothing of a browser's rides along with a token.</summary>
-    internal static readonly HttpClient Http = new(new SocketsHttpHandler
-    {
-        UseCookies = false,
-        AutomaticDecompression = DecompressionMethods.All,
-    })
-    {
-        Timeout = TimeSpan.FromSeconds(30),
-    };
+    internal static readonly HttpClient Http = HttpClients.Create(TimeSpan.FromSeconds(30), useCookies: false);
 
     /// <summary>Microsoft's sign-in page for Xbox Live, which goes to its own blank page with the code once signed in.</summary>
     public static string SignInUrl =>

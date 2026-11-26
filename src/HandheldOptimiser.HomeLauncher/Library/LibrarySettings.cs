@@ -110,6 +110,7 @@ internal static class LibrarySettings
     private const string SortValue = "SortOrder";
     private const string GameModeValue = "GameMode";
     private const string WindowsGameModeValue = "WindowsGameMode";
+    private const string StopAmdRecordingValue = "StopAmdRecording";
     private const string ReopenValue = "ReopenClosedApps";
     private const string StoreClosingValue = "CloseStoreApps";
     private const string LayoutValue = "Layout";
@@ -239,6 +240,13 @@ internal static class LibrarySettings
             ? mode
             : WindowsGameMode.XboxMode;
         set => Write(WindowsGameModeValue, value.ToString().ToLowerInvariant());
+    }
+
+    /// <summary>Whether to also terminate AMD Instant Replay (AMDRSSrcExt) during gaming. Off by default.</summary>
+    public static bool StopAmdRecording
+    {
+        get => ReadSwitch(StopAmdRecordingValue, on: false);
+        set => WriteSwitch(StopAmdRecordingValue, value);
     }
 
     /// <summary>Start the programs closed for a game again once it has closed.</summary>

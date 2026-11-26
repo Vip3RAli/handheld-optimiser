@@ -30,11 +30,14 @@ internal static partial class WindowsProcessOptimiser
 
         // The Radeon Software window, which sits open in the background (about 110 MB). Driver settings
         // such as RSR, AFMF and Anti-Lag do not need it, and Alt+R opens it again.
-        "RadeonSoftware",
-
-        // AMD's recording and Instant Replay (about 70 MB). Instant Replay stops while a game runs.
-        "AMDRSSrcExt"
+        "RadeonSoftware"
     ];
+
+    // AMD's recording and Instant Replay (about 70 MB): opt-in because Instant Replay stops when closed.
+    private static readonly string[] AmdRecordingProcesses = ["AMDRSSrcExt"];
+
+    internal static IReadOnlyList<string> TargetProcesses(bool stopAmdRecording) =>
+        stopAmdRecording ? [.. NonEssentialProcesses, .. AmdRecordingProcesses] : NonEssentialProcesses;
 
     /// <summary>
     /// Services any signed-in user may stop, which run all the time but are not needed during a game. Only
@@ -62,13 +65,13 @@ internal static partial class WindowsProcessOptimiser
     /// Terminates non-essential Windows hosts and trims shell working sets in the current user session.
     /// Safe to call on a background thread when a game launches.
     /// </summary>
-    public static void Optimise()
+    public static void Optimise(bool stopAmdRecording = false)
     {
         var session = CurrentSession();
         var terminated = 0;
         var trimmed = 0;
 
-        foreach (var name in NonEssentialProcesses)
+        foreach (var name in TargetProcesses(stopAmdRecording))
         {
             Process[] procs;
             try

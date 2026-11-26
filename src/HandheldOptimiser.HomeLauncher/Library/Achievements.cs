@@ -33,7 +33,7 @@ internal sealed record GameAchievements(
 /// </summary>
 internal static class Achievements
 {
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(10) };
+    private static readonly HttpClient Http = HttpClients.Create(TimeSpan.FromSeconds(10));
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {

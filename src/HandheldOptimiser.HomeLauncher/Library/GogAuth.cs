@@ -21,14 +21,7 @@ internal static class GogAuth
     internal const string Redirect = "https://embed.gog.com/on_login_success?origin=client";
 
     /// <summary>A client of its own that sends no cookies, so nothing of a browser's rides along with a token.</summary>
-    internal static readonly HttpClient Http = new(new HttpClientHandler
-    {
-        UseCookies = false,
-        AutomaticDecompression = DecompressionMethods.All,
-    })
-    {
-        Timeout = TimeSpan.FromSeconds(30),
-    };
+    internal static readonly HttpClient Http = HttpClients.Create(TimeSpan.FromSeconds(30), useCookies: false);
 
     /// <summary>GOG's sign-in page for Galaxy's client, laid out as Galaxy shows it.</summary>
     public static string SignInUrl =>

@@ -343,7 +343,7 @@ internal sealed class GameTile : INotifyPropertyChanged, INoticeHost
     // Xbox games ship their logo as a png rather than inside an exe or .ico.
     private static ImageSource? LoadIcon(string path) =>
         Path.GetExtension(path).Equals(".png", StringComparison.OrdinalIgnoreCase)
-            ? LoadCover(path, decodeWidth: 0)
+            ? LoadCover(path, decodeWidth: IconSize)
             : Native.LoadIcon(path, IconSize);
 
     public static ImageSource? LoadCover(string path, int decodeWidth = CoverDecodeWidth)
