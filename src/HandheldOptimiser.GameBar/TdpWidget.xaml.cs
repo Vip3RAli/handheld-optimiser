@@ -35,6 +35,7 @@ namespace HandheldOptimiser.GameBar
         private bool _loaded;
         private bool _placingSlider;
         private bool _placingBoost;
+        private bool _placingAcBoost;
         private bool _placingScreenStats;
         private bool _placingGpuMemory;
         private bool _placingMode;
@@ -478,16 +479,37 @@ namespace HandheldOptimiser.GameBar
             Send(() => EngineClient.SetRadeon(feature, on));
         }
 
-        private void OnCpuBoost(object sender, RoutedEventArgs e)
+        private void OnCpuBoostPicked(object sender, object e)
         {
-            // Set from TDP Engine's answer, not by the player: nothing to send.
-            if (_placingBoost)
+            var current = _status.CpuBoostMode ?? (_status.CpuBoost == true ? AutoTdpProtocol.BoostAggressive : AutoTdpProtocol.BoostOff);
+            if (_placingBoost || !(BoostModeList.SelectedItem is ComboBoxItem item) || !(item.Tag is string mode)
+                || (_status.Reachable && mode == current))
             {
                 return;
             }
 
-            var on = BoostSwitch.IsOn;
-            Send(() => EngineClient.SetCpuBoost(on));
+            Send(() => EngineClient.SetCpuBoostMode(mode));
+        }
+
+        private void OnBoostKey(object sender, Windows.UI.Xaml.Input.KeyRoutedEventArgs e)
+        {
+            if (BoostModeList.IsDropDownOpen)
+            {
+                return;
+            }
+
+            OnGpuMemoryKey(sender, e);
+        }
+
+        private void OnAcBoost(object sender, RoutedEventArgs e)
+        {
+            if (_placingAcBoost)
+            {
+                return;
+            }
+
+            var allow = AcBoostSwitch.IsOn;
+            Send(() => EngineClient.SetAcBoostBursts(allow));
         }
 
         private void OnScreenStats(object sender, RoutedEventArgs e)
@@ -775,9 +797,13 @@ namespace HandheldOptimiser.GameBar
 
             ShowColour(status.LightingColour ?? AutoTdpProtocol.ColourGreen);
 
-            ShowBoost(status.CpuBoost);
+            ShowBoost(status.CpuBoostMode, status.CpuBoost);
             if (status.Reachable)
             {
+                AcBoostRow.Visibility = Visibility.Visible;
+                _placingAcBoost = true;
+                AcBoostSwitch.IsOn = status.AcBoostBursts;
+                _placingAcBoost = false;
                 _placingBatteryCare = true;
                 ShowSwitch(BatteryCareRow, BatteryCareSwitch, status.BatteryCare);
                 _placingBatteryCare = false;
@@ -908,15 +934,22 @@ namespace HandheldOptimiser.GameBar
         }
 
         /// <summary>
-        /// The boost switch as TDP Engine reports it. A switch has no "not known", so while TDP Engine is not
-        /// running it shows off and the line under it says so; turning it on then starts TDP Engine.
+        /// The boost mode as TDP Engine reports it. While TDP Engine is not running it defaults cleanly so
+        /// picking a mode still starts TDP Engine.
         /// </summary>
-        private void ShowBoost(bool? on)
+        private void ShowBoost(string mode, bool? on)
         {
+            var resolved = mode ?? (on == true ? AutoTdpProtocol.BoostAggressive : AutoTdpProtocol.BoostOff);
             _placingBoost = true;
-            BoostSwitch.IsOn = on == true;
+            BoostModeList.SelectedItem = BoostModeList.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == resolved);
             _placingBoost = false;
-            BoostNote.Text = on == null ? "Not known while TDP Engine is off" : "Faster bursts, more heat";
+            BoostNote.Text = on == null && mode == null
+                ? "Not known while TDP Engine is off"
+                : resolved == AutoTdpProtocol.BoostEfficient
+                    ? "Saves watts for the iGPU without stutter"
+                    : resolved == AutoTdpProtocol.BoostAggressive
+                        ? "Fastest bursts, more heat"
+                        : "Caps clocks at base; coolest and quietest";
         }
 
         /// <summary>
@@ -937,6 +970,7 @@ namespace HandheldOptimiser.GameBar
             ShowSwitch(AntiLagRow, AntiLagSwitch, status.AntiLag);
             ShowSwitch(ChillRow, ChillSwitch, status.Chill);
             ShowSwitch(SharpeningRow, SharpeningSwitch, status.Sharpening);
+            ShowSwitch(FreeSyncRow, FreeSyncSwitch, status.FreeSync);
             _placingRadeon = false;
 
             RsrSharpnessPanel.Visibility = Shown(status.Rsr == true && status.RsrSharpness != null);
@@ -948,7 +982,7 @@ namespace HandheldOptimiser.GameBar
             _sharpening.Show(status.SharpeningStrength, status.SharpeningRange);
 
             RadeonCard.Visibility = Shown(status.Rsr != null || status.Afmf != null || status.AntiLag != null
-                || status.Chill != null || status.Sharpening != null);
+                || status.Chill != null || status.Sharpening != null || status.FreeSync != null);
         }
 
         /// <summary>

@@ -573,11 +573,25 @@
                          then shows off with a line saying so, and turning it on starts TDP Engine. The player's in Auto and Manual
                          alike, which the player asked for on 2026-10-28. -->
                     <Grid x:Name="BoostRow" Style="{StaticResource Row}" Margin="0,4,0,0">
-                        <StackPanel VerticalAlignment="Center" Margin="0,0,60,0">
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
                             <TextBlock Style="{StaticResource Label}" Text="CPU Boost" />
                             <TextBlock x:Name="BoostNote" Style="{StaticResource Note}" Text="Faster bursts, more heat" />
                         </StackPanel>
-                        <ToggleSwitch x:Name="BoostSwitch" Style="{StaticResource RowSwitch}" Toggled="OnCpuBoost" />
+                        <ComboBox x:Name="BoostModeList" Style="{StaticResource RowList}" MinWidth="120"
+                                  DropDownClosed="OnCpuBoostPicked" PreviewKeyDown="OnBoostKey">
+                            <ComboBoxItem Content="Off" Tag="off" />
+                            <ComboBoxItem Content="Efficient" Tag="efficient" />
+                            <ComboBoxItem Content="Aggressive" Tag="aggressive" />
+                        </ComboBox>
+                    </Grid>
+
+                    <!-- Opt-in short-term 43/53 W bursts while plugged in (keeps flat limits when off or on battery). -->
+                    <Grid x:Name="AcBoostRow" Style="{StaticResource Row}" Margin="0,4,0,0" Visibility="Collapsed">
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,60,0">
+                            <TextBlock Style="{StaticResource Label}" Text="AC Boost Bursts" />
+                            <TextBlock Style="{StaticResource Note}" Text="Allow 43/53 W short bursts on charger" />
+                        </StackPanel>
+                        <ToggleSwitch x:Name="AcBoostSwitch" Style="{StaticResource RowSwitch}" Toggled="OnAcBoost" />
                     </Grid>
 
                     <!-- Stops charging at 80% while plugged in, through ASUS ACPI. Hidden where the device cannot set it. -->
@@ -779,6 +793,14 @@
                                 <TextBlock x:Name="SharpeningValue" Grid.Column="2" Style="{StaticResource Amount}" MinWidth="52" TextAlignment="Right" />
                             </Grid>
                         </StackPanel>
+
+                        <Grid x:Name="FreeSyncRow" Style="{StaticResource Row}" Visibility="Collapsed" Margin="0,4,0,0">
+                            <StackPanel VerticalAlignment="Center" Margin="0,0,60,0">
+                                <TextBlock Style="{StaticResource Label}" Text="AMD FreeSync (VRR)" />
+                                <TextBlock Style="{StaticResource Note}" Text="Smooths frame dips on 48–120 Hz displays" />
+                            </StackPanel>
+                            <ToggleSwitch x:Name="FreeSyncSwitch" Style="{StaticResource RowSwitch}" Tag="freesync" Toggled="OnRadeon" />
+                        </Grid>
                     </StackPanel>
                 </StackPanel>
             </Border>

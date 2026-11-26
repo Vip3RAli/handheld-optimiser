@@ -25,6 +25,9 @@ internal interface IPowerBackend : IDisposable
     /// <returns>False when the firmware refused it.</returns>
     bool SetPowerLimit(int watts);
 
+    /// <summary>Sets separate sustained (SPL), slow (sPPT), and fast (fPPT) package limits in watts.</summary>
+    bool SetPowerLimits(int sustained, int slow, int fast) => SetPowerLimit(sustained);
+
     /// <summary>Sets the fans to a curve from <see cref="FanCurves"/>: eight temperatures, then eight speeds.</summary>
     /// <returns>False when the firmware refused it, as a model without custom fan curves does.</returns>
     bool SetFanCurve(byte[] curve);

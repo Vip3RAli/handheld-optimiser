@@ -41,6 +41,7 @@ internal sealed record RadeonState
     public const string AntiLagName = "anti-lag";
     public const string ChillName = "chill";
     public const string SharpeningName = "sharpening";
+    public const string FreeSyncName = "freesync";
 
     // The settings that take a number.
     public const string RsrSharpnessName = "rsr-sharpness";
@@ -55,7 +56,7 @@ internal sealed record RadeonState
     private const string RangeSuffix = "-range";
 
     /// <summary>The names of the settings switched on and off.</summary>
-    public static readonly string[] Switches = [RsrName, AfmfName, AntiLagName, ChillName, SharpeningName];
+    public static readonly string[] Switches = [RsrName, AfmfName, AntiLagName, ChillName, SharpeningName, FreeSyncName];
 
     /// <summary>The names of the settings that take a number.</summary>
     public static readonly string[] Numbers = [RsrSharpnessName, ChillMinName, ChillMaxName, SharpeningStrengthName];
@@ -75,6 +76,7 @@ internal sealed record RadeonState
     public bool? Sharpening { get; init; }
     public int? SharpeningStrength { get; init; }
     public RadeonRange? SharpeningRange { get; init; }
+    public bool? FreeSync { get; init; }
 
     /// <summary>Nothing known: before the first read, or where ADLX could not be used.</summary>
     public static RadeonState Unknown { get; } = new();
@@ -95,6 +97,7 @@ internal sealed record RadeonState
         Add(line, SharpeningName, Sharpening);
         Add(line, SharpeningStrengthName, SharpeningStrength);
         Add(line, SharpeningStrengthName + RangeSuffix, SharpeningRange);
+        Add(line, FreeSyncName, FreeSync);
         return line.ToString();
     }
 
@@ -132,6 +135,7 @@ internal sealed record RadeonState
             Sharpening = Flag(pairs, SharpeningName),
             SharpeningStrength = Number(pairs, SharpeningStrengthName),
             SharpeningRange = Range(pairs, SharpeningStrengthName + RangeSuffix),
+            FreeSync = Flag(pairs, FreeSyncName),
         };
     }
 

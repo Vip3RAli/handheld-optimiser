@@ -199,15 +199,17 @@ internal static class Program
             change = new Library.RadeonSettings.Change(name, on, number);
         }
 
-        if (Library.RadeonSettings.Apply(change) is not { } state)
+        var is3DChange = change is not null && change.Value.Name != PowerService.RadeonState.FreeSyncName;
+        if (Library.RadeonSettings.Apply(change, includeFreeSync: !is3DChange) is not { } state)
         {
             return 1;
         }
 
         // The driver switches some settings off as another goes on (RSR as Image Sharpening does, Anti-Lag as
         // Chill does), and the session that made the change still reads them as they were. A new session reads
-        // them as they are (seen on the Ally on 2026-10-28).
-        if (change is not null && Library.RadeonSettings.Apply(null) is { } after)
+        // them as they are (seen on the Ally on 2026-10-28). Run 3D writes without FreeSync so session 1 can
+        // terminate cleanly, then read all settings including FreeSync in session 2.
+        if (is3DChange && Library.RadeonSettings.Apply(null, includeFreeSync: true) is { } after)
         {
             state = after;
         }

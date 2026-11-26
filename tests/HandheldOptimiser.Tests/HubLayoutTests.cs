@@ -35,7 +35,7 @@ public sealed class HubLayoutTests
     }
 
     [Theory]
-    [InlineData("Performance", 11, 8)]
+    [InlineData("Performance", 18, 11)]
     [InlineData("Battery & sleep", 7, 0)]
     [InlineData("Clean up", 23, 14)]
     [InlineData("Full screen", 11, 6)]
@@ -66,10 +66,17 @@ public sealed class HubLayoutTests
     [InlineData("Uninstall Microsoft Edge (leaves WebView2 intact)", TweakCategory.AdsAndAssistants)]
     [InlineData("Turn off Device Encryption (BitLocker)", TweakCategory.Storage)]
     [InlineData("Limit battery charge to 80%", TweakCategory.Sleep)]
+    [InlineData("Prioritise games in the multimedia scheduler", TweakCategory.Games)]
+    [InlineData("Honour high-precision frame timers globally", TweakCategory.Games)]
+    [InlineData("Bias APU power budget towards the GPU (EPP)", TweakCategory.System)]
+    [InlineData("Turn off PCIe power saving when plugged in", TweakCategory.System)]
+    [InlineData("Keep all CPU cores unparked when plugged in", TweakCategory.System)]
+    [InlineData("Merge split Windows background hosts (save RAM)", TweakCategory.System)]
+    [InlineData("Turn off Windows memory compression (24 GB+ handhelds)", TweakCategory.System)]
     public void A_tweak_sits_under_its_heading(string name, TweakCategory category) =>
         Assert.Equal(category, TweakCatalog.All.Single(t => t.Name == name).Category);
 
     [Fact]
-    public void The_catalog_holds_all_57_tweaks_once() =>
-        Assert.Equal(57, TweakCatalog.All.Select(t => t.Id).Distinct().Count());
+    public void The_catalog_holds_all_64_tweaks_once() =>
+        Assert.Equal(64, TweakCatalog.All.Select(t => t.Id).Distinct().Count());
 }

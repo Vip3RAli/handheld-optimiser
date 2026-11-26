@@ -111,204 +111,121 @@ public static class SleepTweaks
         string setting,
         int? ac,
         int? dc,
-        bool needsHibernate) => new()
+        bool needsHibernate)
     {
-        Id = id,
-        Name = name,
-        Description = description,
-        Category = TweakCategory.Sleep,
-        Risk = RiskLevel.Moderate,
-        Warning = warning,
-        IncludeInOneClick = false,
-
-        ScriptDetect = async (ctx, ct) =>
+        if (!needsHibernate)
         {
-            var plans = await ReadPlansAsync(ctx, subgroup, setting, ct);
-            if (plans.Count == 0)
-            {
-                return TweakState.Unknown;
-            }
+            return PowerPlanHelper.CreateTweak(
+                id: id,
+                name: name,
+                description: description,
+                category: TweakCategory.Sleep,
+                risk: RiskLevel.Moderate,
+                warning: warning,
+                includeInOneClick: false,
+                subgroup: subgroup,
+                setting: setting,
+                ac: ac,
+                dc: dc);
+        }
 
-            var matching = plans.Count(p => Matches(p, ac, dc));
-            return matching == plans.Count ? TweakState.Applied
-                : matching == 0 ? TweakState.NotApplied
-                : TweakState.Partial;
-        },
-
-        ScriptApply = async (ctx, journal, ct) =>
+        return new()
         {
-            if (needsHibernate && !await EnsureHibernateAsync(ctx, journal, id, ct))
-            {
-                return TweakResult.Fail(id, "Hibernate could not be switched on, so this would leave the device asleep. The console has the detail.");
-            }
+            Id = id,
+            Name = name,
+            Description = description,
+            Category = TweakCategory.Sleep,
+            Risk = RiskLevel.Moderate,
+            Warning = warning,
+            IncludeInOneClick = false,
 
-            var plans = await ReadPlansAsync(ctx, subgroup, setting, ct);
-            if (plans.Count == 0)
+            ScriptDetect = async (ctx, ct) =>
             {
-                return TweakResult.Fail(id, "Could not read the power plans. The console has the detail.");
-            }
-
-            var commands = new List<string>();
-
-            foreach (var plan in plans.Where(p => !Matches(p, ac, dc)))
-            {
-                // Only what is about to change is journalled, so revert puts back what was found.
-                if (ac is { } acValue && plan.Ac != acValue)
+                var plans = await PowerPlanHelper.ReadPlansAsync(ctx, subgroup, setting, ct);
+                if (plans.Count == 0)
                 {
-                    journal.CapturedState[$"plan.{plan.Scheme}.ac"] = plan.Ac.ToString();
-                    commands.Add($"Set-Value '/setacvalueindex' '{plan.Scheme}' {acValue}");
+                    return TweakState.Unknown;
                 }
 
-                if (dc is { } dcValue && plan.Dc != dcValue)
-                {
-                    journal.CapturedState[$"plan.{plan.Scheme}.dc"] = plan.Dc.ToString();
-                    commands.Add($"Set-Value '/setdcvalueindex' '{plan.Scheme}' {dcValue}");
-                }
-            }
+                var matching = plans.Count(p => PowerPlanHelper.Matches(p, ac, dc));
+                return matching == plans.Count ? TweakState.Applied
+                    : matching == 0 ? TweakState.NotApplied
+                    : TweakState.Partial;
+            },
 
-            if (commands.Count == 0)
+            ScriptApply = async (ctx, journal, ct) =>
             {
-                return TweakResult.NoChange(id);
-            }
+                if (!await EnsureHibernateAsync(ctx, journal, id, ct))
+                {
+                    return TweakResult.Fail(id, "Hibernate could not be switched on, so this would leave the device asleep. The console has the detail.");
+                }
 
-            return await WriteAsync(ctx, subgroup, setting, commands, $"Apply \"{name}\" to every power plan", ct)
-                ? TweakResult.Ok(id, $"\"{name}\" applied.")
-                : TweakResult.Fail(id, "One or more power plans could not be changed. The console has the detail.");
-        },
+                var plans = await PowerPlanHelper.ReadPlansAsync(ctx, subgroup, setting, ct);
+                if (plans.Count == 0)
+                {
+                    return TweakResult.Fail(id, "Could not read the power plans. The console has the detail.");
+                }
 
-        ScriptRevert = async (ctx, journal, ct) =>
-        {
-            var commands = new List<string>();
+                var commands = PowerPlanHelper.BuildApplyCommands(plans, journal, ac, dc);
+                if (commands.Count == 0)
+                {
+                    return TweakResult.NoChange(id);
+                }
 
-            foreach (var (key, value) in journal.CapturedState)
+                return await PowerPlanHelper.WriteAsync(ctx, subgroup, setting, commands, $"Apply \"{name}\" to every power plan", ct)
+                    ? TweakResult.Ok(id, $"\"{name}\" applied.")
+                    : TweakResult.Fail(id, "One or more power plans could not be changed. The console has the detail.");
+            },
+
+            ScriptRevert = async (ctx, journal, ct) =>
             {
-                // plan.{scheme}.{ac|dc}; both parts are checked because they go into an elevated script.
-                var parts = key.Split('.');
-                if (parts.Length != 3 || parts[0] != "plan" || !Guid.TryParse(parts[1], out var scheme)
-                    || !uint.TryParse(value, out var original))
-                {
-                    continue;
-                }
+                var commands = PowerPlanHelper.BuildRevertCommands(journal);
+                var ok = commands.Count == 0
+                    || await PowerPlanHelper.WriteAsync(ctx, subgroup, setting, commands, $"Restore power plans for \"{name}\"", ct);
 
-                var verb = parts[2] switch { "ac" => "/setacvalueindex", "dc" => "/setdcvalueindex", _ => null };
-                if (verb is not null)
+                // Hibernate goes back off if it was off before this app switched it on, whichever of the
+                // settings that need it switched it on and whichever of them is reverted last.
+                if (journal.CapturedState.ContainsKey(HibernateSwitchedOn) || HibernateWasOffBeforeUs(ctx))
                 {
-                    commands.Add($"Set-Value '{verb}' '{scheme:D}' {original}");
-                }
-            }
-
-            var ok = commands.Count == 0
-                || await WriteAsync(ctx, subgroup, setting, commands, $"Restore power plans for \"{name}\"", ct);
-
-            // Hibernate goes back off if it was off before this app switched it on, whichever of the
-            // settings that need it switched it on and whichever of them is reverted last.
-            if (needsHibernate && (journal.CapturedState.ContainsKey(HibernateSwitchedOn) || HibernateWasOffBeforeUs(ctx)))
-            {
-                if (await AnotherSettingNeedsHibernateAsync(ctx, id, ct))
-                {
-                    // Written down here as well, so undo data from before the shared record existed
-                    // still lets the other setting's revert turn hibernate off.
-                    RecordHibernateWasOff(ctx);
-                    ctx.Log.Info("Hibernate is left on: another Battery & sleep setting still uses it.");
-                }
-                else
-                {
-                    var off = await ctx.Runner.RunProcessAsync("powercfg.exe", ["/hibernate", "off"], "Switch hibernate back off", ct);
-                    ok &= off.Succeeded;
-
-                    if (off.Succeeded)
+                    if (await AnotherSettingNeedsHibernateAsync(ctx, id, ct))
                     {
-                        ClearHibernateWasOff(ctx);
+                        // Written down here as well, so undo data from before the shared record existed
+                        // still lets the other setting's revert turn hibernate off.
+                        RecordHibernateWasOff(ctx);
+                        ctx.Log.Info("Hibernate is left on: another Battery & sleep setting still uses it.");
+                    }
+                    else
+                    {
+                        var off = await ctx.Runner.RunProcessAsync("powercfg.exe", ["/hibernate", "off"], "Switch hibernate back off", ct);
+                        ok &= off.Succeeded;
+
+                        if (off.Succeeded)
+                        {
+                            ClearHibernateWasOff(ctx);
+                        }
                     }
                 }
-            }
 
-            return ok
-                ? TweakResult.Ok(id, $"\"{name}\" undone.")
-                : TweakResult.Fail(id, "One or more power plans could not be restored. The console has the detail.");
-        }
-    };
+                return ok
+                    ? TweakResult.Ok(id, $"\"{name}\" undone.")
+                    : TweakResult.Fail(id, "One or more power plans could not be restored. The console has the detail.");
+            }
+        };
+    }
 
     /// <summary>Whether any power plan still holds another setting that hibernates the device.</summary>
     private static async Task<bool> AnotherSettingNeedsHibernateAsync(TweakContext ctx, string revertingId, CancellationToken ct)
     {
         foreach (var other in NeedHibernate.Where(n => n.Id != revertingId))
         {
-            var plans = await ReadPlansAsync(ctx, other.Subgroup, other.Setting, ct);
-            if (plans.Any(p => Matches(p, other.Ac, other.Dc)))
+            var plans = await PowerPlanHelper.ReadPlansAsync(ctx, other.Subgroup, other.Setting, ct);
+            if (plans.Any(p => PowerPlanHelper.Matches(p, other.Ac, other.Dc)))
             {
                 return true;
             }
         }
 
         return false;
-    }
-
-    private sealed record PlanValue(string Scheme, uint Ac, uint Dc);
-
-    private static bool Matches(PlanValue plan, int? ac, int? dc) =>
-        (ac is null || plan.Ac == ac) && (dc is null || plan.Dc == dc);
-
-    /// <summary>
-    /// The setting's current value in every power plan. The plan list and the values are picked out of
-    /// powercfg's output by shape (GUIDs, and the trailing hex values) rather than by its labels, which
-    /// are translated on non-English Windows. A plan that does not report the setting cleanly is left out.
-    /// Asked with /qh, which also shows the settings Windows hides from its own power options, such as
-    /// what the power button does.
-    /// </summary>
-    private static async Task<List<PlanValue>> ReadPlansAsync(TweakContext ctx, string subgroup, string setting, CancellationToken ct)
-    {
-        var outcome = await ctx.Runner.RunScriptAsync(
-            $$"""
-            $plans = & powercfg.exe /list | Select-String '[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}' | ForEach-Object { $_.Matches[0].Value }
-            foreach ($plan in $plans) {
-                $hex = @(& powercfg.exe /qh $plan {{subgroup}} {{setting}} 2>$null | Select-String '(0x[0-9a-fA-F]{8})\s*$' | ForEach-Object { $_.Matches[0].Groups[1].Value })
-                # A list setting prints 2 values (AC, DC); a range setting prints min, max and step first.
-                if ($hex.Count -eq 2 -or $hex.Count -eq 5) {
-                    Write-Output ("PLAN={0}={1}={2}" -f $plan, [Convert]::ToUInt32($hex[-2], 16), [Convert]::ToUInt32($hex[-1], 16))
-                }
-            }
-            """,
-            "Read a power setting from every power plan",
-            ct,
-            echoScript: false);
-
-        var plans = new List<PlanValue>();
-
-        foreach (var line in outcome.OutputLines.Where(l => l.StartsWith("PLAN=", StringComparison.Ordinal)))
-        {
-            var parts = line.Split('=');
-            if (parts.Length == 4 && Guid.TryParse(parts[1], out var scheme)
-                && uint.TryParse(parts[2], out var acValue) && uint.TryParse(parts[3], out var dcValue))
-            {
-                plans.Add(new PlanValue(scheme.ToString("D"), acValue, dcValue));
-            }
-        }
-
-        return plans;
-    }
-
-    private static async Task<bool> WriteAsync(
-        TweakContext ctx, string subgroup, string setting, List<string> commands, string description, CancellationToken ct)
-    {
-        var outcome = await ctx.Runner.RunScriptAsync(
-            $$"""
-            $ErrorActionPreference = 'Continue'
-            $script:failed = $false
-            function Set-Value($verb, $plan, $value) {
-                & powercfg.exe $verb $plan {{subgroup}} {{setting}} $value
-                if ($LASTEXITCODE -ne 0) { Write-Output "powercfg $verb failed for plan $plan (exit $LASTEXITCODE)"; $script:failed = $true }
-            }
-            {{string.Join("\n", commands)}}
-            # Settings only take effect when a plan is activated, so re-activate the one in use.
-            $active = & powercfg.exe /getactivescheme | Select-String '[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}' | ForEach-Object { $_.Matches[0].Value }
-            if ($active) { & powercfg.exe /setactive $active }
-            if ($script:failed) { exit 1 }
-            """,
-            description,
-            ct);
-
-        return outcome.Succeeded;
     }
 
     /// <summary>
