@@ -171,6 +171,15 @@ internal sealed partial class AutoTdpService
             ChooseFans(_control, fans, _power.ReadTemperature());
         }
 
+        // Relinquishing power or fan control from an active session requires restoring the vendor mode first,
+        // otherwise the previous session's custom fan curve or wattage stays stuck in EC firmware.
+        if (previous is not null
+            && ((WattsNow(previous) is not null && WattsNow(_control) is null)
+                || (previous.Curve is not null && _control.Curve is null)))
+        {
+            _power.SetVendorMode(restoreMode ?? _power.DefaultVendorMode);
+        }
+
         // Saved before the limit is first set, so a crash from here on still gets the mode put back.
         MarkHolding(restoreMode ?? _power.DefaultVendorMode);
         Set(_control);

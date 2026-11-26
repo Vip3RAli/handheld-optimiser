@@ -17,6 +17,19 @@ internal sealed class GpuMemoryHost(AsusAcpi? acpi)
 
     // What the driver reported, read once it has reported something: it does not change until Windows restarts.
     private int? _now;
+    private bool _changedInSession;
+
+    /// <summary>Whether a GPU memory change was written in this session and is waiting for a restart.</summary>
+    public bool HasPendingRestart
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _changedInSession;
+            }
+        }
+    }
 
     /// <summary>The status with the GPU memory filled in: empty sizes on offer when this device cannot set it.</summary>
     public AutoTdpStatus AddTo(AutoTdpStatus status)
@@ -65,6 +78,8 @@ internal sealed class GpuMemoryHost(AsusAcpi? acpi)
                 return "The Ally's firmware would not take that GPU memory size.";
             }
 
+            var (_, next) = GpuMemory.Describe(Now(), code);
+            _changedInSession = next is not null;
             Log.Write($"GPU memory set to {Name(wanted)}, used from the next restart");
             return null;
         }

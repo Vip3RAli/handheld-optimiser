@@ -26,8 +26,11 @@ internal static partial class SessionLauncher
     private const int TokenPrimary = 1;
     private const uint CreateUnicodeEnvironment = 0x00000400;
 
-    // TOKEN_INFORMATION_CLASS TokenUIAccess.
+    // TOKEN_INFORMATION_CLASS TokenIntegrityLevel / TokenUIAccess, and Medium-Plus integrity SID (0x2010).
+    private const int TokenIntegrityLevel = 25;
     private const int TokenUIAccess = 26;
+    private const uint SeGroupIntegrity = 0x00000020u;
+    private const string MediumPlusSid = "S-1-16-8208";
 
     /// <summary>The session of the player at the console, or null when nobody is signed in.</summary>
     public static uint? ActiveSession() => WTSGetActiveConsoleSessionId() is var session && session != NoSession ? session : null;
@@ -84,22 +87,52 @@ internal static partial class SessionLauncher
 
         try
         {
+            var outputBytes = new MemoryStream();
+            var readTask = Task.Run(() =>
+            {
+                try
+                {
+                    using var stream = new FileStream(reader, FileAccess.Read, 1);
+                    var buffer = new byte[4096];
+                    int read;
+                    while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        var room = OutputPipeSize - (int)outputBytes.Length;
+                        if (room > 0)
+                        {
+                            outputBytes.Write(buffer, 0, Math.Min(read, room));
+                        }
+                    }
+                }
+                catch (IOException)
+                {
+                }
+            });
+
             if (WaitForSingleObject(handle, (uint)timeout.TotalMilliseconds) != WaitObject0)
             {
+                TerminateProcess(handle, 1);
+                CancelIoEx(reader, 0);
+                readTask.Wait(TimeSpan.FromMilliseconds(200));
                 return "It did not finish in time.";
             }
 
             if (!GetExitCodeProcess(handle, out var code))
             {
+                CancelIoEx(reader, 0);
+                readTask.Wait(TimeSpan.FromMilliseconds(200));
                 return $"Its result could not be read (error {Marshal.GetLastPInvokeError()}).";
             }
 
             exitCode = (int)code;
 
-            // It has ended, so the pipe holds all it printed, which is far less than the pipe's size.
-            using var stream = new FileStream(reader, FileAccess.Read, 1);
-            using var text = new StreamReader(stream);
-            output = text.ReadToEnd();
+            if (!readTask.Wait(TimeSpan.FromSeconds(1)))
+            {
+                CancelIoEx(reader, 0);
+                readTask.Wait(TimeSpan.FromMilliseconds(200));
+            }
+
+            output = System.Text.Encoding.UTF8.GetString(outputBytes.GetBuffer(), 0, (int)outputBytes.Length);
             return null;
         }
         finally
@@ -149,11 +182,25 @@ internal static partial class SessionLauncher
                 {
                     Log.Write($"Windows would not set UIAccess for {Path.GetFileName(exePath)} (error {Marshal.GetLastPInvokeError()}), so it starts without it");
                 }
+                else if (!RaiseToMediumPlusIntegrity(primaryToken))
+                {
+                    var off = 0;
+                    SetTokenInformation(primaryToken, TokenUIAccess, &off, sizeof(int));
+                    Log.Write($"Windows would not raise integrity for {Path.GetFileName(exePath)} (error {Marshal.GetLastPInvokeError()}), so it starts without UIAccess");
+                }
             }
 
             if (!CreateEnvironmentBlock(out environment, primaryToken, inherit: false))
             {
                 return $"The player's environment could not be made (error {Marshal.GetLastPInvokeError()}).";
+            }
+
+            char[]? sanitizedBlock = null;
+            if (uiAccess)
+            {
+                var entries = ReadEnvironmentBlock((char*)environment);
+                var machinePath = Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Machine);
+                sanitizedBlock = AutoTdpRules.BuildEnvironmentBlock(AutoTdpRules.SanitizeUiAccessEnvironment(entries, machinePath));
             }
 
             // CreateProcessAsUser may write to the command line, so it is given a buffer of its own.
@@ -164,7 +211,9 @@ internal static partial class SessionLauncher
             ProcessInformation process;
             fixed (char* desktop = @"winsta0\default")
             fixed (char* command = commandBuffer)
+            fixed (char* sanitizedEnv = sanitizedBlock)
             {
+                var effectiveEnv = sanitizedEnv != null ? (nint)sanitizedEnv : environment;
                 var startup = new StartupInfoEx();
                 startup.StartupInfo.Size = sizeof(StartupInfo);
                 startup.StartupInfo.Desktop = desktop;
@@ -198,7 +247,7 @@ internal static partial class SessionLauncher
                     }
 
                     if (!CreateProcessAsUser(primaryToken, exePath, command, 0, 0, inheritHandles: standardOutput != 0,
-                            flags, environment, directory, &startup, out process))
+                            flags, effectiveEnv, directory, &startup, out process))
                     {
                         return $"The program could not be started (error {Marshal.GetLastPInvokeError()}).";
                     }
@@ -397,10 +446,72 @@ internal static partial class SessionLauncher
 
     private const uint WaitObject0 = 0;
 
+    private static unsafe bool RaiseToMediumPlusIntegrity(nint primaryToken)
+    {
+        if (!ConvertStringSidToSidW(MediumPlusSid, out var labelSid))
+        {
+            return false;
+        }
+
+        try
+        {
+            var label = new SidAndAttributes { Sid = labelSid, Attributes = SeGroupIntegrity };
+            return SetTokenInformation(primaryToken, TokenIntegrityLevel, &label, sizeof(SidAndAttributes) + GetLengthSid(labelSid));
+        }
+        finally
+        {
+            LocalFree(labelSid);
+        }
+    }
+
+    private static unsafe List<string> ReadEnvironmentBlock(char* block)
+    {
+        var entries = new List<string>();
+        if (block == null)
+        {
+            return entries;
+        }
+
+        var current = block;
+        while (*current != '\0')
+        {
+            var entry = new string(current);
+            entries.Add(entry);
+            current += entry.Length + 1;
+        }
+
+        return entries;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct SidAndAttributes
+    {
+        public nint Sid;
+        public uint Attributes;
+    }
+
+    [LibraryImport("advapi32.dll", EntryPoint = "ConvertStringSidToSidW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool ConvertStringSidToSidW(string stringSid, out nint sid);
+
+    [LibraryImport("advapi32.dll")]
+    private static partial int GetLengthSid(nint sid);
+
+    [LibraryImport("kernel32.dll")]
+    private static partial nint LocalFree(nint memory);
+
     [LibraryImport("kernel32.dll", SetLastError = true)]
     private static partial uint WaitForSingleObject(nint handle, uint milliseconds);
 
     [LibraryImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static partial bool GetExitCodeProcess(nint process, out uint exitCode);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool TerminateProcess(nint process, uint exitCode);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool CancelIoEx(SafeFileHandle handle, nint overlapped);
 }

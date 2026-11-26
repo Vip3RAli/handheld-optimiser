@@ -197,19 +197,38 @@ internal static class GogContent
         }
     }
 
+    internal const int MaxManifestBytes = 64 * 1024 * 1024;
+
     /// <summary>The text of a zlib stream, or of the bytes as they are when they are not one.</summary>
     internal static string Unzlib(byte[] bytes)
     {
         // A zlib stream starts 0x78; JSON starts with a brace or white space.
         if (bytes is not [0x78, ..])
         {
+            if (bytes.Length > MaxManifestBytes)
+            {
+                throw new InvalidDataException("GOG's data was larger than allowed.");
+            }
+
             return Encoding.UTF8.GetString(bytes);
         }
 
         using var input = new MemoryStream(bytes);
         using var zlib = new ZLibStream(input, CompressionMode.Decompress);
-        using var reader = new StreamReader(zlib, Encoding.UTF8);
-        return reader.ReadToEnd();
+        using var output = new MemoryStream();
+        var buffer = new byte[81920];
+        int read;
+        while ((read = zlib.Read(buffer, 0, buffer.Length)) > 0)
+        {
+            if (output.Length + read > MaxManifestBytes)
+            {
+                throw new InvalidDataException("GOG's data was larger than allowed.");
+            }
+
+            output.Write(buffer, 0, read);
+        }
+
+        return Encoding.UTF8.GetString(output.GetBuffer(), 0, (int)output.Length);
     }
 
     private static long Long(JsonElement element, string name) =>

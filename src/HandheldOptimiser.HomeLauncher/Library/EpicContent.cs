@@ -1,3 +1,4 @@
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -173,7 +174,7 @@ internal static class EpicContent
         }
     }
 
-    /// <summary>A piece's bytes from the CDN, as it keeps them. The next CDN is tried when one fails.</summary>
+    /// <summary>A piece's bytes from the CDN, verified against its checksum. The next CDN is tried when one fails or sends bad data.</summary>
     public static async Task<byte[]> ChunkAsync(EpicBuild build, EpicChunk chunk, CancellationToken cancel)
     {
         Exception? last = null;
@@ -186,11 +187,17 @@ internal static class EpicContent
                 request.Headers.TryAddWithoutValidation("User-Agent", EpicAuth.Agent);
                 using var answer = await Http.SendAsync(request, cancel);
                 answer.EnsureSuccessStatusCode();
-                return await answer.Content.ReadAsByteArrayAsync(cancel);
+                var bytes = await answer.Content.ReadAsByteArrayAsync(cancel);
+                _ = EpicManifests.UnpackChunk(bytes, chunk);
+                return bytes;
             }
             catch (HttpRequestException ex)
             {
                 last = ex;
+            }
+            catch (Exception ex) when (ex is InvalidDataException or IndexOutOfRangeException or ArgumentOutOfRangeException)
+            {
+                last = new InvalidDataException("A piece from Epic's CDN was invalid.", ex);
             }
             catch (TaskCanceledException ex) when (!cancel.IsCancellationRequested)
             {

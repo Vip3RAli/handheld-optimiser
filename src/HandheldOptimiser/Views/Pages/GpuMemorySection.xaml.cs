@@ -35,11 +35,17 @@ public partial class GpuMemorySection : UserControl
         }
     }
 
-    private void OnClosed(object sender, EventArgs e)
+    private async void OnClosed(object sender, EventArgs e)
     {
         if (DataContext is GpuMemorySectionViewModel section)
         {
-            _ = section.ApplyAsync();
+            try
+            {
+                await section.ApplyAsync();
+            }
+            catch
+            {
+            }
         }
     }
 }

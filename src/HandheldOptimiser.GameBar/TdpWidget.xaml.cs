@@ -169,6 +169,18 @@ namespace HandheldOptimiser.GameBar
             Unloaded += (sender, e) =>
             {
                 _loaded = false;
+                if (_widget != null)
+                {
+                    _widget.VisibleChanged -= OnVisibleChanged;
+                }
+
+                if (_musicStartCancel != null)
+                {
+                    _musicStartCancel.Cancel();
+                    _musicStartCancel.Dispose();
+                    _musicStartCancel = null;
+                }
+
                 PowerManager.PowerSupplyStatusChanged -= OnPowerSupply;
                 _timer.Stop();
                 _musicTimer.Stop();
@@ -217,8 +229,18 @@ namespace HandheldOptimiser.GameBar
         }
 
         /// <summary>Game Bar may say so on another thread, and the timer belongs to the window's.</summary>
-        private async void OnVisibleChanged(XboxGameBarWidget sender, object args) =>
-            await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, UpdatePolling);
+        private async void OnVisibleChanged(XboxGameBarWidget sender, object args)
+        {
+            try
+            {
+                await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, UpdatePolling);
+            }
+            catch
+            {
+            }
+        }
+
+        private bool _refreshing;
 
         /// <summary>
         /// Asks TDP Engine for news only while the widget can be seen: Game Bar is open, or the widget is
@@ -244,15 +266,26 @@ namespace HandheldOptimiser.GameBar
 
         private async void Refresh()
         {
-            if (_busy || Moving)
+            if (_busy || _refreshing || Moving)
             {
                 return;
             }
 
-            var status = await Task.Run(() => EngineClient.Status());
-            if (!_busy && !Moving)
+            _refreshing = true;
+            try
             {
-                Show(status);
+                var status = await Task.Run(() => EngineClient.Status());
+                if (_loaded && !_busy && !Moving)
+                {
+                    Show(status);
+                }
+            }
+            catch
+            {
+            }
+            finally
+            {
+                _refreshing = false;
             }
         }
 
@@ -340,8 +373,16 @@ namespace HandheldOptimiser.GameBar
             _sliderPause.Start();
         }
 
-        private async void OnPowerSupply(object sender, object e) =>
-            await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, ShowPowerSupply);
+        private async void OnPowerSupply(object sender, object e)
+        {
+            try
+            {
+                await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, ShowPowerSupply);
+            }
+            catch
+            {
+            }
+        }
 
         /// <summary>The slider's top for the charger as it is now; unplugged above the battery's top, the limit comes down to it.</summary>
         private void ShowPowerSupply()
@@ -525,7 +566,7 @@ namespace HandheldOptimiser.GameBar
         /// </summary>
         private void OnGpuMemoryOpened(object sender, object e)
         {
-            if (!_status.Running)
+            if (!_status.Reachable)
             {
                 Send(() => EngineClient.GpuMemory());
             }
@@ -636,7 +677,14 @@ namespace HandheldOptimiser.GameBar
             ShowBusy("Applying…");
             try
             {
-                Show(await Task.Run(change));
+                var status = await Task.Run(change);
+                if (_loaded)
+                {
+                    Show(status);
+                }
+            }
+            catch
+            {
             }
             finally
             {
@@ -663,7 +711,14 @@ namespace HandheldOptimiser.GameBar
             ShowBusy(_status.Running ? "Applying…" : "Starting TDP Engine…");
             try
             {
-                Show(await Task.Run(() => EngineClient.Update(targetFps, powerLimit, fanCurve, start)));
+                var status = await Task.Run(() => EngineClient.Update(targetFps, powerLimit, fanCurve, start));
+                if (_loaded)
+                {
+                    Show(status);
+                }
+            }
+            catch
+            {
             }
             finally
             {

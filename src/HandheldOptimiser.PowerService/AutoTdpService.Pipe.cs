@@ -16,76 +16,83 @@ internal sealed partial class AutoTdpService
 
     private async Task ServeAsync(CancellationToken cancel)
     {
-        // The first instance claims the name, so a program that took it first cannot pose as this service.
-        NamedPipeServerStream claimed;
+        // Pre-create every pipe instance up front and reuse them with Disconnect() so no free instance slot
+        // is ever open for another interactive process to squat on while the service runs.
+        var pipes = new List<NamedPipeServerStream>(PipeInstances);
         try
         {
-            claimed = CreatePipe(first: true);
+            for (var i = 0; i < PipeInstances; i++)
+            {
+                pipes.Add(CreatePipe(first: i == 0));
+            }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
         {
+            foreach (var p in pipes)
+            {
+                p.Dispose();
+            }
+
             // Another program holds the name. Nothing can reach this service, so it ends.
             Log.Write($"Could not open the pipe: {ex.Message}");
             _ = Task.Run(EndSelf);
             return;
         }
 
-        var listeners = new List<Task> { ListenAsync(claimed, cancel) };
-        for (var i = 1; i < PipeInstances; i++)
+        var listeners = new List<Task>(pipes.Count);
+        foreach (var pipe in pipes)
         {
-            listeners.Add(ListenAsync(null, cancel));
+            listeners.Add(ListenAsync(pipe, cancel));
         }
 
         await Task.WhenAll(listeners).ConfigureAwait(false);
     }
 
-    /// <summary>Answers one connection after another on one pipe instance, until the service ends. Never throws.</summary>
-    private async Task ListenAsync(NamedPipeServerStream? pipe, CancellationToken cancel)
+    /// <summary>Answers one connection after another on one long-lived pipe instance, until the service ends. Never throws.</summary>
+    private async Task ListenAsync(NamedPipeServerStream pipe, CancellationToken cancel)
     {
-        while (!cancel.IsCancellationRequested)
+        await using (pipe)
         {
-            NamedPipeServerStream current;
-            try
+            while (!cancel.IsCancellationRequested)
             {
-                current = pipe ?? CreatePipe(first: false);
-                pipe = null;
-            }
-            catch (Exception ex)
-            {
-                Log.Write($"Could not open another pipe instance: {ex.Message}");
+                var connected = false;
                 try
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(1), cancel).ConfigureAwait(false);
+                    await pipe.WaitForConnectionAsync(cancel).ConfigureAwait(false);
+                    connected = true;
+                    using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancel);
+                    timeout.CancelAfter(RequestTimeout);
+                    await AnswerAsync(pipe, timeout.Token).ConfigureAwait(false);
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException) when (cancel.IsCancellationRequested)
                 {
                     return;
                 }
-
-                continue;
-            }
-
-            try
-            {
-                await using (current)
+                catch (OperationCanceledException)
                 {
-                    await current.WaitForConnectionAsync(cancel).ConfigureAwait(false);
-                    using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancel);
-                    timeout.CancelAfter(RequestTimeout);
-                    await AnswerAsync(current, timeout.Token).ConfigureAwait(false);
                 }
-            }
-            catch (OperationCanceledException)
-            {
-            }
-            catch (IOException)
-            {
-                // The library went away mid-request.
-            }
-            catch (Exception ex)
-            {
-                // Whatever one client did, the pipe stays open for the next.
-                Log.Write($"A request failed: {ex.Message}");
+                catch (IOException)
+                {
+                    // The library went away mid-request.
+                }
+                catch (Exception ex)
+                {
+                    // Whatever one client did, the pipe stays open for the next.
+                    Log.Write($"A request failed: {ex.Message}");
+                }
+                finally
+                {
+                    if (connected)
+                    {
+                        try
+                        {
+                            pipe.Disconnect();
+                        }
+                        catch (Exception ex) when (ex is IOException or InvalidOperationException)
+                        {
+                        }
+                    }
+                }
             }
         }
     }
@@ -144,10 +151,29 @@ internal sealed partial class AutoTdpService
         status = _gpuMemory.AddTo(status);
         status = _batteryCare.AddTo(status);
         status = _radeon.AddTo(status);
+
+        var allowRestart = false;
+        if (request?.Command == AutoTdpProtocol.Restart)
+        {
+            if (!_gpuMemory.HasPendingRestart)
+            {
+                status = status with { Error = "No GPU memory change is waiting for a restart." };
+            }
+            else if (!IsRestartCallerAllowed(pipe))
+            {
+                Log.Write("Refused restart request: caller is neither an administrator nor the Game Bar widget");
+                status = status with { Error = "Restart is only allowed from Handheld Optimiser or its Game Bar widget." };
+            }
+            else
+            {
+                allowRestart = true;
+            }
+        }
+
         await writer.WriteLineAsync(AutoTdpProtocol.Write(status).AsMemory(), cancel).ConfigureAwait(false);
 
         // Restarted only once the widget has its answer.
-        if (request?.Command == AutoTdpProtocol.Restart)
+        if (allowRestart)
         {
             RestartWindows();
         }
@@ -292,6 +318,50 @@ internal sealed partial class AutoTdpService
 
     [LibraryImport("advapi32.dll")]
     private static partial nint FreeSid(nint sid);
+
+    private static unsafe bool IsRestartCallerAllowed(NamedPipeServerStream pipe)
+    {
+        var allowed = false;
+        pipe.RunAsClient(() =>
+        {
+            using var identity = WindowsIdentity.GetCurrent(ifImpersonating: true);
+            if (identity is null)
+            {
+                return;
+            }
+
+            if (new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator))
+            {
+                allowed = true;
+                return;
+            }
+
+            if (WidgetSid() is not { } widget)
+            {
+                return;
+            }
+
+            var buffer = stackalloc byte[256];
+            if (!GetTokenInformation(identity.AccessToken, TokenAppContainerSid, buffer, 256, out _))
+            {
+                return;
+            }
+
+            var sid = *(nint*)buffer;
+            if (sid != 0)
+            {
+                allowed = string.Equals(new SecurityIdentifier(sid).Value, widget, StringComparison.OrdinalIgnoreCase);
+            }
+        });
+        return allowed;
+    }
+
+    private const int TokenAppContainerSid = 31;
+
+    [LibraryImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static unsafe partial bool GetTokenInformation(Microsoft.Win32.SafeHandles.SafeAccessTokenHandle token,
+        int infoClass, void* information, int length, out int returnLength);
 
     [LibraryImport("kernel32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

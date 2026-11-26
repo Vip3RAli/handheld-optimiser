@@ -153,7 +153,8 @@ internal static partial class AllyScreen
         if (result != 0 && (width, height) != (current.Width, current.Height))
         {
             Program.Log($"Stats screen: Windows would not set the Ally's screen to {width}x{height} (error {result}), so it stays at {current.Width}x{current.Height}");
-            SetSourceRect(modes, panelMode, place with { Width = current.Width, Height = current.Height, X = (monitors[0].Width - current.Width) / 2 });
+            var fallbackX = monitors.Count > 0 ? (monitors[0].Width - current.Width) / 2 : place.X;
+            SetSourceRect(modes, panelMode, place with { Width = current.Width, Height = current.Height, X = fallbackX });
             result = Apply(paths, modes);
         }
 

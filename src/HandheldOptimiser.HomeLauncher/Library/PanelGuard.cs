@@ -147,19 +147,26 @@ internal sealed unsafe partial class PanelGuard : IDisposable
     [UnmanagedCallersOnly]
     private static void OnEvent(nint hook, uint kind, nint window, int objectId, int childId, uint thread, uint time)
     {
-        if (_current is not { } guard || window == 0 || objectId != ObjectWindow || childId != 0)
+        try
         {
-            return;
+            if (_current is not { } guard || window == 0 || objectId != ObjectWindow || childId != 0)
+            {
+                return;
+            }
+
+            guard._waiting.Add(window);
+            guard._cursorDue |= kind == EventSystemForeground;
+
+            // Many moves arrive at once while a window is dragged or the screens change, so they are looked at together.
+            if (!guard._drainQueued)
+            {
+                guard._drainQueued = true;
+                guard._dispatcher.BeginInvoke(DispatcherPriority.Background, guard.Drain);
+            }
         }
-
-        guard._waiting.Add(window);
-        guard._cursorDue |= kind == EventSystemForeground;
-
-        // Many moves arrive at once while a window is dragged or the screens change, so they are looked at together.
-        if (!guard._drainQueued)
+        catch
         {
-            guard._drainQueued = true;
-            guard._dispatcher.BeginInvoke(DispatcherPriority.Background, guard.Drain);
+            // Never let a managed exception cross an unmanaged WinEvent callback boundary.
         }
     }
 
@@ -202,7 +209,14 @@ internal sealed unsafe partial class PanelGuard : IDisposable
     [UnmanagedCallersOnly]
     private static int OnWindow(nint window, nint list)
     {
-        ((List<nint>)GCHandle.FromIntPtr(list).Target!).Add(window);
+        try
+        {
+            ((List<nint>)GCHandle.FromIntPtr(list).Target!).Add(window);
+        }
+        catch
+        {
+        }
+
         return 1;
     }
 

@@ -143,7 +143,11 @@ internal sealed partial class MusicPlayerWindow : Window
         {
             try
             {
-                if (_signingIn && core.Source.StartsWith(YouTubeMusic.Origin, StringComparison.OrdinalIgnoreCase) && await SignedInAsync())
+                if (_signingIn
+                    && Uri.TryCreate(core.Source, UriKind.Absolute, out var sourceUri)
+                    && sourceUri.Scheme == Uri.UriSchemeHttps
+                    && sourceUri.Host.Equals("music.youtube.com", StringComparison.OrdinalIgnoreCase)
+                    && await SignedInAsync())
                 {
                     _signingIn = false;
                     PutAway();

@@ -30,8 +30,10 @@ public sealed partial class MainViewModel : ObservableObject, IShell
     public bool IsHome => SelectedPage is DashboardViewModel;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(FooterText), nameof(IsWorking))]
+    [NotifyPropertyChangedFor(nameof(FooterText), nameof(IsWorking), nameof(IsIdle))]
     private bool _isBusy;
+
+    public bool IsIdle => !IsBusy;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(FooterText))]
@@ -188,14 +190,14 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         }
     }
 
-    public async Task RunExclusiveAsync(string statusText, Func<IProgress<string>, CancellationToken, Task> work)
+    public async Task<bool> RunExclusiveAsync(string statusText, Func<IProgress<string>, CancellationToken, Task> work)
     {
         // Non-blocking: if something is already running, say so rather than queueing up a second
         // registry pass behind it.
         if (!await _gate.WaitAsync(0))
         {
             Log.Warning($"\"{statusText}\" ignored because another operation is already running.");
-            return;
+            return false;
         }
 
         using var cts = new CancellationTokenSource();
@@ -226,6 +228,8 @@ public sealed partial class MainViewModel : ObservableObject, IShell
             ProgressDetail = string.Empty;
             _gate.Release();
         }
+
+        return true;
     }
 
     [RelayCommand]
@@ -428,6 +432,7 @@ public sealed partial class MainViewModel : ObservableObject, IShell
                 Device = DiagnosticsReport.DeviceText(_engine.Device),
                 ProfileFolder = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                 UserName = Environment.UserName,
+                SessionUserName = SignedInUser.SessionAccount,
                 MachineName = Environment.MachineName,
                 Tweaks = tweaks,
                 UndoEntries = undo,
@@ -537,17 +542,20 @@ public sealed partial class MainViewModel : ObservableObject, IShell
         UpdateOffer? offer = null;
         string? failure = null;
 
-        await RunExclusiveAsync("Checking for updates…", async (_, ct) =>
+        if (!await RunExclusiveAsync("Checking for updates…", async (_, ct) =>
+            {
+                try
+                {
+                    offer = await _updates.CheckAsync(ct);
+                }
+                catch (Exception ex) when (IsUpdateCheckFailure(ex))
+                {
+                    failure = ex.Message;
+                }
+            }))
         {
-            try
-            {
-                offer = await _updates.CheckAsync(ct);
-            }
-            catch (Exception ex) when (IsUpdateCheckFailure(ex))
-            {
-                failure = ex.Message;
-            }
-        });
+            return;
+        }
 
         if (failure is not null)
         {

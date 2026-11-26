@@ -50,6 +50,8 @@ internal static class EpicManifests
 {
     private const uint ManifestMagic = 0x44BEC00C;
     private const uint ChunkMagic = 0xB1FE3AA2;
+    internal const int MaxManifestBytes = 128 * 1024 * 1024;
+    internal const int MaxChunkBytes = 64 * 1024 * 1024;
 
     /// <summary>A manifest's bytes read, or null when they are not a binary manifest or do not match their checksum.</summary>
     public static EpicManifest? Parse(byte[] bytes)
@@ -69,10 +71,15 @@ internal static class EpicManifests
             var storedAs = header.U8();
             var version = (int)header.U32();
 
+            if (headerSize < 0 || headerSize > bytes.Length || sizeUnpacked < 0 || sizeUnpacked > MaxManifestBytes)
+            {
+                return null;
+            }
+
             var body = bytes.AsSpan(headerSize).ToArray();
             if ((storedAs & 1) != 0)
             {
-                body = Unzlib(body, sizeUnpacked);
+                body = Unzlib(body, sizeUnpacked, MaxManifestBytes);
             }
 
             if (!SHA1.HashData(body).AsSpan().SequenceEqual(sha))
@@ -98,13 +105,18 @@ internal static class EpicManifests
             var prerequisitePath = reader.Text();
             var prerequisiteArguments = reader.Text();
             _ = dataVersion;
-            reader.Position = metaStart + metaSize;
+            reader.Position = checked(metaStart + metaSize);
 
             // The pieces, a column at a time.
             var chunksStart = reader.Position;
             var chunksSize = (int)reader.U32();
             reader.U8();
             var count = (int)reader.U32();
+            if (count < 0 || count > reader.Remaining / 4)
+            {
+                return null;
+            }
+
             var guids = new string[count];
             for (var i = 0; i < count; i++)
             {
@@ -141,13 +153,18 @@ internal static class EpicManifests
                 chunks.Add(new EpicChunk(guids[i], hashes[i], shas[i], groups[i], sizes[i], (long)reader.U64()));
             }
 
-            reader.Position = chunksStart + chunksSize;
+            reader.Position = checked(chunksStart + chunksSize);
 
             // The files, a column at a time.
             var filesStart = reader.Position;
             var filesSize = (int)reader.U32();
             reader.U8();
             var fileCount = (int)reader.U32();
+            if (fileCount < 0 || fileCount > reader.Remaining / 4)
+            {
+                return null;
+            }
+
             var names = reader.Texts(fileCount);
             reader.Texts(fileCount);
             var fileShas = new string[fileCount];
@@ -156,7 +173,7 @@ internal static class EpicManifests
                 fileShas[i] = Convert.ToHexStringLower(reader.Bytes(20));
             }
 
-            reader.Position += fileCount;
+            reader.Position = checked(reader.Position + fileCount);
             var tags = new List<string>[fileCount];
             for (var i = 0; i < fileCount; i++)
             {
@@ -167,13 +184,18 @@ internal static class EpicManifests
             for (var i = 0; i < fileCount; i++)
             {
                 var partCount = (int)reader.U32();
+                if (partCount < 0 || partCount > reader.Remaining / 4)
+                {
+                    return null;
+                }
+
                 var parts = new List<EpicChunkPart>(partCount);
                 for (var p = 0; p < partCount; p++)
                 {
                     var partStart = reader.Position;
                     var partSize = (int)reader.U32();
                     parts.Add(new EpicChunkPart(reader.Guid(), reader.U32(), reader.U32()));
-                    reader.Position = partStart + partSize;
+                    reader.Position = checked(partStart + partSize);
                 }
 
                 files.Add(new EpicFile(names[i], fileShas[i], parts, tags[i]));
@@ -219,15 +241,20 @@ internal static class EpicManifests
         reader.U32();
         reader.Position += 16 + 8;
         var storedAs = reader.U8();
-        if (headerSize > file.Length)
+        if (headerSize < 0 || headerSize > file.Length)
         {
             throw new InvalidDataException("A piece was cut short.");
+        }
+
+        if (chunk.Size > MaxChunkBytes)
+        {
+            throw new InvalidDataException("A piece was larger than allowed.");
         }
 
         var data = file.AsSpan(headerSize).ToArray();
         if ((storedAs & 1) != 0)
         {
-            data = Unzlib(data, (int)chunk.Size);
+            data = Unzlib(data, (int)chunk.Size, MaxChunkBytes);
         }
 
         if (data.Length != chunk.Size || !string.Equals(Convert.ToHexStringLower(SHA1.HashData(data)), chunk.Sha, StringComparison.OrdinalIgnoreCase))
@@ -238,8 +265,13 @@ internal static class EpicManifests
         return data;
     }
 
-    private static byte[] Unzlib(byte[] packed, int size)
+    private static byte[] Unzlib(byte[] packed, int size, int maxBytes)
     {
+        if (size < 0 || size > maxBytes)
+        {
+            throw new InvalidDataException("Epic's data was larger than allowed.");
+        }
+
         var unpacked = new byte[size];
         using var zlib = new ZLibStream(new MemoryStream(packed), CompressionMode.Decompress);
         var read = 0;
@@ -261,6 +293,7 @@ internal static class EpicManifests
     private sealed class Reader(byte[] bytes)
     {
         public int Position { get; set; }
+        public int Remaining => Math.Max(0, bytes.Length - Position);
 
         public byte U8() => bytes[Position++];
 
@@ -280,6 +313,11 @@ internal static class EpicManifests
 
         public byte[] Bytes(int count)
         {
+            if (count < 0 || count > Remaining)
+            {
+                throw new InvalidDataException("Epic's data was cut short.");
+            }
+
             var value = bytes.AsSpan(Position, count).ToArray();
             Position += count;
             return value;
@@ -302,10 +340,25 @@ internal static class EpicManifests
 
             if (length < 0)
             {
+                if (length == int.MinValue)
+                {
+                    throw new InvalidDataException("Epic's string length was invalid.");
+                }
+
                 var wide = checked(-length * 2);
+                if (wide < 2 || wide > Remaining)
+                {
+                    throw new InvalidDataException("Epic's data was cut short.");
+                }
+
                 var text = Encoding.Unicode.GetString(bytes, Position, wide - 2);
                 Position += wide;
                 return text;
+            }
+
+            if (length > Remaining)
+            {
+                throw new InvalidDataException("Epic's data was cut short.");
             }
 
             var plain = Encoding.ASCII.GetString(bytes, Position, length - 1);
@@ -315,7 +368,11 @@ internal static class EpicManifests
 
         public List<string> Texts(int count)
         {
-            ArgumentOutOfRangeException.ThrowIfNegative(count);
+            if (count < 0 || count > Remaining / 4)
+            {
+                throw new InvalidDataException("Epic's list was longer than its data.");
+            }
+
             var list = new List<string>(Math.Min(count, 1 << 16));
             for (var i = 0; i < count; i++)
             {

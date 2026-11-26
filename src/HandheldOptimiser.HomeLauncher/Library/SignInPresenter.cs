@@ -365,7 +365,10 @@ internal sealed class SignInPresenter
         core.NewWindowRequested += (_, e) =>
         {
             e.Handled = true;
-            core.Navigate(e.Uri);
+            if (Uri.TryCreate(e.Uri, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps)
+            {
+                core.Navigate(e.Uri);
+            }
         };
 
         web.Focus();

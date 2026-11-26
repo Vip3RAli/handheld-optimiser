@@ -85,9 +85,14 @@ public static class TrustedExecutables
             using var repo = Registry.CurrentUser.OpenSubKey(PackageRepositoryKey);
 
             return (repo?.GetSubKeyNames() ?? [])
-                .Select(name => (Name: name, Match: WingetPackageFolder.Match(name)))
-                .Where(p => p.Match.Success)
-                .OrderByDescending(p => Version.Parse(p.Match.Groups["version"].Value))
+                .Select(name =>
+                {
+                    var match = WingetPackageFolder.Match(name);
+                    var version = match.Success && Version.TryParse(match.Groups["version"].Value, out var parsed) ? parsed : null;
+                    return (Name: name, Version: version);
+                })
+                .Where(p => p.Version is not null)
+                .OrderByDescending(p => p.Version)
                 .Select(p => Path.Combine(windowsApps, p.Name, "winget.exe"))
                 .FirstOrDefault(File.Exists);
         }

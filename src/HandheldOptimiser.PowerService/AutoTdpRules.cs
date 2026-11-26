@@ -151,4 +151,102 @@ internal static class AutoTdpRules
 
         return builder.ToString();
     }
+
+    /// <summary>The last folder of a game's path, stripped of control characters, commas and quotes for plain CSV.</summary>
+    public static string CsvSafeName(string? folder) =>
+        folder is null ? string.Empty : Printable(Path.GetFileName(folder.TrimEnd('\\', '/'))).Replace(',', ' ').Replace('"', ' ');
+
+    private static readonly string[] UnsafeLoaderEnvPrefixes =
+    [
+        "DOTNET_",
+        "CORECLR_",
+        "COR_",
+        "COMPlus_",
+        "ASPNETCORE_",
+        "MSBUILD",
+        "NUGET_"
+    ];
+
+    /// <summary>
+    /// Removes .NET / profiler loader variables and any user-controlled PATH from an environment block
+    /// passed to a <c>TokenUIAccess</c> process, replacing PATH with <paramref name="machinePath"/> and
+    /// sorting case-insensitively as Windows requires for <c>CREATE_UNICODE_ENVIRONMENT</c>.
+    /// </summary>
+    public static string[] SanitizeUiAccessEnvironment(IEnumerable<string> entries, string? machinePath)
+    {
+        var kept = new List<string>();
+        foreach (var entry in entries)
+        {
+            if (string.IsNullOrEmpty(entry))
+            {
+                continue;
+            }
+
+            var eq = entry.IndexOf('=');
+            if (eq <= 0)
+            {
+                continue;
+            }
+
+            var name = entry.AsSpan(0, eq);
+            if (name.Equals("PATH", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var blocked = false;
+            foreach (var prefix in UnsafeLoaderEnvPrefixes)
+            {
+                if (name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    blocked = true;
+                    break;
+                }
+            }
+
+            if (!blocked)
+            {
+                kept.Add(entry);
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(machinePath))
+        {
+            kept.Add($"PATH={machinePath}");
+        }
+
+        kept.Sort((a, b) =>
+        {
+            var aEq = a.IndexOf('=');
+            var bEq = b.IndexOf('=');
+            var aName = aEq >= 0 ? a.AsSpan(0, aEq) : a.AsSpan();
+            var bName = bEq >= 0 ? b.AsSpan(0, bEq) : b.AsSpan();
+            return aName.CompareTo(bName, StringComparison.OrdinalIgnoreCase);
+        });
+        return [.. kept];
+    }
+
+    /// <summary>Packs environment entries into a double-null-terminated UTF-16 block for <c>CreateProcessAsUser</c>.</summary>
+    public static char[] BuildEnvironmentBlock(IEnumerable<string> entries)
+    {
+        var chars = new List<char>();
+        foreach (var entry in entries)
+        {
+            if (string.IsNullOrEmpty(entry))
+            {
+                continue;
+            }
+
+            chars.AddRange(entry);
+            chars.Add('\0');
+        }
+
+        if (chars.Count == 0)
+        {
+            chars.Add('\0');
+        }
+
+        chars.Add('\0');
+        return [.. chars];
+    }
 }

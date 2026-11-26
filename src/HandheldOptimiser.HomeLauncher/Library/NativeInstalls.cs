@@ -70,6 +70,16 @@ internal static class NativeInstalls
         list.Add(install);
     });
 
+    /// <summary>Updates <see cref="NativeInstall.UpdateBuildId"/> only if the entry still exists with the same build.</summary>
+    public static void SetUpdateBuildId(string key, string expectedBuildId, string? updateBuildId) => Change(list =>
+    {
+        var index = list.FindIndex(i => string.Equals(i.Key, key, StringComparison.OrdinalIgnoreCase) && i.BuildId == expectedBuildId);
+        if (index >= 0 && list[index].UpdateBuildId != updateBuildId)
+        {
+            list[index] = list[index] with { UpdateBuildId = updateBuildId };
+        }
+    });
+
     /// <summary>Takes a game out of the record.</summary>
     public static void Remove(string key) => Change(list => list.RemoveAll(i => string.Equals(i.Key, key, StringComparison.OrdinalIgnoreCase)));
 
@@ -79,15 +89,16 @@ internal static class NativeInstalls
         {
             var list = All();
             change(list);
+            var temp = $"{RecordPath}.{Guid.NewGuid():N}.tmp";
             try
             {
                 Directory.CreateDirectory(Folder);
-                var temp = RecordPath + ".tmp";
                 File.WriteAllText(temp, JsonSerializer.Serialize(list));
                 File.Move(temp, RecordPath, overwrite: true);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
+                TryDelete(temp);
                 Program.Log($"Could not keep the library's installs: {ex.Message}");
             }
         }
@@ -122,15 +133,16 @@ internal static class NativeInstalls
 
     internal static void WriteJson<T>(string path, T value)
     {
+        var temp = $"{path}.{Guid.NewGuid():N}.tmp";
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            var temp = path + ".tmp";
             File.WriteAllText(temp, JsonSerializer.Serialize(value));
             File.Move(temp, path, overwrite: true);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            TryDelete(temp);
             Program.Log($"Could not keep how far a download got: {ex.Message}");
         }
     }
@@ -164,16 +176,21 @@ internal static class NativeInstalls
             var files = ReadFiles(install.Store, install.Id);
             if (files.Count == 0)
             {
-                // No list of what was installed: nothing says which files are the player's.
-                Directory.Delete(folder, recursive: true);
+                // Missing/corrupt files.json: never recursively delete the game folder, as player saves may live there.
+                Program.Log($"Skipped deleting {folder} for {install.Key}: installed file list was missing");
+                kept = Directory.EnumerateFileSystemEntries(folder).Any();
             }
             else
             {
+                var rootPrefix = Path.TrimEndingDirectorySeparator(folder) + Path.DirectorySeparatorChar;
                 foreach (var path in files.Keys)
                 {
-                    if (GogDepots.SafePath(path) is { } safe)
+                    if (!Path.IsPathRooted(path)
+                        && Path.GetFullPath(Path.Combine(folder, path)) is { } full
+                        && full.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase)
+                        && File.Exists(full))
                     {
-                        File.Delete(Path.Combine(folder, safe));
+                        File.Delete(full);
                     }
                 }
 

@@ -496,6 +496,8 @@ internal sealed class OldSchoolPresenter
             (int)Math.Round(OldSchoolStack.CardHeight * drawn * toDevice.M22));
     }
 
+    public bool DisplayOff { get; set; }
+
     /// <summary>
     /// Draws with the GPU while the Old School layout is in front, where moving the cards every frame is
     /// more than software rendering keeps up with, and in software the rest of the time, which keeps the
@@ -505,7 +507,8 @@ internal sealed class OldSchoolPresenter
     public void UpdateRenderMode()
     {
         UpdateLook();
-        var mode = _layouts.Layout == LibraryLayout.OldSchool && _window.IsActive ? RenderMode.Default : RenderMode.SoftwareOnly;
+        var active = _window.IsActive && !DisplayOff;
+        var mode = _layouts.Layout == LibraryLayout.OldSchool && active ? RenderMode.Default : RenderMode.SoftwareOnly;
         if (RenderOptions.ProcessRenderMode == mode)
         {
             return;
@@ -527,7 +530,7 @@ internal sealed class OldSchoolPresenter
     public void UpdateLook()
     {
         var console = _layouts.Layout == LibraryLayout.OldSchool && LibrarySettings.OldSchoolLook == OldSchoolLook.ConsoleSpace;
-        _parts.ConsoleSpace.Show(console, _window.IsActive);
+        _parts.ConsoleSpace.Show(console, _window.IsActive && !DisplayOff);
         if (console == OldSchoolPanel.ConsoleSpace && console == ConsoleSpaceLook.On)
         {
             return;

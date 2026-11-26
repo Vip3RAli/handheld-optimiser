@@ -294,7 +294,17 @@ internal sealed unsafe partial class FrameCounter : IDisposable
     }
 
     [UnmanagedCallersOnly]
-    private static void OnEvent(byte* record) => _running?.Record(record);
+    private static void OnEvent(byte* record)
+    {
+        try
+        {
+            _running?.Record(record);
+        }
+        catch
+        {
+            // Never let a managed exception cross an unmanaged ETW callback boundary.
+        }
+    }
 
     internal void Record(byte* record)
     {

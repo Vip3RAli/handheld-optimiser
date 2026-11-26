@@ -50,12 +50,20 @@ try {
             # An upgrade in place keeps the widget in Game Bar; removing it first makes Game Bar forget it.
             # Each local build has a higher version (see build-installer.ps1). The same version again or an
             # older one is refused, and only then does the old copy go first.
+            $addParams = @{
+                Path = $package
+                ForceApplicationShutdown = $true
+            }
+            if ($dependencies.Count -gt 0) {
+                $addParams.DependencyPath = $dependencies
+            }
+
             try {
-                Add-AppxPackage -Path $package -DependencyPath $dependencies -ForceApplicationShutdown
+                Add-AppxPackage @addParams
             }
             catch {
                 Get-AppxPackage -Name 'HandheldOptimiser.GameBar' | Remove-AppxPackage
-                Add-AppxPackage -Path $package -DependencyPath $dependencies -ForceApplicationShutdown
+                Add-AppxPackage @addParams
             }
 
             # Game Bar only reads the OEM widget and manifest placement when it starts, so a running copy

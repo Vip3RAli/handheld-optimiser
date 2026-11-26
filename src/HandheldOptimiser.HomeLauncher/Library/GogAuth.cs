@@ -33,7 +33,8 @@ internal static class GogAuth
     /// <summary>The code on the page GOG goes to once signed in, or null for any other page.</summary>
     public static string? CodeFrom(Uri uri)
     {
-        if (!uri.Host.Equals("embed.gog.com", StringComparison.OrdinalIgnoreCase)
+        if (uri.Scheme != Uri.UriSchemeHttps
+            || !uri.Host.Equals("embed.gog.com", StringComparison.OrdinalIgnoreCase)
             || !uri.AbsolutePath.StartsWith("/on_login_success", StringComparison.OrdinalIgnoreCase))
         {
             return null;
