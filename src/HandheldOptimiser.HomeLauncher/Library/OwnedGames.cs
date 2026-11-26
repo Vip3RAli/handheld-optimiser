@@ -256,18 +256,18 @@ internal static class OwnedGames
             .Select(app => SteamGame(app.AppId, app.Name, artDir))
             .ToList();
 
-    private static Game SteamGame(long appId, string name, string? artDir)
+    private static Game SteamGame(long appId, string name, string? _)
     {
-        var cover = artDir is null ? null : SteamLibrary.FindArt(artDir, appId.ToString(), SteamLibrary.CoverNames);
+        // Local Steam cache art is resolved lazily by GameTile.Pictures as tiles approach the viewport.
         return new Game(
             Key: $"steam:{appId}",
             Title: name,
             Store: GameStore.Steam,
-            CoverPath: cover,
+            CoverPath: null,
             IconPath: null,
             LaunchTarget: $"steam://install/{appId}",
             Installed: false,
-            CoverUrl: cover is null ? $"https://cdn.cloudflare.steamstatic.com/steam/apps/{appId}/library_600x900.jpg" : null);
+            CoverUrl: $"https://cdn.cloudflare.steamstatic.com/steam/apps/{appId}/library_600x900.jpg");
     }
 
     /// <summary>The Steam games in a GetOwnedGames answer, as games to install.</summary>

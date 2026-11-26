@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.IO;
 using System.Net.Http;
 using System.Text.Json;
@@ -45,12 +46,17 @@ internal static class Achievements
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "HandheldOptimiser", "achievements");
 
+    private static readonly ConcurrentDictionary<string, GameAchievements?> MemoryCache =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    internal static void ClearCache() => MemoryCache.Clear();
+
     /// <summary>
     /// The achievements last synced for a game, or null. Only the small cached file is read: the menus and the
     /// Continue card ask on the window's thread, and store files are read when a sync runs, off it.
     /// </summary>
     public static GameAchievements? For(Game game) =>
-        ReadCache(game.Key) is { Total: > 0 } cached ? cached : null;
+        MemoryCache.GetOrAdd(game.Key, key => ReadCache(key)) is { Total: > 0 } cached ? cached : null;
 
     /// <summary>Syncs achievements for one game from its store or local database and updates the cache.</summary>
     public static async Task<GameAchievements?> SyncGameAsync(Game game)
@@ -473,6 +479,10 @@ internal static class Achievements
             Directory.CreateDirectory(folder);
             var path = CachePath(achievements.GameKey, folder);
             File.WriteAllText(path, JsonSerializer.Serialize(achievements, JsonOptions));
+            if (cacheFolder is null)
+            {
+                MemoryCache[achievements.GameKey] = achievements;
+            }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -501,31 +511,8 @@ internal static class Achievements
         return colon >= 0 ? game.Key[(colon + 1)..] : game.Key;
     }
 
-    private static string? FirstSteamId64()
-    {
-        if (SteamLibrary.SteamDirectory() is not { } path)
-        {
-            return null;
-        }
-
-        var userdata = Path.Combine(path, "userdata");
-        try
-        {
-            if (Directory.Exists(userdata))
-            {
-                foreach (var dir in Directory.GetDirectories(userdata))
-                {
-                    if (uint.TryParse(Path.GetFileName(dir), out var id32) && id32 > 0)
-                    {
-                        return (76561197960265728L + id32).ToString();
-                    }
-                }
-            }
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-        }
-
-        return null;
-    }
+    private static string? FirstSteamId64() =>
+        SteamLibrary.ActiveAccountId32() is { } id32
+            ? (SteamIdBase + id32).ToString()
+            : null;
 }

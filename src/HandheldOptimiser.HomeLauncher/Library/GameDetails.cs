@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.IO;
 using System.Net;
 using System.Net.Http;
@@ -42,8 +43,16 @@ internal static class StoreDetails
     // Going back to a game whose details are still on their way joins that request.
     private static readonly InFlight<GameDetails?> Fetches = new();
 
+    private static readonly ConcurrentDictionary<string, GameDetails?> DiskCache =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    internal static void ClearCache() => DiskCache.Clear();
+
     /// <summary>The details kept on disk, without asking for anything. Null when none are kept.</summary>
-    public static GameDetails? Cached(Game game)
+    public static GameDetails? Cached(Game game) =>
+        DiskCache.GetOrAdd(game.Key, _ => ReadCached(game));
+
+    private static GameDetails? ReadCached(Game game)
     {
         var path = CachePath(game);
         try
@@ -79,6 +88,7 @@ internal static class StoreDetails
     /// <summary>Forgets what was found for the game, after the title it is looked up by changed.</summary>
     public static void Forget(Game game)
     {
+        DiskCache.TryRemove(game.Key, out _);
         File.Delete(CachePath(game));
         File.Delete(NotFoundPath(game));
     }
@@ -100,10 +110,12 @@ internal static class StoreDetails
             if (details is null)
             {
                 File.WriteAllBytes(NotFoundPath(game), []);
+                DiskCache[game.Key] = null;
                 return null;
             }
 
             await AtomicFile.WriteAllTextAsync(CachePath(game), JsonSerializer.Serialize(details));
+            DiskCache[game.Key] = details;
             return details;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException or UnauthorizedAccessException)

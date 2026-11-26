@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.IO;
 using System.Text.Json;
 using HandheldOptimiser.PowerService;
@@ -106,14 +107,19 @@ internal sealed record GameProfile(PowerMode? PowerMode, int? RefreshRate, int? 
 internal static class GameProfiles
 {
     private const string ProfilesKey = Program.SettingsKey + @"\Profiles";
+    private static readonly ConcurrentDictionary<string, GameProfile> Cache = new(StringComparer.OrdinalIgnoreCase);
 
-    public static GameProfile For(Game game)
+    internal static void ClearCache() => Cache.Clear();
+
+    public static GameProfile For(Game game) => Cache.GetOrAdd(game.Key, ReadFromRegistry);
+
+    private static GameProfile ReadFromRegistry(string gameKey)
     {
         string? text;
         try
         {
             using var key = Registry.CurrentUser.OpenSubKey(ProfilesKey);
-            text = key?.GetValue(game.Key) as string;
+            text = key?.GetValue(gameKey) as string;
         }
         catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
         {
@@ -280,10 +286,12 @@ internal static class GameProfiles
             if (text.Length == 0)
             {
                 key.DeleteValue(game.Key, throwOnMissingValue: false);
+                Cache[game.Key] = GameProfile.None;
             }
             else
             {
                 key.SetValue(game.Key, text, RegistryValueKind.String);
+                Cache[game.Key] = profile;
             }
 
             return true;

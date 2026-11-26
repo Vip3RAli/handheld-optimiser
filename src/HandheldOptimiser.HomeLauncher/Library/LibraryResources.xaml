@@ -88,12 +88,12 @@
                             <Border x:Name="Art" CornerRadius="8" Background="{Binding Background}" ClipToBounds="True">
                                 <Grid>
                                     <Image Source="{Binding Cover}" Stretch="UniformToFill"
-                                           RenderOptions.BitmapScalingMode="HighQuality"
+                                           RenderOptions.BitmapScalingMode="Linear"
                                            Visibility="{Binding HasCover, Converter={StaticResource BoolToVis}}" />
                                     <StackPanel VerticalAlignment="Center" Margin="16,0"
                                                 Visibility="{Binding ShowsIcon, Converter={StaticResource BoolToVis}}">
                                         <Image Source="{Binding Icon}" Width="88" Height="88"
-                                               RenderOptions.BitmapScalingMode="HighQuality" />
+                                               RenderOptions.BitmapScalingMode="Linear" />
                                     </StackPanel>
                                 </Grid>
                             </Border>
@@ -203,7 +203,7 @@
                             <Setter Property="Panel.ZIndex" Value="1" />
                             <Trigger.EnterActions>
                                 <BeginStoryboard>
-                                    <Storyboard>
+                                    <Storyboard Timeline.DesiredFrameRate="30">
                                         <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.05" Duration="0:0:0.14" EasingFunction="{StaticResource ZoomEase}" />
                                         <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.05" Duration="0:0:0.14" EasingFunction="{StaticResource ZoomEase}" />
                                     </Storyboard>
@@ -211,7 +211,7 @@
                             </Trigger.EnterActions>
                             <Trigger.ExitActions>
                                 <BeginStoryboard>
-                                    <Storyboard>
+                                    <Storyboard Timeline.DesiredFrameRate="30">
                                         <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" Duration="0:0:0.14" EasingFunction="{StaticResource ZoomEase}" />
                                         <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" Duration="0:0:0.14" EasingFunction="{StaticResource ZoomEase}" />
                                     </Storyboard>
@@ -248,12 +248,12 @@
                         <Border x:Name="Art" CornerRadius="6" Background="{Binding Background}" ClipToBounds="True">
                             <Grid>
                                 <Image Source="{Binding Cover}" Stretch="UniformToFill" VerticalAlignment="Top"
-                                       RenderOptions.BitmapScalingMode="HighQuality" />
+                                       RenderOptions.BitmapScalingMode="Linear" />
                                 <Image Source="{Binding Icon}" Width="72" Height="72"
-                                       RenderOptions.BitmapScalingMode="HighQuality"
+                                       RenderOptions.BitmapScalingMode="Linear"
                                        Visibility="{Binding ShowsIcon, Converter={StaticResource BoolToVis}}" />
                                 <Image Source="{Binding Square}" Stretch="UniformToFill"
-                                       RenderOptions.BitmapScalingMode="HighQuality" />
+                                       RenderOptions.BitmapScalingMode="Linear" />
                             </Grid>
                         </Border>
                         <!-- Top-left stacked badges: Store logo (when shown), Running/Paused, and Last played. -->
@@ -322,7 +322,7 @@
                             <Setter Property="Panel.ZIndex" Value="1" />
                             <Trigger.EnterActions>
                                 <BeginStoryboard>
-                                    <Storyboard>
+                                    <Storyboard Timeline.DesiredFrameRate="30">
                                         <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="2" Duration="0:0:0.14" EasingFunction="{StaticResource ZoomEase}" />
                                         <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="2" Duration="0:0:0.14" EasingFunction="{StaticResource ZoomEase}" />
                                         <ThicknessAnimation Storyboard.TargetProperty="Margin" To="81,6,81,6" Duration="0:0:0.14" EasingFunction="{StaticResource ZoomEase}" />
@@ -331,7 +331,7 @@
                             </Trigger.EnterActions>
                             <Trigger.ExitActions>
                                 <BeginStoryboard>
-                                    <Storyboard>
+                                    <Storyboard Timeline.DesiredFrameRate="30">
                                         <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" Duration="0:0:0.14" EasingFunction="{StaticResource ZoomEase}" />
                                         <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" Duration="0:0:0.14" EasingFunction="{StaticResource ZoomEase}" />
                                         <ThicknessAnimation Storyboard.TargetProperty="Margin" Duration="0:0:0.14" EasingFunction="{StaticResource ZoomEase}" />
@@ -641,7 +641,7 @@
                             <Setter Property="Panel.ZIndex" Value="1" />
                             <Trigger.EnterActions>
                                 <BeginStoryboard>
-                                    <Storyboard>
+                                    <Storyboard Timeline.DesiredFrameRate="30">
                                         <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.22" Duration="0:0:0.14" EasingFunction="{StaticResource ZoomEase}" />
                                         <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.22" Duration="0:0:0.14" EasingFunction="{StaticResource ZoomEase}" />
                                         <ThicknessAnimation Storyboard.TargetProperty="Margin" To="26,8,26,8" Duration="0:0:0.14" EasingFunction="{StaticResource ZoomEase}" />
@@ -650,7 +650,7 @@
                             </Trigger.EnterActions>
                             <Trigger.ExitActions>
                                 <BeginStoryboard>
-                                    <Storyboard>
+                                    <Storyboard Timeline.DesiredFrameRate="30">
                                         <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" Duration="0:0:0.14" EasingFunction="{StaticResource ZoomEase}" />
                                         <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" Duration="0:0:0.14" EasingFunction="{StaticResource ZoomEase}" />
                                         <ThicknessAnimation Storyboard.TargetProperty="Margin" Duration="0:0:0.14" EasingFunction="{StaticResource ZoomEase}" />
@@ -671,7 +671,7 @@
                     <Border CornerRadius="8" ClipToBounds="True" Background="#262B36">
                         <Grid>
                             <Image Source="{Binding Banner}" Stretch="UniformToFill"
-                                   RenderOptions.BitmapScalingMode="HighQuality" />
+                                   RenderOptions.BitmapScalingMode="Linear" />
                             <TextBlock Text="&#xE719;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="28" Opacity="0.35"
                                        HorizontalAlignment="Center" VerticalAlignment="Center"
                                        Visibility="{Binding ShowsTitle, Converter={StaticResource BoolToVis}}" />

@@ -25,8 +25,8 @@ internal enum GameSessionState
 /// </summary>
 internal sealed class GameTile : INotifyPropertyChanged, INoticeHost
 {
-    // Tiles are 180 x 270 DIPs; 360 px wide covers up to 200% scaling.
-    private const int CoverDecodeWidth = 360;
+    // Grid tiles are 144 x 216 DIPs (216 px at 150% DPI); 240 px saves ~55% pixel memory vs 360 px.
+    private const int CoverDecodeWidth = 240;
     private const int IconSize = 256;
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -236,8 +236,20 @@ internal sealed class GameTile : INotifyPropertyChanged, INoticeHost
     {
         try
         {
+            var localPath = game.CoverPath;
+            if (localPath is null && !game.Installed && game.Store == GameStore.Steam
+                && game.Key.StartsWith("steam:", StringComparison.OrdinalIgnoreCase)
+                && !SteamShortcuts.IsShortcut(game)
+                && SteamLibrary.SteamDirectory() is { } steamDir)
+            {
+                localPath = SteamLibrary.FindArt(
+                    Path.Combine(steamDir, "appcache", "librarycache"),
+                    game.Key["steam:".Length..],
+                    SteamLibrary.CoverNames);
+            }
+
             // A cover fetched on an earlier run is on disk already, so the tile opens with it.
-            var cover = (game.CoverPath ?? Artwork.CachedCover(game)) is { } path ? LoadCover(path) : null;
+            var cover = (localPath ?? Artwork.CachedCover(game)) is { } path ? LoadCover(path) : null;
             var icon = cover is null && game.IconPath is not null ? LoadIcon(game.IconPath) : null;
             return (cover, icon, Palette.Colours(cover ?? icon) ?? StoreColours(game.Store));
         }

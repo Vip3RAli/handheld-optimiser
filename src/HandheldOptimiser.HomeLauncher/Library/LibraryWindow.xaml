@@ -163,11 +163,7 @@
         <Border x:Name="DealsDock" Grid.Row="2" VerticalAlignment="Bottom" Margin="14,0,14,4" />
 
         <TextBlock x:Name="EmptyText" Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Center"
-                   FontSize="18" Foreground="#F2F3F5" Opacity="0.88" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="560">
-            <TextBlock.Effect>
-                <DropShadowEffect BlurRadius="8" ShadowDepth="0" Color="#E6000000" Opacity="0.9" />
-            </TextBlock.Effect>
-        </TextBlock>
+                   FontSize="18" Foreground="#F2F3F5" Opacity="0.88" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="560" />
 
         <!--
             The button hints. A, which changes with what has the focus, and X are at the left, and the

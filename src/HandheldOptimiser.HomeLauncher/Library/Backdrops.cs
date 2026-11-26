@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -42,6 +43,10 @@ internal static class Backdrops
     internal const int MaxWidth = 1920;
     internal const int MaxHeight = 1080;
 
+    // Reusable full-screen pixel buffers (1920x1080x4 exceeds ArrayPool<byte>.Shared's 1 MB default bucket).
+    private static readonly ArrayPool<byte> BufferPool =
+        ArrayPool<byte>.Create(maxArrayLength: MaxWidth * MaxHeight * BytesPerPixel, maxArraysPerBucket: 2);
+
     /// <summary>Caps backdrop generation dimensions at 1920x1080 while preserving aspect ratio.</summary>
     internal static (int Width, int Height) CapSize(int width, int height)
     {
@@ -59,12 +64,20 @@ internal static class Backdrops
     public static BitmapSource Gradient(Color from, Color to, int width, int height, double shade)
     {
         (width, height) = CapSize(width, height);
-        return Frozen(GradientPixels(from, to, width, height, shade), width, height);
+        var pixels = GradientPixels(from, to, width, height, shade);
+        try
+        {
+            return Frozen(pixels, width, height);
+        }
+        finally
+        {
+            BufferPool.Return(pixels);
+        }
     }
 
     private static byte[] GradientPixels(Color from, Color to, int width, int height, double shade)
     {
-        var pixels = new byte[width * height * BytesPerPixel];
+        var pixels = BufferPool.Rent(width * height * BytesPerPixel);
         var alphas = ShadeByRow(height, shade);
 
         // Rows are independent, so they are shared out across the cores: the picture is wanted quickly.
@@ -117,35 +130,49 @@ internal static class Backdrops
             return null;
         }
 
-        var pixels = GradientPixels(from, to, width, height, shade);
-        var alphas = ShadeByRow(height, PictureShade);
-
-        var atBottom = position == ArtworkPosition.Bottom;
-        var firstRow = atBottom ? height - pictureHeight : 0;
-
-        // The picture gives way to the gradient over this many rows, on the side where the two meet.
-        var fade = pictureHeight < height ? pictureHeight * FadeShare : 0;
-
-        Parallel.For(0, pictureHeight, y =>
+        try
         {
-            var fromMeetingEdge = atBottom ? y : pictureHeight - 1 - y;
-            var show = fromMeetingEdge >= fade ? 1 : Smooth(fromMeetingEdge / fade);
-            var alpha = alphas[firstRow + y];
-            var keep = 1 - alpha;
-            var source = y * width * BytesPerPixel;
-            var target = (firstRow + y) * width * BytesPerPixel;
-
-            for (var x = 0; x < width * BytesPerPixel; x += BytesPerPixel)
+            var pixels = GradientPixels(from, to, width, height, shade);
+            try
             {
-                var s = source + x;
-                var t = target + x;
-                pixels[t] = Round((art[s] * keep + ShadeBlue * alpha) * show + pixels[t] * (1 - show));
-                pixels[t + 1] = Round((art[s + 1] * keep + ShadeGreen * alpha) * show + pixels[t + 1] * (1 - show));
-                pixels[t + 2] = Round((art[s + 2] * keep + ShadeRed * alpha) * show + pixels[t + 2] * (1 - show));
-            }
-        });
+                var alphas = ShadeByRow(height, PictureShade);
 
-        return Frozen(pixels, width, height);
+                var atBottom = position == ArtworkPosition.Bottom;
+                var firstRow = atBottom ? height - pictureHeight : 0;
+
+                // The picture gives way to the gradient over this many rows, on the side where the two meet.
+                var fade = pictureHeight < height ? pictureHeight * FadeShare : 0;
+
+                Parallel.For(0, pictureHeight, y =>
+                {
+                    var fromMeetingEdge = atBottom ? y : pictureHeight - 1 - y;
+                    var show = fromMeetingEdge >= fade ? 1 : Smooth(fromMeetingEdge / fade);
+                    var alpha = alphas[firstRow + y];
+                    var keep = 1 - alpha;
+                    var source = y * width * BytesPerPixel;
+                    var target = (firstRow + y) * width * BytesPerPixel;
+
+                    for (var x = 0; x < width * BytesPerPixel; x += BytesPerPixel)
+                    {
+                        var s = source + x;
+                        var t = target + x;
+                        pixels[t] = Round((art[s] * keep + ShadeBlue * alpha) * show + pixels[t] * (1 - show));
+                        pixels[t + 1] = Round((art[s + 1] * keep + ShadeGreen * alpha) * show + pixels[t + 1] * (1 - show));
+                        pixels[t + 2] = Round((art[s + 2] * keep + ShadeRed * alpha) * show + pixels[t + 2] * (1 - show));
+                    }
+                });
+
+                return Frozen(pixels, width, height);
+            }
+            finally
+            {
+                BufferPool.Return(pixels);
+            }
+        }
+        finally
+        {
+            BufferPool.Return(art);
+        }
     }
 
     // Banner artwork is about three times as wide as it is tall, and a little over that is decoded.
@@ -164,7 +191,19 @@ internal static class Backdrops
             return null;
         }
 
-        return Cover(picture, width, height) is { } pixels ? Frozen(pixels, width, height) : null;
+        if (Cover(picture, width, height) is not { } pixels)
+        {
+            return null;
+        }
+
+        try
+        {
+            return Frozen(pixels, width, height);
+        }
+        finally
+        {
+            BufferPool.Return(pixels);
+        }
     }
 
     // The panel under an app's picture on its card, top and bottom: the dark of the deals' cards.
@@ -194,40 +233,54 @@ internal static class Backdrops
             return null;
         }
 
-        var pixels = new byte[width * height * BytesPerPixel];
-        var fade = pictureHeight < height ? pictureHeight * PanelFadeShare : 0;
-
-        Parallel.For(0, height, y =>
+        try
         {
-            var down = height > 1 ? (double)y / (height - 1) : 0;
-            var blue = PanelTop.B + (PanelBottom.B - PanelTop.B) * down;
-            var green = PanelTop.G + (PanelBottom.G - PanelTop.G) * down;
-            var red = PanelTop.R + (PanelBottom.R - PanelTop.R) * down;
-
-            // How much of the picture shows on this row: all of it, less and less towards its foot, then none.
-            var fromFoot = pictureHeight - 1 - y;
-            var show = fromFoot < 0 ? 0 : fromFoot >= fade ? 1 : Smooth(fromFoot / fade);
-            var row = y * width * BytesPerPixel;
-
-            for (var x = 0; x < width * BytesPerPixel; x += BytesPerPixel)
+            var pixels = BufferPool.Rent(width * height * BytesPerPixel);
+            try
             {
-                var i = row + x;
-                if (show > 0)
-                {
-                    pixels[i] = Round(art[i] * show + blue * (1 - show));
-                    pixels[i + 1] = Round(art[i + 1] * show + green * (1 - show));
-                    pixels[i + 2] = Round(art[i + 2] * show + red * (1 - show));
-                }
-                else
-                {
-                    pixels[i] = Round(blue);
-                    pixels[i + 1] = Round(green);
-                    pixels[i + 2] = Round(red);
-                }
-            }
-        });
+                var fade = pictureHeight < height ? pictureHeight * PanelFadeShare : 0;
 
-        return Frozen(pixels, width, height);
+                Parallel.For(0, height, y =>
+                {
+                    var down = height > 1 ? (double)y / (height - 1) : 0;
+                    var blue = PanelTop.B + (PanelBottom.B - PanelTop.B) * down;
+                    var green = PanelTop.G + (PanelBottom.G - PanelTop.G) * down;
+                    var red = PanelTop.R + (PanelBottom.R - PanelTop.R) * down;
+
+                    // How much of the picture shows on this row: all of it, less and less towards its foot, then none.
+                    var fromFoot = pictureHeight - 1 - y;
+                    var show = fromFoot < 0 ? 0 : fromFoot >= fade ? 1 : Smooth(fromFoot / fade);
+                    var row = y * width * BytesPerPixel;
+
+                    for (var x = 0; x < width * BytesPerPixel; x += BytesPerPixel)
+                    {
+                        var i = row + x;
+                        if (show > 0)
+                        {
+                            pixels[i] = Round(art[i] * show + blue * (1 - show));
+                            pixels[i + 1] = Round(art[i + 1] * show + green * (1 - show));
+                            pixels[i + 2] = Round(art[i + 2] * show + red * (1 - show));
+                        }
+                        else
+                        {
+                            pixels[i] = Round(blue);
+                            pixels[i + 1] = Round(green);
+                            pixels[i + 2] = Round(red);
+                        }
+                    }
+                });
+
+                return Frozen(pixels, width, height);
+            }
+            finally
+            {
+                BufferPool.Return(pixels);
+            }
+        }
+        finally
+        {
+            BufferPool.Return(art);
+        }
     }
 
     // A picture is the point of this background, so it gets less of the shade than a plain gradient
@@ -298,22 +351,43 @@ internal static class Backdrops
             return null;
         }
 
+        var workBytes = workWidth * workHeight * BytesPerPixel;
         if (radius > 0)
         {
-            var scratch = new byte[work.Length];
-            for (var pass = 0; pass < BlurPasses; pass++)
+            var scratch = BufferPool.Rent(workBytes);
+            try
             {
-                BlurRows(work, scratch, workWidth, workHeight, radius);
-                BlurColumns(scratch, work, workWidth, workHeight, radius);
+                for (var pass = 0; pass < BlurPasses; pass++)
+                {
+                    BlurRows(work, scratch, workWidth, workHeight, radius);
+                    BlurColumns(scratch, work, workWidth, workHeight, radius);
+                }
+            }
+            finally
+            {
+                BufferPool.Return(scratch);
             }
         }
 
-        return divisor == 1 ? work : Enlarge(work, workWidth, workHeight, width, height);
+        if (divisor == 1)
+        {
+            return work;
+        }
+
+        try
+        {
+            return Enlarge(work, workWidth, workHeight, width, height);
+        }
+        finally
+        {
+            BufferPool.Return(work);
+        }
     }
 
     /// <summary>The picture scaled to cover the given size and cropped to it about its centre.</summary>
     private static byte[]? Cover(BitmapSource picture, int width, int height)
     {
+        byte[]? pixels = null;
         try
         {
             // A pixel over on each side, so rounding never leaves the crop short of the edge.
@@ -327,14 +401,24 @@ internal static class Backdrops
             var crop = new CroppedBitmap(scaled, new Int32Rect(
                 (scaled.PixelWidth - width) / 2, (scaled.PixelHeight - height) / 2, width, height));
 
-            var pixels = new byte[width * height * BytesPerPixel];
+            var byteCount = width * height * BytesPerPixel;
+            pixels = BufferPool.Rent(byteCount);
             new FormatConvertedBitmap(crop, PixelFormats.Bgr32, null, 0).CopyPixels(pixels, width * BytesPerPixel, 0);
-            return pixels;
+            var result = pixels;
+            pixels = null;
+            return result;
         }
         catch (Exception ex) when (ex is NotSupportedException or FormatException or ArgumentException
             or InvalidOperationException or OverflowException or COMException)
         {
             return null;
+        }
+        finally
+        {
+            if (pixels is not null)
+            {
+                BufferPool.Return(pixels);
+            }
         }
     }
 
@@ -375,7 +459,7 @@ internal static class Backdrops
     /// <summary>Enlarges the blurred picture to its size on screen, smoothly.</summary>
     private static byte[] Enlarge(byte[] work, int workWidth, int workHeight, int width, int height)
     {
-        var pixels = new byte[width * height * BytesPerPixel];
+        var pixels = BufferPool.Rent(width * height * BytesPerPixel);
 
         // Where each output column falls between two source columns, worked out once.
         var left = new int[width];

@@ -26,14 +26,11 @@ internal static partial class WindowsProcessOptimiser
         "PhoneExperienceHost",
         "SecurityHealthSystray",
         "GameBarPresenceWriter",
-        "StartMenuExperienceHost",
-
-        // The Radeon Software window, which sits open in the background (about 110 MB). Driver settings
-        // such as RSR, AFMF and Anti-Lag do not need it, and Alt+R opens it again.
-        "RadeonSoftware"
+        "StartMenuExperienceHost"
     ];
 
     // AMD's recording and Instant Replay (about 70 MB): opt-in because Instant Replay stops when closed.
+    // RadeonSoftware itself is left untouched so Adrenalin/ADLX overlay and FreeSync stay intact.
     private static readonly string[] AmdRecordingProcesses = ["AMDRSSrcExt"];
 
     internal static IReadOnlyList<string> TargetProcesses(bool stopAmdRecording) =>
@@ -68,76 +65,59 @@ internal static partial class WindowsProcessOptimiser
     public static void Optimise(bool stopAmdRecording = false)
     {
         var session = CurrentSession();
+        var targets = new HashSet<string>(TargetProcesses(stopAmdRecording), StringComparer.OrdinalIgnoreCase);
+        var retained = new HashSet<string>(RetainedShellProcesses, StringComparer.OrdinalIgnoreCase);
         var terminated = 0;
         var trimmed = 0;
 
-        foreach (var name in TargetProcesses(stopAmdRecording))
+        Process[] allProcesses;
+        try
         {
-            Process[] procs;
-            try
-            {
-                procs = Process.GetProcessesByName(name);
-            }
-            catch (Exception)
-            {
-                continue;
-            }
+            allProcesses = Process.GetProcesses();
+        }
+        catch (Exception)
+        {
+            allProcesses = [];
+        }
 
-            foreach (var proc in procs)
+        foreach (var proc in allProcesses)
+        {
+            using (proc)
             {
-                using (proc)
+                string name;
+                try
                 {
-                    if (SessionOf(proc) != session)
-                    {
-                        continue;
-                    }
+                    name = proc.ProcessName;
+                }
+                catch (Exception)
+                {
+                    continue;
+                }
 
-                    try
+                var isTarget = targets.Contains(name);
+                var isRetained = !isTarget && retained.Contains(name);
+                if ((!isTarget && !isRetained) || SessionOf(proc) != session)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    if (isTarget)
                     {
                         proc.Kill();
                         terminated++;
                         Program.Log($"Optimised Windows: terminated {name} (PID {proc.Id})");
                     }
-                    catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
+                    else if (Native.EmptyWorkingSet(proc.Handle))
                     {
-                        // Already exited or permission denied
+                        trimmed++;
+                        Program.Log($"Optimised Windows: trimmed working set for {name} (PID {proc.Id})");
                     }
                 }
-            }
-        }
-
-        foreach (var name in RetainedShellProcesses)
-        {
-            Process[] procs;
-            try
-            {
-                procs = Process.GetProcessesByName(name);
-            }
-            catch (Exception)
-            {
-                continue;
-            }
-
-            foreach (var proc in procs)
-            {
-                using (proc)
+                catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
                 {
-                    if (SessionOf(proc) != session)
-                    {
-                        continue;
-                    }
-
-                    try
-                    {
-                        if (Native.EmptyWorkingSet(proc.Handle))
-                        {
-                            trimmed++;
-                            Program.Log($"Optimised Windows: trimmed working set for {name} (PID {proc.Id})");
-                        }
-                    }
-                    catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
-                    {
-                    }
+                    // Already exited or permission denied
                 }
             }
         }

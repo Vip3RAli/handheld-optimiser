@@ -381,7 +381,7 @@ internal sealed class InstallQueue
         }
 
         Publish();
-        if (_entries.Count == 0)
+        if (_entries.Count == 0 || _entries.All(e => e.Status == Status.Paused && e.Run is null))
         {
             _timer.Stop();
         }
