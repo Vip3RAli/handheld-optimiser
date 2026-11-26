@@ -367,8 +367,18 @@
                             local:MenuRow.About="Choose whether background programs are closed as this game starts." />
                     <Button x:Name="ProfileAutoTdpSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE950;" Content="TDP Engine"
                             local:MenuRow.About="How TDP Engine sets the power limit while this game runs." />
+                    <Button x:Name="ProfileWattsSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE945;" Content="Max TDP limit"
+                            local:MenuRow.About="The highest power limit TDP Engine may use for this game." />
                     <Button x:Name="ProfileFanSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE9CA;" Content="Fan curve"
                             local:MenuRow.About="The fan curve used while this game runs." />
+                    <Button x:Name="ProfileBoostSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xEC4A;" Content="CPU boost"
+                            local:MenuRow.About="Processor boost mode used while this game runs." />
+                    <Button x:Name="ProfileAcBoostSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE83E;" Content="AC boost bursts"
+                            local:MenuRow.About="Allow short high power bursts while plugged in during this game." />
+                    <Button x:Name="ProfileFreeSyncSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE7F4;" Content="FreeSync"
+                            local:MenuRow.About="Variable refresh rate used while this game runs." />
+                    <Button x:Name="ProfileControlsSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE7FC;" Content="Controller mode"
+                            local:MenuRow.About="Switch the Ally controller to gamepad or desktop mode while this game runs." />
                     <Button x:Name="ProfileExportItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE898;" Content="Export preset"
                             local:MenuRow.About="Save this game's profile to a file, to keep or share." />
                     <Button x:Name="ProfileImportItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE896;" Content="Import preset"
@@ -673,6 +683,12 @@
                             local:MenuRow.About="The most watts TDP Engine may give a game." />
                     <Button x:Name="FanCurveSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE9CA;" Content="Fan curve"
                             local:MenuRow.About="Choose a fan profile." />
+                    <Button x:Name="CpuBoostSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xEC4A;" Content="CPU boost"
+                            local:MenuRow.About="Set the processor boost mode through the power service." />
+                    <Button x:Name="AcBoostSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE83E;" Content="AC boost bursts"
+                            local:MenuRow.About="Allow short high power bursts while plugged in." />
+                    <Button x:Name="FreeSyncSetting" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE7F4;" Content="Radeon FreeSync"
+                            local:MenuRow.About="Switch AMD FreeSync variable refresh rate on or off." />
                     <!-- For touch, which has no B button. -->
                     <Button x:Name="PowerCoolingBackItem" Style="{StaticResource MenuButton}" local:MenuRow.Icon="&#xE72B;" Content="Back"
                             local:MenuRow.About="Back to While Playing." />

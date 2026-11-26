@@ -30,17 +30,26 @@ internal static partial class AutoTdp
     private static Task _queue = Task.CompletedTask;
 
     /// <summary>The frame rates on offer. 0 is off.</summary>
-    public static readonly int[] FrameRates = [30, 40, 45, 60];
+    public static readonly int[] FrameRates = [30, 40, 45, 50, 60, 72, 90, 120];
 
     public static readonly int[] TemperatureLimits = [70, 75, 80, 85, 90];
 
     public static readonly int[] MostWatts = [15, 18, 20, 25, 30];
+
+    /// <summary>Minimum play time before a game's settled TDP is saved for future launches.</summary>
+    public static readonly TimeSpan MinLearnDuration = TimeSpan.FromMinutes(2);
 
     /// <summary>The Ally's own fan curve, which TDP Engine leaves alone.</summary>
     public const string AllyFans = "default";
 
     /// <summary>The fan curves on offer, the Ally's own first.</summary>
     public static readonly string[] FanChoices = [AllyFans, .. AutoTdpProtocol.FanModes];
+
+    /// <summary>Processor boost modes offered by the power service.</summary>
+    public static readonly string[] CpuBoostModes = AutoTdpProtocol.CpuBoostModes;
+
+    /// <summary>Ally controller modes offered by the power service.</summary>
+    public static readonly string[] ControllerModes = [AutoTdpProtocol.GamepadMode, AutoTdpProtocol.DesktopMode];
 
     public static string FanName(string fans) => fans switch
     {
@@ -51,13 +60,26 @@ internal static partial class AutoTdp
         _ => "Default"
     };
 
+    public static string CpuBoostName(string? mode) => mode switch
+    {
+        AutoTdpProtocol.BoostEfficient => "Efficient",
+        AutoTdpProtocol.BoostAggressive => "Aggressive",
+        _ => "Off"
+    };
+
+    public static string ControllerModeName(string? mode) =>
+        mode == AutoTdpProtocol.DesktopMode ? "Desktop" : "Gamepad";
+
     /// <summary>Starts holding a game at its target, from what it settled on last time, and setting its fan curve.</summary>
     /// <param name="targetFps">The frame rate to hold, or 0 to set only the fans.</param>
+    /// <param name="maxWatts">Optional per-game TDP ceiling override in watts; null uses the library setting.</param>
     /// <returns>Why it could not start, or null.</returns>
-    public static Task<string?> StartAsync(Game game, int targetFps, string fanCurve) => Queue(async () =>
+    public static Task<string?> StartAsync(Game game, int targetFps, string fanCurve, int? maxWatts = null) => Queue(async () =>
     {
+        var max = Math.Clamp(maxWatts ?? LibrarySettings.AutoTdpMaxWatts,
+            AutoTdpProtocol.LowestWatts, AutoTdpProtocol.HighestWatts);
         var request = new AutoTdpRequest(AutoTdpProtocol.Start, targetFps, AutoTdpProtocol.LowestWatts,
-            LibrarySettings.AutoTdpMaxWatts, LibrarySettings.AutoTdpTemperature, Learned(game),
+            max, LibrarySettings.AutoTdpTemperature, Learned(game),
             GameSession.ProcessFolder(game), fanCurve == AllyFans ? null : fanCurve);
 
         if (await StartServiceAsync() is { } problem)
@@ -85,12 +107,29 @@ internal static partial class AutoTdp
             return "TDP Engine did not answer.";
         }
 
-        Program.Log($"TDP Engine for {game.Key}: {targetFps} fps from {status.Watts} W, {fanCurve} fans{(status.Error is { } error ? $" ({error})" : "")}");
+        Program.Log($"TDP Engine for {game.Key}: {targetFps} fps from {status.Watts} W (max {max} W), {fanCurve} fans{(status.Error is { } error ? $" ({error})" : "")}");
         return status.Error;
     });
 
-    /// <summary>Stops, remembering where the game settled for next time.</summary>
-    public static Task StopAsync(Game game) => Queue(async () =>
+    /// <summary>Whether the returned status represents a settled TDP worth saving for future launches.</summary>
+    internal static bool ShouldRememberWatts(AutoTdpStatus? status, TimeSpan? played)
+    {
+        if (status?.Watts is not { } watts || watts < AutoTdpProtocol.LowestWatts || watts > AutoTdpProtocol.HighestWatts)
+        {
+            return false;
+        }
+
+        if (played is { } duration && duration < MinLearnDuration)
+        {
+            return false;
+        }
+
+        return Enum.TryParse<AutoTdpState>(status.State, out var state)
+            && state is AutoTdpState.Holding or AutoTdpState.AtMaximum or AutoTdpState.NoGain;
+    }
+
+    /// <summary>Stops, remembering where the game settled when the session actually settled.</summary>
+    public static Task StopAsync(Game game, TimeSpan? played = null) => Queue(async () =>
     {
         // Nothing to stop when the service is not running, and asking would start a wait for nothing.
         if (!ServiceRunning())
@@ -98,18 +137,45 @@ internal static partial class AutoTdp
             return null;
         }
 
-        if (await SendAsync(new AutoTdpRequest(AutoTdpProtocol.Stop)) is { Watts: { } watts })
+        var status = await SendAsync(new AutoTdpRequest(AutoTdpProtocol.Stop));
+        if (ShouldRememberWatts(status, played))
         {
-            Remember(game, watts);
+            Remember(game, status!.Watts!.Value);
         }
 
         return null;
     });
 
-    /// <summary>A line on what it is doing, or null when it is not running.</summary>
-    /// <summary>TDP Engine's status, with the controller's state while it replaces Armoury Crate, or null when it is not running.</summary>
+    /// <summary>Stops an active TDP Engine session without saving learned watts (for an explicit Off profile).</summary>
+    public static Task StopIfRunningAsync() => Queue(async () =>
+    {
+        if (ServiceRunning())
+        {
+            _ = await SendAsync(new AutoTdpRequest(AutoTdpProtocol.Stop));
+        }
+
+        return null;
+    });
+
+    /// <summary>TDP Engine's status, with the controller's state while it replaces Armoury Crate, or null when not running.</summary>
     public static async Task<AutoTdpStatus?> StatusAsync() =>
         ServiceRunning() ? await SendAsync(new AutoTdpRequest(AutoTdpProtocol.Status)) : null;
+
+    /// <summary>Sets the processor boost mode through the power service, or returns null if the service is not running.</summary>
+    public static async Task<AutoTdpStatus?> SetCpuBoostModeAsync(string mode) =>
+        ServiceRunning() ? await SendAsync(new AutoTdpRequest(AutoTdpProtocol.SetBoost, CpuBoostMode: mode)) : null;
+
+    /// <summary>Allows or disallows short-term AC boost bursts (sPPT/fPPT) through the power service.</summary>
+    public static async Task<AutoTdpStatus?> SetAcBoostBurstsAsync(bool enabled) =>
+        ServiceRunning() ? await SendAsync(new AutoTdpRequest(AutoTdpProtocol.SetAcBoost, AcBoostBursts: enabled)) : null;
+
+    /// <summary>Sets a Radeon ADLX switch through the power service.</summary>
+    public static async Task<AutoTdpStatus?> SetRadeonAsync(string feature, bool on) =>
+        ServiceRunning() ? await SendAsync(new AutoTdpRequest(AutoTdpProtocol.SetRadeon, RadeonFeature: feature, RadeonOn: on)) : null;
+
+    /// <summary>Sets AMD FreeSync (VRR) through the power service.</summary>
+    public static Task<AutoTdpStatus?> SetFreeSyncAsync(bool on) =>
+        SetRadeonAsync(RadeonState.FreeSyncName, on);
 
     /// <summary>
     /// For the overlay, each second: the frame rate of the program in front, with the power limit, the

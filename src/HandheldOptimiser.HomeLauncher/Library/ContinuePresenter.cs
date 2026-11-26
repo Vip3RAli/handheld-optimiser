@@ -270,7 +270,7 @@ internal sealed class ContinuePresenter
         }
 
         var profile = GameProfiles.For(tile.Game);
-        if (!profile.IsEmpty || profile.CloseApps is not null || profile.AutoTdpFps is not null || profile.FanCurve is not null)
+        if (profile.HasAny)
         {
             rows.Add(new InfoRow("Game profile", Capitalised(profile.Describe())));
         }
