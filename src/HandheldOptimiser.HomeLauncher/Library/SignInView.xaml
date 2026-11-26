@@ -12,7 +12,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Visibility="Collapsed">
     <Grid Background="#C8000000">
-        <Border x:Name="Panel" Width="940" Margin="40,28" HorizontalAlignment="Center" VerticalAlignment="Center"
+        <Border x:Name="Panel" MaxWidth="940" Margin="40,28" HorizontalAlignment="Center" VerticalAlignment="Center"
                 CornerRadius="5" Background="{StaticResource MenuPanelBack}" BorderBrush="#47FFFFFF" BorderThickness="1">
             <Grid>
                 <Rectangle Fill="{StaticResource MenuPanelSheen}" RadiusX="5" RadiusY="5" IsHitTestVisible="False" />

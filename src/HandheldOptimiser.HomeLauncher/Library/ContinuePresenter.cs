@@ -77,7 +77,7 @@ internal sealed class ContinuePresenter
     public void Update()
     {
         var view = _view;
-        var tile = _isRow() && _options.ContinueInfo && _state.Filter == TileFilter.All ? _detailsFor : null;
+        var tile = _isRow() && _options.ContinueInfo && !_state.Filter.NotInstalled ? _detailsFor : null;
         if (tile is null || !_state.Tiles.Contains(tile))
         {
             view.ContinuePanel.Visibility = Visibility.Collapsed;
@@ -309,9 +309,12 @@ internal sealed class ContinuePresenter
         view.ContinueSource.Visibility = source is null ? Visibility.Collapsed : Visibility.Visible;
 
         // With no description the lines would be lost in a panel as wide as the screen, and as tall as one with it.
+        var responsiveHeight = _scroller.ViewportHeight > 0
+            ? Math.Clamp(_scroller.ViewportHeight - 340, 150, 270)
+            : 220;
         view.ContinueRows.Width = about is null ? double.NaN : RowsWidth;
         view.ContinueInfo.Width = about is null ? Math.Min(InfoWidthAlone, InfoRoom() - 20) : double.NaN;
-        view.ContinueInfo.Height = about is null ? double.NaN : 270;
+        view.ContinueInfo.Height = about is null ? double.NaN : responsiveHeight;
         view.ContinueInfo.HorizontalAlignment = about is null ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;
         view.ContinueInfo.Visibility = Visibility.Visible;
     }

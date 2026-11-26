@@ -202,6 +202,7 @@ internal sealed class BackdropPresenter(Rectangle front, Rectangle back, Library
         }
 
         var previous = front.Fill;
+        var previousOpacity = front.Opacity;
         if (brush is null && previous is null)
         {
             return;
@@ -212,16 +213,16 @@ internal sealed class BackdropPresenter(Rectangle front, Rectangle back, Library
 
         if (brush is null)
         {
-            // Nothing new to show: the old one fades away on the back layer.
+            // Nothing new to show: the old one fades away on the back layer from its current opacity.
             front.Fill = null;
             front.Opacity = 0;
             back.Fill = previous;
-            back.BeginAnimation(UIElement.OpacityProperty, Fade(1, 0, () => back.Fill = null));
+            back.BeginAnimation(UIElement.OpacityProperty, Fade(previousOpacity, 0, () => back.Fill = null));
             return;
         }
 
         back.Fill = previous;
-        back.Opacity = previous is null ? 0 : 1;
+        back.Opacity = previous is null ? 0 : previousOpacity;
         front.Fill = brush;
 
         // Once the new one is solid the old one is covered, and can go.

@@ -138,8 +138,14 @@ internal sealed class DownloadsPresenter
     /// <summary>Adds a row for each new download, takes away finished ones, and updates the rest in place.</summary>
     private void Fill()
     {
+        var lostFocus = false;
         foreach (var gone in _shown.Keys.Except(_rows.Select(r => r.AppId)).ToList())
         {
+            if (_shown[gone].IsKeyboardFocused)
+            {
+                lostFocus = true;
+            }
+
             _view.DownloadsItems.Children.Remove(_shown[gone]);
             _shown.Remove(gone);
         }
@@ -150,15 +156,22 @@ internal sealed class DownloadsPresenter
             {
                 var key = row.AppId;
                 var library = IsLibraryDownload(row);
+                var store = row.AppId.StartsWith("epic:", StringComparison.Ordinal) ? "Epic Games" : "GOG";
                 button = _menu.AddRow(_view.DownloadsItems, _view.DownloadsSteamItem, row.Title, null,
                     library ? () => Queue?.Toggle(key) : OpenSteam);
                 MenuRow.SetAbout(button, library
-                    ? "Downloading here, from GOG. Press to pause or carry on. Cancel it from the game's own menu."
+                    ? $"Downloading here, from {store}. Press to pause or carry on. Cancel it from the game's own menu."
                     : "Open Steam's downloads to pause, resume or cancel it.");
                 _shown[row.AppId] = button;
             }
 
             button.Tag = row.Progress.Text;
+        }
+
+        if (lostFocus && Showing)
+        {
+            _menu.ShowItems(_shown.Values.FirstOrDefault()
+                ?? (_view.DownloadsSteamItem.IsVisible ? _view.DownloadsSteamItem : _view.DownloadsBackItem));
         }
 
         if (_rows.Count == 0 && Showing)

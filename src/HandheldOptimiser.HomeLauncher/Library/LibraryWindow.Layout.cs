@@ -62,7 +62,7 @@ public partial class LibraryWindow
                 _continue.ForgetInfo();
             }
 
-            OptionsHint.Visibility = _options.QuickActions ? Visibility.Visible : Visibility.Collapsed;
+            HintBar.Visibility = _options.QuickActions ? Visibility.Visible : Visibility.Collapsed;
             _ = _topBar.UpdateStatusAsync();
         }
         ScaledContent.LayoutTransform = scale == 1 ? Transform.Identity : new ScaleTransform(scale, scale);
@@ -72,6 +72,7 @@ public partial class LibraryWindow
         var narrow = _layouts.Layout != LibraryLayout.OldSchool;
         Resources["TopBarEdges"] = narrow ? new Thickness(24, 14, 24, 8) : new Thickness(48, 14, 48, 8);
         Resources["HintBarEdges"] = narrow ? new Thickness(24, 2, 24, 12) : new Thickness(48, 2, 48, 12);
+        Resources["BannerEdges"] = narrow ? new Thickness(24, 0, 24, 12) : new Thickness(48, 0, 48, 12);
 
         // The cards' artwork is made at the size they are drawn, which has just changed.
         if (scaleChanged)

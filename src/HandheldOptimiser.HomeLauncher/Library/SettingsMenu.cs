@@ -44,13 +44,13 @@ internal sealed class SettingsMenu
     private readonly TileArtwork _artwork;
     private readonly TopBarPresenter _topBar;
     private readonly ContinuePresenter _continue;
-    private readonly UIElement _optionsHint;
+    private readonly UIElement _hintBar;
     private readonly ILibraryHost _host;
 
-    /// <param name="optionsHint">The X Options hint at the foot of the screen, which shows only while quick actions are on.</param>
+    /// <param name="hintBar">The controller button hint bar at the foot of the screen, hidden when hints are off.</param>
     public SettingsMenu(MenuView view, MenuPresenter menu, NoticePresenter notices, LibraryState state, LibraryOptions options,
         BackdropPresenter backdrop, TileArtwork artwork, TopBarPresenter topBar, ContinuePresenter continuePresenter,
-        UIElement optionsHint, ILibraryHost host)
+        UIElement hintBar, ILibraryHost host)
     {
         _view = view;
         _menu = menu;
@@ -61,7 +61,7 @@ internal sealed class SettingsMenu
         _artwork = artwork;
         _topBar = topBar;
         _continue = continuePresenter;
-        _optionsHint = optionsHint;
+        _hintBar = hintBar;
         _host = host;
 
         // The settings list.
@@ -162,7 +162,7 @@ internal sealed class SettingsMenu
         view.QuickActionsSetting.Click += (_, _) =>
         {
             _options.QuickActions = !_options.QuickActions;
-            _optionsHint.Visibility = _options.QuickActions ? Visibility.Visible : Visibility.Collapsed;
+            _hintBar.Visibility = _options.QuickActions ? Visibility.Visible : Visibility.Collapsed;
             Refresh();
         };
         view.HiddenSetting.Click += (_, _) =>
@@ -372,8 +372,8 @@ internal sealed class SettingsMenu
         };
         view.HiddenSetting.Tag = SettingSteps.OnOff(_options.ShowHidden);
 
-        // Where to get a key is on the screen it is typed in.
-        view.ArtworkKeySetting.Visibility = _options.Background == BackgroundKind.Artwork ? Visibility.Visible : Visibility.Collapsed;
+        // Keep SteamGridDB API key visible regardless of current background mode (also used by Old School cards and Apps).
+        view.ArtworkKeySetting.Visibility = Visibility.Visible;
         view.ArtworkKeySetting.Tag = LibrarySettings.ArtworkKey is null ? "Not set" : "Set";
 
         // How the Old School layout is drawn, and whether the Console space look's background moves.

@@ -84,6 +84,26 @@ internal sealed class LibraryNavigationCoordinator
         // Every game's tile.
         Visuals.OnItemButtons(parts.Tiles, OnTileClick, OnTileFocused, OnTileRightClick);
         parts.TilesScroller.PreviewMouseWheel += OnTilesWheel;
+        _play.SessionStateChanged += UpdateAcceptHint;
+    }
+
+    public void OpenFocusedOptions()
+    {
+        var tile = Keyboard.FocusedElement is Button { DataContext: GameTile focused } ? focused : _state.FocusedTile;
+        if (tile is not null)
+        {
+            _gameActions.Open(tile);
+        }
+    }
+
+    public void OpenSettings() => OpenSettingsOrItsCards();
+
+    public void OpenPower() => OpenPowerOrItsCards();
+
+    private void UpdateAcceptHint()
+    {
+        var tile = Keyboard.FocusedElement is Button { DataContext: GameTile focused } ? focused : _state.FocusedTile;
+        _acceptHint.Text = tile is { IsSessionActive: true } ? "Resume" : _state.Filter.Accept;
     }
 
     /// <summary>
@@ -290,7 +310,7 @@ internal sealed class LibraryNavigationCoordinator
                 }
 
                 break;
-            case GamepadAction.Options when _options.QuickActions && Keyboard.FocusedElement is Button { DataContext: GameTile tile }:
+            case GamepadAction.Options when Keyboard.FocusedElement is Button { DataContext: GameTile tile }:
                 _gameActions.Open(tile);
                 break;
 
@@ -415,7 +435,7 @@ internal sealed class LibraryNavigationCoordinator
             CycleFilter(e.Key == Key.PageUp ? -1 : 1);
             e.Handled = true;
         }
-        else if (_options.QuickActions && e.Key is Key.X or Key.Apps && Keyboard.FocusedElement is Button { DataContext: GameTile tile })
+        else if (e.Key is Key.X or Key.Apps && Keyboard.FocusedElement is Button { DataContext: GameTile tile })
         {
             _gameActions.Open(tile);
             e.Handled = true;
@@ -439,7 +459,7 @@ internal sealed class LibraryNavigationCoordinator
 
     private void OnTileRightClick(object sender, MouseButtonEventArgs e)
     {
-        if (_options.QuickActions && sender is Button { DataContext: GameTile tile } button)
+        if (sender is Button { DataContext: GameTile tile } button)
         {
             // An Old School card shows its quick actions from the front. One behind the front comes
             // forward first, and the next press and hold opens them.
@@ -493,7 +513,7 @@ internal sealed class LibraryNavigationCoordinator
         if (sender is Button { DataContext: GameTile tile } button)
         {
             _state.FocusedKey = tile.Game.Key;
-            _acceptHint.Text = _state.Filter.Accept;
+            _acceptHint.Text = tile.IsSessionActive ? "Resume" : _state.Filter.Accept;
             _deals.FocusWasHere = false;
             _backdrop.Queue(tile);
             _continue.Focused(tile);

@@ -26,8 +26,8 @@ internal sealed class NoticePresenter
     private static readonly Duration PopIn = TimeSpan.FromMilliseconds(220);
     private static readonly Duration FadeOut = TimeSpan.FromMilliseconds(450);
 
-    // How far below its place the notice starts as it pops in.
-    private const double Rise = 28;
+    // How far above its place the notice starts as it pops in at top centre.
+    private const double Rise = -20;
 
     /// <summary>The notice's own place at the bottom centre of the library, and the text in it.</summary>
     public (Border Panel, TextBlock Text)? Panel { get; init; }

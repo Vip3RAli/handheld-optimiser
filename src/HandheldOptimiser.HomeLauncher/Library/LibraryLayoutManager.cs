@@ -136,7 +136,7 @@ internal sealed class LibraryLayoutManager(Window window, LibraryState state)
             _ => LibraryLayout.Row
         };
 
-        return (layout, Displays.Scale(_dockedSize, window.ActualWidth));
+        return (layout, Displays.Scale(_dockedSize, window.ActualWidth, window.ActualHeight));
     }
 
     /// <summary>Whether the settings or the screen ask for a different layout or size than the one on screen.</summary>

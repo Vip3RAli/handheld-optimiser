@@ -20,7 +20,7 @@
                                     <ColumnDefinition Width="108" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="{Binding Label}" FontSize="14" Opacity="0.6" />
+                                <TextBlock Text="{Binding Label}" FontSize="14" Opacity="0.72" />
                                 <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="14"
                                            TextTrimming="CharacterEllipsis" />
                             </Grid>
@@ -29,7 +29,7 @@
                 </ItemsControl>
                 <!-- Wikipedia's text is free to show when it is credited. -->
                 <TextBlock x:Name="ContinueSource" DockPanel.Dock="Bottom" Margin="28,8,0,0" FontSize="11"
-                           Opacity="0.5" Visibility="Collapsed" />
+                           Opacity="0.68" Visibility="Collapsed" />
                 <TextBlock x:Name="ContinueAbout" Margin="28,0,0,0" FontSize="15" LineHeight="23" Opacity="0.85"
                            TextWrapping="Wrap" TextTrimming="CharacterEllipsis" Visibility="Collapsed" />
             </DockPanel>

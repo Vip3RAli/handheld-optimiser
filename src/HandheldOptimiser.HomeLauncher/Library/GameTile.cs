@@ -5,6 +5,13 @@ using System.Windows.Media.Imaging;
 
 namespace HandheldOptimiser.HomeLauncher.Library;
 
+internal enum GameSessionState
+{
+    None,
+    Running,
+    Paused,
+}
+
 /// <summary>
 /// What one tile shows. Built off the UI thread with frozen images, decoded at tile size so a large
 /// library costs a few MB of pixels rather than the full-size artwork.
@@ -82,6 +89,34 @@ internal sealed class GameTile : INotifyPropertyChanged, INoticeHost
 
     /// <summary>The same game on other stores, shown as this one tile and played from its Options menu.</summary>
     public IReadOnlyList<GameTile> OtherCopies { get; set; } = [];
+
+    /// <summary>Whether the game is currently running or paused under Quick Resume.</summary>
+    public GameSessionState SessionState
+    {
+        get => _sessionState;
+        set
+        {
+            if (_sessionState != value)
+            {
+                _sessionState = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SessionState)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SessionBadge)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSessionActive)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSessionPaused)));
+            }
+        }
+    }
+
+    public string? SessionBadge => _sessionState switch
+    {
+        GameSessionState.Paused => "Paused",
+        GameSessionState.Running => "Running",
+        _ => null,
+    };
+
+    public bool IsSessionActive => _sessionState != GameSessionState.None;
+
+    public bool IsSessionPaused => _sessionState == GameSessionState.Paused;
 
     /// <summary>
     /// Its play time or achievements, drawn on its picture: on the last game played in the grid, and on the
@@ -166,6 +201,7 @@ internal sealed class GameTile : INotifyPropertyChanged, INoticeHost
     private bool _isLastPlayed;
     private string? _coverDetail;
     private bool _isHidden;
+    private GameSessionState _sessionState;
     private string? _notice;
     public bool HasCover => Cover is not null;
     public bool ShowsIcon => Cover is null;
