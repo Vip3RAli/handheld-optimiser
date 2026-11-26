@@ -23,6 +23,7 @@ internal sealed class SleepAndCleanUpMenu
     private int _listing;
 
     private (long Temp, long Shaders, long? Recycle)? _measured;
+    private readonly HashSet<Button> _cleaning = [];
 
     public SleepAndCleanUpMenu(MenuView view, MenuPresenter menu, NoticePresenter notices, ILibraryHost host)
     {
@@ -354,6 +355,11 @@ internal sealed class SleepAndCleanUpMenu
     /// <summary>Arms a clean-up row on its first press and runs it on the second.</summary>
     private async void ConfirmClean(Button row, string name, Func<CleanResult> clean)
     {
+        if (_cleaning.Contains(row))
+        {
+            return;
+        }
+
         if (!ReferenceEquals(_menu.Armed, row))
         {
             _menu.Armed = row;
@@ -362,15 +368,23 @@ internal sealed class SleepAndCleanUpMenu
         }
 
         _menu.Armed = null;
+        _cleaning.Add(row);
         row.Tag = "Clearing...";
-        var result = await Task.Run(clean);
-        Program.Log($"{name}: {result.Describe()}");
-        _notices.Show($"{name}: {result.Describe()}.");
-
-        if (ReferenceEquals(_menu.List, _view.MaintenanceItems))
+        try
         {
-            _menu.Subtitle = StorageSummary();
-            _ = MeasureAsync();
+            var result = await Task.Run(clean);
+            Program.Log($"{name}: {result.Describe()}");
+            _notices.Show($"{name}: {result.Describe()}.");
+
+            if (ReferenceEquals(_menu.List, _view.MaintenanceItems))
+            {
+                _menu.Subtitle = StorageSummary();
+                _ = MeasureAsync();
+            }
+        }
+        finally
+        {
+            _cleaning.Remove(row);
         }
     }
 

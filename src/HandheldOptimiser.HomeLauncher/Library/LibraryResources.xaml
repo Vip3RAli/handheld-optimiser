@@ -55,6 +55,9 @@
     <!-- How a picked tile or card grows and shrinks back: fast at first, settling at the end. -->
     <CubicEase x:Key="ZoomEase" EasingMode="EaseOut" />
 
+    <!-- Banner horizontal edges aligned with TopBar / HintBar. -->
+    <Thickness x:Key="BannerEdges">24,0,24,12</Thickness>
+
     <!-- Shown only while a game's tile has something to say on its picture (GameTile.CoverDetail). -->
     <Style x:Key="CoverDetailStrip" TargetType="FrameworkElement">
         <Style.Triggers>
@@ -91,8 +94,6 @@
                                                 Visibility="{Binding ShowsIcon, Converter={StaticResource BoolToVis}}">
                                         <Image Source="{Binding Icon}" Width="88" Height="88"
                                                RenderOptions.BitmapScalingMode="HighQuality" />
-                                        <TextBlock Text="{Binding Title}" Margin="0,14,0,0" FontSize="17" FontWeight="SemiBold"
-                                                   TextAlignment="Center" TextWrapping="Wrap" MaxHeight="92" />
                                     </StackPanel>
                                 </Grid>
                             </Border>
@@ -116,11 +117,18 @@
                                 </Border.Background>
                                 <TextBlock Text="{Binding CoverDetail}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
                             </Border>
-                            <Border Margin="8" Padding="7,3" CornerRadius="6" Background="#D0101216"
-                                    HorizontalAlignment="Left" VerticalAlignment="Top"
-                                    Visibility="{Binding IsLastPlayed, Converter={StaticResource BoolToVis}}">
-                                <TextBlock Text="Last played" FontSize="12" FontWeight="SemiBold" />
-                            </Border>
+                            <StackPanel Margin="8" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                <Border x:Name="SessionBadge" Padding="7,3" CornerRadius="6" Background="#D0163B22"
+                                        HorizontalAlignment="Left" Margin="0,0,0,4"
+                                        Visibility="{Binding IsSessionActive, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="{Binding SessionBadge}" FontSize="12" FontWeight="SemiBold" Foreground="#8AF2A2" />
+                                </Border>
+                                <Border Padding="7,3" CornerRadius="6" Background="#D0101216"
+                                        HorizontalAlignment="Left"
+                                        Visibility="{Binding IsLastPlayed, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="Last played" FontSize="12" FontWeight="SemiBold" />
+                                </Border>
+                            </StackPanel>
                             <!-- The store the game is from, as its logo, unless the store badges are switched off. -->
                             <Grid Visibility="{DynamicResource StoreBadgeVisibility}" HorizontalAlignment="Right" VerticalAlignment="Bottom">
                                 <Border x:Name="StoreMark" Width="30" Height="30" CornerRadius="15" Margin="8" Background="#D0101216">
@@ -181,8 +189,14 @@
                             <Setter TargetName="InstallMark" Property="Visibility" Value="Collapsed" />
                             <Setter TargetName="StoreMark" Property="Visibility" Value="Collapsed" />
                         </DataTrigger>
+                        <DataTrigger Binding="{Binding IsSessionPaused}" Value="True">
+                            <Setter TargetName="SessionBadge" Property="Background" Value="#D03A2910" />
+                        </DataTrigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Ring" Property="Opacity" Value="0.45" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter Property="Opacity" Value="0.82" />
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
                             <Setter TargetName="Ring" Property="Opacity" Value="1" />
@@ -242,19 +256,24 @@
                                        RenderOptions.BitmapScalingMode="HighQuality" />
                             </Grid>
                         </Border>
-                        <!-- The store the game is from, as its logo, unless the store badges are switched off. -->
-                        <Grid Visibility="{DynamicResource StoreBadgeVisibility}" HorizontalAlignment="Left" VerticalAlignment="Top">
-                            <Border x:Name="StoreMark" Width="18" Height="18" CornerRadius="9" Margin="5" Background="#D0101216">
-                                <Path Data="{Binding StoreLogo}" Fill="#F2F3F5" Stretch="Uniform" Width="10" Height="10"
-                                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <!-- Top-left stacked badges: Store logo (when shown), Running/Paused, and Last played. -->
+                        <StackPanel Margin="5" HorizontalAlignment="Left" VerticalAlignment="Top">
+                            <Grid Visibility="{DynamicResource StoreBadgeVisibility}" HorizontalAlignment="Left" Margin="0,0,0,4">
+                                <Border x:Name="StoreMark" Width="18" Height="18" CornerRadius="9" Background="#D0101216">
+                                    <Path Data="{Binding StoreLogo}" Fill="#F2F3F5" Stretch="Uniform" Width="10" Height="10"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                            </Grid>
+                            <Border x:Name="SessionBadge" Padding="5,1" CornerRadius="4" Background="#D0163B22"
+                                    HorizontalAlignment="Left" Margin="0,0,0,4"
+                                    Visibility="{Binding IsSessionActive, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="{Binding SessionBadge}" FontSize="9" FontWeight="SemiBold" Foreground="#8AF2A2" />
                             </Border>
-                        </Grid>
-                        <!-- The last game played, first in the row when Last played first is on. -->
-                        <Border Margin="5,28,0,0" Padding="5,1" CornerRadius="4" Background="#D0101216"
-                                HorizontalAlignment="Left" VerticalAlignment="Top"
-                                Visibility="{Binding IsLastPlayed, Converter={StaticResource BoolToVis}}">
-                            <TextBlock Text="Last played" FontSize="9" FontWeight="SemiBold" />
-                        </Border>
+                            <Border Padding="5,1" CornerRadius="4" Background="#D0101216" HorizontalAlignment="Left"
+                                    Visibility="{Binding IsLastPlayed, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="Last played" FontSize="9" FontWeight="SemiBold" />
+                            </Border>
+                        </StackPanel>
                         <!-- Favourites wear a star in the corner. -->
                         <Border Width="18" Height="18" CornerRadius="9" Margin="5" Background="#B0101216"
                                 HorizontalAlignment="Right" VerticalAlignment="Top"
@@ -287,8 +306,14 @@
                         <DataTrigger Binding="{Binding IsHidden}" Value="True">
                             <Setter TargetName="Art" Property="Opacity" Value="0.4" />
                         </DataTrigger>
+                        <DataTrigger Binding="{Binding IsSessionPaused}" Value="True">
+                            <Setter TargetName="SessionBadge" Property="Background" Value="#D03A2910" />
+                        </DataTrigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Ring" Property="Opacity" Value="0.45" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter Property="Opacity" Value="0.82" />
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
                             <Setter TargetName="Ring" Property="Opacity" Value="1" />
@@ -498,6 +523,11 @@
                             layout's Card details setting asks.
                         -->
                         <StackPanel Margin="12" HorizontalAlignment="Left" VerticalAlignment="Top">
+                            <Border x:Name="SessionBadge" Padding="10,4" CornerRadius="8" Background="#D0163B22"
+                                    HorizontalAlignment="Left" Margin="0,0,0,6"
+                                    Visibility="{Binding IsSessionActive, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="{Binding SessionBadge}" FontSize="15" FontWeight="SemiBold" Foreground="#8AF2A2" />
+                            </Border>
                             <Border Padding="10,4" CornerRadius="8" Background="#D0101216" HorizontalAlignment="Left"
                                     Visibility="{Binding IsLastPlayed, Converter={StaticResource BoolToVis}}">
                                 <TextBlock Text="Last played" FontSize="15" FontWeight="SemiBold" Foreground="#F2F3F5" />
@@ -536,9 +566,15 @@
                         <DataTrigger Binding="{Binding ShowsIcon}" Value="True">
                             <Setter TargetName="Fallback" Property="Background" Value="Transparent" />
                         </DataTrigger>
+                        <DataTrigger Binding="{Binding IsSessionPaused}" Value="True">
+                            <Setter TargetName="SessionBadge" Property="Background" Value="#D03A2910" />
+                        </DataTrigger>
                         <!-- No ring under the mouse: after a swipe it would sit on whichever card came to rest there. -->
                         <Trigger Property="IsKeyboardFocused" Value="True">
                             <Setter TargetName="Ring" Property="Opacity" Value="1" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Art" Property="Opacity" Value="0.85" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -575,7 +611,7 @@
         upwards from its lower edge, into the room DealsView keeps above the cards.
     -->
     <Style x:Key="DealCardButton" TargetType="Button">
-        <Setter Property="Margin" Value="10" />
+        <Setter Property="Margin" Value="8" />
         <Setter Property="Foreground" Value="#F2F3F5" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
@@ -597,15 +633,18 @@
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Ring" Property="Opacity" Value="0.45" />
                         </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter Property="Opacity" Value="0.82" />
+                        </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
                             <Setter TargetName="Ring" Property="Opacity" Value="1" />
                             <Setter Property="Panel.ZIndex" Value="1" />
                             <Trigger.EnterActions>
                                 <BeginStoryboard>
                                     <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.35" Duration="0:0:0.14" EasingFunction="{StaticResource ZoomEase}" />
-                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.35" Duration="0:0:0.14" EasingFunction="{StaticResource ZoomEase}" />
-                                        <ThicknessAnimation Storyboard.TargetProperty="Margin" To="62,10,62,10" Duration="0:0:0.14" EasingFunction="{StaticResource ZoomEase}" />
+                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.22" Duration="0:0:0.14" EasingFunction="{StaticResource ZoomEase}" />
+                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.22" Duration="0:0:0.14" EasingFunction="{StaticResource ZoomEase}" />
+                                        <ThicknessAnimation Storyboard.TargetProperty="Margin" To="26,8,26,8" Duration="0:0:0.14" EasingFunction="{StaticResource ZoomEase}" />
                                     </Storyboard>
                                 </BeginStoryboard>
                             </Trigger.EnterActions>
@@ -627,38 +666,39 @@
 
     <DataTemplate x:Key="DealCard">
         <Button Style="{StaticResource DealCardButton}">
-            <StackPanel Width="300">
-                <Grid Height="140">
+            <StackPanel Width="236">
+                <Grid Height="104">
                     <Border CornerRadius="8" ClipToBounds="True" Background="#262B36">
                         <Grid>
                             <Image Source="{Binding Banner}" Stretch="UniformToFill"
                                    RenderOptions.BitmapScalingMode="HighQuality" />
-                            <TextBlock Text="{Binding Title}" Margin="16,0" FontSize="18" FontWeight="SemiBold"
-                                       TextAlignment="Center" TextWrapping="Wrap" VerticalAlignment="Center"
+                            <TextBlock Text="&#xE719;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="28" Opacity="0.35"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"
                                        Visibility="{Binding ShowsTitle, Converter={StaticResource BoolToVis}}" />
                         </Grid>
                     </Border>
-                    <Border Margin="8" Padding="8,3" CornerRadius="6" Background="#3FA34D"
-                            HorizontalAlignment="Left" VerticalAlignment="Bottom">
-                        <TextBlock Text="{Binding Cut}" FontSize="15" FontWeight="Bold" />
+                    <Border Margin="6" Padding="7,2" CornerRadius="6" Background="#3FA34D"
+                            HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                            Visibility="{Binding HasCut, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="{Binding Cut}" FontSize="13" FontWeight="Bold" />
                     </Border>
-                    <Border Margin="8" Padding="8,3" CornerRadius="6" Background="#D0101216"
+                    <Border Margin="6" Padding="7,2" CornerRadius="6" Background="#D0101216"
                             HorizontalAlignment="Right" VerticalAlignment="Top"
                             Visibility="{Binding HasBadge, Converter={StaticResource BoolToVis}}">
-                        <TextBlock Text="{Binding Badge}" FontSize="12" FontWeight="SemiBold" Foreground="#F5C542" />
+                        <TextBlock Text="{Binding Badge}" FontSize="11.5" FontWeight="SemiBold" Foreground="#F5C542" />
                     </Border>
-                    <Border Style="{StaticResource ShownByNotice}" CornerRadius="0,0,8,8" Padding="10,8"
+                    <Border Style="{StaticResource ShownByNotice}" CornerRadius="0,0,8,8" Padding="8,6"
                             Background="#E6101216" VerticalAlignment="Bottom">
-                        <TextBlock Text="{Binding Notice}" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding Notice}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
                     </Border>
                 </Grid>
-                <TextBlock Text="{Binding Title}" Margin="2,8,2,0" FontSize="14" FontWeight="SemiBold"
+                <TextBlock Text="{Binding Title}" Margin="2,6,2,0" FontSize="13.5" FontWeight="SemiBold"
                            TextTrimming="CharacterEllipsis" />
                 <StackPanel Orientation="Horizontal" Margin="2,1,2,0">
                     <TextBlock Text="{Binding Price}" FontSize="13" FontWeight="SemiBold" />
-                    <TextBlock Text="{Binding Regular}" Margin="8,0,0,0" FontSize="12" Opacity="0.5"
+                    <TextBlock Text="{Binding Regular}" Margin="7,0,0,0" FontSize="12" Opacity="0.72"
                                TextDecorations="Strikethrough" VerticalAlignment="Center" />
-                    <TextBlock Text="{Binding Shop}" Margin="8,0,0,0" FontSize="12" Opacity="0.55"
+                    <TextBlock Text="{Binding Shop}" Margin="7,0,0,0" FontSize="12" Opacity="0.78"
                                TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                 </StackPanel>
             </StackPanel>
@@ -719,7 +759,8 @@
                         </Border>
                         <!-- At the right, which is the part of a card that shows from behind the one in front. -->
                         <Border Margin="12" Padding="9,3" CornerRadius="6" Background="#3FA34D"
-                                HorizontalAlignment="Right" VerticalAlignment="Top">
+                                HorizontalAlignment="Right" VerticalAlignment="Top"
+                                Visibility="{Binding HasCut, Converter={StaticResource BoolToVis}}">
                             <TextBlock Text="{Binding Cut}" FontSize="17" FontWeight="Bold" />
                         </Border>
                         <!-- Only on the front card: the ones behind have theirs half covered. -->
@@ -867,7 +908,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
-                    <Border x:Name="Pill" Width="44" Height="44" CornerRadius="22" Background="#59101216" Opacity="0.85">
+                    <Border x:Name="Pill" MinWidth="44" Height="44" CornerRadius="22" Padding="0" Background="#59101216" Opacity="0.85">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
@@ -876,6 +917,7 @@
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Pill" Property="Background" Value="#F2F3F5" />
+                            <Setter TargetName="Pill" Property="Padding" Value="14,0" />
                             <Setter TargetName="Pill" Property="Opacity" Value="1" />
                             <Setter Property="Foreground" Value="#101010" />
                             <Setter Property="FontWeight" Value="SemiBold" />
@@ -1028,6 +1070,10 @@
                             <Setter TargetName="Disc" Property="Background" Value="#22FFFFFF" />
                             <Setter TargetName="Disc" Property="Opacity" Value="1" />
                         </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Disc" Property="Background" Value="#38FFFFFF" />
+                            <Setter TargetName="Disc" Property="Opacity" Value="1" />
+                        </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
                             <Setter TargetName="Disc" Property="Background" Value="#22FFFFFF" />
                             <Setter TargetName="Disc" Property="BorderBrush" Value="#F2F3F5" />
@@ -1056,6 +1102,9 @@
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Pill" Property="Background" Value="#22FFFFFF" />
                         </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Pill" Property="Background" Value="#38FFFFFF" />
+                        </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
                             <Setter TargetName="Pill" Property="Background" Value="#22FFFFFF" />
                             <Setter TargetName="Pill" Property="BorderBrush" Value="#F2F3F5" />
@@ -1082,6 +1131,9 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Pill" Property="Background" Value="#3A4254" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Pill" Property="Background" Value="#485268" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

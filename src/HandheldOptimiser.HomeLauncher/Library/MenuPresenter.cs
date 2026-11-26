@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
@@ -203,6 +204,7 @@ internal sealed class MenuPresenter
 
         _save = null;
         _navigation.EndEdit();
+        HideTouchKeyboard();
         _view.TextEditor.Visibility = Visibility.Collapsed;
         list.Visibility = Visibility.Visible;
         ShowHints(list);
@@ -227,6 +229,7 @@ internal sealed class MenuPresenter
         Tile = null;
         _save = null;
         Armed = null;
+        HideTouchKeyboard();
         _navigation.CloseMenu();
         HideOverlay();
         _notices.Place();
@@ -321,7 +324,14 @@ internal sealed class MenuPresenter
         _view.EditorHint.Text = hint;
         _view.EditorBox.Text = text ?? string.Empty;
         _view.EditorBox.CaretIndex = _view.EditorBox.Text.Length;
-        _view.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => _view.EditorBox.Focus());
+        _view.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
+        {
+            _view.EditorBox.Focus();
+            if (WindowHandle() is var hwnd && hwnd != 0)
+            {
+                TouchKeyboard.Show(hwnd);
+            }
+        });
     }
 
     /// <summary>Enter, Menu or the Save button: what was typed is saved.</summary>
@@ -330,7 +340,19 @@ internal sealed class MenuPresenter
         if (_save is { } save)
         {
             _save = null;
+            HideTouchKeyboard();
             save(_view.EditorBox.Text.Trim());
+        }
+    }
+
+    private nint WindowHandle() =>
+        Window.GetWindow(_view) is { } window ? new WindowInteropHelper(window).Handle : 0;
+
+    private void HideTouchKeyboard()
+    {
+        if (WindowHandle() is var hwnd && hwnd != 0)
+        {
+            TouchKeyboard.Hide(hwnd);
         }
     }
 

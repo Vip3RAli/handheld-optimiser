@@ -403,8 +403,7 @@ internal sealed class DealsPresenter
     /// </summary>
     private void Dock(bool docked)
     {
-        // At the bottom they are drawn smaller, which the user asked for on 2026-11-16, to leave the games more room.
-        _view.LayoutTransform = docked ? DockedSize : Transform.Identity;
+        _view.LayoutTransform = Transform.Identity;
 
         var parent = VisualTreeHelper.GetParent(_view);
         if (docked ? ReferenceEquals(parent, _dock) : ReferenceEquals(parent, _page))
@@ -433,11 +432,8 @@ internal sealed class DealsPresenter
         FitPage();
     }
 
-    // The deals at the bottom are drawn at 65% (the user asked for 85%, then 35% off, on 2026-11-16), and the
-    // picked one grows to read (DealCardButton), into room kept above the cards.
-    private static readonly ScaleTransform DockedSize = new(0.65, 0.65);
-    // Room above the cards, under the heading, for the picked one to grow into.
-    private static readonly Thickness ZoomRoom = new(0, 64, 0, 0);
+    // Room above the compact bottom deals row for the picked card to grow slightly upwards.
+    private static readonly Thickness ZoomRoom = new(0, 44, 0, 0);
 
     /// <summary>Ends the page where the deals at the bottom begin, so no game is hidden under them.</summary>
     private void FitPage()
@@ -796,8 +792,8 @@ internal sealed class DealsPresenter
         _menuView.EpicFreeSetting.IsEnabled = on;
         _menuView.EpicFreeSetting.Tag = SettingSteps.OnOff(epic);
 
-        // What went wrong with a key is said in a notice, and where to get one on the screen it is typed in.
-        _menuView.DealsKeySetting.IsEnabled = on;
+        // Keep IsThereAnyDeal API key editable inside API Keys even before Deals are enabled.
+        _menuView.DealsKeySetting.IsEnabled = true;
         _menuView.DealsKeySetting.Tag = key is null ? "Not set" : _dealsError is null ? "Set" : "Not working";
 
         var wishlist = LibrarySettings.WishlistDeals;

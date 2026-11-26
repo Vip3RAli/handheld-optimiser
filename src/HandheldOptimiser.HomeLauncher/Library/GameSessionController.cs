@@ -58,8 +58,39 @@ internal sealed class GameSessionController
         _showLibrary = showLibrary;
     }
 
+    /// <summary>Told when the active game's running or Quick Resume paused state changes.</summary>
+    public event Action? SessionStateChanged;
+
     /// <summary>The game being played, paused or not, or null.</summary>
     public GameSession? Session => _session;
+
+    /// <summary>Refreshes Running/Paused markers across all tiles to match the active session.</summary>
+    public void SyncTileStates()
+    {
+        var session = _session;
+        var target = session is null ? null : session.Game.Key;
+        var activeState = session is null ? GameSessionState.None
+            : session.IsPaused ? GameSessionState.Paused
+            : GameSessionState.Running;
+
+        var changed = false;
+        foreach (var tile in _state.AllTiles)
+        {
+            var next = !tile.IsApp && tile.IsInstalled && tile.Game.Key == target
+                ? activeState
+                : GameSessionState.None;
+            if (tile.SessionState != next)
+            {
+                tile.SessionState = next;
+                changed = true;
+            }
+        }
+
+        if (changed)
+        {
+            SessionStateChanged?.Invoke();
+        }
+    }
 
     /// <summary>The games the library installs itself, which a press on a GOG game that is not installed goes to.</summary>
     public InstallQueue? Installs { get; set; }
@@ -73,6 +104,7 @@ internal sealed class GameSessionController
     /// </summary>
     public void Returned()
     {
+        SyncTileStates();
         _ = ResumeGameAsync();
         if (!_resuming && !JustWoke)
         {
@@ -307,6 +339,7 @@ internal sealed class GameSessionController
         var session = new GameSession(game);
         _session = session;
         _sessionStoreWasOpen = storeWasOpen;
+        SyncTileStates();
 
         if (LibrarySettings.SaveGuard && !backedUp)
         {
@@ -434,6 +467,7 @@ internal sealed class GameSessionController
         session.Stop();
         RecordPlaytime(session);
         StopAutoTdp(wait);
+        SyncTileStates();
     }
 
     // Set once EndSession has run, so the window closing and LibraryApp's finally do not both do it.
@@ -468,6 +502,7 @@ internal sealed class GameSessionController
         StopAutoTdp();
         RestoreProfileSettings();
         ReopenClosedApps();
+        SyncTileStates();
         if (LibrarySettings.SaveGuard)
         {
             _ = Task.Run(() => SaveGuard.CreateSnapshot(session.Game));
@@ -767,6 +802,7 @@ internal sealed class GameSessionController
             case PauseOutcome.Paused:
                 WatchForeground();
                 ShowAbout(session.Game, $"{title} is paused. Press A on it to carry on.");
+                SyncTileStates();
                 _continue.Update();
                 break;
 
@@ -788,6 +824,7 @@ internal sealed class GameSessionController
         StopWatchingForeground();
         if (session.Resume())
         {
+            SyncTileStates();
             _continue.Update();
         }
     }

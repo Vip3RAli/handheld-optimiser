@@ -70,7 +70,17 @@ internal sealed class AccountsMenu
             if (session is not null)
             {
                 var name = Game.NameOf(store);
-                var signOut = _menu.AddRow(_view.AccountsItems, before, $"Sign out of {name}", null, () => SignOut(store));
+                var label = $"Sign out of {name}";
+                Button? signOut = null;
+                signOut = _menu.AddRow(_view.AccountsItems, before, label, null, () => SignOut(store));
+                signOut.LostKeyboardFocus += (_, _) =>
+                {
+                    if (ReferenceEquals(_menu.Armed, signOut))
+                    {
+                        _menu.Armed = null;
+                        signOut.Content = label;
+                    }
+                };
                 MenuRow.SetAbout(signOut, store == GameStore.Steam
                     ? "Forgets the library's Steam sign-in on this device. The Steam app stays signed in."
                     : $"Forgets the library's {name} sign-in on this device.");
@@ -193,7 +203,15 @@ internal sealed class AccountsMenu
             _syncing = false;
             if (ReferenceEquals(_menu.List, _view.AccountsItems))
             {
+                var focusedLabel = System.Windows.Input.Keyboard.FocusedElement is Button focused
+                    && _view.AccountsItems.Children.Contains(focused)
+                    ? focused.Content as string
+                    : null;
                 RefreshRows();
+                var target = focusedLabel is not null
+                    ? _view.AccountsItems.Children.OfType<Button>().FirstOrDefault(b => b.IsVisible && b.Content as string == focusedLabel)
+                    : null;
+                _menu.ShowItems(target);
             }
         }
     }

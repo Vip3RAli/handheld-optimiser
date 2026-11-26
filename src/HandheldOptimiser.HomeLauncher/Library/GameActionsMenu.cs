@@ -722,43 +722,51 @@ internal sealed class GameActionsMenu
 
     // ----- Tags and collections -----
 
-    private void OpenTags(Button? focus = null)
+    private void OpenTags(Button? focus = null, string? focusTag = null)
     {
         if (_menu.Tile is not { } tile)
         {
             return;
         }
 
-        RefreshTagsRows(tile);
-        _menu.Show(_view.TagsItems, null, "Group games into filter tabs along the top bar", focus);
+        var matched = RefreshTagsRows(tile, focusTag);
+        _menu.Show(_view.TagsItems, null, "Group games into filter tabs along the top bar", matched ?? focus);
     }
 
-    private void RefreshTagsRows(GameTile tile)
+    private Button? RefreshTagsRows(GameTile tile, string? focusTag)
     {
         _menu.ClearRows(_view.TagsItems);
         var current = GameTags.For(tile.Game);
         tile.Tags = current;
 
         var allChoices = GameTags.BuiltInTags
+            .Concat(GameTags.All().Values.SelectMany(tags => tags))
             .Concat(current)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
+        Button? focusMatch = null;
         foreach (var tag in allChoices)
         {
             var tagName = tag;
             var has = current.Any(t => string.Equals(t, tagName, StringComparison.OrdinalIgnoreCase));
-            Button? row = null;
-            row = _menu.AddRow(_view.TagsItems, _view.AddCustomTagItem, tagName, SettingSteps.OnOff(has), () =>
+            var row = _menu.AddRow(_view.TagsItems, _view.AddCustomTagItem, tagName, SettingSteps.OnOff(has), () =>
             {
                 if (GameTags.Toggle(tile.Game, tagName))
                 {
                     tile.Tags = GameTags.For(tile.Game);
                     _host.ShowTiles();
-                    OpenTags(row);
+                    OpenTags(focusTag: tagName);
                 }
             });
+
+            if (focusTag is not null && string.Equals(tagName, focusTag, StringComparison.OrdinalIgnoreCase))
+            {
+                focusMatch = row;
+            }
         }
+
+        return focusMatch;
     }
 
     private void EditCustomTag()

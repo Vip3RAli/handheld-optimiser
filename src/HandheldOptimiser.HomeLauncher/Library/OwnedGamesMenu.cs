@@ -189,9 +189,9 @@ internal sealed class OwnedGamesMenu
         var on = LibrarySettings.ShowNotInstalled;
         _view.NotInstalledSetting.Tag = SettingSteps.OnOff(on);
 
-        // Signed in to Steam inside the library, the key is not used for the list, so its row is not shown.
-        _view.SteamKeySetting.Visibility = StoreSessions.SignedIn(GameStore.Steam) ? Visibility.Collapsed : Visibility.Visible;
-        _view.SteamKeySetting.IsEnabled = on;
+        // Keep the Steam API key row visible and editable under API Keys so wishlist deals and fallback discovery remain reachable.
+        _view.SteamKeySetting.Visibility = Visibility.Visible;
+        _view.SteamKeySetting.IsEnabled = true;
         _view.SteamKeySetting.Tag = LibrarySettings.SteamKey is null ? "Not set" : _error is null ? "Set" : "Not working";
 
         _view.OwnedRefreshItem.IsEnabled = on;

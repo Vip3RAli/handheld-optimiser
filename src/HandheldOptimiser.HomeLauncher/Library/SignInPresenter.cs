@@ -166,6 +166,16 @@ internal sealed class SignInPresenter
     /// <summary>A press of the controller while the sign-in is open.</summary>
     public void Press(GamepadAction action)
     {
+        if (_onWebPage && TouchKeyboard.IsShowing())
+        {
+            if (action == GamepadAction.QuickSettings)
+            {
+                TouchKeyboard.Toggle();
+            }
+
+            return;
+        }
+
         switch (action)
         {
             case GamepadAction.Back:
@@ -187,7 +197,7 @@ internal sealed class SignInPresenter
     /// <summary>The D-pad while the sign-in is open: through the web page's fields and buttons.</summary>
     public void Navigate(FocusNavigationDirection direction)
     {
-        if (!_onWebPage)
+        if (!_onWebPage || TouchKeyboard.IsShowing())
         {
             return;
         }
@@ -234,7 +244,8 @@ internal sealed class SignInPresenter
     {
         var run = Restart();
         CloseWebPage();
-        _view.Panel.Width = 940;
+        _view.Panel.Width = double.NaN;
+        _view.Panel.MaxWidth = 940;
         _view.Panel.HorizontalAlignment = HorizontalAlignment.Center;
         _view.Panel.VerticalAlignment = VerticalAlignment.Center;
         _view.QrPart.Visibility = Visibility.Visible;

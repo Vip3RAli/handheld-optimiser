@@ -43,15 +43,19 @@
 
         <StackPanel Grid.Row="1">
             <!-- A newer release is on GitHub. The controller reaches the same action in Settings. -->
-            <Border x:Name="UpdateBanner" Margin="48,0,48,12" Padding="18,8,8,8" CornerRadius="10"
+            <Border x:Name="UpdateBanner" Margin="{DynamicResource BannerEdges}" Padding="18,8,8,8" CornerRadius="10"
                     Background="#222630" Visibility="Collapsed">
                 <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock x:Name="UpdateText" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                         <TextBlock Text="Opens Handheld Optimiser to install it." Margin="0,2,0,0"
-                                   FontSize="12.5" Opacity="0.6" TextTrimming="CharacterEllipsis" />
+                                   FontSize="12.5" Opacity="0.78" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <StackPanel Grid.Column="1" Margin="12,0,0,0" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                         <Button x:Name="UpdateNowButton" Style="{StaticResource DialogButton}" Content="Update now" />
                         <Button x:Name="DismissUpdateButton" Style="{StaticResource IconButton}" Margin="6,0,0,0" FontSize="14"
                                 Content="&#xE711;" ToolTip="Dismiss" />
@@ -74,16 +78,20 @@
                 <Rectangle Fill="{StaticResource MenuPanelSheen}" RadiusX="5" RadiusY="5" IsHitTestVisible="False" />
             </Border>
             <Grid x:Name="OpenCardHeading" Height="60" Margin="14,0,14,0" VerticalAlignment="Top" Visibility="Collapsed">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
                 <!-- The hairline under the heading, as under each of the menu's rows. -->
-                <Rectangle Height="1" Margin="6,0" VerticalAlignment="Bottom" Fill="#30FFFFFF" />
+                <Rectangle Grid.ColumnSpan="2" Height="1" Margin="6,0" VerticalAlignment="Bottom" Fill="#30FFFFFF" />
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <!-- For a finger or the mouse. B does the same on the controller. -->
                     <Button x:Name="CloseOpenCardButton" Style="{StaticResource IconButton}" Margin="0,0,14,0" FontSize="16"
                             VerticalAlignment="Center" Content="&#xE72B;" ToolTip="Back to the cards" />
                     <TextBlock Text="Ready to install" FontSize="26" FontWeight="SemiBold" VerticalAlignment="Center" />
-                    <TextBlock x:Name="OpenCardCount" Margin="14,0,0,0" FontSize="15" Opacity="0.75" VerticalAlignment="Center" />
+                    <TextBlock x:Name="OpenCardCount" Margin="14,0,0,0" FontSize="15" Opacity="0.78" VerticalAlignment="Center" />
                 </StackPanel>
-                <StackPanel x:Name="OpenCardSearch" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                <StackPanel x:Name="OpenCardSearch" Grid.Column="1" Margin="12,0,0,0" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" />
             </Grid>
         </Grid>
 
@@ -155,14 +163,18 @@
         <Border x:Name="DealsDock" Grid.Row="2" VerticalAlignment="Bottom" Margin="14,0,14,4" />
 
         <TextBlock x:Name="EmptyText" Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Center"
-                   FontSize="18" Opacity="0.6" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="560" />
+                   FontSize="18" Foreground="#F2F3F5" Opacity="0.88" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="560">
+            <TextBlock.Effect>
+                <DropShadowEffect BlurRadius="8" ShadowDepth="0" Color="#E6000000" Opacity="0.9" />
+            </TextBlock.Effect>
+        </TextBlock>
 
         <!--
             The button hints. A, which changes with what has the focus, and X are at the left, and the
             rest are at the right, with View and Menu each above what it opens. Margins that keep the bar the
             height it was with everything in one line, so the Old School cards above it still fit.
         -->
-        <Grid Grid.Row="3" Margin="{DynamicResource HintBarEdges}" TextElement.FontFamily="{DynamicResource HintFont}">
+        <Grid x:Name="HintBar" Grid.Row="3" Margin="{DynamicResource HintBarEdges}" TextElement.FontFamily="{DynamicResource HintFont}">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
                 <Border Style="{StaticResource HintPill}" Margin="0" Background="{DynamicResource AcceptPillBackground}"
                         BorderBrush="{DynamicResource AcceptPillBorder}">
@@ -173,7 +185,7 @@
                         <TextBlock x:Name="AcceptHint" Text="Play" FontSize="15" VerticalAlignment="Center" />
                     </StackPanel>
                 </Border>
-                <Border x:Name="OptionsHint" Style="{StaticResource HintPill}">
+                <Border x:Name="OptionsHint" Style="{StaticResource HintPill}" Cursor="Hand">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Border Style="{StaticResource HintGlyph}" Background="#2F6FD0">
                             <TextBlock Text="X" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
@@ -184,7 +196,7 @@
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                 <!-- Only while the Old School layout's Not installed card is open, which B closes. -->
-                <Border x:Name="BackHint" Style="{StaticResource HintPill}" Visibility="Collapsed">
+                <Border x:Name="BackHint" Style="{StaticResource HintPill}" Visibility="Collapsed" Cursor="Hand">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Border Style="{StaticResource HintGlyph}" Background="#C8423B">
                             <TextBlock Text="B" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
@@ -192,20 +204,22 @@
                         <TextBlock Text="Back" FontSize="15" VerticalAlignment="Center" />
                     </StackPanel>
                 </Border>
-                <StackPanel Margin="26,0,0,0" VerticalAlignment="Center" Visibility="{DynamicResource ClassicOnly}">
+                <StackPanel x:Name="PowerHintClassic" Margin="26,0,0,0" VerticalAlignment="Center" Visibility="{DynamicResource ClassicOnly}"
+                            Background="Transparent" Cursor="Hand">
                     <Border Style="{StaticResource BumperGlyph}" HorizontalAlignment="Center">
                         <TextBlock Text="VIEW" FontSize="11" FontWeight="Bold" />
                     </Border>
                     <TextBlock Text="Power" Margin="0,3,0,0" FontSize="15" HorizontalAlignment="Center" />
                 </StackPanel>
-                <StackPanel Margin="22,0,0,0" VerticalAlignment="Center" Visibility="{DynamicResource ClassicOnly}">
+                <StackPanel x:Name="SettingsHintClassic" Margin="22,0,0,0" VerticalAlignment="Center" Visibility="{DynamicResource ClassicOnly}"
+                            Background="Transparent" Cursor="Hand">
                     <Border Style="{StaticResource BumperGlyph}" HorizontalAlignment="Center">
                         <TextBlock Text="MENU" FontSize="11" FontWeight="Bold" />
                     </Border>
                     <TextBlock Text="Settings" Margin="0,3,0,0" FontSize="15" HorizontalAlignment="Center" />
                 </StackPanel>
                 <!-- In the Console space look, the View button's mark (two windows) and the Menu button's (three lines). -->
-                <Border Style="{StaticResource HintPill}" Visibility="{DynamicResource ConsoleOnly}">
+                <Border x:Name="PowerHintConsole" Style="{StaticResource HintPill}" Visibility="{DynamicResource ConsoleOnly}" Cursor="Hand">
                     <StackPanel Orientation="Horizontal" Margin="10,0,0,0">
                         <Canvas Width="22" Height="18" Margin="0,0,10,0" VerticalAlignment="Center">
                             <Rectangle Width="13" Height="10" RadiusX="2" RadiusY="2" Stroke="#FFFFFF" StrokeThickness="1.6" />
@@ -215,7 +229,7 @@
                         <TextBlock Text="Power" FontSize="15" VerticalAlignment="Center" />
                     </StackPanel>
                 </Border>
-                <Border Style="{StaticResource HintPill}" Visibility="{DynamicResource ConsoleOnly}">
+                <Border x:Name="SettingsHintConsole" Style="{StaticResource HintPill}" Visibility="{DynamicResource ConsoleOnly}" Cursor="Hand">
                     <StackPanel Orientation="Horizontal" Margin="10,0,0,0">
                         <Path Data="M1,1 H17 M1,7 H17 M1,13 H17" Stroke="#FFFFFF" StrokeThickness="2" StrokeStartLineCap="Round"
                               StrokeEndLineCap="Round" Margin="0,0,10,0" VerticalAlignment="Center" />
@@ -229,15 +243,11 @@
 
         <!--
             Every notice: that a game is starting, what TDP Engine is doing, that something could not be done. It
-            pops in here at the bottom centre, above the button hints, and fades out, as an achievement does on
-            an Xbox. NoticePresenter shows and hides it.
+            pops in here at the top centre so it never covers the bottom deals row. NoticePresenter shows and hides it.
         -->
-        <Border x:Name="NoticePanel" Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="48,0,48,18"
-                MaxWidth="900" CornerRadius="30" BorderThickness="1" BorderBrush="#40FFFFFF" Padding="10,10,28,10"
+        <Border x:Name="NoticePanel" Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="48,10,48,0"
+                MaxWidth="900" CornerRadius="30" BorderThickness="1" BorderBrush="#55FFFFFF" Padding="10,10,28,10"
                 Background="{StaticResource MenuPanelBack}" IsHitTestVisible="False" Visibility="Collapsed" Opacity="0">
-            <Border.Effect>
-                <DropShadowEffect BlurRadius="24" ShadowDepth="4" Direction="270" Opacity="0.5" />
-            </Border.Effect>
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />

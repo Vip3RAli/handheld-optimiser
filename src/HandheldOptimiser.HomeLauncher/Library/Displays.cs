@@ -13,8 +13,9 @@ internal static class Displays
     private const uint UdiEmbedded = 13;
     private const uint Internal = 0x80000000;
 
-    // The width, in device-independent pixels, the library is laid out for on the Ally: 1920 pixels at 150%.
+    // The viewport size, in device-independent pixels, the library is laid out for on the Ally: 1920x1080 at 150%.
     private const double HandheldWidth = 1280;
+    private const double HandheldHeight = 720;
 
     public static bool IsBuiltIn(uint technology) => technology is Lvds or DisplayPortEmbedded or UdiEmbedded or Internal;
 
@@ -35,4 +36,12 @@ internal static class Displays
     /// <param name="width">The window's width in device-independent pixels.</param>
     public static double Scale(int size, double width) =>
         size > 0 ? size / 100.0 : Math.Clamp(width / HandheldWidth, 1, 3);
+
+    /// <summary>
+    /// Aspect-aware scaling so ultrawide monitors do not overflow vertically past 720 virtual DIPs.
+    /// </summary>
+    public static double Scale(int size, double width, double height) =>
+        size > 0 ? size / 100.0
+        : height > 0 ? Math.Clamp(Math.Min(width / HandheldWidth, height / HandheldHeight), 1, 3)
+        : Scale(size, width);
 }

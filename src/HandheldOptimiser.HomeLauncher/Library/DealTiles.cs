@@ -27,6 +27,8 @@ internal sealed class DealTile(Deal deal) : INotifyPropertyChanged, INoticeHost
         : Deal.Cut > 0 ? $"-{Deal.Cut}%"
         : "";
 
+    public bool HasCut => Cut.Length > 0;
+
     /// <summary>A giveaway's note, Wishlist or Lowest ever, or nothing.</summary>
     public string? Badge => Deal.Note ?? (Deal.OnWishlist ? "On your wishlist" : Deal.HistoricalLow ? "Lowest ever" : null);
 

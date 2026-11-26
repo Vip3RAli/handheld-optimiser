@@ -120,7 +120,7 @@ public partial class LibraryWindow : Window, ILibraryHost
         var accounts = _accounts = new AccountsMenu(Menu, _menu, _notices, _state, _continue, _signIn, _owned);
         accounts.SignedOut += () => _ = _topBar.ShowAccountAsync();
         _gameActions = new GameActionsMenu(Menu, _menu, _notices, _state, _options, _artwork, _backdrop, _continue, this) { Installs = _installs };
-        _settings = new SettingsMenu(Menu, _menu, _notices, _state, _options, _backdrop, _artwork, _topBar, _continue, OptionsHint, this);
+        _settings = new SettingsMenu(Menu, _menu, _notices, _state, _options, _backdrop, _artwork, _topBar, _continue, HintBar, this);
         _ = new AddProgramMenu(Menu, _menu, _notices, _state, this);
         _ = new EmulatorsMenu(Menu, _menu, _notices, _state, this);
         _ = new SleepAndCleanUpMenu(Menu, _menu, _notices, this);
@@ -158,6 +158,14 @@ public partial class LibraryWindow : Window, ILibraryHost
         _gamepad = new GamepadInput(Dispatcher);
         _gamepad.Navigate += _input.Navigate;
         _gamepad.Pressed += _input.Press;
+
+        HintBar.Visibility = _options.QuickActions ? Visibility.Visible : Visibility.Collapsed;
+        OptionsHint.MouseLeftButtonUp += (_, _) => _input.OpenFocusedOptions();
+        BackHint.MouseLeftButtonUp += (_, _) => _oldSchool.LeaveNotInstalled();
+        PowerHintClassic.MouseLeftButtonUp += (_, _) => _input.OpenPower();
+        PowerHintConsole.MouseLeftButtonUp += (_, _) => _input.OpenPower();
+        SettingsHintClassic.MouseLeftButtonUp += (_, _) => _input.OpenSettings();
+        SettingsHintConsole.MouseLeftButtonUp += (_, _) => _input.OpenSettings();
 
         _clock = new DispatcherTimer(TimeSpan.FromSeconds(15), DispatcherPriority.Background, (_, _) => _topBar.Refresh(), Dispatcher);
 
@@ -231,7 +239,7 @@ public partial class LibraryWindow : Window, ILibraryHost
         }
 
         _options.Reload();
-        OptionsHint.Visibility = _options.QuickActions ? Visibility.Visible : Visibility.Collapsed;
+        HintBar.Visibility = _options.QuickActions ? Visibility.Visible : Visibility.Collapsed;
 
         // Changed in another session, or a screen plugged in while a game was in front.
         var layoutChanged = _layouts.LayoutChanged();
@@ -485,7 +493,8 @@ public partial class LibraryWindow : Window, ILibraryHost
         UpdateHeadings();
         _tilesUnbound = false;
         Tiles.ItemsSource = _state.Tiles;
-        AcceptHint.Text = _state.Filter.Accept;
+        _play.SyncTileStates();
+        AcceptHint.Text = _state.FocusedTile is { IsSessionActive: true } ? "Resume" : _state.Filter.Accept;
         _oldSchool.UpdateOpenCardCount();
 
         // The pictures of games that are not installed are only kept while their tab is open.
@@ -532,14 +541,47 @@ public partial class LibraryWindow : Window, ILibraryHost
 
     private RadioButton FilterTab(TileFilter filter)
     {
+        var label = new TextBlock
+        {
+            Text = filter.Name,
+            Margin = new Thickness(8, 0, 2, 0),
+            FontFamily = FontFamily,
+            FontSize = 14,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
+        var panel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        var icon = TabIcon(filter);
+        if (icon is UIElement element)
+        {
+            panel.Children.Add(element);
+        }
+        else
+        {
+            panel.Children.Add(new TextBlock
+            {
+                Text = icon.ToString(),
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center
+            });
+        }
+
         var tab = new RadioButton
         {
             Style = (Style)FindResource("FilterTab"),
             GroupName = "StoreFilter",
-            Content = TabIcon(filter),
+            Content = panel,
             ToolTip = filter.Name,
             IsChecked = filter == _state.Filter
         };
+
+        label.SetBinding(VisibilityProperty, new System.Windows.Data.Binding(nameof(RadioButton.IsChecked))
+        {
+            Source = tab,
+            Converter = (System.Windows.Data.IValueConverter)FindResource("BoolToVis")
+        });
+        panel.Children.Add(label);
 
         tab.Click += (_, _) => SetFilter(filter);
         return tab;
@@ -701,7 +743,8 @@ public partial class LibraryWindow : Window, ILibraryHost
     /// </summary>
     private void UpdateHeadings()
     {
-        GamesHeading.Visibility = !_layouts.IsOldSchool && !_layouts.IsBrowsing && _state.Filter == TileFilter.All
+        GamesHeading.Text = _state.Filter.Name;
+        GamesHeading.Visibility = !_layouts.IsOldSchool && !_layouts.IsBrowsing
             && _state.Tiles.Count > 0 && LibrarySettings.SectionTitles ? Visibility.Visible : Visibility.Collapsed;
         Resources["StoreBadgeVisibility"] = LibrarySettings.StoreBadge ? Visibility.Visible : Visibility.Collapsed;
 
