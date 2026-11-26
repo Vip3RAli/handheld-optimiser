@@ -171,6 +171,8 @@ internal sealed class SettingsMenu
             Refresh();
             _host.ShowTiles();
         };
+        view.HiddenGamesGroup.Click += (_, _) => OpenHiddenGames();
+        view.HiddenGamesBackItem.Click += (_, _) => menu.Back();
         view.SortSetting.Click += (_, _) => StepSort(1);
 
         // Docked mode.
@@ -253,6 +255,7 @@ internal sealed class SettingsMenu
             (view.BackgroundAppsItems, view.BackgroundAppsGroup), (view.PowerCoolingItems, view.PowerCoolingGroup),
             (view.StoreAppsItems, view.StoreAppsGroup),
             (view.AccountsItems, view.AccountsGroup), (view.OwnedItems, view.OwnedGroup), (view.DealsItems, view.DealsGroup),
+            (view.HiddenGamesItems, view.HiddenGamesGroup),
             (view.AddItems, view.AddProgramGroup), (view.WhilePlayingItems, view.WhilePlayingGroup),
             (view.EmulatorItems, view.EmulatorsGroup), (view.MaintenanceItems, view.MaintenanceGroup),
             (view.DownloadsItems, view.DownloadsGroup)
@@ -370,7 +373,10 @@ internal sealed class SettingsMenu
             SortOrder.Name => "A to Z",
             _ => "Recently played"
         };
+        var hiddenCount = _state.AllTiles.Count(t => t.IsHidden);
         view.HiddenSetting.Tag = SettingSteps.OnOff(_options.ShowHidden);
+        view.HiddenGamesGroup.Visibility = hiddenCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+        view.HiddenGamesGroup.Tag = hiddenCount > 0 ? $"{hiddenCount} hidden" : null;
 
         // Keep SteamGridDB API key visible regardless of current background mode (also used by Old School cards and Apps).
         view.ArtworkKeySetting.Visibility = Visibility.Visible;
@@ -534,12 +540,122 @@ internal sealed class SettingsMenu
         {
             StepDockedSize(step);
         }
+        else if (ReferenceEquals(row, view.MovingBackgroundSetting))
+        {
+            LibrarySettings.MovingBackground = !LibrarySettings.MovingBackground;
+            Refresh();
+            _host.OldSchoolLookChanged();
+        }
+        else if (ReferenceEquals(row, view.ContinueSetting))
+        {
+            _options.ContinuePlaying = !_options.ContinuePlaying;
+            Refresh();
+            _host.ShowTiles();
+        }
+        else if (ReferenceEquals(row, view.ContinueInfoSetting))
+        {
+            _options.ContinueInfo = !_options.ContinueInfo;
+            Refresh();
+            _continue.Update();
+            _host.ShowTiles();
+        }
+        else if (ReferenceEquals(row, view.StoreDetailsSetting))
+        {
+            _options.StoreDetails = !_options.StoreDetails;
+            Refresh();
+            _continue.ForgetInfo();
+            _continue.Update();
+        }
+        else if (ReferenceEquals(row, view.TitlesSetting))
+        {
+            LibrarySettings.SectionTitles = !LibrarySettings.SectionTitles;
+            Refresh();
+            _continue.Update();
+            HomeScreenChanged?.Invoke();
+        }
+        else if (ReferenceEquals(row, view.StoreBadgeSetting))
+        {
+            LibrarySettings.StoreBadge = !LibrarySettings.StoreBadge;
+            Refresh();
+            HomeScreenChanged?.Invoke();
+        }
+        else if (ReferenceEquals(row, view.StatusSetting))
+        {
+            _options.ShowStatus = !_options.ShowStatus;
+            Refresh();
+            _ = _topBar.UpdateStatusAsync();
+        }
+        else if (ReferenceEquals(row, view.FilterSetting))
+        {
+            _options.ShowFilter = !_options.ShowFilter;
+            Refresh();
+            _host.ShowTiles();
+        }
+        else if (ReferenceEquals(row, view.QuickActionsSetting))
+        {
+            _options.QuickActions = !_options.QuickActions;
+            _hintBar.Visibility = _options.QuickActions ? Visibility.Visible : Visibility.Collapsed;
+            Refresh();
+        }
+        else if (ReferenceEquals(row, view.HiddenSetting))
+        {
+            _options.ShowHidden = !_options.ShowHidden;
+            Refresh();
+            _host.ShowTiles();
+        }
+        else if (ReferenceEquals(row, view.DockedSetting))
+        {
+            LibrarySettings.DockedMode = !LibrarySettings.DockedMode;
+            LayoutChanged();
+        }
         else
         {
             return false;
         }
 
         return true;
+    }
+
+    private void OpenHiddenGames(string? focusKey = null)
+    {
+        var hidden = _state.AllTiles
+            .Where(t => t.IsHidden)
+            .OrderBy(t => t.Title, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        if (hidden.Count == 0)
+        {
+            OpenCategory(_view.DisplayItems, _view.HiddenSetting);
+            return;
+        }
+
+        _menu.ClearRows(_view.HiddenGamesItems);
+        Button? focusMatch = null;
+        foreach (var tile in hidden)
+        {
+            var target = tile;
+            var row = _menu.AddRow(_view.HiddenGamesItems, _view.HiddenGamesBackItem, target.Title, "Restore", () =>
+            {
+                if (!GameCatalog.SetHidden(target.Game, false))
+                {
+                    _notices.Show($"{target.Title} could not be shown.");
+                    return;
+                }
+
+                target.IsHidden = false;
+                _host.ShowTiles();
+                _notices.Show($"{target.Title} restored to the library.");
+                Refresh();
+                OpenHiddenGames();
+            });
+            MenuRow.SetAbout(row, $"Restore {target.Title} ({target.StoreName}) to the library.");
+            if (focusKey is not null && target.Game.Key == focusKey)
+            {
+                focusMatch = row;
+            }
+        }
+
+        _menu.Show(_view.HiddenGamesItems, "Hidden games", HomeScreen, focusMatch);
     }
 
     // ----- Refresh, the main app, and closing the library -----

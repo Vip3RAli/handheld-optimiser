@@ -83,10 +83,16 @@ internal sealed class MenuPresenter
 
         view.SaveEditItem.Click += (_, _) => SaveEdit();
         view.CancelEditItem.Click += (_, _) => ShowItems();
+        view.MenuCloseButton.Click += (_, _) => Close();
 
-        // The panel's column says what the row in focus does.
+        // Both the Old School side column and the Grid/Row box footer say what the row in focus does.
         view.MenuBox.GotKeyboardFocus += (_, e) =>
-            view.MenuDetailText.Text = e.NewFocus is Button row ? MenuRow.GetAbout(row) : null;
+        {
+            var about = e.NewFocus is Button row ? MenuRow.GetAbout(row) : null;
+            view.MenuDetailText.Text = about;
+            view.MenuBoxAbout.Text = about;
+            view.MenuBoxAbout.Visibility = !_panel && about is { Length: > 0 } ? Visibility.Visible : Visibility.Collapsed;
+        };
 
         view.SizeChanged += (_, _) =>
         {
@@ -187,7 +193,8 @@ internal sealed class MenuPresenter
             view.QuickItems, view.WhilePlayingItems, view.AppsToCloseItems, view.RunningAppsItems, view.MaintenanceItems,
             view.StartupItems, view.EmulatorItems, view.TvItems, view.OwnedItems, view.DealsItems,
             view.AccountsItems, view.AchievementsItems, view.SaveSnapshotsItems, view.TagsItems, view.DownloadsItems,
-            view.SystemItems, view.ApiKeysItems, view.BackgroundAppsItems, view.PowerCoolingItems, view.StoreAppsItems
+            view.SystemItems, view.ApiKeysItems, view.BackgroundAppsItems, view.PowerCoolingItems, view.StoreAppsItems,
+            view.HiddenGamesItems
         })
         {
             list.Visibility = Visibility.Collapsed;
@@ -273,7 +280,29 @@ internal sealed class MenuPresenter
         }
 
         var index = Keyboard.FocusedElement is Button focused ? items.IndexOf(focused) : -1;
-        items[Math.Clamp(index + move, 0, items.Count - 1)].Focus();
+        var next = index < 0 ? 0 : (index + move + items.Count) % items.Count;
+        items[next].Focus();
+    }
+
+    public void PageMove(int direction)
+    {
+        var items = List?.Children.OfType<Button>().Where(b => b.IsEnabled && b.IsVisible).ToList() ?? [];
+        if (direction == 0 || items.Count == 0)
+        {
+            return;
+        }
+
+        var index = Keyboard.FocusedElement is Button focused ? items.IndexOf(focused) : 0;
+        items[Math.Clamp(index + (direction * 6), 0, items.Count - 1)].Focus();
+    }
+
+    public void FocusEdge(bool end)
+    {
+        var items = List?.Children.OfType<Button>().Where(b => b.IsEnabled && b.IsVisible).ToList() ?? [];
+        if (items.Count > 0)
+        {
+            items[end ? ^1 : 0].Focus();
+        }
     }
 
     // ----- Rows a list is filled with as it opens -----
@@ -398,6 +427,7 @@ internal sealed class MenuPresenter
         _panel = _oldSchool();
         view.MenuSheen.Visibility = _panel ? Visibility.Visible : Visibility.Collapsed;
         view.MenuDetail.Visibility = _panel ? Visibility.Visible : Visibility.Collapsed;
+        view.MenuBoxAbout.Visibility = !_panel && view.MenuBoxAbout.Text is { Length: > 0 } ? Visibility.Visible : Visibility.Collapsed;
         if (!_panel)
         {
             ShowBox();

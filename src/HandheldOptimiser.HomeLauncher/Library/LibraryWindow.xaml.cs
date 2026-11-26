@@ -437,12 +437,8 @@ public partial class LibraryWindow : Window, ILibraryHost
             TopBar.FilterTabs.Children.Add(FilterTab(option));
         }
 
-        // Search is only on the Not installed tab, and is forgotten when that is left.
-        TopBar.SearchButton.Visibility = _state.Filter.NotInstalled ? Visibility.Visible : Visibility.Collapsed;
-        if (!_state.Filter.NotInstalled)
-        {
-            _search.Reset();
-        }
+        // Searching works across every tab; switching tabs resets any previous query cleanly in SetFilter.
+        TopBar.SearchButton.Visibility = Visibility.Visible;
 
         // The Not installed tab is a grid whatever the layout, so a change of tab may change how they are laid out.
         ApplyTilePanel();
@@ -525,9 +521,9 @@ public partial class LibraryWindow : Window, ILibraryHost
             return;
         }
 
-        EmptyText.Text = _search.Text.Length > 0
+        EmptyText.Text = _search.Text.Length > 0 || _search.Store is not null
             ? _state.Tiles.Count == 0
-                ? $"No games that are not installed match \"{_search.Text}\"{(_search.Store is { } store ? $" on {Game.NameOf(store)}" : string.Empty)}."
+                ? $"No matches{(_search.Text.Length > 0 ? $" for \"{_search.Text}\"" : string.Empty)} in {_state.Filter.Name}{(_search.Store is { } store ? $" on {Game.NameOf(store)}" : string.Empty)}."
                 : string.Empty
             : _state.Filter.Apps
             ? _state.Tiles.Count == 0
@@ -625,7 +621,8 @@ public partial class LibraryWindow : Window, ILibraryHost
             return;
         }
 
-        _state.Filter = filter;
+        _search.Reset();
+        _state.SwitchFilter(filter);
 
         // Another tab's Old School cards slide in, as they do when the layout is first shown.
         _oldSchool.GameCards.Fresh = true;

@@ -11,15 +11,17 @@ internal enum GamepadAction
     QuickSettings,
     PreviousFilter,
     NextFilter,
+    PageUp,
+    PageDown,
     Menu,
     View
 }
 
 /// <summary>
 /// Polls XInput controllers while the library is in front, so the d-pad or left stick moves between
-/// tiles, A launches, X opens a game's options, Y opens quick settings and the bumpers change the store
-/// filter. Polling stops whenever the library loses focus: the game owns the controller then, and the
-/// library must not react to in-game presses.
+/// tiles, A launches, X opens a game's options, Y opens search, LT/RT page through lists, and the bumpers
+/// change the store filter. Polling stops whenever the library loses focus: the game owns the controller
+/// then, and the library must not react to in-game presses.
 /// </summary>
 internal sealed class GamepadInput
 {
@@ -27,6 +29,7 @@ internal sealed class GamepadInput
     private const ushort DpadDown = 0x0002;
     private const ushort DpadLeft = 0x0004;
     private const ushort DpadRight = 0x0008;
+    private const ushort AllDpad = DpadUp | DpadDown | DpadLeft | DpadRight;
 
     private static readonly (ushort Bit, GamepadAction Action)[] Buttons =
     [
@@ -40,11 +43,16 @@ internal sealed class GamepadInput
         (0x0020, GamepadAction.View)
     ];
 
-    private const short StickThreshold = 16000;
+    private const short StickEngage = 10500;
+    private const short StickRelease = 7800;
+    private const byte TriggerEngage = 120;
+    private const byte TriggerRelease = 80;
     private const uint MaxControllers = 4;
 
-    private static readonly TimeSpan RepeatDelay = TimeSpan.FromMilliseconds(400);
-    private static readonly TimeSpan RepeatInterval = TimeSpan.FromMilliseconds(110);
+    private static readonly TimeSpan RepeatDelay = TimeSpan.FromMilliseconds(360);
+    private static readonly TimeSpan RepeatNormal = TimeSpan.FromMilliseconds(110);
+    private static readonly TimeSpan RepeatMedium = TimeSpan.FromMilliseconds(65);
+    private static readonly TimeSpan RepeatFast = TimeSpan.FromMilliseconds(40);
 
     // XInputGetState is slow for empty slots, so those are only retried now and then.
     private static readonly TimeSpan DisconnectedRetry = TimeSpan.FromSeconds(2);
@@ -55,7 +63,11 @@ internal sealed class GamepadInput
 
     private ushort _previous;
     private FocusNavigationDirection? _heldDirection;
+    private ushort _heldStickBit;
+    private DateTime _heldStartedAt;
     private DateTime _nextRepeat;
+    private bool _leftTriggerDown;
+    private bool _rightTriggerDown;
 
     public event Action<FocusNavigationDirection>? Navigate;
     public event Action<GamepadAction>? Pressed;
@@ -69,8 +81,11 @@ internal sealed class GamepadInput
     public void Start()
     {
         // Buttons already held when focus returns (such as the A that closed a game menu) are not presses.
-        _previous = ReadButtons();
+        _previous = ReadButtons(out _, out _);
         _heldDirection = null;
+        _heldStickBit = 0;
+        _leftTriggerDown = false;
+        _rightTriggerDown = false;
         _timer.Start();
     }
 
@@ -78,7 +93,7 @@ internal sealed class GamepadInput
 
     private void Poll()
     {
-        var buttons = ReadButtons();
+        var buttons = ReadButtons(out var leftTrigger, out var rightTrigger);
         var pressed = (ushort)(buttons & ~_previous);
         _previous = buttons;
 
@@ -90,6 +105,26 @@ internal sealed class GamepadInput
             }
         }
 
+        if (!_leftTriggerDown && leftTrigger >= TriggerEngage)
+        {
+            _leftTriggerDown = true;
+            Pressed?.Invoke(GamepadAction.PageUp);
+        }
+        else if (_leftTriggerDown && leftTrigger < TriggerRelease)
+        {
+            _leftTriggerDown = false;
+        }
+
+        if (!_rightTriggerDown && rightTrigger >= TriggerEngage)
+        {
+            _rightTriggerDown = true;
+            Pressed?.Invoke(GamepadAction.PageDown);
+        }
+        else if (_rightTriggerDown && rightTrigger < TriggerRelease)
+        {
+            _rightTriggerDown = false;
+        }
+
         var direction = DirectionOf(buttons);
         var now = DateTime.UtcNow;
 
@@ -98,6 +133,7 @@ internal sealed class GamepadInput
             _heldDirection = direction;
             if (direction is { } first)
             {
+                _heldStartedAt = now;
                 Navigate?.Invoke(first);
                 _nextRepeat = now + RepeatDelay;
             }
@@ -105,14 +141,24 @@ internal sealed class GamepadInput
         else if (direction is { } held && now >= _nextRepeat)
         {
             Navigate?.Invoke(held);
-            _nextRepeat = now + RepeatInterval;
+            _nextRepeat = now + RepeatIntervalFor(now - _heldStartedAt);
         }
     }
 
-    /// <summary>All connected controllers combined, with the left stick folded into the d-pad bits.</summary>
-    private ushort ReadButtons()
+    internal static TimeSpan RepeatIntervalFor(TimeSpan heldFor) => heldFor.TotalMilliseconds switch
+    {
+        >= 1800 => RepeatFast,
+        >= 800 => RepeatMedium,
+        _ => RepeatNormal
+    };
+
+    /// <summary>All connected controllers combined, with sticks folded into the d-pad bits and max trigger pressure read.</summary>
+    private ushort ReadButtons(out byte maxLeftTrigger, out byte maxRightTrigger)
     {
         ushort buttons = 0;
+        ushort stickBits = 0;
+        maxLeftTrigger = 0;
+        maxRightTrigger = 0;
         var now = DateTime.UtcNow;
 
         for (uint i = 0; i < MaxControllers; i++)
@@ -131,18 +177,54 @@ internal sealed class GamepadInput
 
             var pad = state.Gamepad;
             buttons |= pad.Buttons;
-            buttons |= StickToDpad(pad.ThumbLX, pad.ThumbLY);
+            if (pad.LeftTrigger > maxLeftTrigger)
+            {
+                maxLeftTrigger = pad.LeftTrigger;
+            }
+
+            if (pad.RightTrigger > maxRightTrigger)
+            {
+                maxRightTrigger = pad.RightTrigger;
+            }
+
+            var left = StickToDpad(pad.ThumbLX, pad.ThumbLY, _heldStickBit);
+            if (left != 0)
+            {
+                stickBits |= left;
+            }
+            else if ((pad.Buttons & AllDpad) == 0)
+            {
+                stickBits |= StickToDpad(pad.ThumbRX, pad.ThumbRY, _heldStickBit);
+            }
         }
 
-        return buttons;
+        _heldStickBit = stickBits;
+        return (ushort)(buttons | stickBits);
     }
 
-    /// <summary>Maps the left stick to at most one d-pad direction along its dominant axis.</summary>
-    internal static ushort StickToDpad(short lx, short ly)
+    /// <summary>Maps an analog stick to at most one d-pad direction along its dominant axis.</summary>
+    internal static ushort StickToDpad(short lx, short ly) => StickToDpad(lx, ly, 0);
+
+    /// <summary>
+    /// Maps an analog stick with hysteresis and sticky-axis lock when held so slight drift across 45 degrees
+    /// does not cancel key repeat or inject unwanted perpendicular steps.
+    /// </summary>
+    internal static ushort StickToDpad(short lx, short ly, ushort heldBit)
     {
         var absX = Math.Abs((int)lx);
         var absY = Math.Abs((int)ly);
-        if (absX <= StickThreshold && absY <= StickThreshold)
+
+        if (heldBit is DpadLeft or DpadRight && absX > StickRelease && absY < absX * 1.35)
+        {
+            return lx < 0 ? DpadLeft : DpadRight;
+        }
+
+        if (heldBit is DpadUp or DpadDown && absY > StickRelease && absX < absY * 1.35)
+        {
+            return ly > 0 ? DpadUp : DpadDown;
+        }
+
+        if (absX <= StickEngage && absY <= StickEngage)
         {
             return 0;
         }

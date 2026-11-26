@@ -27,7 +27,7 @@ public sealed class LibraryStateTests
     public void Store_tabs_need_the_setting_and_more_than_one_store()
     {
         GameTile[] tiles = [Tile("a"), Tile("b", GameStore.Epic), Tile("c", GameStore.Epic, favourite: true)];
-        Assert.Equal([TileFilter.All, TileFilter.AppsTab], TileFilter.Options(tiles, storeTabs: false));
+        Assert.Equal([TileFilter.All, TileFilter.AppsTab, TileFilter.Starred], TileFilter.Options(tiles, storeTabs: false));
         Assert.Equal(
             [TileFilter.All, TileFilter.AppsTab, TileFilter.Starred, new TileFilter(GameStore.Steam, false), new TileFilter(GameStore.Epic, false)],
             TileFilter.Options(tiles, storeTabs: true));

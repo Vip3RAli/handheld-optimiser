@@ -126,6 +126,7 @@ internal sealed class AccountsMenu
 
         // Not signed in, or the store wants it done again.
         _menu.Close();
+        _signIn.ReturnToMenu = () => Open();
         if (store == GameStore.Gog)
         {
             _signIn.OpenGog();

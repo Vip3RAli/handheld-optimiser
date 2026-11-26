@@ -37,7 +37,7 @@ public class PerformanceAndUxFixesTests
     [InlineData(-25000, -17000, 0x0004)]
     [InlineData(17000, 25000, 0x0001)]
     [InlineData(17000, -25000, 0x0002)]
-    [InlineData(16000, 16000, 0)]
+    [InlineData(10500, 10500, 0)]
     [InlineData(-1000, 1000, 0)]
     [InlineData(short.MinValue, 0, 0x0004)]
     [InlineData(0, short.MinValue, 0x0002)]

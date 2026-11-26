@@ -36,15 +36,19 @@
                     Content="All stores" ToolTip="Show one store's games" />
             <Grid x:Name="SearchPanel" Margin="0,0,8,0" Width="336" Height="40" VerticalAlignment="Center"
                   Visibility="Collapsed">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
                 <!-- The bar as the d-pad finds it: what was searched for, and A to type. -->
-                <Button x:Name="SearchBar" Style="{StaticResource PillButton}" HorizontalContentAlignment="Left"
-                        Focusable="True" ToolTip="Type to search">
-                    <TextBlock x:Name="SearchText" Text="Search" Width="296" FontSize="16" Opacity="0.72"
+                <Button x:Name="SearchBar" Grid.Column="0" Grid.ColumnSpan="2" Style="{StaticResource PillButton}"
+                        HorizontalContentAlignment="Left" Focusable="True" ToolTip="Type to search">
+                    <TextBlock x:Name="SearchText" Text="Search" Width="264" FontSize="16" Opacity="0.72"
                                TextTrimming="CharacterEllipsis" />
                 </Button>
                 <!-- The bar while it is typed in. Focusing the box brings up Windows' own keyboard. -->
-                <Border x:Name="SearchEntry" Padding="18,0" CornerRadius="20" Background="#66101216"
-                        BorderBrush="#F2F3F5" BorderThickness="2" Visibility="Collapsed">
+                <Border x:Name="SearchEntry" Grid.Column="0" Grid.ColumnSpan="2" Padding="18,0,40,0" CornerRadius="20"
+                        Background="#66101216" BorderBrush="#F2F3F5" BorderThickness="2" Visibility="Collapsed">
                     <Grid>
                         <TextBox x:Name="SearchBox" MaxLength="64" FontSize="16" VerticalAlignment="Center"
                                  Background="Transparent" BorderThickness="0" Foreground="#F2F3F5" CaretBrush="#F2F3F5" />
@@ -54,10 +58,29 @@
                                    Visibility="Collapsed" />
                     </Grid>
                 </Border>
+                <Button x:Name="SearchClearButton" Grid.Column="1" Focusable="False" Width="34" Height="34" Margin="0,0,5,0"
+                        VerticalAlignment="Center" Foreground="#F2F3F5" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                        FontSize="12" Content="&#xE711;" Cursor="Hand" ToolTip="Clear search" Visibility="Collapsed">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="ClearDisc" Width="32" Height="32" CornerRadius="16" Background="#22FFFFFF">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="ClearDisc" Property="Background" Value="#38FFFFFF" />
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="ClearDisc" Property="Background" Value="#50FFFFFF" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
             </Grid>
             <Button x:Name="SearchButton" Style="{StaticResource IconButton}" Margin="0,0,4,0" VerticalAlignment="Center"
                     Focusable="True" Visibility="Collapsed"
-                    Content="&#xE721;" ToolTip="Search games ready to install" />
+                    Content="&#xE721;" ToolTip="Search library (Y)" />
 
             <!--
                 The library's settings, also on the controller's Menu button. Sized for a finger. Up from
