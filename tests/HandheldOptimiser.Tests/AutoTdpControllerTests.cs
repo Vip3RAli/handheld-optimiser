@@ -416,4 +416,179 @@ public class AutoTdpControllerTests
         Assert.Equal(8, low[^1]);
         Assert.All(high.Concat(low), w => Assert.InRange(w, 8, 20));
     }
+
+    [Fact]
+    public void Hardware_response_lag_after_a_raise_does_not_falsely_trigger_no_gain()
+    {
+        // Simulates 1 second of EC/GPU ramp lag after each wattage change.
+        var controller = new AutoTdpController(Sixty, startWatts: 15);
+        var prevWatts = 15;
+        var laggedWatts = 15;
+        var watts = Run(controller, 60, (_, w) =>
+        {
+            var effective = laggedWatts;
+            laggedWatts = prevWatts == w ? w : prevWatts;
+            prevWatts = w;
+            return 2.5 * effective;
+        });
+
+        Assert.True(watts[^1] >= 24, $"Expected >= 24 W for 60 fps, got {watts[^1]} W (state {controller.State})");
+    }
+
+    [Fact]
+    public void Easy_scene_after_no_gain_hold_does_not_jump_to_max_watts_and_clears_hold()
+    {
+        var controller = new AutoTdpController(Sixty, startWatts: 30);
+
+        // 30 fps menu for 240 s -> steps down and holds around 8-10 W in NoGain.
+        // 240-269 s: easy scene hitting 72 fps on low watts -> should NOT jump to 30 W.
+        // 270-360 s: heavy scene (2.5 fps/W) -> should climb to 24+ W without being blocked by stale _noGainUntil.
+        var watts = Run(controller, 360, (second, w) =>
+            second < 240 ? Math.Min(30, 4.0 * w)
+            : second < 270 ? 72
+            : 2.5 * w);
+
+        Assert.True(watts[239] <= 12, $"Was at {watts[239]} W in menu");
+        Assert.True(watts.Skip(240).Take(30).Max() <= 12, $"Easy scene jumped to {watts.Skip(240).Take(30).Max()} W");
+        Assert.True(watts[^1] >= 24, $"Heavy scene stayed at {watts[^1]} W (state {controller.State})");
+    }
+
+    [Fact]
+    public void Small_one_watt_raises_near_max_keep_climbing_when_power_helps()
+    {
+        // Sublinear GPU-bound scaling: 60 * sqrt(w / 30) gives ~1.6-2.5% per 1 W near 20-30 W.
+        var controller = new AutoTdpController(Sixty, startWatts: 20);
+        var watts = Run(controller, 120, (_, w) => 60 * Math.Sqrt(w / 30.0));
+
+        Assert.True(watts[^1] >= 28, $"Gave up at {watts[^1]} W instead of climbing to ~30 W (state {controller.State})");
+    }
+
+    [Fact]
+    public void Clamped_step_up_from_no_gain_succeeds_when_fps_rises()
+    {
+        var settings = Sixty with { MaxWatts = 25 };
+        var controller = new AutoTdpController(settings, startWatts: 24);
+
+        var watts = Run(controller, 240, (second, w) =>
+            second < 100 ? 30.0 : Math.Min(60.0, 2.4 * w));
+
+        Assert.True(watts[^1] >= 25, $"Expected climb to 25 W, got {watts[^1]} W (state {controller.State})");
+    }
+
+    [Fact]
+    public void Learned_watts_keeps_gameplay_power_across_quit_menu_and_exit_pause()
+    {
+        var controller = new AutoTdpController(Sixty, startWatts: 25);
+
+        // 240 s of 15 W gameplay (4 fps/W -> 60 fps), then 30 s of 30 fps quit menu, then 5 s of 0 fps teardown.
+        Run(controller, 275, (second, w) =>
+            second < 240 ? 4.0 * w
+            : second < 270 ? Math.Min(30, 4.0 * w)
+            : 0);
+
+        Assert.Equal(AutoTdpState.Waiting, controller.State);
+        Assert.InRange(controller.LearnedWatts ?? 0, 15, 16);
+    }
+
+    [Fact]
+    public void Learned_watts_uses_no_gain_when_game_is_cpu_capped_all_session()
+    {
+        var controller = new AutoTdpController(Sixty, startWatts: 30);
+        Run(controller, 300, (_, w) => Math.Min(30, 4.0 * w));
+
+        Assert.NotNull(controller.LearnedWatts);
+        Assert.InRange(controller.LearnedWatts!.Value, 7, 12);
+    }
+
+    [Fact]
+    public void Learned_watts_is_null_for_short_sessions()
+    {
+        var controller = new AutoTdpController(Sixty, startWatts: 15);
+        Run(controller, 20, (_, w) => 4.0 * w);
+
+        Assert.Null(controller.LearnedWatts);
+    }
+
+    [Fact]
+    public void Heat_capped_controller_does_not_step_down_25_percent()
+    {
+        // Trigger _rememberedHeat at 27 W: hit 80 °C twice within 10 minutes at 28 W -> remembered ceiling 27 W.
+        var controller = new AutoTdpController(Sixty, startWatts: 28);
+        var watts = Run(controller, 360, (_, w) => 1.8 * w, (second, w) =>
+            second < 180 && w >= 28 ? 82 : 74);
+
+        // Once capped at 27 W by heat memory, staying under 60 fps should NOT trigger StepDown (~20 W) probes.
+        var afterMemory = watts.Skip(180).ToList();
+        Assert.All(afterMemory, w => Assert.InRange(w, 26, 27));
+    }
+
+    [Fact]
+    public void Severe_temperature_overshoot_cuts_more_watts_than_mild_overshoot()
+    {
+        var mild = new AutoTdpController(Sixty, startWatts: 25);
+        var severe = new AutoTdpController(Sixty, startWatts: 25);
+
+        mild.Tick(Start, 50, 81);   // 1 °C over -> cuts 2 W -> 23 W
+        severe.Tick(Start, 50, 88); // 8 °C over -> cuts 4 W -> 21 W
+
+        Assert.Equal(23, mild.Watts);
+        Assert.Equal(21, severe.Watts);
+    }
+
+    [Fact]
+    public void SetMaxWatts_clamps_in_place_without_losing_learned_history()
+    {
+        var controller = new AutoTdpController(Sixty, startWatts: 28);
+        Run(controller, 60, (_, w) => 2.0 * w); // 28 W -> 56 fps, climbs to 30 W (AtMaximum).
+
+        var clamped = controller.SetMaxWatts(Start.AddSeconds(60), 25);
+        Assert.Equal(25, clamped);
+        Assert.Equal(25, controller.Watts);
+        Assert.NotNull(controller.LearnedWatts);
+
+        // Raising MaxWatts back to 30 allows climbing again without resetting history.
+        Assert.Null(controller.SetMaxWatts(Start.AddSeconds(61), 30));
+        for (var second = 62; second < 102; second++)
+        {
+            controller.Tick(Start.AddSeconds(second), 2.0 * controller.Watts, null);
+        }
+
+        Assert.Equal(30, controller.Watts);
+    }
+
+    [Fact]
+    public void Stuttering_frametimes_prevent_stepping_power_down_even_at_target_fps()
+    {
+        var controller = new AutoTdpController(Sixty, startWatts: 20);
+        for (var second = 0; second < 60; second++)
+        {
+            controller.Tick(Start.AddSeconds(second), 62, null, lowFps: 42);
+        }
+
+        Assert.Equal(20, controller.Watts);
+        Assert.Equal(AutoTdpState.Holding, controller.State);
+    }
+
+    [Fact]
+    public void Capped_game_descends_faster_than_one_watt_per_ten_seconds()
+    {
+        // Capped at 60 fps, needs 12 W, starting at 30 W (18 W to drop).
+        var controller = new AutoTdpController(Sixty, startWatts: 30);
+        var watts = Run(controller, 140, (_, w) => Math.Min(60, 5.0 * w));
+
+        Assert.True(watts[^1] <= 14, $"Expected <= 14 W within 140 s, got {watts[^1]} W");
+    }
+
+    [Fact]
+    public void Cpu_bound_no_gain_hold_backs_off_probes_over_time()
+    {
+        var controller = new AutoTdpController(Sixty, startWatts: 15);
+
+        // Held back at 30 fps from 7 W up. Count how many seconds are spent probing above 12 W after settling.
+        var watts = Run(controller, 700, (_, w) => Math.Min(30, 4.5 * w));
+        var lateProbes = watts.Skip(150).Zip(watts.Skip(151)).Count(p => p.Second > p.First);
+
+        // With 1 -> 2 -> 4 minute backoff, at most 3 StepUp probes happen in the remaining ~9 minutes (instead of 9).
+        Assert.True(lateProbes <= 4, $"Too many StepUp probes: {lateProbes}");
+    }
 }

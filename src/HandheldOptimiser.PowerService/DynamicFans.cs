@@ -21,8 +21,8 @@ internal sealed class DynamicFans
     private const int CoolBelowLimit = 10;
     private const int FullBelowLimit = 3;
 
-    // A power limit at this share of the highest allowed is high enough to want Cool at least.
-    private const int HighPowerPercent = 70;
+    // A power limit at or above this wattage is high enough to want Cool at least.
+    private const int HighPowerWatts = 20;
 
     private static readonly string[] Levels = [AutoTdpProtocol.QuietFans, AutoTdpProtocol.CoolFans, AutoTdpProtocol.FullFans];
 
@@ -41,9 +41,9 @@ internal sealed class DynamicFans
         // Without a temperature it keeps what it has, or starts in the middle.
         var wanted = temperature is { } degrees ? ForTemperature(degrees, temperatureLimit) : Math.Max(_level, 1);
 
-        if (watts is { } power && maxWatts > 0)
+        if (watts is { } power)
         {
-            if (power * 100 >= maxWatts * HighPowerPercent)
+            if (power >= HighPowerWatts)
             {
                 wanted = Math.Max(wanted, 1);
             }

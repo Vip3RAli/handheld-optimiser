@@ -132,6 +132,21 @@ public class ReliabilityTests
         Assert.Contains("FanRow.Visibility = manual;", code);
     }
 
+    [Fact]
+    public void GameBar_frame_rate_stops_match_library_frame_rates()
+    {
+        var xaml = File.ReadAllText(Path.Combine(RepoRoot(), "src", "HandheldOptimiser.GameBar", "TdpWidget.xaml"));
+        var code = File.ReadAllText(Path.Combine(RepoRoot(), "src", "HandheldOptimiser.GameBar", "TdpWidget.xaml.cs"));
+
+        var match = Regex.Match(code, @"FrameRateStops\s*=\s*\{([^}]+)\}");
+        Assert.True(match.Success, "Could not find FrameRateStops in TdpWidget.xaml.cs");
+        var stops = match.Groups[1].Value.Split(',').Select(s => int.Parse(s.Trim())).ToArray();
+
+        Assert.Equal([0, 30, 40, 45, 50, 60, 72, 90, 120], stops);
+        Assert.Contains("x:Name=\"FrameRateSlider\" Minimum=\"0\" Maximum=\"8\"", xaml);
+        Assert.Contains("<TextBlock Style=\"{StaticResource Note}\" Text=\"120\" HorizontalAlignment=\"Right\" />", xaml);
+    }
+
     /// <summary>The Tag of every button whose Click goes to the named handler, in the order they appear.</summary>
     private static List<string> Tags(string xaml, string handler) =>
         Regex.Matches(xaml, $"<ToggleButton\\b[^>]*?Click=\"{handler}\"[^>]*>")

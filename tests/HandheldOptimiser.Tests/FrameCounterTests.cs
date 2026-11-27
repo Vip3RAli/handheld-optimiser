@@ -17,11 +17,12 @@ public unsafe class FrameCounterTests
     private static readonly DateTime Start = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
     private static readonly DateTime OneSecondLater = Start.AddSeconds(1);
 
-    private static void SendPresent(FrameCounter counter, Guid provider, ushort id, int processId)
+    private static void SendPresent(FrameCounter counter, Guid provider, ushort id, int processId, long timeStamp = 0)
     {
         var record = stackalloc byte[112];
         new Span<byte>(record, 112).Clear();
         *(int*)(record + 12) = processId;
+        *(long*)(record + 16) = timeStamp;
         *(Guid*)(record + 24) = provider;
         *(ushort*)(record + 40) = id;
         counter.Record(record);
@@ -154,6 +155,64 @@ public unsafe class FrameCounterTests
         var frames = counter.Take(OneSecondLater).Shown;
 
         Assert.Equal(2, frames[10]);
+    }
+
+    [Fact]
+    public void Qpc_timestamps_remove_flush_boundary_jitter_from_rendered_fps()
+    {
+        // Use a 6000 Hz QPC clock so 60 fps = 100 ticks per frame.
+        var counter = new FrameCounter(Start, qpcFrequency: 6000);
+
+        // Simulate 54 frames arriving across 53/60 s (lumped flush boundary).
+        for (var i = 0; i < 54; i++)
+        {
+            SendPresent(counter, Dxgi, 0x2A, processId: 10, timeStamp: 1000 + i * 100L);
+        }
+
+        var first = counter.Take(OneSecondLater);
+        Assert.Equal(60.0, first.Rendered[10], precision: 1);
+
+        // Next tick receives 66 frames spanning 65/60 s.
+        for (var i = 54; i < 120; i++)
+        {
+            SendPresent(counter, Dxgi, 0x2A, processId: 10, timeStamp: 1000 + i * 100L);
+        }
+
+        var second = counter.Take(OneSecondLater.AddSeconds(1));
+        Assert.Equal(60.0, second.Rendered[10], precision: 1);
+    }
+
+    [Fact]
+    public void LowFps_reports_p95_frametime_drops_even_when_average_fps_is_high()
+    {
+        // 1000 Hz QPC clock: 1 tick = 1 ms.
+        var counter = new FrameCounter(Start, qpcFrequency: 1000);
+
+        // 58 frames: mostly ~14 ms (~71 fps) plus 3 stutter frames of 28 ms (~35.7 fps) -> P95 >= 28 ms.
+        long ts = 1000;
+        for (var i = 0; i < 58; i++)
+        {
+            SendPresent(counter, Dxgi, 0x2A, processId: 10, timeStamp: ts);
+            ts += i is 15 or 30 or 45 ? 28 : 14;
+        }
+
+        var rates = counter.Take(OneSecondLater);
+        Assert.NotNull(rates.LowFps);
+        Assert.True(rates.LowFps![10] <= 36.5, $"Expected LowFps <= 36.5, got {rates.LowFps[10]}");
+    }
+
+    [Fact]
+    public void Reset_clears_accumulated_counts()
+    {
+        var counter = new FrameCounter(Start);
+        for (var i = 0; i < 30; i++)
+        {
+            SendPresent(counter, Dxgi, 0x2A, processId: 10);
+        }
+
+        counter.Reset();
+        var rates = counter.Take(OneSecondLater);
+        Assert.Empty(rates.Rendered);
     }
 }
 

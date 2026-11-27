@@ -63,9 +63,10 @@ public class DynamicFansTests
     [Fact]
     public void High_power_keeps_it_on_cool_at_least()
     {
-        // 70% of 25 W is 17.5, so 18 W is high and 17 W is not.
-        Assert.Equal(AutoTdpProtocol.CoolFans, new DynamicFans().Pick(Start, 50, 18, MaxWatts, Limit));
-        Assert.Equal(AutoTdpProtocol.QuietFans, new DynamicFans().Pick(Start, 50, 17, MaxWatts, Limit));
+        // Absolute 20 W threshold regardless of MaxWatts.
+        Assert.Equal(AutoTdpProtocol.CoolFans, new DynamicFans().Pick(Start, 50, 20, MaxWatts, Limit));
+        Assert.Equal(AutoTdpProtocol.QuietFans, new DynamicFans().Pick(Start, 50, 19, MaxWatts, Limit));
+        Assert.Equal(AutoTdpProtocol.QuietFans, new DynamicFans().Pick(Start, 50, 11, 15, Limit));
     }
 
     [Fact]

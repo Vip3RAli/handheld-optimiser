@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using HandheldOptimiser.PowerService;
@@ -46,8 +46,8 @@ namespace HandheldOptimiser.GameBar
         private bool _placingFrameRate;
         private bool _placingOverlay;
 
-        // The frame rate slider's five stops. In Auto the first is None, no target; in Manual it is Off.
-        private static readonly int[] FrameRateStops = { 0, 30, 40, 45, 60 };
+        // The frame rate slider's stops. In Auto the first is None, no target; in Manual it is Off.
+        private static readonly int[] FrameRateStops = { 0, 30, 40, 45, 50, 60, 72, 90, 120 };
 
         private static readonly (string Action, string Label)[] PaddleChoices =
         {

@@ -16,7 +16,7 @@ internal sealed partial class AutoTdpService
     private AutoTdpStatus SetOverlay(AutoTdpRequest request)
     {
         _overlay.Set(request.OverlayLevel, request.OverlayCorner, request.OverlayLayout);
-        _idleSince = DateTime.UtcNow;
+        _idleSince = MonotonicClock.UtcNow;
         return _error is not null && _control is null ? new AutoTdpStatus(false, Error: _error) : _last;
     }
 
@@ -45,7 +45,7 @@ internal sealed partial class AutoTdpService
             _screenStats.SetLime(lime);
         }
 
-        _idleSince = DateTime.UtcNow;
+        _idleSince = MonotonicClock.UtcNow;
         return _error is not null && _control is null ? new AutoTdpStatus(false, Error: _error) : _last;
     }
 
@@ -69,7 +69,7 @@ internal sealed partial class AutoTdpService
         lock (_gate)
         {
             _overlay.Toggle();
-            _idleSince = DateTime.UtcNow;
+            _idleSince = MonotonicClock.UtcNow;
         }
     }
 
@@ -88,6 +88,8 @@ internal sealed partial class AutoTdpService
             return new AutoTdpStatus(false, Error: AutoTdpProtocol.EndingError);
         }
 
+        _suppressedFolder = null;
+
         // Without the library's process there is no telling when it goes away, and the power limit would
         // stay set until the service is stopped by hand. A session from the widget is ended instead when
         // no game has drawn for a minute, so it needs none.
@@ -102,7 +104,7 @@ internal sealed partial class AutoTdpService
             clientProcess = asking;
         }
 
-        var auto = Settings(request);
+        var auto = AutoTdpRules.Settings(request);
         var power = PowerLimit(request);
         var settings = auto is null ? null : PowerLimits.WithTop(auto, power);
         var fixedWatts = PowerLimits.Fixed(request.TargetFps, power);
@@ -131,14 +133,12 @@ internal sealed partial class AutoTdpService
             return _last;
         }
 
-        var folder = string.IsNullOrWhiteSpace(request.GameFolder) ? null : request.GameFolder;
+        var folder = AutoTdpRules.GameFolder(request.GameFolder);
         AutoTdpController? controller = null;
         if (settings is not null)
         {
             // 0 starts halfway; what a game learnt is held between the two limits, which may have moved since.
-            var start = request.StartWatts > 0
-                ? Math.Clamp(request.StartWatts, settings.MinWatts, settings.MaxWatts)
-                : (settings.MinWatts + settings.MaxWatts + 1) / 2;
+            var start = AutoTdpRules.StartWatts(request.StartWatts, settings);
             controller = new AutoTdpController(settings, start);
         }
 
@@ -154,12 +154,13 @@ internal sealed partial class AutoTdpService
             FixedWatts = fixedWatts,
             Lock = folder is null ? new GameLock() : null,
             LibraryFolders = folder is null && fromWidget ? ClientGameFolders(client) : null,
-            LastFrames = DateTime.UtcNow
+            LastFrames = MonotonicClock.UtcNow
         };
 
+        var temperature = _power.ReadTemperature();
         if (_engine.Auto)
         {
-            StartAuto(_control, onBattery, _power.ReadTemperature());
+            StartAuto(_control, onBattery, temperature);
         }
         else
         {
@@ -168,7 +169,7 @@ internal sealed partial class AutoTdpService
                 EndAuto(previous);
             }
 
-            ChooseFans(_control, fans, _power.ReadTemperature());
+            ChooseFans(_control, fans, temperature);
         }
 
         // Relinquishing power or fan control from an active session requires restoring the vendor mode first,
@@ -182,11 +183,11 @@ internal sealed partial class AutoTdpService
 
         // Saved before the limit is first set, so a crash from here on still gets the mode put back.
         MarkHolding(restoreMode ?? _power.DefaultVendorMode);
-        Set(_control);
+        Set(_control, temperature);
         var target = (folder is null ? null : AutoTdpRules.Printable(folder))
             ?? (_control.LibraryFolders is { } library ? $"the busiest of the library's {library.Length} games" : "the busiest program");
         Log.Write($"{Describe(_control)}, for {target}{source ?? (fromWidget ? ", from Game Bar" : "")}");
-        _last = Status(_control, null, _power.ReadTemperature());
+        _last = Status(_control, null, temperature);
         return _last;
     }
 
@@ -206,13 +207,16 @@ internal sealed partial class AutoTdpService
             return Begin(request with { GameFolder = null, StartWatts = 0 }, client, fromWidget: true);
         }
 
+        _suppressedFolder = null;
+
         // In Auto only the frame rate is the widget's, and none is a target too, not off.
         if (_engine.Auto)
         {
+            var autoTemp = _power.ReadTemperature();
             _control = ToAuto(old, request.TargetFps);
-            Set(_control);
+            Set(_control, autoTemp);
             Log.Write($"{Describe(_control)}, changed in Game Bar");
-            _last = Status(_control, null, _power.ReadTemperature());
+            _last = Status(_control, null, autoTemp);
             return _last;
         }
 
@@ -231,7 +235,7 @@ internal sealed partial class AutoTdpService
         // The range the library asked for stays, with the widget's power limit as its top when one is chosen.
         var auto = target == 0 ? null
             : old.AutoSettings is { } kept ? kept with { TargetFps = target }
-            : Settings(new AutoTdpRequest(AutoTdpProtocol.Update, target));
+            : AutoTdpRules.Settings(new AutoTdpRequest(AutoTdpProtocol.Update, target));
         var settings = auto is null ? null : PowerLimits.WithTop(auto, power);
 
         // A running controller is kept while its settings are the same, so what it has learnt is not lost.
@@ -244,7 +248,8 @@ internal sealed partial class AutoTdpService
         _control.AutoSettings = auto;
         _control.PowerLimit = power;
         _control.FixedWatts = fixedWatts;
-        ChooseFans(_control, fans, _power.ReadTemperature());
+        var temperature = _power.ReadTemperature();
+        ChooseFans(_control, fans, temperature);
         _control.LastFrames = old.LastFrames;
 
         // Letting go of the power limit or the fans means setting the mode again, which puts back its own of
@@ -254,13 +259,13 @@ internal sealed partial class AutoTdpService
             _power.SetVendorMode(old.RestoreMode ?? _power.DefaultVendorMode);
         }
 
-        Set(_control);
+        Set(_control, temperature);
         Log.Write($"{Describe(_control)}, changed in Game Bar");
-        _last = Status(_control, null, _power.ReadTemperature());
+        _last = Status(_control, null, temperature);
         return _last;
     }
 
-    private void Set(Control control)
+    private void Set(Control control, int? temperature)
     {
         // Kept for a session started for a game launched outside the library (see StartForRunningGame).
         if (control.Auto)
@@ -270,7 +275,7 @@ internal sealed partial class AutoTdpService
 
         if (WattsNow(control) is { } watts)
         {
-            Apply(control, watts);
+            Apply(control, watts, temperature);
         }
 
         if (control.Curve is not null)
@@ -282,25 +287,6 @@ internal sealed partial class AutoTdpService
     /// <summary>The widget's power limit, kept to what the Ally allows, or 0 for Auto.</summary>
     private static int PowerLimit(AutoTdpRequest request) =>
         request.PowerLimit > 0 ? Math.Clamp(request.PowerLimit, AutoTdpProtocol.LowestWatts, AutoTdpProtocol.HighestWatts) : 0;
-
-    private static AutoTdpSettings? Settings(AutoTdpRequest request)
-    {
-        if (request.TargetFps <= 0)
-        {
-            return null;
-        }
-
-        var min = Math.Clamp(request.MinWatts > 0 ? request.MinWatts : AutoTdpProtocol.LowestWatts,
-            AutoTdpProtocol.LowestWatts, AutoTdpProtocol.HighestWatts);
-        var max = Math.Clamp(request.MaxWatts > 0 ? request.MaxWatts : AutoTdpProtocol.DefaultMaxWatts,
-            min, AutoTdpProtocol.HighestWatts);
-        return new AutoTdpSettings(
-            Math.Clamp(request.TargetFps, AutoTdpProtocol.LowestFps, AutoTdpProtocol.HighestFps),
-            min,
-            max,
-            Math.Clamp(request.TemperatureLimit > 0 ? request.TemperatureLimit : AutoTdpProtocol.DefaultTemperature,
-                AutoTdpProtocol.LowestTemperature, AutoTdpProtocol.HighestTemperature));
-    }
 
     private static string? FanCurve(string? name) => AutoTdpProtocol.FanModes.Contains(name) ? name : null;
 
@@ -333,9 +319,19 @@ internal sealed partial class AutoTdpService
         return string.Join(", ", parts);
     }
 
-    private AutoTdpStatus End()
+    private AutoTdpStatus End(AutoTdpRequest request)
     {
         Release("the game closed");
+        if (!string.IsNullOrWhiteSpace(request.GameFolder))
+        {
+            _suppressedFolder = request.GameFolder.TrimEnd('\\', '/') + '\\';
+            _suppressedLastSeen = MonotonicClock.UtcNow;
+        }
+        else
+        {
+            _suppressedFolder = null;
+        }
+
         return _last;
     }
 
@@ -348,8 +344,8 @@ internal sealed partial class AutoTdpService
         }
 
         _control = null;
-        _idleSince = DateTime.UtcNow;
-        _last = _last with { Running = false };
+        _idleSince = MonotonicClock.UtcNow;
+        _last = _last with { Running = false, LearnedWatts = control.Controller?.LearnedWatts ?? _last.LearnedWatts };
         control.ClientProcess?.Dispose();
         if (control.Auto)
         {

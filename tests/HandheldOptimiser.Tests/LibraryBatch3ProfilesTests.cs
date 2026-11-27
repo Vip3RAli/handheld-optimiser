@@ -45,6 +45,17 @@ public sealed class LibraryBatch3ProfilesTests : IDisposable
     }
 
     [Fact]
+    public void AutoTdp_WattsToRemember_prefers_LearnedWatts_even_on_waiting_exit()
+    {
+        var status = new AutoTdpStatus(Running: false, Watts: 8, State: nameof(AutoTdpState.Waiting), LearnedWatts: 18);
+        Assert.Equal(18, AutoTdp.WattsToRemember(status, TimeSpan.FromMinutes(5)));
+        Assert.Null(AutoTdp.WattsToRemember(status, TimeSpan.FromMinutes(1)));
+
+        var fallback = new AutoTdpStatus(Running: false, Watts: 20, State: nameof(AutoTdpState.Holding), LearnedWatts: null);
+        Assert.Equal(20, AutoTdp.WattsToRemember(fallback, TimeSpan.FromMinutes(5)));
+    }
+
+    [Fact]
     public void AutoTdp_DisplayNameHelpersFormatBoostAndControls()
     {
         Assert.Equal("Off", AutoTdp.CpuBoostName(AutoTdpProtocol.BoostOff));

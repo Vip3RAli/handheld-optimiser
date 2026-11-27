@@ -18,8 +18,8 @@ internal sealed class FineFans
     private const int QuietUnderLimit = 20;
     private const int FullUnderLimit = 3;
 
-    // At this share of the top power limit, the fans run at Cool's step at least, as Dynamic does.
-    private const int HighPowerPercent = 70;
+    // At or above this wattage, the fans run at Cool's step at least, as Dynamic does.
+    private const int HighPowerWatts = 20;
     private const int HighPowerStep = 5;
 
     // A rise of the power limit this big this fast, or boost turning on, lifts the fans this many steps.
@@ -62,9 +62,9 @@ internal sealed class FineFans
     private int Floor(DateTime now, int? watts, int topWatts, bool boost)
     {
         var floor = 0;
-        if (watts is { } power && topWatts > 0)
+        if (watts is { } power)
         {
-            if (power * 100 >= topWatts * HighPowerPercent)
+            if (power >= HighPowerWatts)
             {
                 floor = HighPowerStep;
             }

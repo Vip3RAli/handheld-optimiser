@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -23,9 +24,11 @@ internal sealed unsafe partial class FrameCounter : IDisposable
     /// Each program's frames a second, by process id. Rendered is what the program drew itself, which is
     /// what TDP Engine steers by: power only changes how many of those there are. Shown adds the frames
     /// AMD Fluid Motion Frames made for it, which is what the player sees, for the overlay and the
-    /// Dashboard. Without Fluid Motion Frames the two are the same.
+    /// Dashboard. Without Fluid Motion Frames the two are the same. LowFps is the P95 frametime converted
+    /// to FPS when enough QPC timestamps were recorded.
     /// </summary>
-    public sealed record FrameRates(Dictionary<int, double> Rendered, Dictionary<int, double> Shown);
+    public sealed record FrameRates(Dictionary<int, double> Rendered, Dictionary<int, double> Shown,
+        Dictionary<int, double>? LowFps = null);
 
     private const string SessionName = "HandheldOptimiser AutoTdp";
 
@@ -87,7 +90,9 @@ internal sealed unsafe partial class FrameCounter : IDisposable
     private static FrameCounter? _running;
 
     private readonly object _gate = new();
+    private readonly long _qpcFrequency;
     private Dictionary<int, Counts> _counts = [];
+    private Dictionary<int, long> _lastStamp = [];
     private int _original;
     private int _afmf;
     private DateTime _since;
@@ -97,9 +102,10 @@ internal sealed unsafe partial class FrameCounter : IDisposable
     private Thread? _thread;
     private nint _name;
 
-    internal FrameCounter(DateTime? since = null)
+    internal FrameCounter(DateTime? since = null, long? qpcFrequency = null)
     {
-        _since = since ?? DateTime.UtcNow;
+        _since = since ?? MonotonicClock.UtcNow;
+        _qpcFrequency = qpcFrequency is > 0 ? qpcFrequency.Value : Stopwatch.Frequency;
     }
 
     /// <summary>Starts counting.</summary>
@@ -122,21 +128,37 @@ internal sealed unsafe partial class FrameCounter : IDisposable
     }
 
     /// <summary>Each program's frames a second since the last call, by process id, as rendered and as shown.</summary>
-    public FrameRates Take() => Take(DateTime.UtcNow);
+    public FrameRates Take() => Take(MonotonicClock.UtcNow);
+
+    /// <summary>Clears accumulated frame counts and timestamps (e.g. after waking from sleep).</summary>
+    public void Reset()
+    {
+        lock (_gate)
+        {
+            _counts = [];
+            _lastStamp = [];
+            _original = 0;
+            _afmf = 0;
+            _since = MonotonicClock.UtcNow;
+        }
+    }
 
     internal FrameRates Take(DateTime now)
     {
         Dictionary<int, Counts> counts;
+        Dictionary<int, long> lastStamp;
         int original;
         int afmf;
         DateTime since;
         lock (_gate)
         {
             counts = _counts;
+            lastStamp = _lastStamp;
             original = _original;
             afmf = _afmf;
             since = _since;
             _counts = [];
+            _lastStamp = [];
             _original = 0;
             _afmf = 0;
             _since = now;
@@ -146,15 +168,97 @@ internal sealed unsafe partial class FrameCounter : IDisposable
         int? game = afmf > 0 && counts.Count > 0 ? AfmfProcess(counts, original) : null;
 
         // The runtime's count where there is one: the kernel's event can also come from other paths for the same frame.
-        var rendered = counts.ToDictionary(pair => pair.Key, pair => Presented(pair.Value) / seconds);
+        var rendered = new Dictionary<int, double>(counts.Count);
+        var lowFps = new Dictionary<int, double>();
+        var nextStamp = new Dictionary<int, long>(counts.Count);
+
+        foreach (var (processId, count) in counts)
+        {
+            var stamps = count.Runtime > 0 ? count.RuntimeStamps : count.KernelStamps;
+            var fps = ComputeFps(Presented(count), stamps, seconds);
+            rendered[processId] = fps;
+
+            if (stamps is { Count: > 0 })
+            {
+                lastStamp.TryGetValue(processId, out var prevStamp);
+                if (ComputeLowFps(stamps, prevStamp, fps) is { } low)
+                {
+                    lowFps[processId] = low;
+                }
+
+                nextStamp[processId] = stamps[^1];
+            }
+        }
+
+        if (nextStamp.Count > 0)
+        {
+            lock (_gate)
+            {
+                foreach (var (pid, stamp) in nextStamp)
+                {
+                    if (!_lastStamp.ContainsKey(pid))
+                    {
+                        _lastStamp[pid] = stamp;
+                    }
+                }
+            }
+        }
+
         if (game is not { } withAfmf)
         {
-            return new FrameRates(rendered, rendered);
+            return new FrameRates(rendered, rendered, lowFps.Count > 0 ? lowFps : null);
         }
 
         var shown = new Dictionary<int, double>(rendered);
         shown[withAfmf] += afmf / seconds;
-        return new FrameRates(rendered, shown);
+        return new FrameRates(rendered, shown, lowFps.Count > 0 ? lowFps : null);
+    }
+
+    private double ComputeFps(int presented, List<long>? stamps, double fallbackSeconds)
+    {
+        if (stamps is { Count: >= 2 })
+        {
+            stamps.Sort();
+            var spanSeconds = (stamps[^1] - stamps[0]) / (double)_qpcFrequency;
+            if (spanSeconds >= 0.25 && spanSeconds <= fallbackSeconds * 1.5)
+            {
+                return (stamps.Count - 1) / spanSeconds;
+            }
+        }
+
+        return presented / fallbackSeconds;
+    }
+
+    private double? ComputeLowFps(List<long> stamps, long prevStamp, double renderedFps)
+    {
+        var intervals = new List<double>(stamps.Count);
+        var prev = prevStamp;
+        var hasPrev = prev > 0 && stamps[0] > prev && (stamps[0] - prev) <= _qpcFrequency * 2.0;
+
+        foreach (var stamp in stamps)
+        {
+            if (hasPrev)
+            {
+                var ms = (stamp - prev) * 1000.0 / _qpcFrequency;
+                if (ms is > 0 and <= 2000.0)
+                {
+                    intervals.Add(ms);
+                }
+            }
+
+            prev = stamp;
+            hasPrev = true;
+        }
+
+        if (intervals.Count < 5)
+        {
+            return null;
+        }
+
+        intervals.Sort();
+        var p95Index = Math.Clamp((int)Math.Ceiling(intervals.Count * 0.95) - 1, 0, intervals.Count - 1);
+        var p95Ms = intervals[p95Index];
+        return p95Ms > 0 ? Math.Min(renderedFps, 1000.0 / p95Ms) : null;
     }
 
     private static int Presented(Counts counts) => counts.Runtime > 0 ? counts.Runtime : counts.Kernel;
@@ -308,9 +412,10 @@ internal sealed unsafe partial class FrameCounter : IDisposable
 
     internal void Record(byte* record)
     {
-        // EVENT_RECORD starts with EVENT_HEADER: ProcessId at 12, ProviderId at 24, EventDescriptor.Id at 40,
-        // EventDescriptor.Version at 42. UserDataLength is at 86 and UserData at 96.
+        // EVENT_RECORD starts with EVENT_HEADER: ProcessId at 12, TimeStamp at 16, ProviderId at 24,
+        // EventDescriptor.Id at 40, EventDescriptor.Version at 42. UserDataLength is at 86 and UserData at 96.
         var processId = *(int*)(record + 12);
+        var timestamp = *(long*)(record + 16);
         var provider = *(Guid*)(record + 24);
         var id = *(ushort*)(record + 40);
 
@@ -360,10 +465,18 @@ internal sealed unsafe partial class FrameCounter : IDisposable
             if (runtime)
             {
                 counts.Runtime++;
+                if (timestamp > 0)
+                {
+                    (counts.RuntimeStamps ??= []).Add(timestamp);
+                }
             }
             else
             {
                 counts.Kernel++;
+                if (timestamp > 0)
+                {
+                    (counts.KernelStamps ??= []).Add(timestamp);
+                }
             }
         }
     }
@@ -403,6 +516,8 @@ internal sealed unsafe partial class FrameCounter : IDisposable
     {
         public int Runtime;
         public int Kernel;
+        public List<long>? RuntimeStamps;
+        public List<long>? KernelStamps;
     }
 
     [LibraryImport("advapi32.dll", EntryPoint = "StartTraceW", StringMarshalling = StringMarshalling.Utf16)]

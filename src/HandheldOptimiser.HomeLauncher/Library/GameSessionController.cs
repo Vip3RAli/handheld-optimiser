@@ -380,7 +380,7 @@ internal sealed class GameSessionController
         }
         else if (explicitAutoTdpOff && autoTdpFps == 0 && fanCurve == AutoTdp.AllyFans)
         {
-            _ = AutoTdp.StopIfRunningAsync();
+            _ = AutoTdp.StopIfRunningAsync(GameSession.ProcessFolder(game));
         }
 
         if (session.CanFollow)

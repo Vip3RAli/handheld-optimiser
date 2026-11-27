@@ -184,6 +184,7 @@ internal sealed record AutoTdpRequest(string Command, int TargetFps = 0, int Min
 /// <param name="ControllerLighting">The thumbstick light ring mode while replacing Armoury Crate, one of <see cref="AutoTdpProtocol.LightingModes"/>.</param>
 /// <param name="LightingColour">The thumbstick light ring colour while replacing Armoury Crate, one of <see cref="AutoTdpProtocol.LightingColours"/>.</param>
 /// <param name="ScreenStatsLime">Whether the stats screen is drawn on the lime background, rather than black.</param>
+/// <param name="LearnedWatts">The settled gameplay power limit to remember when the session ends, or null when not enough data.</param>
 internal sealed record AutoTdpStatus(bool Running, double? Fps = null, int? Watts = null, int? Temperature = null,
     string? State = null, string? Error = null, int TargetFps = 0, string? FanCurve = null, int PowerLimit = 0,
     bool Replacing = false, bool ControllerConnected = false, string? ControllerMode = null, bool? CpuBoost = null,
@@ -195,4 +196,4 @@ internal sealed record AutoTdpStatus(bool Running, double? Fps = null, int? Watt
     int? ChillMin = null, int? ChillMax = null, int[]? ChillRange = null, bool? Sharpening = null,
     int? SharpeningStrength = null, int[]? SharpeningRange = null, bool? FreeSync = null, bool? BatteryCare = null,
     string? PaddleAction = null, string? ControllerLighting = null, string? LightingColour = null,
-    bool ScreenStatsLime = true);
+    bool ScreenStatsLime = true, int? LearnedWatts = null);

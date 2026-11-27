@@ -67,8 +67,8 @@ internal sealed partial class AutoTdpService : ServiceBase
 
     // The game being controlled, or null between games.
     private Control? _control;
-    private DateTime _idleSince = DateTime.UtcNow;
-    private DateTime _lastTick = DateTime.UtcNow;
+    private DateTime _idleSince = MonotonicClock.UtcNow;
+    private DateTime _lastTick = MonotonicClock.UtcNow;
     private AutoTdpStatus _last = new(false);
 
     // Set once it has decided to end, so a start that arrives meanwhile is turned away rather than lost.
@@ -80,6 +80,8 @@ internal sealed partial class AutoTdpService : ServiceBase
     private DateTime _playerLibraryRead;
     private static readonly TimeSpan PlayerLibraryEvery = TimeSpan.FromMinutes(1);
     private GameLock _runningGameLock = new();
+    private string? _suppressedFolder;
+    private DateTime _suppressedLastSeen;
 
     // Which part of the service answers each request that is not the engine's own. See Routes.
     private readonly Dictionary<string, RequestRoute> _routes;
@@ -113,7 +115,7 @@ internal sealed partial class AutoTdpService : ServiceBase
 
     private void OnSystemResumed()
     {
-        var now = DateTime.UtcNow;
+        var now = MonotonicClock.UtcNow;
         lock (_gate)
         {
             _idleSince = now;
@@ -125,7 +127,8 @@ internal sealed partial class AutoTdpService : ServiceBase
             }
         }
 
-        // Outside the gate, as it closes the controller's handle.
+        // Outside the gate, as it closes the controller's handle and resets frame timestamps.
+        _frames?.Reset();
         _controls?.Resume();
         _batteryCare.RestoreIfEnabled();
     }
@@ -212,11 +215,11 @@ internal sealed partial class AutoTdpService : ServiceBase
 
             serving = ServeAsync(cancel);
             using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
-            _lastTick = DateTime.UtcNow;
+            _lastTick = MonotonicClock.UtcNow;
             while (await timer.WaitForNextTickAsync(cancel))
             {
                 var woken = false;
-                var tickNow = DateTime.UtcNow;
+                var tickNow = MonotonicClock.UtcNow;
                 if (tickNow - _lastTick > TimeSpan.FromSeconds(15))
                 {
                     woken = true;
@@ -243,7 +246,7 @@ internal sealed partial class AutoTdpService : ServiceBase
                     // While replacing Armoury Crate it runs the controller too, and while the overlay, the stats
                     // screen or the battery charge limit is on it keeps them, so it stays.
                     if (_controls is null && _control is null && !_overlay.Wanted && !_screenStats.On
-                        && !_batteryCare.IsSavedOn && DateTime.UtcNow - _idleSince > IdleExit)
+                        && !_batteryCare.IsSavedOn && MonotonicClock.UtcNow - _idleSince > IdleExit)
                     {
                         _ending = true;
                         Log.Write("Nothing to do, so ending");
@@ -379,7 +382,7 @@ internal sealed partial class AutoTdpService : ServiceBase
         }
 
         // The library's folders are read through the busiest program's own user, a minute at a time.
-        var now = DateTime.UtcNow;
+        var now = MonotonicClock.UtcNow;
         if (_playerLibrary is null || now - _playerLibraryRead > PlayerLibraryEvery)
         {
             var (_, _, busiest) = GameFps(frames.Rendered, null, null);
@@ -396,6 +399,21 @@ internal sealed partial class AutoTdpService : ServiceBase
         }
 
         var (fps, program, processId) = GameFps(frames.Rendered, null, library);
+        if (_suppressedFolder is not null)
+        {
+            if (AutoTdpRules.IsSuppressed(program, _suppressedFolder) && fps >= GameFrames)
+            {
+                _suppressedLastSeen = now;
+                _runningGameLock = new GameLock();
+                return;
+            }
+
+            if (now - _suppressedLastSeen > NoGameExit)
+            {
+                _suppressedFolder = null;
+            }
+        }
+
         if (_runningGameLock.Observe(now, program, fps) is null || program is null)
         {
             return;
@@ -414,9 +432,11 @@ internal sealed partial class AutoTdpService : ServiceBase
 
         // The overlay and the stats screen show frames as seen, Fluid Motion Frames included.
         _lastFrames = frames?.Shown;
+        var needTemp = _overlay.Wanted || _screenStats.On || _control is not null;
+        var temperature = needTemp ? _power?.ReadTemperature() : null;
         if (_overlay.Wanted || _screenStats.On)
         {
-            _overlayTemperature = _power?.ReadTemperature();
+            _overlayTemperature = temperature;
             _overlay.Keep();
             _screenStats.Keep();
         }
@@ -431,6 +451,11 @@ internal sealed partial class AutoTdpService : ServiceBase
             return;
         }
 
+        if (!needTemp)
+        {
+            temperature = _power.ReadTemperature();
+        }
+
         if (!ClientAlive(control.ClientProcess))
         {
             Release("the game library closed");
@@ -443,8 +468,8 @@ internal sealed partial class AutoTdpService : ServiceBase
         var (fps, program, processId) = frames is null ? (0, null, 0)
             : GameFps(frames.Rendered, control.GameFolder ?? control.FoundFolder, control.LibraryFolders);
         var shownFps = frames is not null && frames.Shown.TryGetValue(processId, out var shown) ? shown : fps;
-        var temperature = _power.ReadTemperature();
-        var now = DateTime.UtcNow;
+        double? lowFps = frames?.LowFps is { } lows && lows.TryGetValue(processId, out var low) ? low : null;
+        var now = MonotonicClock.UtcNow;
 
         if (control.Lock?.Observe(now, program, fps) is { } found)
         {
@@ -463,30 +488,32 @@ internal sealed partial class AutoTdpService : ServiceBase
             return;
         }
 
+        control = SyncAutoPowerSource(control, now, temperature);
+
         if (control.Controller is { } controller)
         {
-            if (controller.Tick(now, fps, temperature) is { } watts)
+            if (controller.Tick(now, fps, temperature, lowFps) is { } watts)
             {
-                Apply(control, watts);
+                Apply(control, watts, temperature);
                 // The frame rate the change went on, not this second's count, which can be far from it.
                 Log.Write($"{watts} W: {controller.DecidedFps ?? fps:0} fps, {temperature?.ToString() ?? "?"} °C, {controller.State}");
             }
-            else if (now - control.LastSet >= Reassert)
+            else if (now - control.LastSet >= Reassert || PowerLimits.AllowAcBoost(_engine.AcBoostBursts, controller.State) != control.LastAcBoost)
             {
-                Apply(control, controller.Watts);
+                Apply(control, controller.Watts, temperature);
             }
 
-            Log.Second(now, control.GameFolder ?? control.FoundFolder, control.Settings?.TargetFps ?? 0, fps, temperature,
+            Log.Second(DateTime.UtcNow, control.GameFolder ?? control.FoundFolder, control.Settings?.TargetFps ?? 0, fps, temperature,
                 controller.Watts, controller.State, shownFps);
         }
         else if (control.FixedWatts is { } fixedWatts && now - control.LastSet >= Reassert)
         {
-            Apply(control, fixedWatts);
+            Apply(control, fixedWatts, temperature);
         }
 
         if (control.Auto)
         {
-            control = TickAuto(control, now, fps, temperature);
+            control = TickAuto(control, now, temperature);
         }
 
         if (control.Dynamic is { } dynamic && control.Curve is not null)
@@ -525,7 +552,7 @@ internal sealed partial class AutoTdpService : ServiceBase
         }
 
         control.Dynamic ??= new DynamicFans();
-        control.DynamicPick = control.Dynamic.Pick(DateTime.UtcNow, temperature, WattsNow(control),
+        control.DynamicPick = control.Dynamic.Pick(MonotonicClock.UtcNow, temperature, WattsNow(control),
             TopWatts(control), TemperatureLimit(control));
         control.Curve = FanCurves.For(control.DynamicPick);
     }
@@ -547,7 +574,7 @@ internal sealed partial class AutoTdpService : ServiceBase
         control.BoostOn = CpuBoost.Read() ?? false;
         control.Fine = new FineFans();
         control.FineStep = null;
-        PickFans(control, DateTime.UtcNow, temperature);
+        PickFans(control, MonotonicClock.UtcNow, temperature);
     }
 
     /// <summary>
@@ -575,25 +602,42 @@ internal sealed partial class AutoTdpService : ServiceBase
     }
 
     /// <summary>
-    /// One second of an Auto session: the power range follows the power source, and the fans follow the power
-    /// and the player's CPU boost.
+    /// Updates Auto's upper wattage limit in place when the power source changes, preserving the running
+    /// controller's learned history and thermal memory.
     /// </summary>
-    /// <returns>The session, rebuilt when the power source changed.</returns>
-    private Control TickAuto(Control control, DateTime now, double fps, int? temperature)
+    private Control SyncAutoPowerSource(Control control, DateTime now, int? temperature)
     {
-        var onBattery = CpuBoost.OnBattery();
-        if (onBattery != control.OnBattery && control.Settings is { } old && control.Controller is { } running)
+        if (!control.Auto)
         {
-            var settings = old with { MaxWatts = AutoMode.TopWatts(onBattery) };
-            var from = Math.Clamp(running.Watts, settings.MinWatts, settings.MaxWatts);
-            control = control with { Settings = settings, Controller = new AutoTdpController(settings, from) };
-            control.AutoSettings = settings;
-            control.OnBattery = onBattery;
-            _control = control;
-            Apply(control, from);
-            Log.Write($"Auto: {(onBattery ? "on battery" : "plugged in")}, so up to {settings.MaxWatts} W, from {from} W");
+            return control;
         }
 
+        var onBattery = CpuBoost.OnBattery();
+        if (onBattery == control.OnBattery || control.Settings is not { } old || control.Controller is not { } running)
+        {
+            return control;
+        }
+
+        var settings = old with { MaxWatts = AutoMode.TopWatts(onBattery) };
+        control = control with { Settings = settings };
+        control.AutoSettings = settings;
+        control.OnBattery = onBattery;
+        _control = control;
+
+        if (running.SetMaxWatts(now, settings.MaxWatts) is { } clamped)
+        {
+            Apply(control, clamped, temperature);
+        }
+
+        Log.Write($"Auto: {(onBattery ? "on battery" : "plugged in")}, so up to {settings.MaxWatts} W, at {running.Watts} W");
+        return control;
+    }
+
+    /// <summary>
+    /// One second of an Auto session: the fans follow the power and the player's CPU boost.
+    /// </summary>
+    private Control TickAuto(Control control, DateTime now, int? temperature)
+    {
         // Read each second, as the player can switch it in the widget at any time, and the fans run a little
         // harder while it is on.
         var watts = WattsNow(control) ?? 0;
@@ -644,7 +688,7 @@ internal sealed partial class AutoTdpService : ServiceBase
     private AutoTdpStatus SetMode(AutoTdpRequest request, int client)
     {
         var auto = AutoMode.IsAuto(request.Mode);
-        _idleSince = DateTime.UtcNow;
+        _idleSince = MonotonicClock.UtcNow;
         if (auto != _engine.Auto)
         {
             _engine.SetMode(auto);
@@ -655,10 +699,11 @@ internal sealed partial class AutoTdpService : ServiceBase
                 var target = AutoMode.ShownTarget(control.Settings?.TargetFps ?? 0);
                 if (auto)
                 {
+                    var temperature = _power.ReadTemperature();
                     _control = ToAuto(control, target);
-                    Set(_control);
+                    Set(_control, temperature);
                     Log.Write($"{Describe(_control)}, changed to Auto in Game Bar");
-                    _last = Status(_control, null, _power.ReadTemperature());
+                    _last = Status(_control, null, temperature);
                 }
                 else
                 {
@@ -680,12 +725,12 @@ internal sealed partial class AutoTdpService : ServiceBase
         }
 
         _engine.SetAcBoostBursts(allow);
-        _idleSince = DateTime.UtcNow;
+        _idleSince = MonotonicClock.UtcNow;
         Log.Write($"AC boost bursts {(allow ? "enabled (up to 43/53 W on charger)" : "disabled")}");
 
         if (_control is { } control && _power is not null && WattsNow(control) is { } watts)
         {
-            Apply(control, watts);
+            Apply(control, watts, _power.ReadTemperature());
         }
 
         return _error is not null && _control is null ? new AutoTdpStatus(false, Error: _error) : _last;
@@ -702,26 +747,28 @@ internal sealed partial class AutoTdpService : ServiceBase
     private static int TopWatts(Control control) =>
         control.Settings?.MaxWatts ?? (control.FixedWatts is null ? 0 : AutoTdpProtocol.HighestWatts);
 
-    private void Apply(Control control, int watts)
+    private void Apply(Control control, int watts, int? temperature)
     {
+        var allowBoost = PowerLimits.AllowAcBoost(_engine.AcBoostBursts, control.Controller?.State);
         var envelope = PowerLimits.Envelope(
             watts,
-            _engine.AcBoostBursts,
+            allowBoost,
             CpuBoost.OnBattery(),
-            _power!.ReadTemperature(),
+            temperature,
             TemperatureLimit(control));
 
-        if (!_power.SetPowerLimits(envelope.Sustained, envelope.Slow, envelope.Fast))
+        if (!_power!.SetPowerLimits(envelope.Sustained, envelope.Slow, envelope.Fast))
         {
             Log.Write($"The firmware refused {watts} W");
         }
 
-        control.LastSet = DateTime.UtcNow;
+        control.LastAcBoost = allowBoost;
+        control.LastSet = MonotonicClock.UtcNow;
     }
 
     private void ApplyFans(Control control)
     {
-        control.LastFans = DateTime.UtcNow;
+        control.LastFans = MonotonicClock.UtcNow;
         if (_power!.SetFanCurve(control.Curve!))
         {
             control.FansApplied = true;
@@ -753,7 +800,7 @@ internal sealed partial class AutoTdpService : ServiceBase
         new(true, fps, WattsNow(control), temperature,
             control.Controller?.State.ToString() ?? (control.FixedWatts is null ? null : AutoTdpProtocol.FixedState),
             TargetFps: AutoMode.ShownTarget(control.Settings?.TargetFps ?? 0), FanCurve: control.Curve is null ? null : control.FanCurve,
-            PowerLimit: control.PowerLimit);
+            PowerLimit: control.PowerLimit, LearnedWatts: control.Controller?.LearnedWatts);
 
     /// <summary>
     /// The game's frames a second: the busiest program running from its folder. Without a folder, the
@@ -836,6 +883,7 @@ internal sealed partial class AutoTdpService : ServiceBase
         public bool OnBattery { get; set; }
 
         public DateTime LastSet { get; set; }
+        public bool LastAcBoost { get; set; }
         public DateTime LastFans { get; set; }
         public DateTime LastFrames { get; set; }
         public bool FansApplied { get; set; }

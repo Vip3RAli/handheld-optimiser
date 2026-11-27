@@ -14,25 +14,37 @@ internal static class AutoTdpRules
     public const int MaxRequestBytes = 4096;
 
     /// <summary>
-    /// What a start request comes to, held to the limits the service allows whatever the library sent:
-    /// a lowest and highest limit inside the Ally's range with the highest never under the lowest, and a
-    /// starting point between them.
+    /// Settings from a start/update request, clamped to the service's allowed limits, or null when no
+    /// frame-rate target was requested (e.g. fans-only or fixed power limit).
     /// </summary>
-    public static (AutoTdpSettings Settings, int StartWatts, string? GameFolder) FromRequest(AutoTdpRequest request)
+    public static AutoTdpSettings? Settings(AutoTdpRequest request)
     {
-        var min = Math.Clamp(request.MinWatts, AutoTdpProtocol.LowestWatts, AutoTdpProtocol.HighestWatts);
-        var max = Math.Clamp(request.MaxWatts, min, AutoTdpProtocol.HighestWatts);
-        var settings = new AutoTdpSettings(
+        if (request.TargetFps <= 0)
+        {
+            return null;
+        }
+
+        var min = Math.Clamp(request.MinWatts > 0 ? request.MinWatts : AutoTdpProtocol.LowestWatts,
+            AutoTdpProtocol.LowestWatts, AutoTdpProtocol.HighestWatts);
+        var max = Math.Clamp(request.MaxWatts > 0 ? request.MaxWatts : AutoTdpProtocol.DefaultMaxWatts,
+            min, AutoTdpProtocol.HighestWatts);
+        return new AutoTdpSettings(
             Math.Clamp(request.TargetFps, AutoTdpProtocol.LowestFps, AutoTdpProtocol.HighestFps),
             min,
             max,
-            Math.Clamp(request.TemperatureLimit, AutoTdpProtocol.LowestTemperature, AutoTdpProtocol.HighestTemperature));
-
-        // 0 (or nonsense) starts halfway; anything else is held between the two limits.
-        var start = request.StartWatts > 0 ? Math.Clamp(request.StartWatts, min, max) : (min + max + 1) / 2;
-        var folder = string.IsNullOrWhiteSpace(request.GameFolder) ? null : request.GameFolder;
-        return (settings, start, folder);
+            Math.Clamp(request.TemperatureLimit > 0 ? request.TemperatureLimit : AutoTdpProtocol.DefaultTemperature,
+                AutoTdpProtocol.LowestTemperature, AutoTdpProtocol.HighestTemperature));
     }
+
+    /// <summary>Starting wattage for a controller: halfway when unset, otherwise clamped inside the settings range.</summary>
+    public static int StartWatts(int requestedStartWatts, AutoTdpSettings settings) =>
+        requestedStartWatts > 0
+            ? Math.Clamp(requestedStartWatts, settings.MinWatts, settings.MaxWatts)
+            : (settings.MinWatts + settings.MaxWatts + 1) / 2;
+
+    /// <summary>Normalized game folder from a request, or null when blank.</summary>
+    public static string? GameFolder(string? folder) =>
+        string.IsNullOrWhiteSpace(folder) ? null : folder;
 
     /// <summary>
     /// The game's frames a second: the busiest program running from its folder. Without a folder, the
@@ -111,6 +123,12 @@ internal static class AutoTdpRules
 
         return best;
     }
+
+    /// <summary>Whether a program runs inside a folder explicitly excluded from Auto TDP (e.g. an Off game profile).</summary>
+    public static bool IsSuppressed(string? programPath, string? suppressedFolder) =>
+        !string.IsNullOrEmpty(programPath)
+        && !string.IsNullOrEmpty(suppressedFolder)
+        && GameLock.InFolders(programPath, [suppressedFolder]);
 
     /// <summary>
     /// One line from the pipe, read no further than a limit so a client cannot make the service hold an

@@ -44,6 +44,25 @@ public class AllyPerformanceTweaksTests
         Assert.Equal(new PowerEnvelope(expectedSpl, expectedSppt, expectedFppt), envelope);
     }
 
+    [Theory]
+    [InlineData(true, null, true)]
+    [InlineData(true, nameof(AutoTdpState.Waiting), true)]
+    [InlineData(true, nameof(AutoTdpState.Holding), false)]
+    [InlineData(true, nameof(AutoTdpState.Raising), false)]
+    [InlineData(true, nameof(AutoTdpState.Lowering), false)]
+    [InlineData(true, nameof(AutoTdpState.Settling), false)]
+    [InlineData(true, nameof(AutoTdpState.AtMaximum), false)]
+    [InlineData(true, nameof(AutoTdpState.NoGain), false)]
+    [InlineData(true, nameof(AutoTdpState.TooHot), false)]
+    [InlineData(false, null, false)]
+    [InlineData(false, nameof(AutoTdpState.Waiting), false)]
+    public void PowerLimits_AllowAcBoost_only_allows_bursts_in_fixed_or_waiting_states(
+        bool acBoostEnabled, string? stateName, bool expected)
+    {
+        AutoTdpState? state = stateName is null ? null : Enum.Parse<AutoTdpState>(stateName);
+        Assert.Equal(expected, PowerLimits.AllowAcBoost(acBoostEnabled, state));
+    }
+
     [Fact]
     public void RadeonState_round_trips_freesync_flag_and_accepts_freesync_switch()
     {

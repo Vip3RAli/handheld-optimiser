@@ -26,6 +26,14 @@ internal static class PowerLimits
             : null;
 
     /// <summary>
+    /// AC boost bursts (sPPT/fPPT above SPL) are allowed in fixed-wattage mode and while Auto TDP is
+    /// waiting on a loading screen or shader compile, but kept flat during active closed-loop control
+    /// so temporary boosts do not trick the controller into lowering SPL too far.
+    /// </summary>
+    public static bool AllowAcBoost(bool acBoostEnabled, AutoTdpState? controllerState) =>
+        acBoostEnabled && controllerState is null or AutoTdpState.Waiting;
+
+    /// <summary>
     /// Computes SPL/sPPT/fPPT limits. Flat by default, on battery, or near the temperature limit; when
     /// plugged in with <paramref name="allowAcBoost"/> and thermal headroom, grants ASUS-style short bursts
     /// up to 43 W slow / 53 W fast for faster shader compilation and level loads.

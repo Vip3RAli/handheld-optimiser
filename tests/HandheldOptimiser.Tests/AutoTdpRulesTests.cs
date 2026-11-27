@@ -14,65 +14,58 @@ public class AutoTdpRulesTests
     // ----- What a request comes to -----
 
     [Fact]
-    public void A_request_with_nothing_set_comes_to_the_lowest_limits()
+    public void A_request_with_no_target_fps_returns_null_settings()
     {
-        var (settings, start, folder) = AutoTdpRules.FromRequest(new AutoTdpRequest(AutoTdpProtocol.Start));
-
-        Assert.Equal(AutoTdpProtocol.LowestFps, settings.TargetFps);
-        Assert.Equal(AutoTdpProtocol.LowestWatts, settings.MinWatts);
-        Assert.Equal(AutoTdpProtocol.LowestWatts, settings.MaxWatts);
-        Assert.Equal(AutoTdpProtocol.LowestTemperature, settings.TemperatureLimit);
-        Assert.Equal(AutoTdpProtocol.LowestWatts, start);
-        Assert.Null(folder);
+        Assert.Null(AutoTdpRules.Settings(new AutoTdpRequest(AutoTdpProtocol.Start)));
+        Assert.Null(AutoTdpRules.Settings(new AutoTdpRequest(AutoTdpProtocol.Start, TargetFps: -60)));
     }
 
     [Fact]
-    public void Negative_numbers_are_held_to_the_lowest_limits()
+    public void Zero_and_negative_bounds_fall_back_to_service_defaults()
     {
-        var (settings, start, _) = AutoTdpRules.FromRequest(new AutoTdpRequest(AutoTdpProtocol.Start,
-            TargetFps: -60, MinWatts: -5, MaxWatts: -1, TemperatureLimit: -40, StartWatts: -3));
+        var settings = AutoTdpRules.Settings(new AutoTdpRequest(AutoTdpProtocol.Start,
+            TargetFps: 60, MinWatts: -5, MaxWatts: 0, TemperatureLimit: -40));
 
-        Assert.Equal(AutoTdpProtocol.LowestFps, settings.TargetFps);
+        Assert.NotNull(settings);
+        Assert.Equal(60, settings!.TargetFps);
         Assert.Equal(AutoTdpProtocol.LowestWatts, settings.MinWatts);
-        Assert.Equal(AutoTdpProtocol.LowestWatts, settings.MaxWatts);
-        Assert.Equal(AutoTdpProtocol.LowestTemperature, settings.TemperatureLimit);
-        Assert.Equal(AutoTdpProtocol.LowestWatts, start);
+        Assert.Equal(AutoTdpProtocol.DefaultMaxWatts, settings.MaxWatts);
+        Assert.Equal(AutoTdpProtocol.DefaultTemperature, settings.TemperatureLimit);
     }
 
     [Fact]
     public void Numbers_past_the_range_are_held_to_the_highest_limits()
     {
-        var (settings, start, _) = AutoTdpRules.FromRequest(new AutoTdpRequest(AutoTdpProtocol.Start,
-            TargetFps: 1000, MinWatts: 100, MaxWatts: 500, TemperatureLimit: 200, StartWatts: 99));
+        var settings = AutoTdpRules.Settings(new AutoTdpRequest(AutoTdpProtocol.Start,
+            TargetFps: 1000, MinWatts: 100, MaxWatts: 500, TemperatureLimit: 200));
 
-        Assert.Equal(AutoTdpProtocol.HighestFps, settings.TargetFps);
+        Assert.NotNull(settings);
+        Assert.Equal(AutoTdpProtocol.HighestFps, settings!.TargetFps);
         Assert.Equal(AutoTdpProtocol.HighestWatts, settings.MinWatts);
         Assert.Equal(AutoTdpProtocol.HighestWatts, settings.MaxWatts);
         Assert.Equal(AutoTdpProtocol.HighestTemperature, settings.TemperatureLimit);
-        Assert.Equal(AutoTdpProtocol.HighestWatts, start);
+        Assert.Equal(AutoTdpProtocol.HighestWatts, AutoTdpRules.StartWatts(99, settings));
     }
 
     [Fact]
     public void A_highest_limit_under_the_lowest_is_raised_to_it()
     {
-        var (settings, start, _) = AutoTdpRules.FromRequest(new AutoTdpRequest(AutoTdpProtocol.Start,
-            TargetFps: 60, MinWatts: 20, MaxWatts: 10, TemperatureLimit: 80));
+        var settings = AutoTdpRules.Settings(new AutoTdpRequest(AutoTdpProtocol.Start,
+            TargetFps: 60, MinWatts: 20, MaxWatts: 10, TemperatureLimit: 80))!;
 
         Assert.Equal(20, settings.MinWatts);
         Assert.Equal(20, settings.MaxWatts);
-        Assert.Equal(20, start);
+        Assert.Equal(20, AutoTdpRules.StartWatts(0, settings));
     }
 
     [Fact]
     public void Without_a_starting_point_it_starts_halfway_and_otherwise_inside_the_limits()
     {
-        var halfway = AutoTdpRules.FromRequest(new AutoTdpRequest(AutoTdpProtocol.Start, 60, 7, 25, 80));
-        var over = AutoTdpRules.FromRequest(new AutoTdpRequest(AutoTdpProtocol.Start, 60, 7, 25, 80, StartWatts: 28));
-        var learned = AutoTdpRules.FromRequest(new AutoTdpRequest(AutoTdpProtocol.Start, 60, 7, 25, 80, StartWatts: 12));
+        var settings = AutoTdpRules.Settings(new AutoTdpRequest(AutoTdpProtocol.Start, 60, 7, 25, 80))!;
 
-        Assert.Equal(16, halfway.StartWatts);
-        Assert.Equal(25, over.StartWatts);
-        Assert.Equal(12, learned.StartWatts);
+        Assert.Equal(16, AutoTdpRules.StartWatts(0, settings));
+        Assert.Equal(25, AutoTdpRules.StartWatts(28, settings));
+        Assert.Equal(12, AutoTdpRules.StartWatts(12, settings));
     }
 
     [Theory]
@@ -81,9 +74,7 @@ public class AutoTdpRulesTests
     [InlineData("   ")]
     public void A_blank_game_folder_counts_the_busiest_program(string? folder)
     {
-        var (_, _, gameFolder) = AutoTdpRules.FromRequest(new AutoTdpRequest(AutoTdpProtocol.Start, GameFolder: folder));
-
-        Assert.Null(gameFolder);
+        Assert.Null(AutoTdpRules.GameFolder(folder));
     }
 
     // ----- Whose frames are the game's -----
@@ -252,5 +243,17 @@ public class AutoTdpRulesTests
     {
         Assert.Equal(@"C:\Games\Foo?[fake] line?", AutoTdpRules.Printable("C:\\Games\\Foo\n[fake] line\r"));
         Assert.Equal(@"C:\Games\Foo", AutoTdpRules.Printable(@"C:\Games\Foo"));
+    }
+
+    [Theory]
+    [InlineData(@"C:\Games\Foo\bin\foo.exe", @"C:\Games\Foo\", true)]
+    [InlineData(@"c:\games\foo\bin\foo.exe", @"C:\Games\Foo", true)]
+    [InlineData(@"C:\Games\FooBar\foobar.exe", @"C:\Games\Foo\", false)]
+    [InlineData(null, @"C:\Games\Foo\", false)]
+    [InlineData(@"C:\Games\Foo\bin\foo.exe", null, false)]
+    [InlineData(@"C:\Games\Foo\bin\foo.exe", "", false)]
+    public void Suppressed_folder_matches_only_programs_inside_it(string? program, string? suppressed, bool expected)
+    {
+        Assert.Equal(expected, AutoTdpRules.IsSuppressed(program, suppressed));
     }
 }

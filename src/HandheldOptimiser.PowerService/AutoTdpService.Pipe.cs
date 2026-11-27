@@ -118,7 +118,7 @@ internal sealed partial class AutoTdpService
                 error = _error;
                 if (route.KeepsAwake)
                 {
-                    _idleSince = DateTime.UtcNow;
+                    _idleSince = MonotonicClock.UtcNow;
                 }
             }
 
@@ -132,7 +132,7 @@ internal sealed partial class AutoTdpService
                 {
                     AutoTdpProtocol.Start => Begin(request, client),
                     AutoTdpProtocol.Update => Update(request, client),
-                    AutoTdpProtocol.Stop => End(),
+                    AutoTdpProtocol.Stop => End(request),
                     AutoTdpProtocol.SetOverlay => SetOverlay(request),
                     AutoTdpProtocol.SetScreenStats => SetScreenStats(request),
                     AutoTdpProtocol.SetMode => SetMode(request, client),

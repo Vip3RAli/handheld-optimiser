@@ -71,6 +71,9 @@ internal sealed class AutoTdpController
     // that power still buys are not given away.
     private const double NoTargetLoss = 0.95;
 
+    // P95 frametime equivalent FPS must stay at or above this share of target before lowering power.
+    private const double StutterFloor = 0.85;
+
     // A step down takes a quarter of the limit, at least 2 W: big enough that a game the power is helping
     // loses well over the 15% allowed, where a game that gains nothing from it loses nothing.
     private const int StepDownShare = 4;
@@ -79,23 +82,27 @@ internal sealed class AutoTdpController
     private const int CoolBy = 3;
     private const int HeatStep = 2;
 
-    private static readonly TimeSpan SettleAfterRaise = TimeSpan.FromSeconds(3);
-    private static readonly TimeSpan SettleAfterLower = TimeSpan.FromSeconds(6);
+    private static readonly TimeSpan SettleAfterRaise = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan SettleAfterLower = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan SettleAfterHeat = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan FirstFloorHold = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan LongestFloorHold = TimeSpan.FromMinutes(4);
     private static readonly TimeSpan RecentlyLowered = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan NoGainHold = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan LongestNoGainHold = TimeSpan.FromMinutes(4);
     private static readonly TimeSpan CoolRaiseEvery = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan HeldMovedFor = TimeSpan.FromSeconds(4);
     private static readonly TimeSpan FirstStepDownWait = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan LongestStepDownWait = TimeSpan.FromMinutes(4);
 
-    private readonly AutoTdpSettings _settings;
+    private AutoTdpSettings _settings;
     private readonly Queue<double> _readings = new();
 
     // The same readings over a longer window, for judging a step down from the top.
     private readonly Queue<double> _longReadings = new();
+
+    // P95 frametime equivalent FPS over the longer window, so stutters keep power from stepping down.
+    private readonly Queue<double> _lowReadings = new();
 
     private DateTime _nextChange = DateTime.MinValue;
 
@@ -115,8 +122,11 @@ internal sealed class AutoTdpController
     // Raises that gained nothing, and the limit they started from.
     private int _wasted;
     private int _wastedFrom;
+    private double _wastedFromFps;
     private int _noGainCap;
     private DateTime _noGainUntil = DateTime.MinValue;
+    private TimeSpan _noGainHold = NoGainHold;
+    private int _cleanLowers;
 
     // The frame rate when the limit was held, to let it go when the game changes, and since when it has
     // been far from it.
@@ -157,6 +167,13 @@ internal sealed class AutoTdpController
     private int? _rememberedHeat;
     private DateTime _rememberedUntil = DateTime.MinValue;
 
+    // Session-level settled wattage tracking for remembering what the game actually needed.
+    private const int MinLearnedSeconds = 30;
+    private readonly int[] _gameplayWatts = new int[AutoTdpProtocol.HighestWatts + 1];
+    private int _gameplaySeconds;
+    private readonly int[] _noGainWatts = new int[AutoTdpProtocol.HighestWatts + 1];
+    private int _noGainSeconds;
+
     public AutoTdpController(AutoTdpSettings settings, int startWatts)
     {
         _settings = settings;
@@ -172,12 +189,59 @@ internal sealed class AutoTdpController
     /// <summary>The frame rate its last decision went on: the middle of the last few seconds, not one second's count.</summary>
     public double? DecidedFps { get; private set; }
 
+    /// <summary>The settled gameplay power limit to remember when the session ends, or null when not enough data.</summary>
+    public int? LearnedWatts =>
+        _gameplaySeconds >= MinLearnedSeconds && _gameplaySeconds >= _noGainSeconds
+            ? MedianWatts(_gameplayWatts, null, _gameplaySeconds)
+        : _gameplaySeconds + _noGainSeconds >= MinLearnedSeconds
+            ? MedianWatts(_gameplayWatts, _noGainWatts, _gameplaySeconds + _noGainSeconds)
+        : null;
+
     /// <summary>One second's reading.</summary>
     /// <param name="fps">The game's frames in the last second.</param>
     /// <param name="temperature">The processor's temperature in °C, or null when it cannot be read.</param>
+    /// <param name="lowFps">Optional P95 frametime equivalent FPS for stutter awareness.</param>
     /// <returns>The new power limit when it should change, otherwise null.</returns>
-    public int? Tick(DateTime now, double fps, double? temperature)
+    public int? Tick(DateTime now, double fps, double? temperature, double? lowFps = null)
     {
+        var result = TickCore(now, fps, temperature, lowFps);
+        RecordSettled();
+        return result;
+    }
+
+    private int? TickCore(DateTime now, double fps, double? temperature, double? lowFps)
+    {
+        if (CoolDown(now, temperature) is { } cooler)
+        {
+            return cooler;
+        }
+
+        if (_hot)
+        {
+            _wasted = 0;
+            return null;
+        }
+
+        if (fps < MinFrames)
+        {
+            // Whatever was being judged is lost in the pause.
+            _readings.Clear();
+            _longReadings.Clear();
+            _lowReadings.Clear();
+            _judging = null;
+            _wasted = 0;
+            _cleanLowers = 0;
+            _pausedWhileHeld = IsHeld(now);
+            State = AutoTdpState.Waiting;
+            return null;
+        }
+
+        if (now < _nextChange)
+        {
+            State = AutoTdpState.Settling;
+            return null;
+        }
+
         _readings.Enqueue(fps);
         while (_readings.Count > Window)
         {
@@ -190,28 +254,13 @@ internal sealed class AutoTdpController
             _longReadings.Dequeue();
         }
 
-        if (CoolDown(now, temperature) is { } cooler)
+        _lowReadings.Enqueue(lowFps ?? fps);
+        while (_lowReadings.Count > StepDownWindow)
         {
-            return cooler;
+            _lowReadings.Dequeue();
         }
 
-        if (_hot)
-        {
-            return null;
-        }
-
-        if (fps < MinFrames)
-        {
-            // Whatever was being judged is lost in the pause.
-            _readings.Clear();
-            _longReadings.Clear();
-            _judging = null;
-            _pausedWhileHeld = IsHeld(now);
-            State = AutoTdpState.Waiting;
-            return null;
-        }
-
-        if (_readings.Count < Window || now < _nextChange)
+        if (_readings.Count < Window)
         {
             State = AutoTdpState.Settling;
             return null;
@@ -219,18 +268,18 @@ internal sealed class AutoTdpController
 
         var sorted = _readings.Order().ToArray();
         var middle = sorted[sorted.Length / 2];
+        var target = (double)_settings.TargetFps;
 
         // Checked before the window is judged steady, as a game waking up is anything but.
         if (_pausedWhileHeld)
         {
             _pausedWhileHeld = false;
-            if (IsHeld(now) && middle < _noGainFps * AfterPauseShort)
+            if (IsHeld(now) && middle < _noGainFps * AfterPauseShort && middle < target * Below)
             {
                 return BackToTop(now);
             }
         }
         var low = sorted[0];
-        var target = (double)_settings.TargetFps;
         var unsteady = low * Unsteady < middle || sorted[^1] > middle * Unsteady;
 
         // Steps down and back up are judged on the longer window, which already leaves out hitches and
@@ -242,6 +291,7 @@ internal sealed class AutoTdpController
         {
             // A hitch or a spike: whatever was being judged is lost in it too.
             _judging = null;
+            _wasted = 0;
             State = AutoTdpState.Settling;
             return null;
         }
@@ -270,7 +320,7 @@ internal sealed class AutoTdpController
         // menu's seconds stray 20% either way all the time, so its middle wanders that far now and then,
         // and a hold let go there handed the limit to raises judged on three noisy seconds, which climbed
         // to the top. A new scene moves nearly every second at once.
-        if (now < _noGainUntil && _longReadings.Count >= StepDownWindow && HeldMovedAway())
+        if (middle < target * Below && now < _noGainUntil && _longReadings.Count >= StepDownWindow && HeldMovedAway())
         {
             // The game changed, so what power could not do before it may do now.
             _movedSince ??= now;
@@ -302,6 +352,13 @@ internal sealed class AutoTdpController
 
             if (Watts >= ceiling)
             {
+                if (HeatCapped(now, ceiling))
+                {
+                    _atTopSince = null;
+                    State = AutoTdpState.TooHot;
+                    return null;
+                }
+
                 State = now < _noGainUntil ? AutoTdpState.NoGain : AutoTdpState.AtMaximum;
                 return StepDown(now, middle);
             }
@@ -321,13 +378,13 @@ internal sealed class AutoTdpController
             _floorUntil = now + _floorHold;
 
             State = AutoTdpState.Raising;
+            _cleanLowers = 0;
             _judging = (Step.Raise, Watts, middle);
             return Change(now, raised, SettleAfterRaise);
         }
 
         // At the target, so whatever was held from the top no longer matters.
-        _atTopSince = null;
-        _heldNoGain = false;
+        ClearNoGain();
         if (middle >= target * Comfortable && low >= target * SteadyLow)
         {
             var floor = now < _floorUntil ? Math.Max(_floor, _settings.MinWatts) : _settings.MinWatts;
@@ -337,10 +394,10 @@ internal sealed class AutoTdpController
                 return null;
             }
 
+            _cleanLowers++;
             var spare = (LongMiddle() - target) / target;
-            var step = spare > 0.25 ? 2 : 1;
+            var step = spare > 0.60 ? 3 : (spare > 0.25 || _cleanLowers >= 3) ? 2 : 1;
             State = AutoTdpState.Lowering;
-            _judging = (Step.Lower, Watts, middle);
             _lastLowered = now;
             return Change(now, Math.Max(Watts - step, floor), SettleAfterLower);
         }
@@ -380,7 +437,10 @@ internal sealed class AutoTdpController
             // so far is holding the temperature, so it holds too rather than sliding on down to the minimum.
             if (degrees >= _settings.TemperatureLimit && now >= _nextChange && Watts > _settings.MinWatts)
             {
-                var cooler = Math.Max(Watts - HeatStep, _settings.MinWatts);
+                _cleanLowers = 0;
+                var overshoot = degrees - _settings.TemperatureLimit;
+                var cut = overshoot >= 8 ? HeatStep * 2 : overshoot >= 4 ? HeatStep + 1 : HeatStep;
+                var cooler = Math.Max(Watts - cut, _settings.MinWatts);
                 _heatCeiling = cooler;
                 _nextCoolRaise = now + CoolRaiseEvery;
                 _readings.Clear();
@@ -434,6 +494,7 @@ internal sealed class AutoTdpController
             if (kept)
             {
                 // Nothing lost: held here, and the next step down comes as soon as this one has settled.
+                _noGainHold = NoGainHold;
                 Hold(now, Watts, fps);
                 _steppingDown = true;
                 _stepDownWait = FirstStepDownWait;
@@ -457,15 +518,20 @@ internal sealed class AutoTdpController
         {
             // Most of the seconds have to rise, not only the average: an idle menu's average wanders 15% by
             // noise alone now and then, and a pass handed it to raises that then climbed to the top.
-            if (fps >= last.FpsBefore * StepUpGain && LowQuarter() > _stepUpBeforeHigh)
+            var plannedStep = Math.Max(SmallestStepDown, last.From / StepDownShare);
+            var actualStep = Watts - last.From;
+            var requiredGain = actualStep > 0 && actualStep < plannedStep
+                ? 1.0 + Math.Max(0.02, (StepUpGain - 1.0) * actualStep / plannedStep)
+                : StepUpGain;
+            if (fps >= last.FpsBefore * requiredGain && LowQuarter() > _stepUpBeforeHigh)
             {
                 // The power helps again: back to the usual raises and steps down.
-                _heldNoGain = false;
-                _steppingDown = false;
+                ClearNoGain();
                 return null;
             }
 
-            // Still nothing for it: back down, and held there for another while.
+            // Still nothing for it: back down, and held there longer each time.
+            _noGainHold = _noGainHold * 2 > LongestNoGainHold ? LongestNoGainHold : _noGainHold * 2;
             Hold(now, last.From, last.FpsBefore);
             State = AutoTdpState.NoGain;
             return Change(now, last.From, SettleAfterLower);
@@ -473,7 +539,7 @@ internal sealed class AutoTdpController
 
         if (last.Kind == Step.Raise)
         {
-            if (fps >= last.FpsBefore * Gain)
+            if (fps >= last.FpsBefore * RequiredRaiseGain(last.From, Watts))
             {
                 _wasted = 0;
                 return null;
@@ -482,10 +548,17 @@ internal sealed class AutoTdpController
             if (_wasted++ == 0)
             {
                 _wastedFrom = last.From;
+                _wastedFromFps = last.FpsBefore;
             }
 
             if (_wasted < WastedRaises)
             {
+                return null;
+            }
+
+            if (Watts > _wastedFrom && _wastedFromFps > 0 && fps >= _wastedFromFps * RequiredRaiseGain(_wastedFrom, Watts))
+            {
+                _wasted = 0;
                 return null;
             }
 
@@ -509,28 +582,82 @@ internal sealed class AutoTdpController
     /// up to a minute and a half on the Ally on 2026-10-30. Quick up, slow down: the usual steps down find
     /// the limit the match needs from there.
     /// </summary>
-    private int? BackToTop(DateTime now)
+    private void ClearNoGain()
     {
         _noGainUntil = DateTime.MinValue;
+        _noGainHold = NoGainHold;
         _heldNoGain = false;
         _steppingDown = false;
         _movedSince = null;
         _atTopSince = null;
-        _judging = null;
         _wasted = 0;
         _stepDownWait = FirstStepDownWait;
+        _topFps = null;
+    }
+
+    private static double RequiredRaiseGain(int fromWatts, int toWatts)
+    {
+        if (fromWatts <= 0 || toWatts <= fromWatts)
+        {
+            return Gain;
+        }
+
+        var powerRatio = (double)(toWatts - fromWatts) / fromWatts;
+        return 1.0 + Math.Clamp(powerRatio * 0.35, 0.01, Gain - 1.0);
+    }
+
+    private void RecordSettled()
+    {
+        if (Watts is < AutoTdpProtocol.LowestWatts or > AutoTdpProtocol.HighestWatts)
+        {
+            return;
+        }
+
+        if (State is AutoTdpState.Holding or AutoTdpState.AtMaximum)
+        {
+            _gameplayWatts[Watts]++;
+            _gameplaySeconds++;
+        }
+        else if (State == AutoTdpState.NoGain)
+        {
+            _noGainWatts[Watts]++;
+            _noGainSeconds++;
+        }
+    }
+
+    private static int MedianWatts(int[] primary, int[]? secondary, int total)
+    {
+        var midpoint = (total + 1) / 2;
+        var seen = 0;
+        for (var w = AutoTdpProtocol.LowestWatts; w <= AutoTdpProtocol.HighestWatts; w++)
+        {
+            seen += primary[w] + (secondary is null ? 0 : secondary[w]);
+            if (seen >= midpoint)
+            {
+                return w;
+            }
+        }
+
+        return AutoTdpProtocol.LowestWatts;
+    }
+
+    private int? BackToTop(DateTime now)
+    {
+        ClearNoGain();
+        _cleanLowers = 0;
+        _judging = null;
         State = AutoTdpState.Raising;
         return Change(now, Ceiling(now), SettleAfterRaise);
     }
 
     /// <summary>
-    /// Keeps the limit at or under this for <see cref="NoGainHold"/>, or until the frame rate moves. When
+    /// Keeps the limit at or under this for <see cref="_noGainHold"/>, or until the frame rate moves. When
     /// the hold runs out, a step up decides whether the power helps again.
     /// </summary>
     private void Hold(DateTime now, int watts, double fps)
     {
         _noGainCap = watts;
-        _noGainUntil = now + NoGainHold;
+        _noGainUntil = now + _noGainHold;
         _noGainFps = fps;
         _heldNoGain = true;
     }
@@ -615,10 +742,22 @@ internal sealed class AutoTdpController
     /// Fortnite at 60 fps was stepped down on three seconds 56 times in two hours, at a median of 69 fps,
     /// and most were raised again within half a minute.
     /// </summary>
+    private bool FrametimesSteady(double target)
+    {
+        if (_lowReadings.Count == 0)
+        {
+            return true;
+        }
+
+        var sorted = _lowReadings.Order().ToArray();
+        return sorted[sorted.Length / 2] >= target * StutterFloor;
+    }
+
     private bool SustainedSpare(double target) =>
         _longReadings.Count >= StepDownWindow &&
         LongMiddle() >= target * Comfortable &&
-        LowQuarter() >= target * Comfortable;
+        LowQuarter() >= target * Comfortable &&
+        FrametimesSteady(target);
 
     /// <summary>
     /// Whether three quarters of the longer window's seconds are 20% above, or 20% below, the frame rate
@@ -630,7 +769,6 @@ internal sealed class AutoTdpController
     private enum Step
     {
         Raise,
-        Lower,
 
         /// <summary>A step down from the top, to see whether the power was buying anything.</summary>
         Down,
@@ -638,6 +776,45 @@ internal sealed class AutoTdpController
         /// <summary>A step back up once a limit stepped down to has been held, to see whether the power helps again.</summary>
         Up
     }
+
+    /// <summary>
+    /// Updates the upper power limit in place (e.g. when plugging in or unplugging the charger),
+    /// preserving learned wattage history, heat memory, and floor state. Returns the new wattage
+    /// when the current limit had to be clamped down, otherwise null.
+    /// </summary>
+    public int? SetMaxWatts(DateTime now, int maxWatts)
+    {
+        maxWatts = Math.Max(maxWatts, _settings.MinWatts);
+        if (maxWatts == _settings.MaxWatts)
+        {
+            return null;
+        }
+
+        _settings = _settings with { MaxWatts = maxWatts };
+        if (_floor > maxWatts)
+        {
+            _floor = maxWatts;
+        }
+
+        if (_heatCeiling is { } heat && heat >= maxWatts)
+        {
+            _heatCeiling = null;
+        }
+
+        if (Watts > maxWatts)
+        {
+            _judging = null;
+            return Change(now, maxWatts, SettleAfterLower);
+        }
+
+        return null;
+    }
+
+    private bool HeatCapped(DateTime now, int ceiling) =>
+        ceiling < _settings.MaxWatts
+        && (now >= _noGainUntil || ceiling < _noGainCap)
+        && ((_heatCeiling is { } heat && heat <= ceiling)
+            || (_rememberedHeat is { } remembered && now < _rememberedUntil && remembered <= ceiling));
 
     private int Ceiling(DateTime now)
     {
@@ -666,6 +843,7 @@ internal sealed class AutoTdpController
         _nextChange = now + settle;
         _readings.Clear();
         _longReadings.Clear();
+        _lowReadings.Clear();
         if (watts == Watts)
         {
             return null;

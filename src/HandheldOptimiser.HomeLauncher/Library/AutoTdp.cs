@@ -111,22 +111,34 @@ internal static partial class AutoTdp
         return status.Error;
     });
 
-    /// <summary>Whether the returned status represents a settled TDP worth saving for future launches.</summary>
-    internal static bool ShouldRememberWatts(AutoTdpStatus? status, TimeSpan? played)
+    /// <summary>The settled power limit worth saving for future launches, or null when not enough data.</summary>
+    internal static int? WattsToRemember(AutoTdpStatus? status, TimeSpan? played)
     {
-        if (status?.Watts is not { } watts || watts < AutoTdpProtocol.LowestWatts || watts > AutoTdpProtocol.HighestWatts)
-        {
-            return false;
-        }
-
         if (played is { } duration && duration < MinLearnDuration)
         {
-            return false;
+            return null;
         }
 
-        return Enum.TryParse<AutoTdpState>(status.State, out var state)
-            && state is AutoTdpState.Holding or AutoTdpState.AtMaximum or AutoTdpState.NoGain;
+        if (status?.LearnedWatts is { } learned
+            && learned is >= AutoTdpProtocol.LowestWatts and <= AutoTdpProtocol.HighestWatts)
+        {
+            return learned;
+        }
+
+        if (status?.Watts is { } watts
+            && watts is >= AutoTdpProtocol.LowestWatts and <= AutoTdpProtocol.HighestWatts
+            && Enum.TryParse<AutoTdpState>(status.State, out var state)
+            && state is AutoTdpState.Holding or AutoTdpState.AtMaximum or AutoTdpState.NoGain)
+        {
+            return watts;
+        }
+
+        return null;
     }
+
+    /// <summary>Whether the returned status represents a settled TDP worth saving for future launches.</summary>
+    internal static bool ShouldRememberWatts(AutoTdpStatus? status, TimeSpan? played) =>
+        WattsToRemember(status, played).HasValue;
 
     /// <summary>Stops, remembering where the game settled when the session actually settled.</summary>
     public static Task StopAsync(Game game, TimeSpan? played = null) => Queue(async () =>
@@ -138,20 +150,20 @@ internal static partial class AutoTdp
         }
 
         var status = await SendAsync(new AutoTdpRequest(AutoTdpProtocol.Stop));
-        if (ShouldRememberWatts(status, played))
+        if (WattsToRemember(status, played) is { } watts)
         {
-            Remember(game, status!.Watts!.Value);
+            Remember(game, watts);
         }
 
         return null;
     });
 
     /// <summary>Stops an active TDP Engine session without saving learned watts (for an explicit Off profile).</summary>
-    public static Task StopIfRunningAsync() => Queue(async () =>
+    public static Task StopIfRunningAsync(string? suppressFolder = null) => Queue(async () =>
     {
         if (ServiceRunning())
         {
-            _ = await SendAsync(new AutoTdpRequest(AutoTdpProtocol.Stop));
+            _ = await SendAsync(new AutoTdpRequest(AutoTdpProtocol.Stop, GameFolder: suppressFolder));
         }
 
         return null;

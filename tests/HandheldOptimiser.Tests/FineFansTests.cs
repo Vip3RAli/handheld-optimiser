@@ -59,6 +59,15 @@ public class FineFansTests
         Assert.Equal(5, new FineFans().Pick(Start, 50, 21, Top, Limit, boost: false));
 
     [Fact]
+    public void High_power_floor_uses_absolute_watts_regardless_of_power_cap()
+    {
+        // 18 W on battery (top 25 W) stays quiet at step 0; 20 W on battery or AC wants step 5.
+        Assert.Equal(0, new FineFans().Pick(Start, 50, 18, 25, Limit, boost: false));
+        Assert.Equal(5, new FineFans().Pick(Start, 50, 20, 25, Limit, boost: false));
+        Assert.Equal(5, new FineFans().Pick(Start, 50, 20, 30, Limit, boost: false));
+    }
+
+    [Fact]
     public void A_power_jump_adds_2_steps()
     {
         var fans = new FineFans();
