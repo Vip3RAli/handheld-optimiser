@@ -113,6 +113,25 @@ public class ReliabilityTests
         Assert.Equal(RadeonState.Numbers.Order(), numbers.Order());
     }
 
+    [Fact]
+    public void Fan_curve_lives_inside_Performance_section_and_only_shows_in_manual_mode()
+    {
+        var xaml = File.ReadAllText(Path.Combine(RepoRoot(), "src", "HandheldOptimiser.GameBar", "TdpWidget.xaml"));
+        var code = File.ReadAllText(Path.Combine(RepoRoot(), "src", "HandheldOptimiser.GameBar", "TdpWidget.xaml.cs"));
+
+        Assert.DoesNotContain("CoolingCard", xaml);
+        Assert.DoesNotContain("CoolingCard", code);
+
+        var performanceStart = xaml.IndexOf("x:Name=\"PerformanceBody\"", StringComparison.Ordinal);
+        var controllerStart = xaml.IndexOf("x:Name=\"ControllerRow\"", StringComparison.Ordinal);
+        Assert.True(performanceStart >= 0 && controllerStart > performanceStart);
+
+        var performanceSection = xaml[performanceStart..controllerStart];
+        Assert.Matches(@"<Grid\b[^>]*x:Name=""FanRow""[^>]*Visibility=""Collapsed""", performanceSection);
+        Assert.Contains("x:Name=\"FanSlider\"", performanceSection);
+        Assert.Contains("FanRow.Visibility = manual;", code);
+    }
+
     /// <summary>The Tag of every button whose Click goes to the named handler, in the order they appear.</summary>
     private static List<string> Tags(string xaml, string handler) =>
         Regex.Matches(xaml, $"<ToggleButton\\b[^>]*?Click=\"{handler}\"[^>]*>")

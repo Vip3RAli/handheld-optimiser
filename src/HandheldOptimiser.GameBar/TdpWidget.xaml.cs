@@ -769,7 +769,7 @@ namespace HandheldOptimiser.GameBar
             ModeNote.Text = Auto ? "Scales power and fans automatically" : "You set power and fans";
             PowerLabel.Visibility = manual;
             PowerRow.Visibility = manual;
-            CoolingCard.Visibility = manual;
+            FanRow.Visibility = manual;
             FrameRateLowest.Text = Auto ? "None" : "Off";
 
             ShowFrameRate(status);
