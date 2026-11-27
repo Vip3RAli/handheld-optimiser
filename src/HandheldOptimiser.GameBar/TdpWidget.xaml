@@ -569,6 +569,18 @@
                         </StackPanel>
                     </Grid>
 
+                    <!-- Manual only, as TDP Engine runs the fans in Auto. Stops from left to right: Auto (TDP Engine's own), Quiet, Default (the Ally's own), Cool and Max. -->
+                    <Grid x:Name="FanRow" Style="{StaticResource Row}" Margin="0,4,0,0" Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Style="{StaticResource Label}" Text="Fan Curve" />
+                        <Slider x:Name="FanSlider" Grid.Column="1" Grid.ColumnSpan="2" Style="{StaticResource Slim}" Margin="18,0,0,0" Padding="0,0,66,0" />
+                        <TextBlock x:Name="FanValue" Grid.Column="2" Style="{StaticResource Amount}" MinWidth="58" TextAlignment="Right" />
+                    </Grid>
+
                     <!-- On or off for the power source in use. Not known while TDP Engine is not running: the switch
                          then shows off with a line saying so, and turning it on starts TDP Engine. The player's in Auto and Manual
                          alike, which the player asked for on 2026-10-28. -->
@@ -802,25 +814,6 @@
                             <ToggleSwitch x:Name="FreeSyncSwitch" Style="{StaticResource RowSwitch}" Tag="freesync" Toggled="OnRadeon" />
                         </Grid>
                     </StackPanel>
-                </StackPanel>
-            </Border>
-
-            <!-- ===== Cooling: Manual only, as TDP Engine runs the fans in Auto ===== -->
-            <Border x:Name="CoolingCard" Style="{StaticResource Card}">
-                <StackPanel>
-                    <TextBlock Style="{StaticResource CardTitle}" Text="COOLING" />
-
-                    <!-- Stops from left to right: Auto (TDP Engine's own), Quiet, Default (the Ally's own), Cool and Max. -->
-                    <Grid Style="{StaticResource Row}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Style="{StaticResource Label}" Text="Fan Curve" />
-                        <Slider x:Name="FanSlider" Grid.Column="1" Grid.ColumnSpan="2" Style="{StaticResource Slim}" Margin="18,0,0,0" Padding="0,0,66,0" />
-                        <TextBlock x:Name="FanValue" Grid.Column="2" Style="{StaticResource Amount}" MinWidth="58" TextAlignment="Right" />
-                    </Grid>
                 </StackPanel>
             </Border>
 
