@@ -21,6 +21,7 @@ internal sealed class TileArtwork(LibraryState state, LibraryNavigation navigati
     // How many games either side of the focus keep their pictures, on the Not installed tab: a few screens' worth.
     private const int LoadedBefore = 24;
     private const int LoadedAfter = 48;
+    private const int DecodeChunkSize = 8;
 
     // Old School cards this far beyond the ones on screen keep their artwork, so a step back does not load it again.
     private const int CardArtKept = 3;
@@ -340,27 +341,49 @@ internal sealed class TileArtwork(LibraryState state, LibraryNavigation navigati
             }
         }
 
-        var wanted = tiles.GetRange(from, to - from)
-            .Where(t => !t.IsInstalled && !t.IsLoaded && _picturesLoading.Add(t.Game.Key))
-            .ToList();
+        var wanted = new List<(GameTile Tile, int Distance)>();
+        for (var i = from; i < to; i++)
+        {
+            var candidate = tiles[i];
+            if (!candidate.IsInstalled && !candidate.IsLoaded && _picturesLoading.Add(candidate.Game.Key))
+            {
+                wanted.Add((candidate, Math.Abs(i - index)));
+            }
+        }
 
         if (wanted.Count > 0)
         {
-            _ = LoadPicturesAsync(wanted);
+            wanted.Sort(static (a, b) => a.Distance.CompareTo(b.Distance));
+            _ = LoadPicturesAsync(wanted.Select(w => w.Tile).ToList());
         }
     }
 
     private async Task LoadPicturesAsync(List<GameTile> tiles)
     {
+        var needCovers = new List<GameTile>();
         try
         {
-            var pictures = await Task.Run(() => tiles.Select(t => (Tile: t, Pictures: GameTile.Pictures(t.Game))).ToList());
-            foreach (var (tile, picture) in pictures)
+            // Stream decodes in small visible-first chunks so covers appear progressively without stalling.
+            for (var offset = 0; offset < tiles.Count; offset += DecodeChunkSize)
             {
-                // The tab may have closed, or the focus moved far away, while they were decoded.
-                if (StillNearFocus(tile))
+                if (!state.Filter.NotInstalled || !navigation.InFront)
                 {
-                    tile.Load(picture);
+                    break;
+                }
+
+                var chunk = tiles.GetRange(offset, Math.Min(DecodeChunkSize, tiles.Count - offset));
+                var pictures = await Task.Run(() => chunk.Select(t => (Tile: t, Pictures: GameTile.Pictures(t.Game))).ToList());
+                foreach (var (tile, picture) in pictures)
+                {
+                    // The tab may have closed, or the focus moved far away, while they were decoded.
+                    if (StillNearFocus(tile))
+                    {
+                        tile.Load(picture);
+                        if (tile.NeedsCover)
+                        {
+                            needCovers.Add(tile);
+                        }
+                    }
                 }
             }
         }
@@ -373,7 +396,10 @@ internal sealed class TileArtwork(LibraryState state, LibraryNavigation navigati
         }
 
         // The store's own cover, or SteamGridDB's, for those with none on disk yet.
-        _ = FetchCoversAsync(tiles.Where(t => t.IsLoaded && t.NeedsCover).ToList());
+        if (needCovers.Count > 0)
+        {
+            _ = FetchCoversAsync(needCovers);
+        }
     }
 
     private bool StillNearFocus(GameTile tile)
@@ -447,7 +473,6 @@ internal sealed class TileArtwork(LibraryState state, LibraryNavigation navigati
             }
 
             var (width, height) = cardPixels();
-            var decoded = false;
 
             // The front card first, then outwards from it.
             foreach (var tile in tiles.Skip(first).Take(last - first + 1).OrderBy(t => Math.Abs(tiles.IndexOf(t) - front)))
@@ -476,7 +501,6 @@ internal sealed class TileArtwork(LibraryState state, LibraryNavigation navigati
                 else
                 {
                     tile.ShowWide(art);
-                    decoded = true;
                 }
 
                 // The focus has moved on, and the load that followed it takes over from here.
@@ -484,12 +508,6 @@ internal sealed class TileArtwork(LibraryState state, LibraryNavigation navigati
                 {
                     break;
                 }
-            }
-
-            if (decoded)
-            {
-                // As for the background: decoding artwork leaves buffers behind that only a collection frees.
-                GC.Collect();
             }
         }
         catch (Exception ex) when (!LibraryApp.IsFatal(ex))

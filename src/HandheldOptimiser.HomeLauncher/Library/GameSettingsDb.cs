@@ -77,6 +77,61 @@ internal sealed record GameSettingsList(string Updated, IReadOnlyList<GameRecomm
 {
     public static readonly GameSettingsList Empty = new("", []);
 
+    private readonly Lazy<(Dictionary<string, GameRecommendation> ByKey, Dictionary<string, GameRecommendation> ByTitle)> _index =
+        new(() => BuildIndex(Games));
+
+    private static (Dictionary<string, GameRecommendation> ByKey, Dictionary<string, GameRecommendation> ByTitle) BuildIndex(
+        IReadOnlyList<GameRecommendation> games)
+    {
+        var byKey = new Dictionary<string, GameRecommendation>(StringComparer.OrdinalIgnoreCase);
+        var byTitle = new Dictionary<string, GameRecommendation>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var rec in games)
+        {
+            if (rec is null)
+            {
+                continue;
+            }
+
+            if (rec.Keys is not null)
+            {
+                foreach (var key in rec.Keys)
+                {
+                    if (!string.IsNullOrWhiteSpace(key))
+                    {
+                        byKey.TryAdd(key, rec);
+                    }
+                }
+            }
+
+            if (rec.Titles is not null)
+            {
+                foreach (var alt in rec.Titles)
+                {
+                    if (!string.IsNullOrWhiteSpace(alt))
+                    {
+                        var norm = GameSettingsDb.Normalise(alt);
+                        if (norm.Length > 0)
+                        {
+                            byTitle.TryAdd(norm, rec);
+                        }
+                    }
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(rec.Title))
+            {
+                var norm = GameSettingsDb.Normalise(rec.Title);
+                if (norm.Length > 0)
+                {
+                    byTitle.TryAdd(norm, rec);
+                }
+            }
+        }
+
+        return (byKey, byTitle);
+    }
+
     /// <summary>The recommendation for a game, by its key first and then by its name.</summary>
     public GameRecommendation? For(Game game)
     {
@@ -85,15 +140,14 @@ internal sealed record GameSettingsList(string Updated, IReadOnlyList<GameRecomm
             return null;
         }
 
-        var byKey = Games.FirstOrDefault(g => g.Keys.Contains(game.Key, StringComparer.OrdinalIgnoreCase));
-        if (byKey is not null)
+        var (byKey, byTitle) = _index.Value;
+        if (byKey.TryGetValue(game.Key, out var byKeyMatch))
         {
-            return byKey;
+            return byKeyMatch;
         }
 
         var title = GameSettingsDb.Normalise(game.Title);
-        return title.Length == 0 ? null
-            : Games.FirstOrDefault(g => g.Titles.Append(g.Title).Where(t => !string.IsNullOrWhiteSpace(t)).Any(t => GameSettingsDb.Normalise(t) == title));
+        return title.Length == 0 ? null : byTitle.GetValueOrDefault(title);
     }
 }
 

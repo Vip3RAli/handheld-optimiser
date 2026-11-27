@@ -128,7 +128,7 @@ internal sealed unsafe partial class PanelGuard : IDisposable
             return;
         }
 
-        foreach (var kind in (uint[])[EventSystemForeground, EventObjectShow, EventObjectLocationChange])
+        foreach (var kind in (uint[])[EventSystemForeground, EventObjectShow])
         {
             var hook = SetWinEventHook(kind, kind, 0, &OnEvent, 0, 0, WinEventOutOfContext | WinEventSkipOwnProcess);
             if (hook != 0)
@@ -137,7 +137,7 @@ internal sealed unsafe partial class PanelGuard : IDisposable
             }
         }
 
-        if (_hooks.Count < 3)
+        if (_hooks.Count < 2)
         {
             Program.Log("Stats screen: Windows would not report window changes, so windows are moved off the Ally's screen once a second only");
         }
@@ -199,6 +199,14 @@ internal sealed unsafe partial class PanelGuard : IDisposable
         {
             handle.Free();
         }
+
+        var alive = new HashSet<nint>(windows);
+        foreach (var dead in _moves.Keys.Where(h => !alive.Contains(h)).ToList())
+        {
+            _moves.Remove(dead);
+        }
+
+        _refused.RemoveWhere(h => !alive.Contains(h));
 
         foreach (var window in windows)
         {

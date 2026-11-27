@@ -188,11 +188,11 @@ internal sealed class GameSessionController
         StartGame(tile);
     }
 
-    private async Task StartWithSaveGuardAsync(GameTile tile, string? storeArguments)
+    private async Task StartWithSaveGuardAsync(GameTile tile, string? storeArguments, bool epicChecked)
     {
         try
         {
-            await Task.Run(() => SaveGuard.CreateSnapshot(tile.Game));
+            await Task.Run(() => SaveGuard.CreateSnapshot(tile.Game, skipIfUnchanged: true));
         }
         catch (Exception ex) when (!LibraryApp.IsFatal(ex))
         {
@@ -200,7 +200,7 @@ internal sealed class GameSessionController
         }
 
         _saveBackedUpFor = tile.Game.Key;
-        if (storeArguments is not null)
+        if (epicChecked || storeArguments is not null)
         {
             _epicLaunch = (tile.Game.Key, storeArguments);
         }
@@ -224,6 +224,7 @@ internal sealed class GameSessionController
         // An Epic game the library installed is started as the Epic launcher would start it, with a code
         // for the account that Epic has to be asked for first. The game starts once that is back.
         string? storeArguments = null;
+        var epicChecked = false;
         if (tile.IsInstalled && EpicLaunch.Needs(tile.Game))
         {
             if (_epicLaunch is not { } ready || ready.Key != tile.Game.Key)
@@ -234,6 +235,7 @@ internal sealed class GameSessionController
             }
 
             storeArguments = ready.Arguments;
+            epicChecked = true;
             _epicLaunch = null;
         }
 
@@ -281,7 +283,7 @@ internal sealed class GameSessionController
             if (_saveBackedUpFor != tile.Game.Key)
             {
                 _notices.Show($"Launching {tile.Title}...", tile, NoticePresenter.LaunchShownFor);
-                _ = StartWithSaveGuardAsync(tile, storeArguments);
+                _ = StartWithSaveGuardAsync(tile, storeArguments, epicChecked);
                 return;
             }
 
@@ -348,7 +350,7 @@ internal sealed class GameSessionController
 
         if (LibrarySettings.SaveGuard && !backedUp)
         {
-            _ = Task.Run(() => SaveGuard.CreateSnapshot(game));
+            _ = Task.Run(() => SaveGuard.CreateSnapshot(game, skipIfUnchanged: true));
         }
 
         var fullScreen = Native.IsFullScreenExperience();
@@ -445,8 +447,8 @@ internal sealed class GameSessionController
         // A program closed twice, for this game and the one before, is started again once.
         _closedApps.AddRange(closed.Where(c => !_closedApps.Any(a => a.Name == c.Name)));
 
-        // A game that ended while they were closing has already had its programs started again.
-        if (!ReferenceEquals(_session, session))
+        // Only reopen apps if no game is currently active (don't reopen on top of a newly launched game).
+        if (_session is null)
         {
             ReopenClosedApps();
         }
@@ -1181,12 +1183,14 @@ internal sealed class GameSessionController
     /// </summary>
     private void OnDisplayOff()
     {
+        _session?.SetDisplayOff(true);
         _screenOff();
     }
 
     /// <summary>Starts again what <see cref="OnDisplayOff"/> stopped, if the library is still in front.</summary>
     private void OnDisplayOn()
     {
+        _session?.SetDisplayOff(false);
         if (!_window.IsActive)
         {
             return;

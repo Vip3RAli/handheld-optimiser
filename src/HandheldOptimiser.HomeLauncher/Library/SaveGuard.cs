@@ -1,5 +1,7 @@
 using System.IO;
 using System.IO.Compression;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Win32;
 
 namespace HandheldOptimiser.HomeLauncher.Library;
@@ -44,27 +46,22 @@ internal static class SaveGuard
             return custom;
         }
 
-        if (game.Key.StartsWith("steam:", StringComparison.OrdinalIgnoreCase) && !SteamShortcuts.IsShortcut(game)
-            && SteamLibrary.SteamDirectory() is { } steamPath)
+        if (game.Key.StartsWith("steam:", StringComparison.OrdinalIgnoreCase) && !SteamShortcuts.IsShortcut(game))
         {
             var appId = game.Key["steam:".Length..];
-            var userdata = Path.Combine(steamPath, "userdata");
-            try
+            foreach (var userDir in SteamLibrary.UserDataDirectories())
             {
-                if (Directory.Exists(userdata))
+                try
                 {
-                    foreach (var userDir in Directory.GetDirectories(userdata))
+                    var remote = Path.Combine(userDir, appId, "remote");
+                    if (Directory.Exists(remote) && Directory.EnumerateFileSystemEntries(remote).Any())
                     {
-                        var remote = Path.Combine(userDir, appId, "remote");
-                        if (Directory.Exists(remote) && Directory.EnumerateFileSystemEntries(remote).Any())
-                        {
-                            return remote;
-                        }
+                        return remote;
                     }
                 }
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                }
             }
         }
 
@@ -170,11 +167,30 @@ internal static class SaveGuard
         }
     }
 
+    /// <summary>Computes a stable fingerprint from save file paths, lengths, and UTC write timestamps.</summary>
+    internal static string ComputeFingerprint(string folder, string[] files)
+    {
+        var entries = files
+            .Select(f =>
+            {
+                var info = new FileInfo(f);
+                var rel = Path.GetRelativePath(folder, f).Replace('\\', '/');
+                return $"{rel}|{info.Length}|{info.LastWriteTimeUtc.Ticks}";
+            })
+            .OrderBy(static e => e, StringComparer.OrdinalIgnoreCase);
+
+        var joined = string.Join('\n', entries);
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(joined));
+        return Convert.ToHexString(hash);
+    }
+
     /// <summary>
     /// Creates a new zip snapshot of the game's save folder and rotates older snapshots so at most
-    /// <see cref="MaxSnapshots"/> are kept.
+    /// <see cref="MaxSnapshots"/> are kept. When <paramref name="skipIfUnchanged"/> is true and the
+    /// folder matches the previous snapshot's fingerprint, returns the latest snapshot without re-zipping.
     /// </summary>
-    public static SaveSnapshot? CreateSnapshot(Game game, string? sourceFolder = null, string? backupsRoot = null)
+    public static SaveSnapshot? CreateSnapshot(Game game, string? sourceFolder = null, string? backupsRoot = null,
+        bool skipIfUnchanged = false)
     {
         var folder = sourceFolder ?? FindSaveFolder(game);
         if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
@@ -196,7 +212,21 @@ internal static class SaveGuard
                 return null;
             }
 
-            var targetDir = GameBackupDir(game.Key, backupsRoot ?? DefaultBackupsRoot);
+            var root = backupsRoot ?? DefaultBackupsRoot;
+            var targetDir = GameBackupDir(game.Key, root);
+            var fingerprintFile = Path.Combine(targetDir, "last-fingerprint.txt");
+            var fingerprint = ComputeFingerprint(folder, files);
+
+            if (skipIfUnchanged && File.Exists(fingerprintFile)
+                && string.Equals(File.ReadAllText(fingerprintFile).Trim(), fingerprint, StringComparison.Ordinal))
+            {
+                var existing = SnapshotsFor(game, root);
+                if (existing.Count > 0)
+                {
+                    return existing[0];
+                }
+            }
+
             Directory.CreateDirectory(targetDir);
             File.WriteAllText(Path.Combine(targetDir, "source.txt"), folder);
 
@@ -208,6 +238,7 @@ internal static class SaveGuard
             }
 
             ZipFile.CreateFromDirectory(folder, zipPath, CompressionLevel.Fastest, includeBaseDirectory: false);
+            File.WriteAllText(fingerprintFile, fingerprint);
             RotateSnapshots(targetDir);
 
             var info = new FileInfo(zipPath);

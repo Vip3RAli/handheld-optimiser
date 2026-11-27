@@ -50,8 +50,88 @@ internal static partial class SteamLibrary
         }
     }
 
+    private const ulong SteamIdBase = 76561197960265728UL;
+
     /// <summary>The folder Steam is installed in, or null when Steam is not installed.</summary>
     public static string? SteamDirectory() => ReadSteamExe() is { } exe ? Path.GetDirectoryName(exe) : null;
+
+    /// <summary>The 32-bit account id of the active, auto-login, or most recently used Steam account.</summary>
+    internal static uint? ActiveAccountId32(string? steamDir = null)
+    {
+        if (OwnedGames.SteamAccount() is { } steamId64 && steamId64 > SteamIdBase)
+        {
+            return (uint)(steamId64 - SteamIdBase);
+        }
+
+        var dir = steamDir ?? SteamDirectory();
+        if (dir is null)
+        {
+            return null;
+        }
+
+        var userData = Path.Combine(dir, "userdata");
+        if (!Directory.Exists(userData))
+        {
+            return null;
+        }
+
+        try
+        {
+            return new DirectoryInfo(userData).GetDirectories()
+                .Where(d => uint.TryParse(d.Name, out var id) && id > 0)
+                .OrderByDescending(d => d.LastWriteTimeUtc)
+                .Select(d => uint.TryParse(d.Name, out var parsed) ? (uint?)parsed : null)
+                .FirstOrDefault(id => id is > 0);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Existing Steam userdata account folders, ordered with the active account first.</summary>
+    internal static IReadOnlyList<string> UserDataDirectories(string? steamDir = null)
+    {
+        var dir = steamDir ?? SteamDirectory();
+        if (dir is null)
+        {
+            return [];
+        }
+
+        var userData = Path.Combine(dir, "userdata");
+        if (!Directory.Exists(userData))
+        {
+            return [];
+        }
+
+        var ordered = new List<string>();
+        try
+        {
+            if (ActiveAccountId32(dir) is { } activeId)
+            {
+                var activePath = Path.Combine(userData, activeId.ToString());
+                if (Directory.Exists(activePath))
+                {
+                    ordered.Add(activePath);
+                }
+            }
+
+            foreach (var accountDir in new DirectoryInfo(userData).GetDirectories()
+                .Where(d => uint.TryParse(d.Name, out var id) && id > 0)
+                .OrderByDescending(d => d.LastWriteTimeUtc))
+            {
+                if (!ordered.Contains(accountDir.FullName, StringComparer.OrdinalIgnoreCase))
+                {
+                    ordered.Add(accountDir.FullName);
+                }
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+
+        return ordered;
+    }
 
     /// <summary>Steam's own exe, or null when Steam is not installed.</summary>
     public static string? ReadSteamExe()

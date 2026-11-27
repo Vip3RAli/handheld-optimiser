@@ -30,7 +30,7 @@ internal static class GameCatalog
         // keeps the store it was bought from.
         var claimed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var (store, scan) in new (string, Func<IEnumerable<Game>>)[]
+        var scanners = new (string Store, Func<IEnumerable<Game>> Scan)[]
         {
             ("Steam", SteamLibrary.Scan),
             ("Xbox", XboxLibrary.Scan),
@@ -43,29 +43,45 @@ internal static class GameCatalog
             ("Amazon Games", AmazonLibrary.Scan),
             ("Heroic", HeroicLibrary.Scan),
             ("Steam Shortcuts", SteamShortcuts.Scan)
-        })
+        };
+
+        // Run independent store scanners concurrently, then merge in strict priority order so
+        // store ownership / claimed-folder deduplication stays deterministic.
+        var results = new List<Game>?[scanners.Length];
+        Parallel.For(0, scanners.Length, i =>
         {
-            var folders = new List<string>();
+            var (store, scan) = scanners[i];
             try
             {
-                foreach (var game in scan())
-                {
-                    var folder = NormaliseFolder(game.InstallDirectory);
-                    if (folder is not null && claimed.Contains(folder))
-                    {
-                        continue;
-                    }
-
-                    if (games.TryAdd(game.Key, game) && folder is not null)
-                    {
-                        folders.Add(folder);
-                    }
-                }
+                results[i] = scan().ToList();
             }
             catch (Exception ex)
             {
                 // One store's odd install must not empty the whole library.
                 Program.Log($"Scanning {store} failed: {ex.GetType().Name}: {ex.Message}");
+            }
+        });
+
+        for (var i = 0; i < results.Length; i++)
+        {
+            if (results[i] is not { } storeGames)
+            {
+                continue;
+            }
+
+            var folders = new List<string>();
+            foreach (var game in storeGames)
+            {
+                var folder = NormaliseFolder(game.InstallDirectory);
+                if (folder is not null && claimed.Contains(folder))
+                {
+                    continue;
+                }
+
+                if (games.TryAdd(game.Key, game) && folder is not null)
+                {
+                    folders.Add(folder);
+                }
             }
 
             claimed.UnionWith(folders);

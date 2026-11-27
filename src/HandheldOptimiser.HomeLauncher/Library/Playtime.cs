@@ -182,35 +182,8 @@ internal static class Playtime
     /// The localconfig.vdf of the Steam account in use: the one signed in now, or else the one changed
     /// most recently, which is the last account that was.
     /// </summary>
-    private static string? SteamConfigPath()
-    {
-        if (SteamLibrary.SteamDirectory() is not { } steamDir)
-        {
-            return null;
-        }
-
-        var userData = Path.Combine(steamDir, "userdata");
-        using (var active = Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam\ActiveProcess"))
-        {
-            if (active?.GetValue("ActiveUser") is int user && user != 0)
-            {
-                var path = Path.Combine(userData, ((uint)user).ToString(), "config", "localconfig.vdf");
-                if (File.Exists(path))
-                {
-                    return path;
-                }
-            }
-        }
-
-        if (!Directory.Exists(userData))
-        {
-            return null;
-        }
-
-        return Directory.EnumerateDirectories(userData)
+    private static string? SteamConfigPath() =>
+        SteamLibrary.UserDataDirectories()
             .Select(dir => Path.Combine(dir, "config", "localconfig.vdf"))
-            .Where(File.Exists)
-            .OrderByDescending(File.GetLastWriteTimeUtc)
-            .FirstOrDefault();
-    }
+            .FirstOrDefault(File.Exists);
 }

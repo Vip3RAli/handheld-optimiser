@@ -50,6 +50,7 @@ public partial class LibraryWindow : Window, ILibraryHost
 
     // The game being played, from the press that starts it to the moment it closes.
     private readonly GameSessionController _play;
+    private CancellationTokenSource? _trimCts;
 
     // Steam installs under way, shown on their tiles in Ready to install.
     private readonly SteamInstallWatcher _steamInstalls;
@@ -184,6 +185,7 @@ public partial class LibraryWindow : Window, ILibraryHost
         Closed += (_, _) => _play.StopWatchingForeground();
         Closed += (_, _) => _steamInstalls.Stop();
         Closed += (_, _) => _installs.Stop();
+        Closed += (_, _) => CancelWorkingSetTrim();
 
         // Scan on load, not only on activation: Windows can start the home app without giving it focus.
         Loaded += (_, _) => _ = ScanAsync();
@@ -215,6 +217,7 @@ public partial class LibraryWindow : Window, ILibraryHost
 
     private void OnActivated(object? sender, EventArgs e)
     {
+        CancelWorkingSetTrim();
         _navigation.Return();
 
         if (_tilesUnbound && Tiles.ItemsSource is null)
@@ -326,8 +329,37 @@ public partial class LibraryWindow : Window, ILibraryHost
         }
         _oldSchool.UpdateRenderMode();
 
-        // Once the rendering of the focus change has gone out, nothing here is needed until we are back.
-        Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, Native.TrimWorkingSet);
+        // Trim off the UI thread after a short settle so deactivation never stalls focus switching.
+        ScheduleWorkingSetTrim();
+    }
+
+    private void CancelWorkingSetTrim()
+    {
+        _trimCts?.Cancel();
+        _trimCts?.Dispose();
+        _trimCts = null;
+    }
+
+    private void ScheduleWorkingSetTrim()
+    {
+        CancelWorkingSetTrim();
+        var cts = new CancellationTokenSource();
+        _trimCts = cts;
+        var token = cts.Token;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(350, token);
+                if (!token.IsCancellationRequested)
+                {
+                    Native.TrimWorkingSet();
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }, CancellationToken.None);
     }
 
     /// <param name="refreshEmulators">Look for emulators again too, which takes a moment.</param>

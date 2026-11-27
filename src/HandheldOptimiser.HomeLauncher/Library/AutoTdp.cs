@@ -257,8 +257,19 @@ internal static partial class AutoTdp
 
             // Any program of the player's could open a pipe of the same name if the service is not holding
             // it, so the answer only counts from the service's own process.
-            if (!GetNamedPipeServerProcessId(pipe.SafePipeHandle, out var serverId) ||
-                ServiceStatus() is not { ProcessId: > 0 } service || service.ProcessId != serverId)
+            if (!GetNamedPipeServerProcessId(pipe.SafePipeHandle, out var serverId))
+            {
+                Program.Log($"TDP Engine {request.Command} refused: the pipe does not belong to the TDP Engine service");
+                return null;
+            }
+
+            var service = ServiceStatus();
+            if (service is not { ProcessId: > 0 } cached || cached.ProcessId != serverId)
+            {
+                service = ServiceStatus(bypassCache: true);
+            }
+
+            if (service is not { ProcessId: > 0 } current || current.ProcessId != serverId)
             {
                 Program.Log($"TDP Engine {request.Command} refused: the pipe does not belong to the TDP Engine service");
                 return null;
@@ -323,9 +334,22 @@ internal static partial class AutoTdp
     private const int ErrorDoesNotExist = 1060;
     private const int ErrorAccessDenied = 5;
 
+    private static readonly object ServiceCacheGate = new();
+    private const long ServiceStatusCacheMs = 5000;
+    private static ((int State, int ProcessId)? Status, long CheckedAtMs) _serviceStatusCache;
+
+    private static void InvalidateServiceStatusCache()
+    {
+        lock (ServiceCacheGate)
+        {
+            _serviceStatusCache = default;
+        }
+    }
+
     /// <returns>Why it could not be started, or null when it is running or starting.</returns>
     private static async Task<string?> StartServiceAsync()
     {
+        InvalidateServiceStatusCache();
         var problem = TryStartService(out var stopping);
 
         // Still on its way out from the last game: Windows will not start it again until it has stopped.
@@ -335,6 +359,7 @@ internal static partial class AutoTdp
             problem = TryStartService(out _);
         }
 
+        InvalidateServiceStatusCache();
         return problem;
     }
 
@@ -401,8 +426,9 @@ internal static partial class AutoTdp
         var until = DateTime.UtcNow + StopWait;
         while (DateTime.UtcNow < until)
         {
-            if (ServiceStatus() is not { State: not ServiceStoppedState })
+            if (ServiceStatus(bypassCache: true) is not { State: not ServiceStoppedState })
             {
+                InvalidateServiceStatusCache();
                 return;
             }
 
@@ -415,7 +441,31 @@ internal static partial class AutoTdp
     private static bool ServiceRunning() => ServiceStatus() is { State: ServiceRunningState };
 
     /// <summary>The service's state and process id, or null when they cannot be read.</summary>
-    private static (int State, int ProcessId)? ServiceStatus()
+    private static (int State, int ProcessId)? ServiceStatus(bool bypassCache = false)
+    {
+        var now = Environment.TickCount64;
+        if (!bypassCache)
+        {
+            lock (ServiceCacheGate)
+            {
+                if (_serviceStatusCache.CheckedAtMs > 0
+                    && now - _serviceStatusCache.CheckedAtMs < ServiceStatusCacheMs)
+                {
+                    return _serviceStatusCache.Status;
+                }
+            }
+        }
+
+        var queried = QueryServiceStatusDirect();
+        lock (ServiceCacheGate)
+        {
+            _serviceStatusCache = (queried, Environment.TickCount64);
+        }
+
+        return queried;
+    }
+
+    private static (int State, int ProcessId)? QueryServiceStatusDirect()
     {
         var manager = OpenSCManager(null, null, ScManagerConnect);
         if (manager == 0)

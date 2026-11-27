@@ -36,6 +36,7 @@ internal sealed class GameSession
     private readonly object _gate = new();
     private List<PausedProcess> _paused = [];
     private bool _asleepNow;
+    private bool _displayOffNow;
     private DateTime? _idleSince;
     private TimeSpan _idle;
 
@@ -363,10 +364,20 @@ internal sealed class GameSession
         }
     }
 
+    /// <summary>Marks Modern Standby screen-off/on intervals as idle so sleep time is excluded from play time.</summary>
+    public void SetDisplayOff(bool off)
+    {
+        lock (_gate)
+        {
+            _displayOffNow = off;
+            UpdateIdle();
+        }
+    }
+
     /// <summary>Starts or ends a stretch of time not played: while the device sleeps or the game is paused. Hold _gate.</summary>
     private void UpdateIdle()
     {
-        var idle = _asleepNow || _paused.Count > 0;
+        var idle = _asleepNow || _displayOffNow || _paused.Count > 0;
         if (idle && _idleSince is null)
         {
             _idleSince = DateTime.UtcNow;
